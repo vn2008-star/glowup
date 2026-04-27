@@ -97,9 +97,9 @@ export default function ClientsPage() {
       email: selectedClient.email || "",
       birthday: selectedClient.birthday || "",
       notes: selectedClient.notes || "",
-      photo_url: (selectedClient as Record<string, unknown>).photo_url as string || "",
+      photo_url: selectedClient.photo_url || "",
     });
-    setEditPhotoPreview((selectedClient as Record<string, unknown>).photo_url as string || null);
+    setEditPhotoPreview(selectedClient.photo_url || null);
     setShowEditModal(true);
   }
 
@@ -247,8 +247,8 @@ export default function ClientsPage() {
           {filtered.map((c) => (
             <div key={c.id} className={`card ${styles.clientCard}`} onClick={() => setSelectedClient(c)}>
               <div className={styles.clientHeader}>
-                {(c as Record<string, unknown>).photo_url ? (
-                  <img src={(c as Record<string, unknown>).photo_url as string} alt="" className={styles.clientAvatarImg} />
+                {c.photo_url ? (
+                  <img src={c.photo_url} alt="" className={styles.clientAvatarImg} />
                 ) : (
                   <div className={styles.clientAvatar}>{c.first_name[0]}{c.last_name?.[0] || ""}</div>
                 )}
@@ -430,8 +430,8 @@ export default function ClientsPage() {
             {/* Profile Header */}
             <div className={styles.profileHeader}>
               <div className={styles.profileAvatar}>
-                {(selectedClient as Record<string, unknown>).photo_url ? (
-                  <img src={(selectedClient as Record<string, unknown>).photo_url as string} alt="" className={styles.profileAvatarImg} />
+                {selectedClient.photo_url ? (
+                  <img src={selectedClient.photo_url} alt="" className={styles.profileAvatarImg} />
                 ) : (
                   <>{selectedClient.first_name[0]}{selectedClient.last_name?.[0] || ""}</>
                 )}

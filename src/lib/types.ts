@@ -49,6 +49,7 @@ export interface Client {
   preferences: Record<string, unknown>
   allergies: string[]
   notes: string | null
+  photo_url: string | null
   loyalty_points: number
   tags: string[]
   lifetime_spend: number
