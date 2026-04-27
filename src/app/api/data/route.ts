@@ -5,7 +5,13 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 // Unified data API — all dashboard queries go through here
 // Authenticates via session cookies, queries with service role to bypass RLS
 export async function POST(request: Request) {
-  const supabase = await createClient()
+  // Parse body and authenticate in parallel
+  const [body, supabase] = await Promise.all([
+    request.json(),
+    createClient(),
+  ])
+
+  const { action, payload } = body
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
@@ -30,8 +36,6 @@ export async function POST(request: Request) {
 
   const tenantId = staffRecord.tenant_id
   const staffRole = staffRecord.role
-  const body = await request.json()
-  const { action, payload } = body
 
   // Helper: mask contact info for technicians when client protection is enabled
   async function shouldMaskContacts(): Promise<boolean> {

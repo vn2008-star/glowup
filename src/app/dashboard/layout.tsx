@@ -4,7 +4,7 @@
 import styles from "./dashboard.module.css";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useTenant, TenantProvider } from "@/lib/tenant-context";
+import { useTenant, TenantProvider, clearTenantCache } from "@/lib/tenant-context";
 import { createClient } from "@/lib/supabase/client";
 import { GlowUpLogo } from "@/components/GlowUpLogo";
 
@@ -67,6 +67,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const { tenant, currentStaff, loading } = useTenant();
 
   async function handleLogout() {
+    clearTenantCache();
     const supabase = createClient();
     await supabase.auth.signOut();
     router.push('/auth/login');
