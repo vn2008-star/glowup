@@ -1,5 +1,6 @@
 import styles from "./page.module.css";
 import Link from "next/link";
+import { GlowUpLogo } from "@/components/GlowUpLogo";
 
 /* ─── Icon Components ─── */
 const CalendarIcon = () => (
@@ -20,9 +21,10 @@ const ShieldIcon = () => (
 const TrendingIcon = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /><polyline points="17 6 23 6 23 12" /></svg>
 );
-const SparklesIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z" /></svg>
+const BotIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a2 2 0 0 1 2 2v1h3a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3h3V4a2 2 0 0 1 2-2z" /><circle cx="9" cy="10" r="1" fill="currentColor" /><circle cx="15" cy="10" r="1" fill="currentColor" /><path d="M9 14h6" /><line x1="3" y1="10" x2="4" y2="10" /><line x1="20" y1="10" x2="21" y2="10" /></svg>
 );
+const LogoIcon = () => <GlowUpLogo size={28} />;
 const CheckIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
 );
@@ -39,7 +41,7 @@ const features = [
   },
   {
     icon: <CameraIcon />,
-    title: "Photo Portfolio CRM",
+    title: "Photo Portfolio & Customer Relationship Management",
     description: "Store before/after photos, nail designs, color formulas, and client preferences. Your complete beauty database.",
   },
   {
@@ -58,7 +60,7 @@ const features = [
     description: "AI-generated posts from client photos, content calendar, ad templates, and review-to-post automation.",
   },
   {
-    icon: <SparklesIcon />,
+    icon: <BotIcon />,
     title: "AI Receptionist",
     description: "24/7 chatbot answers questions and books appointments from your website, Instagram, and Facebook.",
   },
@@ -69,7 +71,7 @@ const plans = [
     name: "Starter",
     price: "25",
     target: "1–4 staff",
-    features: ["Up to 4 staff members", "Online booking page", "Client CRM + photos", "SMS reminders", "Basic dashboard"],
+    features: ["Up to 4 staff members", "Online booking page", "Client Management + photos", "SMS reminders", "Basic dashboard"],
     cta: "Start Free Trial",
     highlighted: false,
   },
@@ -110,7 +112,7 @@ export default function LandingPage() {
       <header className={styles.header}>
         <div className={`container ${styles.headerInner}`}>
           <Link href="/" className={styles.logo}>
-            <SparklesIcon /> <span>GlowUp</span>
+            <LogoIcon /> <span>GlowUp</span>
           </Link>
           <nav className={styles.nav}>
             <a href="#features">Features</a>
@@ -126,13 +128,13 @@ export default function LandingPage() {
         <div className="container">
           <div className={styles.heroContent}>
             <div className={styles.heroBadge}>
-              <SparklesIcon /> Built for Nails, Lashes, Hair, Facial, and Waxing salons, spas & beauty professionals
+              ✦ Built for Nails, Lashes, Hair, Facial, and Waxing salons, spas & beauty professionals
             </div>
             <h1 className={styles.heroTitle}>
               Grow your beauty business <span className="gradient-text">on autopilot</span>
             </h1>
             <p className={styles.heroSubtitle}>
-              Smart booking, photo CRM, retention automation, and social media tools — everything you need to fill your calendar and keep clients coming back.
+              Smart booking, photo-based Customer Relationship Management, retention automation, and our new <strong>&ldquo;Fill My Openings&rdquo;</strong> campaign tool — instantly blast last-minute availability to clients and keep every chair full.
             </p>
             <div className={styles.heroCta}>
               <Link href="/auth/signup" className="btn btn-lg btn-primary">
@@ -252,7 +254,7 @@ export default function LandingPage() {
         <div className={`container ${styles.footerInner}`}>
           <div className={styles.footerBrand}>
             <Link href="/" className={styles.logo}>
-              <SparklesIcon /> <span>GlowUp</span>
+              <LogoIcon /> <span>GlowUp</span>
             </Link>
             <p>AI-powered automation for beauty businesses.</p>
           </div>

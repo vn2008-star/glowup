@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 
 import { useTenant } from "@/lib/tenant-context";
 import styles from "./settings.module.css";
@@ -247,6 +248,37 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      {/* AI Receptionist */}
+      <div className={`card ${styles.section}`}>
+        <h2>🤖 AI Receptionist</h2>
+        <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginBottom: "var(--space-4)" }}>
+          Your 24/7 virtual front desk. Automatically answers questions, suggests available times, and books appointments across Website, SMS, Instagram, and Facebook.
+        </p>
+        <div className={styles.aiStatusRow}>
+          <div className={styles.aiStatusBadges}>
+            <span className={`badge ${(() => {
+              const bc = ((tenant?.settings || {}) as Record<string, unknown>).bot_config as { enabled?: boolean; channels?: Record<string, boolean> } | undefined;
+              return bc?.enabled ? 'badge-success' : 'badge-warning';
+            })()}`}>
+              {(() => {
+                const bc = ((tenant?.settings || {}) as Record<string, unknown>).bot_config as { enabled?: boolean } | undefined;
+                return bc?.enabled ? '● Active' : '○ Inactive';
+              })()}
+            </span>
+            <span style={{ fontSize: "var(--text-sm)", color: "var(--text-tertiary)" }}>
+              {(() => {
+                const bc = ((tenant?.settings || {}) as Record<string, unknown>).bot_config as { channels?: Record<string, boolean> } | undefined;
+                const count = bc?.channels ? Object.values(bc.channels).filter(Boolean).length : 0;
+                return `${count} channel${count !== 1 ? 's' : ''} connected`;
+              })()}
+            </span>
+          </div>
+          <Link href="/dashboard/inbox" className="btn btn-secondary">
+            Configure AI →
+          </Link>
+        </div>
+      </div>
+
       {/* Booking Link */}
       {tenant?.slug && (
         <div className={`card ${styles.section}`}>
@@ -389,18 +421,26 @@ export default function SettingsPage() {
                     key={plan.key}
                     className={`btn ${plan.key === 'growth' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
                     onClick={async () => {
-                      const res = await fetch('/api/stripe/checkout', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          planKey: plan.key,
-                          tenantId: tenant!.id,
-                          tenantEmail: tenant!.email,
-                          tenantName: tenant!.name,
-                        }),
-                      });
-                      const { url } = await res.json();
-                      if (url) window.location.href = url;
+                      try {
+                        const res = await fetch('/api/stripe/checkout', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            planKey: plan.key,
+                            tenantId: tenant!.id,
+                            tenantEmail: tenant!.email,
+                            tenantName: tenant!.name,
+                          }),
+                        });
+                        const data = await res.json();
+                        if (data.url) {
+                          window.location.href = data.url;
+                        } else {
+                          alert(`Checkout failed: ${data.error || 'Unable to create checkout session. Please verify your Stripe Price IDs are configured correctly.'}`);
+                        }
+                      } catch (err) {
+                        alert(`Checkout error: ${err instanceof Error ? err.message : 'Network error. Please try again.'}`);
+                      }
                     }}
                   >
                     {plan.name} — {plan.price}

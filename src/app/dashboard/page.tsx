@@ -67,7 +67,7 @@ export default function DashboardOverview() {
   const dateStr = now.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
 
   return (
-    <div className={styles.page}>
+    <div className={styles.overview}>
       {/* Greeting */}
       <div className={styles.greeting}>
         <div>
@@ -78,45 +78,52 @@ export default function DashboardOverview() {
               : "No appointments today — perfect time to focus on growth!"}
           </p>
         </div>
-        <div className={styles.dateBlock}>
-          <span className={styles.dayName}>{dayName}</span>
-          <span className={styles.dateStr}>{dateStr}</span>
+        <div className={styles.dateDisplay}>
+          <span className={styles.dateDay}>{dayName}, {dateStr}</span>
         </div>
       </div>
 
       {/* KPI Cards */}
-      <div className={styles.kpiGrid}>
-        <div className={`card ${styles.kpiCard}`}>
-          <span className={styles.kpiIcon}>💰</span>
-          <span className={styles.kpiLabel}>TODAY&apos;S REVENUE</span>
-          <span className={styles.kpiValue}>{loading ? "..." : `$${metrics.todayRevenue}`}</span>
-          <span className={styles.kpiSub}>{metrics.totalClients} total clients</span>
+      <div className={styles.metricsGrid}>
+        <div className={`card ${styles.metricCard}`}>
+          <span className={styles.metricIcon}>💰</span>
+          <div className={styles.metricInfo}>
+            <span className={styles.metricLabel}>TODAY&apos;S REVENUE</span>
+            <span className={styles.metricValue}>{loading ? "..." : `$${metrics.todayRevenue}`}</span>
+            <span className={styles.metricChange}>{metrics.totalClients} total clients</span>
+          </div>
         </div>
-        <div className={`card ${styles.kpiCard}`}>
-          <span className={styles.kpiIcon}>📅</span>
-          <span className={styles.kpiLabel}>APPOINTMENTS TODAY</span>
-          <span className={styles.kpiValue}>{loading ? "..." : metrics.todayAppointments}</span>
-          <span className={styles.kpiSub}>{metrics.pendingCount} pending</span>
+        <div className={`card ${styles.metricCard}`}>
+          <span className={styles.metricIcon}>📅</span>
+          <div className={styles.metricInfo}>
+            <span className={styles.metricLabel}>APPOINTMENTS TODAY</span>
+            <span className={styles.metricValue}>{loading ? "..." : metrics.todayAppointments}</span>
+            <span className={styles.metricChange}>{metrics.pendingCount} pending</span>
+          </div>
         </div>
-        <div className={`card ${styles.kpiCard}`}>
-          <span className={styles.kpiIcon}>✨</span>
-          <span className={styles.kpiLabel}>NEW CLIENTS THIS WEEK</span>
-          <span className={styles.kpiValue}>{loading ? "..." : metrics.newClientsWeek}</span>
-          <span className={styles.kpiSub}>{metrics.totalClients} total</span>
+        <div className={`card ${styles.metricCard}`}>
+          <span className={styles.metricIcon}>✨</span>
+          <div className={styles.metricInfo}>
+            <span className={styles.metricLabel}>NEW CLIENTS THIS WEEK</span>
+            <span className={styles.metricValue}>{loading ? "..." : metrics.newClientsWeek}</span>
+            <span className={styles.metricChange}>{metrics.totalClients} total</span>
+          </div>
         </div>
-        <div className={`card ${styles.kpiCard}`}>
-          <span className={styles.kpiIcon}>💜</span>
-          <span className={styles.kpiLabel}>RETENTION RATE</span>
-          <span className={styles.kpiValue}>{loading ? "..." : `${metrics.retentionRate}%`}</span>
-          <span className={styles.kpiSub}>repeat visitors</span>
+        <div className={`card ${styles.metricCard}`}>
+          <span className={styles.metricIcon}>💜</span>
+          <div className={styles.metricInfo}>
+            <span className={styles.metricLabel}>RETENTION RATE</span>
+            <span className={styles.metricValue}>{loading ? "..." : `${metrics.retentionRate}%`}</span>
+            <span className={styles.metricChange}>repeat visitors</span>
+          </div>
         </div>
       </div>
 
       {/* Bottom Row */}
-      <div className={styles.bottomRow}>
+      <div className={styles.mainGrid}>
         {/* Today's Schedule */}
         <div className={`card ${styles.scheduleCard}`}>
-          <div className={styles.scheduleHeader}>
+          <div className={styles.cardHeader}>
             <h2>Today&apos;s Schedule</h2>
             <a href="/dashboard/calendar" className={styles.viewAll}>View Calendar →</a>
           </div>
@@ -131,7 +138,7 @@ export default function DashboardOverview() {
                 return (
                   <div key={apt.id} className={styles.appointmentRow}>
                     <span className={styles.aptTime}>{time}</span>
-                    <div className={styles.aptInfo}>
+                    <div className={styles.aptDetails}>
                       <span className={styles.aptClient}>
                         {apt.client ? `${apt.client.first_name} ${apt.client.last_name || ""}` : "Walk-in"}
                       </span>

@@ -90,7 +90,16 @@
   flex-wrap: wrap;
 }
 
+/* AI Receptionist card */
+.aiStatusRow {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-4);
+}
+.aiStatusBadges {
+  display: flex; align-items: center; gap: var(--space-3);
+}
+
 @media (max-width: 768px) {
   .formGrid { grid-template-columns: 1fr; }
   .upgradePlans { flex-direction: column; }
+  .aiStatusRow { flex-direction: column; align-items: flex-start; }
 }

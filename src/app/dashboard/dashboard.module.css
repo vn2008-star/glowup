@@ -1,4 +1,4 @@
-/* ── Dashboard Layout ── */
+/* ── Dashboard Layout — Soft Luxury Edition ── */
 .layout {
   display: flex;
   min-height: 100vh;
@@ -9,7 +9,7 @@
 .sidebar {
   width: var(--sidebar-width);
   background: var(--bg-elevated);
-  border-right: 1px solid var(--border-subtle);
+  border-right: none;
   display: flex;
   flex-direction: column;
   position: fixed;
@@ -18,21 +18,50 @@
   bottom: 0;
   z-index: calc(var(--z-sticky) + 10);
 }
+/* Gradient accent border on the right edge */
+.sidebar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    var(--color-primary) 20%,
+    var(--color-accent) 50%,
+    var(--color-primary) 80%,
+    transparent 100%
+  );
+  opacity: 0.25;
+}
+
 .sidebarHeader {
   padding: var(--space-5) var(--space-5);
   border-bottom: 1px solid var(--border-subtle);
+  position: relative;
 }
 .logo {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   font-family: var(--font-display);
-  font-weight: 800;
+  font-weight: 700;
   font-size: var(--text-lg);
   color: var(--text-primary) !important;
   text-decoration: none;
+  letter-spacing: -0.01em;
 }
-.logo svg { color: var(--color-primary); }
+.logo svg {
+  color: var(--color-primary);
+  filter: drop-shadow(0 0 8px rgba(201, 160, 220, 0.5));
+  animation: logoGlow 3s ease-in-out infinite;
+}
+@keyframes logoGlow {
+  0%, 100% { filter: drop-shadow(0 0 6px rgba(201, 160, 220, 0.4)); }
+  50% { filter: drop-shadow(0 0 12px rgba(240, 163, 181, 0.5)); }
+}
 
 .sidebarNav {
   flex: 1;
@@ -53,6 +82,7 @@
   color: var(--text-secondary) !important;
   text-decoration: none;
   transition: all var(--transition-fast);
+  position: relative;
 }
 .navItem:hover {
   background: var(--bg-surface);
@@ -60,19 +90,33 @@
 }
 .navItem svg {
   flex-shrink: 0;
-  opacity: 0.7;
+  opacity: 0.6;
+  transition: all var(--transition-fast);
 }
 .navItem:hover svg {
   opacity: 1;
 }
 
 .navItemActive {
-  background: var(--bg-surface);
+  background: rgba(201, 160, 220, 0.08);
   color: var(--text-primary) !important;
+  font-weight: 600;
+}
+.navItemActive::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 20px;
+  background: var(--gradient-primary);
+  border-radius: 0 var(--radius-full) var(--radius-full) 0;
 }
 .navItemActive svg {
   opacity: 1;
   color: var(--color-primary);
+  filter: drop-shadow(0 0 6px rgba(201, 160, 220, 0.4));
 }
 
 .sidebarFooter {
@@ -99,8 +143,8 @@
   flex-shrink: 0;
 }
 .logoutButton:hover {
-  background: var(--bg-surface);
-  color: var(--color-error, #ef4444);
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
 }
 .staffName {
   font-size: var(--text-sm);
@@ -115,10 +159,11 @@
   justify-content: center;
   background: var(--gradient-primary);
   color: var(--text-inverse);
-  font-family: var(--font-display);
+  font-family: var(--font-heading);
   font-weight: 700;
   font-size: var(--text-sm);
   border-radius: var(--radius-md);
+  box-shadow: var(--shadow-glow-soft);
 }
 .salonName {
   font-size: var(--text-sm);
@@ -150,6 +195,7 @@
   position: sticky;
   top: 0;
   z-index: var(--z-sticky);
+  backdrop-filter: blur(12px);
 }
 .searchBar {
   display: flex;
@@ -160,10 +206,11 @@
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   width: 360px;
-  transition: border-color var(--transition-fast);
+  transition: all var(--transition-fast);
 }
 .searchBar:focus-within {
-  border-color: var(--color-accent);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-50);
 }
 .searchBar svg {
   color: var(--text-tertiary);

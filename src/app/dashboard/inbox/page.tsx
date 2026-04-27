@@ -22,6 +22,9 @@ const QUICK_REPLIES = [
 ];
 
 const BOT_CONFIG_DEFAULTS = {
+  enabled: true,
+  auto_booking: false,
+  channels: { web: true, sms: false, instagram: false, facebook: false },
   greeting: "Hi there! 👋 Welcome to our salon. How can I help you today?",
   after_hours: "Thanks for your message! We're currently closed but will get back to you first thing tomorrow. Our hours are Mon–Sat, 9am–6pm.",
   booking_prompt: "Would you like to book an appointment? I can help you find an available time!",
@@ -31,6 +34,15 @@ const BOT_CONFIG_DEFAULTS = {
     { q: "Where are you located?", a: "Check our website for directions and parking info!" },
   ],
 };
+
+type BotConfig = typeof BOT_CONFIG_DEFAULTS;
+
+const CHANNEL_DETAILS = [
+  { key: "web", icon: "🌐", name: "Website Widget", desc: "Embed a chat widget on your website" },
+  { key: "sms", icon: "💬", name: "SMS / Text", desc: "Auto-reply to incoming text messages" },
+  { key: "instagram", icon: "📸", name: "Instagram DMs", desc: "Respond to Instagram direct messages" },
+  { key: "facebook", icon: "📘", name: "Facebook Messenger", desc: "Handle Messenger conversations" },
+] as const;
 
 export default function InboxPage() {
   const { tenant } = useTenant();
@@ -45,7 +57,8 @@ export default function InboxPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Bot config state
-  const [botConfig, setBotConfig] = useState(BOT_CONFIG_DEFAULTS);
+  const [botConfig, setBotConfig] = useState<BotConfig>(BOT_CONFIG_DEFAULTS);
+  const [configSaved, setConfigSaved] = useState(false);
 
   const fetchConversations = useCallback(async () => {
     if (!tenant) return;
@@ -61,7 +74,7 @@ export default function InboxPage() {
     // Load bot config from tenant settings
     if (tenant) {
       const settings = (tenant.settings || {}) as Record<string, unknown>;
-      const saved = settings.bot_config as typeof BOT_CONFIG_DEFAULTS | undefined;
+      const saved = settings.bot_config as BotConfig | undefined;
       if (saved) setBotConfig({ ...BOT_CONFIG_DEFAULTS, ...saved });
     }
   }, [tenant]);
@@ -129,6 +142,16 @@ export default function InboxPage() {
     }
   }
 
+  function toggleChannel(channelKey: string) {
+    setBotConfig((prev) => ({
+      ...prev,
+      channels: {
+        ...prev.channels,
+        [channelKey]: !prev.channels[channelKey as keyof typeof prev.channels],
+      },
+    }));
+  }
+
   async function saveBotConfig() {
     const res = await fetch("/api/save-settings", {
       method: "PUT",
@@ -140,11 +163,15 @@ export default function InboxPage() {
         },
       }),
     });
-    if (res.ok) alert("Bot configuration saved!");
+    if (res.ok) {
+      setConfigSaved(true);
+      setTimeout(() => setConfigSaved(false), 3000);
+    }
   }
 
   const openCount = conversations.filter((c) => c.status === "open").length;
   const unreadCount = conversations.reduce((sum, c) => sum + (c.unread_count || 0), 0);
+  const activeChannels = Object.values(botConfig.channels).filter(Boolean).length;
 
   function getConvoName(c: Conversation) {
     if (c.client) return `${c.client.first_name} ${c.client.last_name || ""}`.trim();
@@ -167,9 +194,80 @@ export default function InboxPage() {
 
       {activeTab === "config" ? (
         <div className={styles.configPanel}>
+          {/* Master Toggle */}
           <div className={`card ${styles.configCard}`}>
-            <h2>AI Bot Settings</h2>
-            <p className={styles.configDesc}>Configure how your AI receptionist responds to client messages.</p>
+            <div className={styles.masterToggleRow}>
+              <div>
+                <h2>🤖 AI Receptionist</h2>
+                <p className={styles.configDesc}>Your 24/7 virtual front desk — answers questions, books appointments, and keeps clients engaged.</p>
+              </div>
+              <label className={styles.switchLabel}>
+                <input
+                  type="checkbox"
+                  checked={botConfig.enabled}
+                  onChange={(e) => setBotConfig({ ...botConfig, enabled: e.target.checked })}
+                />
+                <span className={styles.switchTrack}><span className={styles.switchThumb} /></span>
+                <span className={styles.switchText}>{botConfig.enabled ? "Active" : "Off"}</span>
+              </label>
+            </div>
+
+            {botConfig.enabled && (
+              <div className={styles.statusStrip}>
+                <span className={styles.statusDot} />
+                <span>AI is responding on <strong>{activeChannels}</strong> channel{activeChannels !== 1 && "s"}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Connected Channels */}
+          <div className={`card ${styles.configCard}`}>
+            <h2>📡 Connected Channels</h2>
+            <p className={styles.configDesc}>Choose which channels your AI receptionist should monitor and respond on.</p>
+            <div className={styles.channelGrid}>
+              {CHANNEL_DETAILS.map((ch) => (
+                <div key={ch.key} className={`${styles.channelCard} ${botConfig.channels[ch.key as keyof typeof botConfig.channels] ? styles.channelActive : ""}`}>
+                  <div className={styles.channelIcon}>{ch.icon}</div>
+                  <div className={styles.channelInfo}>
+                    <div className={styles.channelName}>{ch.name}</div>
+                    <div className={styles.channelDesc}>{ch.desc}</div>
+                  </div>
+                  <label className={styles.switchLabel}>
+                    <input
+                      type="checkbox"
+                      checked={botConfig.channels[ch.key as keyof typeof botConfig.channels]}
+                      onChange={() => toggleChannel(ch.key)}
+                    />
+                    <span className={styles.switchTrack}><span className={styles.switchThumb} /></span>
+                  </label>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Auto-Booking */}
+          <div className={`card ${styles.configCard}`}>
+            <div className={styles.masterToggleRow}>
+              <div>
+                <h2>📅 Auto-Booking</h2>
+                <p className={styles.configDesc}>When enabled, the AI can directly book appointments for clients based on real-time availability — no staff intervention needed.</p>
+              </div>
+              <label className={styles.switchLabel}>
+                <input
+                  type="checkbox"
+                  checked={botConfig.auto_booking}
+                  onChange={(e) => setBotConfig({ ...botConfig, auto_booking: e.target.checked })}
+                />
+                <span className={styles.switchTrack}><span className={styles.switchThumb} /></span>
+                <span className={styles.switchText}>{botConfig.auto_booking ? "On" : "Off"}</span>
+              </label>
+            </div>
+          </div>
+
+          {/* Messages & Responses */}
+          <div className={`card ${styles.configCard}`}>
+            <h2>💬 Messages & Responses</h2>
+            <p className={styles.configDesc}>Customize how your AI greets and responds to clients.</p>
 
             <div className={styles.configGroup}>
               <label className="label">Greeting Message</label>
@@ -185,32 +283,62 @@ export default function InboxPage() {
               <label className="label">Booking Prompt</label>
               <textarea className="input" rows={2} value={botConfig.booking_prompt} onChange={(e) => setBotConfig({ ...botConfig, booking_prompt: e.target.value })} />
             </div>
+          </div>
 
-            <div className={styles.configGroup}>
-              <label className="label">FAQ Answers</label>
-              {botConfig.faq.map((f, i) => (
-                <div key={i} className={styles.faqRow}>
-                  <input className="input" placeholder="Question" value={f.q} onChange={(e) => {
-                    const updated = [...botConfig.faq];
-                    updated[i] = { ...updated[i], q: e.target.value };
-                    setBotConfig({ ...botConfig, faq: updated });
-                  }} />
-                  <input className="input" placeholder="Answer" value={f.a} onChange={(e) => {
-                    const updated = [...botConfig.faq];
-                    updated[i] = { ...updated[i], a: e.target.value };
-                    setBotConfig({ ...botConfig, faq: updated });
-                  }} />
-                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => {
-                    setBotConfig({ ...botConfig, faq: botConfig.faq.filter((_, idx) => idx !== i) });
-                  }}>🗑️</button>
+          {/* FAQ */}
+          <div className={`card ${styles.configCard}`}>
+            <h2>❓ FAQ Answers</h2>
+            <p className={styles.configDesc}>Teach your AI how to answer common questions. It will match incoming messages to these automatically.</p>
+            {botConfig.faq.map((f, i) => (
+              <div key={i} className={styles.faqRow}>
+                <input className="input" placeholder="Question" value={f.q} onChange={(e) => {
+                  const updated = [...botConfig.faq];
+                  updated[i] = { ...updated[i], q: e.target.value };
+                  setBotConfig({ ...botConfig, faq: updated });
+                }} />
+                <input className="input" placeholder="Answer" value={f.a} onChange={(e) => {
+                  const updated = [...botConfig.faq];
+                  updated[i] = { ...updated[i], a: e.target.value };
+                  setBotConfig({ ...botConfig, faq: updated });
+                }} />
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => {
+                  setBotConfig({ ...botConfig, faq: botConfig.faq.filter((_, idx) => idx !== i) });
+                }}>🗑️</button>
+              </div>
+            ))}
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => {
+              setBotConfig({ ...botConfig, faq: [...botConfig.faq, { q: "", a: "" }] });
+            }}>+ Add FAQ</button>
+          </div>
+
+          {/* Bot Preview */}
+          <div className={`card ${styles.configCard}`}>
+            <h2>👁️ Preview</h2>
+            <p className={styles.configDesc}>This is how your AI receptionist will greet clients.</p>
+            <div className={styles.botPreview}>
+              <div className={styles.previewHeader}>
+                <span className={styles.previewDot} />
+                <span className={styles.previewTitle}>{tenant?.name || "Your Salon"} — AI Receptionist</span>
+              </div>
+              <div className={styles.previewBody}>
+                <div className={styles.previewBubble}>
+                  <span className={styles.previewBot}>🤖 AI</span>
+                  <p>{botConfig.greeting}</p>
                 </div>
-              ))}
-              <button type="button" className="btn btn-ghost btn-sm" onClick={() => {
-                setBotConfig({ ...botConfig, faq: [...botConfig.faq, { q: "", a: "" }] });
-              }}>+ Add FAQ</button>
+                <div className={styles.previewSuggestions}>
+                  {botConfig.faq.slice(0, 3).map((f, i) => (
+                    <span key={i} className={styles.previewChip}>{f.q}</span>
+                  ))}
+                </div>
+              </div>
             </div>
+          </div>
 
-            <button className="btn btn-primary" onClick={saveBotConfig}>Save Configuration</button>
+          {/* Save */}
+          <div className={styles.configSaveBar}>
+            <button className="btn btn-primary btn-lg" onClick={saveBotConfig}>
+              {configSaved ? "✓ Configuration Saved!" : "Save Configuration"}
+            </button>
           </div>
         </div>
       ) : (

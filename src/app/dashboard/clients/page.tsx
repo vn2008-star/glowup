@@ -166,7 +166,7 @@ export default function ClientsPage() {
   function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>, mode: 'add' | 'edit') {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) { alert('Photo must be under 2MB'); return; }
+    if (file.size > 5 * 1024 * 1024) { alert('Photo must be under 5MB'); return; }
     const reader = new FileReader();
     reader.onload = () => {
       const result = reader.result as string;
