@@ -28,7 +28,8 @@ export default function ClientsPage() {
   const [filter, setFilter] = useState<string>("all");
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
-  const [formData, setFormData] = useState({ first_name: "", last_name: "", phone: "", email: "", birthday: "", notes: "" });
+  const [formData, setFormData] = useState({ first_name: "", last_name: "", phone: "", email: "", birthday: "", notes: "", photo_url: "" });
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
 
   // ── Client Protection ──
   const protectionEnabled = !!(tenant?.settings as Record<string, unknown> | undefined)?.client_protection;
@@ -42,7 +43,8 @@ export default function ClientsPage() {
 
   // Edit profile state
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editData, setEditData] = useState({ first_name: "", last_name: "", phone: "", email: "", birthday: "", notes: "" });
+  const [editData, setEditData] = useState({ first_name: "", last_name: "", phone: "", email: "", birthday: "", notes: "", photo_url: "" });
+  const [editPhotoPreview, setEditPhotoPreview] = useState<string | null>(null);
 
   // Book appointment state
   const [showBookModal, setShowBookModal] = useState(false);
@@ -73,7 +75,8 @@ export default function ClientsPage() {
     if (data) {
       setClients((prev) => [data, ...prev]);
       setShowAddModal(false);
-      setFormData({ first_name: "", last_name: "", phone: "", email: "", birthday: "", notes: "" });
+      setFormData({ first_name: "", last_name: "", phone: "", email: "", birthday: "", notes: "", photo_url: "" });
+      setPhotoPreview(null);
     }
   }
 
@@ -94,7 +97,9 @@ export default function ClientsPage() {
       email: selectedClient.email || "",
       birthday: selectedClient.birthday || "",
       notes: selectedClient.notes || "",
+      photo_url: (selectedClient as Record<string, unknown>).photo_url as string || "",
     });
+    setEditPhotoPreview((selectedClient as Record<string, unknown>).photo_url as string || null);
     setShowEditModal(true);
   }
 
@@ -156,6 +161,24 @@ export default function ClientsPage() {
     } else {
       alert("Failed to book appointment. Please try again.");
     }
+  }
+
+  function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>, mode: 'add' | 'edit') {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { alert('Photo must be under 2MB'); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      if (mode === 'add') {
+        setPhotoPreview(result);
+        setFormData(prev => ({ ...prev, photo_url: result }));
+      } else {
+        setEditPhotoPreview(result);
+        setEditData(prev => ({ ...prev, photo_url: result }));
+      }
+    };
+    reader.readAsDataURL(file);
   }
 
   function formatDate(dateStr: string | null) {
@@ -224,7 +247,11 @@ export default function ClientsPage() {
           {filtered.map((c) => (
             <div key={c.id} className={`card ${styles.clientCard}`} onClick={() => setSelectedClient(c)}>
               <div className={styles.clientHeader}>
-                <div className={styles.clientAvatar}>{c.first_name[0]}{c.last_name?.[0] || ""}</div>
+                {(c as Record<string, unknown>).photo_url ? (
+                  <img src={(c as Record<string, unknown>).photo_url as string} alt="" className={styles.clientAvatarImg} />
+                ) : (
+                  <div className={styles.clientAvatar}>{c.first_name[0]}{c.last_name?.[0] || ""}</div>
+                )}
                 <div>
                   <h3>{c.first_name} {c.last_name || ""}</h3>
                   <span className={`badge ${c.status === "active" ? "badge-success" : c.status === "new" ? "badge-info" : c.status === "at_risk" ? "badge-danger" : "badge-warning"}`}>
@@ -252,6 +279,19 @@ export default function ClientsPage() {
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <h2>Add New Client</h2>
             <form onSubmit={handleAddClient}>
+              <div className={styles.photoUpload}>
+                <label className={styles.photoUploadLabel}>
+                  {photoPreview ? (
+                    <img src={photoPreview} alt="Preview" className={styles.photoPreviewImg} />
+                  ) : (
+                    <div className={styles.photoPlaceholder}>
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                      <span>Add Photo</span>
+                    </div>
+                  )}
+                  <input type="file" accept="image/*" onChange={(e) => handlePhotoChange(e, 'add')} hidden />
+                </label>
+              </div>
               <div className={styles.formGrid}>
                 <div className={styles.formGroup}>
                   <label className="label">First Name *</label>
@@ -293,6 +333,19 @@ export default function ClientsPage() {
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <h2>Edit Client Profile</h2>
             <form onSubmit={handleEditProfile}>
+              <div className={styles.photoUpload}>
+                <label className={styles.photoUploadLabel}>
+                  {editPhotoPreview ? (
+                    <img src={editPhotoPreview} alt="Preview" className={styles.photoPreviewImg} />
+                  ) : (
+                    <div className={styles.photoPlaceholder}>
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                      <span>Add Photo</span>
+                    </div>
+                  )}
+                  <input type="file" accept="image/*" onChange={(e) => handlePhotoChange(e, 'edit')} hidden />
+                </label>
+              </div>
               <div className={styles.formGrid}>
                 <div className={styles.formGroup}>
                   <label className="label">First Name *</label>
@@ -377,7 +430,11 @@ export default function ClientsPage() {
             {/* Profile Header */}
             <div className={styles.profileHeader}>
               <div className={styles.profileAvatar}>
-                {selectedClient.first_name[0]}{selectedClient.last_name?.[0] || ""}
+                {(selectedClient as Record<string, unknown>).photo_url ? (
+                  <img src={(selectedClient as Record<string, unknown>).photo_url as string} alt="" className={styles.profileAvatarImg} />
+                ) : (
+                  <>{selectedClient.first_name[0]}{selectedClient.last_name?.[0] || ""}</>
+                )}
               </div>
               <h2 className={styles.profileName}>{selectedClient.first_name} {selectedClient.last_name || ""}</h2>
               <span className={`badge ${selectedClient.status === "active" ? "badge-success" : selectedClient.status === "new" ? "badge-info" : selectedClient.status === "at_risk" ? "badge-danger" : "badge-warning"}`}>

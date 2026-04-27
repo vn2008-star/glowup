@@ -677,3 +677,72 @@
   font-weight: 800;
   color: var(--text-primary);
 }
+
+/* ── Photo Upload ── */
+.photoUpload {
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--space-4);
+}
+.photoUploadLabel {
+  cursor: pointer;
+  display: block;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+.photoUploadLabel:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 0 3px var(--primary);
+}
+.photoPlaceholder {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 2px dashed var(--border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: var(--text-tertiary);
+  background: rgba(255,255,255,0.03);
+  transition: all 0.2s ease;
+}
+.photoPlaceholder span {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.photoPlaceholder:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: rgba(var(--primary-rgb), 0.06);
+}
+.photoPreviewImg {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid var(--primary);
+}
+
+/* ── Client Avatar Image (cards) ── */
+.clientAvatarImg {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+/* ── Profile Drawer Avatar Image ── */
+.profileAvatarImg {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
