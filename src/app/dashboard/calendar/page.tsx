@@ -254,7 +254,7 @@ export default function CalendarPage() {
           </div>
         </div>
         <div className={styles.headerRight}>
-          <button className={styles.todayBtn} onClick={() => setSelectedDate(new Date())}>Today</button>
+          <button className={styles.todayBtn} onClick={() => { setSelectedDate(new Date()); setView("day"); }}>Today</button>
           <div className={styles.viewToggle}>
             {(["day", "week", "month"] as const).map(v => (
               <button key={v} className={`${styles.viewBtn} ${view === v ? styles.activeView : ""}`} onClick={() => setView(v)}>
