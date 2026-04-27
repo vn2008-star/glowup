@@ -46,6 +46,13 @@ export default function ClientsPage() {
   const [editData, setEditData] = useState({ first_name: "", last_name: "", phone: "", email: "", birthday: "", notes: "", photo_url: "" });
   const [editPhotoPreview, setEditPhotoPreview] = useState<string | null>(null);
 
+  // Import clients state
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importData, setImportData] = useState<Record<string, string>[]>([]);
+  const [importFileName, setImportFileName] = useState("");
+  const [importLoading, setImportLoading] = useState(false);
+  const [importResult, setImportResult] = useState<{ added: number; skipped: number } | null>(null);
+
   // Book appointment state
   const [showBookModal, setShowBookModal] = useState(false);
   const [services, setServices] = useState<Service[]>([]);
@@ -78,6 +85,94 @@ export default function ClientsPage() {
       setFormData({ first_name: "", last_name: "", phone: "", email: "", birthday: "", notes: "", photo_url: "" });
       setPhotoPreview(null);
     }
+  }
+
+  // ── Import CSV ──
+  function parseCSV(text: string): Record<string, string>[] {
+    const lines = text.split(/\r?\n/).filter(l => l.trim());
+    if (lines.length < 2) return [];
+    // Detect delimiter
+    const delimiter = lines[0].includes('\t') ? '\t' : ',';
+    const headers = lines[0].split(delimiter).map(h => h.trim().replace(/^"|"$/g, '').toLowerCase());
+    const rows: Record<string, string>[] = [];
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i].split(delimiter).map(v => v.trim().replace(/^"|"$/g, ''));
+      if (values.every(v => !v)) continue;
+      const row: Record<string, string> = {};
+      headers.forEach((h, j) => { row[h] = values[j] || ''; });
+      rows.push(row);
+    }
+    return rows;
+  }
+
+  function guessField(headers: string[], targets: string[]): string | null {
+    for (const t of targets) {
+      const found = headers.find(h => h.includes(t));
+      if (found) return found;
+    }
+    return null;
+  }
+
+  function handleImportFile(file: File) {
+    setImportFileName(file.name);
+    setImportResult(null);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      const rows = parseCSV(text);
+      setImportData(rows);
+    };
+    reader.readAsText(file);
+  }
+
+  async function handleImportSubmit() {
+    if (!importData.length) return;
+    setImportLoading(true);
+    const headers = Object.keys(importData[0]);
+    const firstNameCol = guessField(headers, ['first_name', 'first name', 'firstname', 'name', 'first']);
+    const lastNameCol = guessField(headers, ['last_name', 'last name', 'lastname', 'last', 'surname']);
+    const phoneCol = guessField(headers, ['phone', 'phone number', 'mobile', 'cell', 'tel', 'telephone']);
+    const emailCol = guessField(headers, ['email', 'e-mail', 'email address']);
+    const birthdayCol = guessField(headers, ['birthday', 'birth date', 'birthdate', 'dob', 'date of birth']);
+    const notesCol = guessField(headers, ['notes', 'note', 'comments', 'comment']);
+
+    let added = 0;
+    let skipped = 0;
+
+    for (const row of importData) {
+      let firstName = firstNameCol ? row[firstNameCol] : '';
+      let lastName = lastNameCol ? row[lastNameCol] : '';
+
+      // If only a "name" column, split it
+      if (firstName && !lastNameCol && firstName.includes(' ')) {
+        const parts = firstName.split(' ');
+        firstName = parts[0];
+        lastName = parts.slice(1).join(' ');
+      }
+
+      if (!firstName) { skipped++; continue; }
+
+      const clientPayload = {
+        first_name: firstName,
+        last_name: lastName || '',
+        phone: phoneCol ? row[phoneCol] : '',
+        email: emailCol ? row[emailCol] : '',
+        birthday: birthdayCol ? row[birthdayCol] : '',
+        notes: notesCol ? row[notesCol] : '',
+        status: 'active' as const,
+      };
+
+      const { data } = await queryData<Client>('clients.add', clientPayload);
+      if (data) {
+        added++;
+        setClients(prev => [data, ...prev]);
+      } else {
+        skipped++;
+      }
+    }
+
+    setImportResult({ added, skipped });
+    setImportLoading(false);
   }
 
   async function handleDeleteClient(id: string) {
@@ -210,6 +305,7 @@ export default function ClientsPage() {
               {viewAsTechnician ? 'Exit Technician View' : 'View as Technician'}
             </button>
           )}
+          <button className={styles.importBtn} onClick={() => { setShowImportModal(true); setImportData([]); setImportFileName(''); setImportResult(null); }}>📥 Import</button>
           <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>+ Add Client</button>
         </div>
       </div>
@@ -542,6 +638,107 @@ export default function ClientsPage() {
               <button className="btn btn-secondary" style={{ flex: 1 }} onClick={openEditProfile}>✏️ Edit Profile</button>
               <button className="btn btn-danger" onClick={() => handleDeleteClient(selectedClient.id)}>🗑️ Delete</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Import Clients Modal ── */}
+      {showImportModal && (
+        <div className={styles.modalOverlay} onClick={() => setShowImportModal(false)}>
+          <div className={styles.importModal} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2>📥 Import Clients</h2>
+              <button className={styles.modalClose} onClick={() => setShowImportModal(false)}>✕</button>
+            </div>
+
+            {!importData.length && !importResult ? (
+              <div className={styles.importUploadArea}>
+                <div
+                  className={styles.importDropZone}
+                  onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add(styles.dragOver); }}
+                  onDragLeave={(e) => { e.currentTarget.classList.remove(styles.dragOver); }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.currentTarget.classList.remove(styles.dragOver);
+                    const file = e.dataTransfer.files[0];
+                    if (file) handleImportFile(file);
+                  }}
+                >
+                  <div className={styles.importIcon}>📄</div>
+                  <p className={styles.importDropText}>Drag & drop a CSV file here</p>
+                  <p className={styles.importDropSubtext}>or</p>
+                  <label className={styles.importBrowseBtn}>
+                    Browse Files
+                    <input
+                      type="file"
+                      accept=".csv,.tsv,.txt"
+                      style={{ display: 'none' }}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleImportFile(file);
+                      }}
+                    />
+                  </label>
+                </div>
+                <div className={styles.importFormatHelp}>
+                  <h4>Supported Format</h4>
+                  <p>CSV with columns like: <strong>Name, Phone, Email, Birthday, Notes</strong></p>
+                  <p>Column names are auto-detected. Export from your phone contacts or any spreadsheet app.</p>
+                  <div className={styles.importExample}>
+                    <code>Name,Phone,Email,Birthday{"\n"}Jane Smith,(415) 555-1234,jane@email.com,1990-05-15{"\n"}Maria Garcia,(916) 555-5678,maria@email.com,</code>
+                  </div>
+                </div>
+              </div>
+            ) : importResult ? (
+              <div className={styles.importResultArea}>
+                <div className={styles.importResultIcon}>✅</div>
+                <h3>Import Complete!</h3>
+                <div className={styles.importResultStats}>
+                  <div className={styles.importStat}>
+                    <span className={styles.importStatNum}>{importResult.added}</span>
+                    <span>clients added</span>
+                  </div>
+                  {importResult.skipped > 0 && (
+                    <div className={styles.importStat}>
+                      <span className={styles.importStatNum}>{importResult.skipped}</span>
+                      <span>skipped</span>
+                    </div>
+                  )}
+                </div>
+                <button className="btn btn-primary" onClick={() => setShowImportModal(false)}>Done</button>
+              </div>
+            ) : (
+              <div className={styles.importPreviewArea}>
+                <p className={styles.importPreviewInfo}>
+                  📎 <strong>{importFileName}</strong> — {importData.length} client{importData.length !== 1 ? 's' : ''} found
+                </p>
+                <div className={styles.importPreviewTable}>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        {Object.keys(importData[0]).slice(0, 5).map(h => <th key={h}>{h}</th>)}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {importData.slice(0, 5).map((row, i) => (
+                        <tr key={i}>
+                          <td>{i + 1}</td>
+                          {Object.keys(importData[0]).slice(0, 5).map(h => <td key={h}>{row[h]}</td>)}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {importData.length > 5 && <p className={styles.importMoreText}>...and {importData.length - 5} more</p>}
+                </div>
+                <div className={styles.importActions}>
+                  <button className="btn btn-secondary" onClick={() => { setImportData([]); setImportFileName(''); }}>← Choose Another File</button>
+                  <button className="btn btn-primary" onClick={handleImportSubmit} disabled={importLoading}>
+                    {importLoading ? 'Importing...' : `Import ${importData.length} Clients`}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
