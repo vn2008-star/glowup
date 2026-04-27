@@ -72,29 +72,41 @@ export default function CalendarPage() {
     });
   }, [tenant]);
 
+  // Build timezone-aware ISO boundaries for a local date
+  function localDayStart(d: Date) {
+    const copy = new Date(d);
+    copy.setHours(0, 0, 0, 0);
+    return copy.toISOString();
+  }
+  function localDayEnd(d: Date) {
+    const copy = new Date(d);
+    copy.setHours(23, 59, 59, 999);
+    return copy.toISOString();
+  }
+
   // Fetch appointments on date/view change
   const fetchAppointments = useCallback(async () => {
     if (!tenant) return;
     if (!initialLoaded) setLoading(true);
 
-    let startDate: string, endDate: string;
+    let startISO: string, endISO: string;
 
     if (view === "day") {
-      startDate = toDateStr(selectedDate);
-      endDate = startDate;
+      startISO = localDayStart(selectedDate);
+      endISO = localDayEnd(selectedDate);
     } else if (view === "week") {
       const ws = new Date(selectedDate);
       ws.setDate(ws.getDate() - ((ws.getDay() + 6) % 7));
       const we = new Date(ws);
       we.setDate(we.getDate() + 6);
-      startDate = toDateStr(ws);
-      endDate = toDateStr(we);
+      startISO = localDayStart(ws);
+      endISO = localDayEnd(we);
     } else {
-      startDate = toDateStr(monthDays[0]);
-      endDate = toDateStr(monthDays[41]);
+      startISO = localDayStart(monthDays[0]);
+      endISO = localDayEnd(monthDays[41]);
     }
 
-    const aptsRes = await queryData<FullAppointment[]>("appointments.list", view === "day" ? { date: startDate } : { startDate, endDate });
+    const aptsRes = await queryData<FullAppointment[]>("appointments.list", { startDate: startISO, endDate: endISO });
     setAppointments(aptsRes.data || []);
     setLoading(false);
     setInitialLoaded(true);

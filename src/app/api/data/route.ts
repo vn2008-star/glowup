@@ -163,16 +163,14 @@ export async function POST(request: Request) {
           .order('start_time', { ascending: true })
 
         if (payload?.date) {
-          // Use date string directly to avoid UTC/local timezone mismatch
-          const dateStr = payload.date; // e.g. "2026-04-28"
+          // Legacy single-date param (kept for backwards compatibility)
+          const dateStr = payload.date;
           query = query.gte('start_time', `${dateStr}T00:00:00`).lte('start_time', `${dateStr}T23:59:59`)
         }
 
         if (payload?.startDate && payload?.endDate) {
-          // Ensure full day coverage on both ends
-          const sd = payload.startDate.includes('T') ? payload.startDate : `${payload.startDate}T00:00:00`;
-          const ed = payload.endDate.includes('T') ? payload.endDate : `${payload.endDate}T23:59:59`;
-          query = query.gte('start_time', sd).lte('start_time', ed)
+          // Client sends timezone-aware ISO strings — pass directly
+          query = query.gte('start_time', payload.startDate).lte('start_time', payload.endDate)
         }
 
         const { data, error } = await query.limit(payload?.limit || 200)
