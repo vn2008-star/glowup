@@ -524,78 +524,68 @@ export async function POST(request: Request) {
         const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)
         const sixtyDaysAgo = new Date(today.getTime() - 60 * 24 * 60 * 60 * 1000)
 
-        // Today's appointments
-        const { data: todayApts } = await svc
-          .from('appointments')
-          .select('*, client:clients(*), service:services(*), staff_member:staff(*)')
-          .eq('tenant_id', tenantId)
-          .gte('start_time', `${todayStr}T00:00:00`)
-          .lte('start_time', `${todayStr}T23:59:59`)
-          .order('start_time')
+        // Fire ALL queries in parallel instead of sequentially
+        const [
+          todayAptsRes,
+          totalClientsRes,
+          newClientsWeekRes,
+          recentClientsRes,
+          atRiskRes,
+          activeClientsRes,
+          unreadConvosRes,
+        ] = await Promise.all([
+          svc.from('appointments')
+            .select('*, client:clients(*), service:services(*), staff_member:staff(*)')
+            .eq('tenant_id', tenantId)
+            .gte('start_time', `${todayStr}T00:00:00`)
+            .lte('start_time', `${todayStr}T23:59:59`)
+            .order('start_time'),
+          svc.from('clients')
+            .select('id', { count: 'exact', head: true })
+            .eq('tenant_id', tenantId),
+          svc.from('clients')
+            .select('id', { count: 'exact', head: true })
+            .eq('tenant_id', tenantId)
+            .gte('created_at', weekAgo.toISOString()),
+          svc.from('clients')
+            .select('*')
+            .eq('tenant_id', tenantId)
+            .order('created_at', { ascending: false })
+            .limit(5),
+          svc.from('clients')
+            .select('*')
+            .eq('tenant_id', tenantId)
+            .eq('status', 'at_risk')
+            .limit(5),
+          svc.from('clients')
+            .select('id', { count: 'exact', head: true })
+            .eq('tenant_id', tenantId)
+            .gte('last_visit', sixtyDaysAgo.toISOString()),
+          svc.from('conversations')
+            .select('id', { count: 'exact', head: true })
+            .eq('tenant_id', tenantId)
+            .gt('unread_count', 0),
+        ])
 
-        // Revenue today
-        const todayRevenue = (todayApts || [])
+        const todayApts = todayAptsRes.data || []
+        const totalClients = totalClientsRes.count || 0
+        const todayRevenue = todayApts
           .filter(a => a.status === 'completed')
           .reduce((sum, a) => sum + (a.total_price || 0), 0)
-
-        // Pending appointments
-        const pendingCount = (todayApts || []).filter(a => a.status === 'pending' || a.status === 'confirmed').length
-
-        // Client counts
-        const { count: totalClients } = await svc
-          .from('clients')
-          .select('id', { count: 'exact', head: true })
-          .eq('tenant_id', tenantId)
-
-        const { count: newClientsWeek } = await svc
-          .from('clients')
-          .select('id', { count: 'exact', head: true })
-          .eq('tenant_id', tenantId)
-          .gte('created_at', weekAgo.toISOString())
-
-        // Recent clients
-        const { data: recentClients } = await svc
-          .from('clients')
-          .select('*')
-          .eq('tenant_id', tenantId)
-          .order('created_at', { ascending: false })
-          .limit(5)
-
-        // At-risk clients
-        const { data: atRisk } = await svc
-          .from('clients')
-          .select('*')
-          .eq('tenant_id', tenantId)
-          .eq('status', 'at_risk')
-          .limit(5)
-
-        // Retention
-        const { count: activeClients } = await svc
-          .from('clients')
-          .select('id', { count: 'exact', head: true })
-          .eq('tenant_id', tenantId)
-          .gte('last_visit', sixtyDaysAgo.toISOString())
-
-        const retentionRate = totalClients ? Math.round(((activeClients || 0) / totalClients) * 100) : 0
-
-        // Unread conversations count
-        const { count: unreadConvos } = await svc
-          .from('conversations')
-          .select('id', { count: 'exact', head: true })
-          .eq('tenant_id', tenantId)
-          .gt('unread_count', 0)
+        const pendingCount = todayApts.filter(a => a.status === 'pending' || a.status === 'confirmed').length
+        const retentionRate = totalClients ? Math.round(((activeClientsRes.count || 0) / totalClients) * 100) : 0
 
         return NextResponse.json({
           data: {
-            todayAppointments: todayApts || [],
+            todayAppointments: todayApts,
             todayRevenue,
             pendingCount,
-            totalClients: totalClients || 0,
-            newClientsWeek: newClientsWeek || 0,
+            totalClients,
+            newClientsWeek: newClientsWeekRes.count || 0,
             retentionRate,
-            recentClients: recentClients || [],
-            atRiskClients: atRisk || [],
-            unreadConvos: unreadConvos || 0,
+            recentClients: recentClientsRes.data || [],
+            atRiskClients: atRiskRes.data || [],
+            unreadConvos: unreadConvosRes.count || 0,
           }
         })
       }
@@ -607,47 +597,66 @@ export async function POST(request: Request) {
         const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString()
         const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59).toISOString()
 
-        // This month appointments + revenue
-        const { data: thisMonthApts } = await svc
-          .from('appointments')
-          .select('total_price, status, service_id, staff_id')
-          .eq('tenant_id', tenantId)
-          .gte('start_time', thisMonthStart)
-          .eq('status', 'completed')
+        // Fire ALL queries in parallel instead of sequentially
+        const [
+          thisMonthAptsRes,
+          lastMonthAptsRes,
+          thisMonthNewRes,
+          lastMonthNewRes,
+          servicesRes,
+          staffListRes,
+          noShowsRes,
+          totalAptsRes,
+        ] = await Promise.all([
+          svc.from('appointments')
+            .select('total_price, status, service_id, staff_id')
+            .eq('tenant_id', tenantId)
+            .gte('start_time', thisMonthStart)
+            .eq('status', 'completed'),
+          svc.from('appointments')
+            .select('total_price')
+            .eq('tenant_id', tenantId)
+            .gte('start_time', lastMonthStart)
+            .lte('start_time', lastMonthEnd)
+            .eq('status', 'completed'),
+          svc.from('clients')
+            .select('id', { count: 'exact', head: true })
+            .eq('tenant_id', tenantId)
+            .gte('created_at', thisMonthStart),
+          svc.from('clients')
+            .select('id', { count: 'exact', head: true })
+            .eq('tenant_id', tenantId)
+            .gte('created_at', lastMonthStart)
+            .lte('created_at', lastMonthEnd),
+          svc.from('services')
+            .select('id, name')
+            .eq('tenant_id', tenantId),
+          svc.from('staff')
+            .select('id, name')
+            .eq('tenant_id', tenantId),
+          svc.from('appointments')
+            .select('id', { count: 'exact', head: true })
+            .eq('tenant_id', tenantId)
+            .gte('start_time', thisMonthStart)
+            .eq('status', 'no_show'),
+          svc.from('appointments')
+            .select('id', { count: 'exact', head: true })
+            .eq('tenant_id', tenantId)
+            .gte('start_time', thisMonthStart),
+        ])
 
-        const { data: lastMonthApts } = await svc
-          .from('appointments')
-          .select('total_price')
-          .eq('tenant_id', tenantId)
-          .gte('start_time', lastMonthStart)
-          .lte('start_time', lastMonthEnd)
-          .eq('status', 'completed')
+        const thisMonthApts = thisMonthAptsRes.data || []
+        const lastMonthApts = lastMonthAptsRes.data || []
+        const services = servicesRes.data || []
+        const staffList = staffListRes.data || []
 
-        const thisRevenue = (thisMonthApts || []).reduce((s, a) => s + (a.total_price || 0), 0)
-        const lastRevenue = (lastMonthApts || []).reduce((s, a) => s + (a.total_price || 0), 0)
-
-        const { count: thisMonthNew } = await svc
-          .from('clients')
-          .select('id', { count: 'exact', head: true })
-          .eq('tenant_id', tenantId)
-          .gte('created_at', thisMonthStart)
-
-        const { count: lastMonthNew } = await svc
-          .from('clients')
-          .select('id', { count: 'exact', head: true })
-          .eq('tenant_id', tenantId)
-          .gte('created_at', lastMonthStart)
-          .lte('created_at', lastMonthEnd)
+        const thisRevenue = thisMonthApts.reduce((s, a) => s + (a.total_price || 0), 0)
+        const lastRevenue = lastMonthApts.reduce((s, a) => s + (a.total_price || 0), 0)
 
         // Top services
-        const { data: services } = await svc
-          .from('services')
-          .select('id, name')
-          .eq('tenant_id', tenantId)
-
         const serviceCounts: Record<string, { name: string; bookings: number; revenue: number }> = {}
-        for (const apt of (thisMonthApts || [])) {
-          const svcName = services?.find(s => s.id === apt.service_id)?.name || 'Unknown'
+        for (const apt of thisMonthApts) {
+          const svcName = services.find(s => s.id === apt.service_id)?.name || 'Unknown'
           if (!serviceCounts[svcName]) serviceCounts[svcName] = { name: svcName, bookings: 0, revenue: 0 }
           serviceCounts[svcName].bookings++
           serviceCounts[svcName].revenue += apt.total_price || 0
@@ -657,14 +666,9 @@ export async function POST(request: Request) {
           .slice(0, 5)
 
         // Staff performance
-        const { data: staffList } = await svc
-          .from('staff')
-          .select('id, name')
-          .eq('tenant_id', tenantId)
-
         const staffPerf: Record<string, { name: string; appointments: number; revenue: number }> = {}
-        for (const apt of (thisMonthApts || [])) {
-          const name = staffList?.find(s => s.id === apt.staff_id)?.name || 'Unassigned'
+        for (const apt of thisMonthApts) {
+          const name = staffList.find(s => s.id === apt.staff_id)?.name || 'Unassigned'
           if (!staffPerf[name]) staffPerf[name] = { name, appointments: 0, revenue: 0 }
           staffPerf[name].appointments++
           staffPerf[name].revenue += apt.total_price || 0
@@ -673,33 +677,19 @@ export async function POST(request: Request) {
           .sort((a, b) => b.revenue - a.revenue)
           .slice(0, 5)
 
-        // No-show rate
-        const { count: noShows } = await svc
-          .from('appointments')
-          .select('id', { count: 'exact', head: true })
-          .eq('tenant_id', tenantId)
-          .gte('start_time', thisMonthStart)
-          .eq('status', 'no_show')
-
-        const { count: totalApts } = await svc
-          .from('appointments')
-          .select('id', { count: 'exact', head: true })
-          .eq('tenant_id', tenantId)
-          .gte('start_time', thisMonthStart)
-
-        const noShowRate = totalApts ? Math.round(((noShows || 0) / totalApts) * 100) : 0
+        const noShowRate = totalAptsRes.count ? Math.round(((noShowsRes.count || 0) / totalAptsRes.count) * 100) : 0
 
         return NextResponse.json({
           data: {
             thisMonth: {
               revenue: thisRevenue,
-              appointments: (thisMonthApts || []).length,
-              newClients: thisMonthNew || 0,
+              appointments: thisMonthApts.length,
+              newClients: thisMonthNewRes.count || 0,
             },
             lastMonth: {
               revenue: lastRevenue,
-              appointments: (lastMonthApts || []).length,
-              newClients: lastMonthNew || 0,
+              appointments: lastMonthApts.length,
+              newClients: lastMonthNewRes.count || 0,
             },
             topServices,
             staffPerformance,
