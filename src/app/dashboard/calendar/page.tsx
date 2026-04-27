@@ -8,10 +8,10 @@ import type { Appointment, Client, Service, Staff } from "@/lib/types";
 
 type FullAppointment = Appointment & { client?: Client; service?: Service; staff_member?: Staff };
 
-const HOURS = Array.from({ length: 10 }, (_, i) => i + 9); // 9–18
+
 const SLOT_HEIGHT = 60;
-const WORK_START = 9;
-const WORK_END = 18;
+const DEFAULT_WORK_START = 9;
+const DEFAULT_WORK_END = 18;
 
 export default function CalendarPage() {
   const { tenant } = useTenant();
@@ -56,6 +56,27 @@ export default function CalendarPage() {
     d.setDate(d.getDate() + i);
     return d;
   });
+
+  // ── Dynamic time grid range (expand if appointments outside default hours) ──
+  const { WORK_START, WORK_END, HOURS } = (() => {
+    let earliest = DEFAULT_WORK_START;
+    let latest = DEFAULT_WORK_END;
+    for (const apt of appointments) {
+      const s = new Date(apt.start_time);
+      const e = new Date(apt.end_time);
+      const sH = s.getHours();
+      const eH = e.getHours() + (e.getMinutes() > 0 ? 1 : 0);
+      if (sH < earliest) earliest = sH;
+      if (eH > latest) latest = eH;
+    }
+    const ws = earliest;
+    const we = Math.min(latest, 23);
+    return {
+      WORK_START: ws,
+      WORK_END: we,
+      HOURS: Array.from({ length: we - ws }, (_, i) => i + ws),
+    };
+  })();
 
   // ── Data fetching (optimized: staff/services/clients cached, only apts refresh) ──
   const [initialLoaded, setInitialLoaded] = useState(false);
