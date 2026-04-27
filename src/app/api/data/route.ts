@@ -169,7 +169,10 @@ export async function POST(request: Request) {
         }
 
         if (payload?.startDate && payload?.endDate) {
-          query = query.gte('start_time', payload.startDate).lte('start_time', payload.endDate)
+          // Ensure full day coverage on both ends
+          const sd = payload.startDate.includes('T') ? payload.startDate : `${payload.startDate}T00:00:00`;
+          const ed = payload.endDate.includes('T') ? payload.endDate : `${payload.endDate}T23:59:59`;
+          query = query.gte('start_time', sd).lte('start_time', ed)
         }
 
         const { data, error } = await query.limit(payload?.limit || 200)

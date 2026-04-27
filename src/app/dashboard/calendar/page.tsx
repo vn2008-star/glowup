@@ -227,10 +227,14 @@ export default function CalendarPage() {
     setShowModal(true);
   }
 
-  // ── Appointments for a specific day ──
+  // ── Appointments for a specific day (timezone-safe) ──
   function aptsForDay(day: Date) {
-    const ds = toDateStr(day);
-    return appointments.filter(a => a.start_time.startsWith(ds));
+    return appointments.filter(a => {
+      const aptDate = new Date(a.start_time);
+      return aptDate.getFullYear() === day.getFullYear()
+        && aptDate.getMonth() === day.getMonth()
+        && aptDate.getDate() === day.getDate();
+    });
   }
 
   return (
