@@ -30,7 +30,7 @@ export async function GET(request: Request) {
   // Get active services
   const { data: services } = await svc
     .from('services')
-    .select('id, name, category, description, duration_minutes, price, sort_order')
+    .select('id, name, category, description, duration_minutes, price, sort_order, image_url')
     .eq('tenant_id', tenant.id)
     .eq('is_active', true)
     .order('sort_order', { ascending: true })

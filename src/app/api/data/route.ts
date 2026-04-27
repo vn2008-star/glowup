@@ -125,17 +125,16 @@ export async function POST(request: Request) {
       }
 
       case 'services.add': {
-        const { image_url: _img, ...serviceFields } = payload
         const { data, error } = await svc
           .from('services')
-          .insert({ ...serviceFields, tenant_id: tenantId })
+          .insert({ ...payload, tenant_id: tenantId })
           .select()
           .single()
         return NextResponse.json({ data, error: error?.message })
       }
 
       case 'services.update': {
-        const { id, image_url: _img2, ...fields } = payload
+        const { id, ...fields } = payload
         const { data, error } = await svc
           .from('services')
           .update(fields)
