@@ -280,11 +280,11 @@
 }
 .profileDrawer {
   position: fixed;
-  top: 0;
+  top: 64px;
   right: 0;
   width: 380px;
   max-width: 92vw;
-  height: 100vh;
+  height: calc(100vh - 64px);
   background: var(--bg-elevated, var(--bg-card));
   border-left: 1px solid var(--border-default);
   padding: var(--space-6);
