@@ -19,6 +19,7 @@ export default function BookingClient({ slug }: { slug: string }) {
   const [submitting, setSubmitting] = useState(false)
   const [booked, setBooked] = useState(false)
   const [bookedTime, setBookedTime] = useState('')
+  const [birthdaySaved, setBirthdaySaved] = useState(false)
 
   // Data from API
   const [business, setBusiness] = useState<BusinessInfo | null>(null)
@@ -150,6 +151,7 @@ export default function BookingClient({ slug }: { slug: string }) {
       if (res.ok) {
         const startDate = new Date(`${selectedDate}T${selectedTime}:00`)
         setBookedTime(startDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) + ' at ' + startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }))
+        if (clientBirthday) setBirthdaySaved(true)
         setBooked(true)
       } else {
         alert('Booking failed. Please try again.')
@@ -213,16 +215,28 @@ export default function BookingClient({ slug }: { slug: string }) {
             <strong>{selectedService?.duration_minutes} minutes</strong>
           </div>
         </div>
-        {!clientBirthday && (
+        {!birthdaySaved && (
           <div className={styles.birthdayPrompt}>
             <p className={styles.birthdayPromptTitle}>🎂 When&apos;s your birthday?</p>
             <p className={styles.birthdayPromptText}>Share your birthday and we&apos;ll send you a special treat — discounts, freebies, and more!</p>
             <div className={styles.birthdayPromptForm}>
-              <input type="date" value={clientBirthday} onChange={e => setClientBirthday(e.target.value)} />
+              <input type="date" value={clientBirthday} onChange={async (e) => {
+                const val = e.target.value
+                setClientBirthday(val)
+                if (val) {
+                  setBirthdaySaved(true)
+                  await fetch('/api/public-booking', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ slug, client_email: clientEmail, client_phone: clientPhone, birthday: val }),
+                  })
+                }
+              }} />
               <button
                 className={styles.birthdayPromptBtn}
                 onClick={async () => {
                   if (!clientBirthday) return
+                  setBirthdaySaved(true)
                   await fetch('/api/public-booking', {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
@@ -236,7 +250,7 @@ export default function BookingClient({ slug }: { slug: string }) {
             </div>
           </div>
         )}
-        {clientBirthday && (
+        {birthdaySaved && (
           <p className={styles.birthdayConfirmed}>🎂 Birthday saved — expect a special surprise!</p>
         )}
         <p className={styles.successNote}>
