@@ -314,6 +314,103 @@ export default function SettingsPage() {
           <span>Enable masked communications for technicians</span>
         </label>
       </div>
+      {/* Billing & Subscription */}
+      <div className={`card ${styles.section}`}>
+        <h2>💳 Billing & Subscription</h2>
+        <div className={styles.billingCard}>
+          <div className={styles.billingInfo}>
+            <div className={styles.billingPlan}>
+              <span className={styles.planName}>
+                {tenant?.subscription_status === 'active'
+                  ? (tenant.stripe_price_id ? 'Paid Plan' : 'Active')
+                  : tenant?.subscription_status === 'trialing'
+                  ? 'Free Trial'
+                  : tenant?.subscription_status === 'past_due'
+                  ? 'Payment Issue'
+                  : tenant?.subscription_status === 'canceled'
+                  ? 'Canceled'
+                  : 'Free Trial'}
+              </span>
+              <span className={`badge ${
+                tenant?.subscription_status === 'active' ? 'badge-success' :
+                tenant?.subscription_status === 'trialing' ? 'badge-info' :
+                tenant?.subscription_status === 'past_due' ? 'badge-danger' :
+                tenant?.subscription_status === 'canceled' ? 'badge-warning' :
+                'badge-info'
+              }`}>
+                {tenant?.subscription_status || 'trialing'}
+              </span>
+            </div>
+            {tenant?.subscription_status === 'trialing' && tenant?.trial_ends_at && (
+              <p className={styles.billingDetail}>
+                ⏰ Trial ends: <strong>{new Date(tenant.trial_ends_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</strong>
+                {(() => {
+                  const days = Math.ceil((new Date(tenant.trial_ends_at).getTime() - Date.now()) / (1000*60*60*24));
+                  return days > 0 ? ` (${days} days left)` : ' (expired)';
+                })()}
+              </p>
+            )}
+            {tenant?.subscription_status === 'active' && tenant?.current_period_end && (
+              <p className={styles.billingDetail}>
+                Next billing: <strong>{new Date(tenant.current_period_end).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</strong>
+              </p>
+            )}
+            {tenant?.subscription_status === 'past_due' && (
+              <p className={styles.billingDetail} style={{ color: 'var(--color-danger)' }}>
+                ⚠️ Your last payment failed. Please update your payment method to avoid service interruption.
+              </p>
+            )}
+          </div>
+          <div className={styles.billingActions}>
+            {tenant?.stripe_customer_id ? (
+              <button
+                className="btn btn-secondary"
+                onClick={async () => {
+                  const res = await fetch('/api/stripe/portal', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tenantId: tenant.id }),
+                  });
+                  const { url } = await res.json();
+                  if (url) window.location.href = url;
+                }}
+              >
+                Manage Subscription
+              </button>
+            ) : null}
+            {(!tenant?.subscription_status || tenant.subscription_status === 'trialing' || tenant.subscription_status === 'canceled') && (
+              <div className={styles.upgradePlans}>
+                {[
+                  { key: 'starter', name: 'Starter', price: '$25/mo' },
+                  { key: 'growth', name: 'Growth', price: '$75/mo' },
+                  { key: 'professional', name: 'Professional', price: '$150/mo' },
+                ].map(plan => (
+                  <button
+                    key={plan.key}
+                    className={`btn ${plan.key === 'growth' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+                    onClick={async () => {
+                      const res = await fetch('/api/stripe/checkout', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          planKey: plan.key,
+                          tenantId: tenant!.id,
+                          tenantEmail: tenant!.email,
+                          tenantName: tenant!.name,
+                        }),
+                      });
+                      const { url } = await res.json();
+                      if (url) window.location.href = url;
+                    }}
+                  >
+                    {plan.name} — {plan.price}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
 
       <div className={styles.saveBar}>
         <button className="btn btn-primary btn-lg" onClick={handleSave} disabled={saving}>
