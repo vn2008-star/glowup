@@ -1,0 +1,281 @@
+/* ── Calendar Page ── */
+.page { animation: fadeIn 0.4s ease-out; }
+
+.pageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: var(--space-6);
+}
+.pageHeader h1 {
+  font-size: var(--text-2xl);
+  font-weight: 800;
+  margin-bottom: var(--space-1);
+}
+.pageHeader p {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.viewToggle {
+  display: flex;
+  background: var(--bg-surface);
+  border-radius: var(--radius-md);
+  padding: 3px;
+}
+.viewBtn {
+  padding: var(--space-2) var(--space-4);
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.viewBtn:hover { color: var(--text-primary); }
+.activeView {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ── Day View ── */
+.dayView {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  overflow-x: auto;
+}
+.techColumns {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-6);
+  min-width: 600px;
+}
+.techColumn {
+  position: relative;
+}
+.techHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: var(--space-2);
+  font-weight: 700;
+  font-size: var(--text-sm);
+}
+.techAvatar {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--gradient-primary);
+  color: var(--text-inverse);
+  font-weight: 700;
+  font-size: var(--text-sm);
+  border-radius: var(--radius-full);
+}
+.timeGrid {
+  position: relative;
+  min-height: 640px;
+}
+.timeSlot {
+  height: 64px;
+  display: flex;
+  align-items: flex-start;
+  position: relative;
+}
+.timeLabel {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  width: 70px;
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+.slotLine {
+  flex: 1;
+  border-top: 1px solid var(--border-subtle);
+  height: 1px;
+  margin-top: 8px;
+}
+
+/* ── Appointment Blocks ── */
+.appointment {
+  position: absolute;
+  left: 80px;
+  right: 8px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.appointment:hover {
+  background: var(--bg-surface-hover);
+  box-shadow: var(--shadow-md);
+  z-index: 2;
+}
+.aptClient {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.aptService {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+/* ── Week View ── */
+.weekView {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+}
+.weekGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: var(--space-3);
+}
+.weekDay {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  transition: all var(--transition-fast);
+  min-height: 200px;
+}
+.weekDay:hover {
+  border-color: var(--border-default);
+  background: var(--bg-surface);
+}
+.todayCol {
+  border-color: var(--color-accent);
+  background: rgba(195, 126, 218, 0.05);
+}
+.weekDayHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.weekDayName {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+}
+.weekDate {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+.todayDate {
+  color: var(--color-accent);
+}
+.weekBookingCount {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+}
+.bookingNum {
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  font-weight: 800;
+  color: var(--text-primary);
+}
+.bookingLabel {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+.weekSlots {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+.weekSlot {
+  min-height: 12px;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+.weekSlot small {
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.loading {
+  text-align: center;
+  padding: var(--space-12);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.navBtns {
+  display: flex;
+  gap: var(--space-1);
+}
+
+/* ── Modal ── */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  backdrop-filter: blur(4px);
+}
+.modal {
+  background: var(--bg-card);
+  border-radius: var(--radius-xl);
+  padding: var(--space-8);
+  width: 90%;
+  max-width: 560px;
+  box-shadow: var(--shadow-xl);
+}
+.modal h2 {
+  font-size: var(--text-xl);
+  font-weight: 800;
+  margin-bottom: var(--space-6);
+}
+.formGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-bottom: var(--space-3);
+}
+.modalActions {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: flex-end;
+  margin-top: var(--space-6);
+}

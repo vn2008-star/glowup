@@ -1,0 +1,108 @@
+.page { animation: fadeIn 0.4s ease-out; }
+.pageHeader { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: var(--space-8); }
+.pageHeader h1 { font-size: var(--text-2xl); font-weight: 800; margin-bottom: var(--space-1); }
+.pageHeader p { font-size: var(--text-sm); color: var(--text-secondary); }
+
+.staffGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: var(--space-6); }
+
+.staffCard { padding: var(--space-6); display: flex; flex-direction: column; gap: var(--space-4); cursor: pointer; transition: all var(--transition-base); }
+.staffCard:hover { border-color: var(--border-strong); transform: translateY(-2px); }
+.staffCard.inactive { opacity: 0.6; }
+.staffHeader { display: flex; align-items: center; gap: var(--space-4); }
+.staffAvatar {
+  width: 56px; height: 56px; display: flex; align-items: center; justify-content: center;
+  background: var(--gradient-primary); color: var(--text-inverse);
+  font-family: var(--font-display); font-weight: 800; font-size: var(--text-lg);
+  border-radius: var(--radius-lg); flex-shrink: 0;
+}
+.staffHeader h3 { font-size: var(--text-lg); font-weight: 700; margin-bottom: 2px; }
+.staffRole { font-size: var(--text-sm); color: var(--text-tertiary); text-transform: capitalize; }
+
+.specialties { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+.staffStats { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-3); }
+.sStat {
+  display: flex; flex-direction: column; align-items: center; gap: var(--space-1);
+  padding: var(--space-3); background: var(--bg-surface); border-radius: var(--radius-md);
+}
+.sStatValue { font-family: var(--font-display); font-size: var(--text-base); font-weight: 800; color: var(--text-primary); }
+.sStatLabel { font-size: var(--text-xs); color: var(--text-tertiary); }
+
+.staffMeta { display: flex; flex-direction: column; gap: var(--space-2); font-size: var(--text-sm); color: var(--text-secondary); }
+
+.staffActions { display: flex; gap: var(--space-2); border-top: 1px solid var(--border-subtle); padding-top: var(--space-3); margin-top: auto; }
+
+.loading { text-align: center; padding: var(--space-12); color: var(--text-secondary); }
+.empty { text-align: center; padding: var(--space-12); display: flex; flex-direction: column; align-items: center; gap: var(--space-4); color: var(--text-secondary); }
+
+/* Modal */
+.modalOverlay {
+  position: fixed; inset: 0; background: var(--bg-overlay); display: flex;
+  align-items: center; justify-content: center; z-index: var(--z-modal-backdrop); backdrop-filter: blur(4px);
+  animation: fadeIn 0.2s ease-out;
+}
+.modal {
+  background: var(--bg-card); border: 1px solid var(--border-default); border-radius: var(--radius-xl); padding: var(--space-8);
+  width: 90%; max-width: 600px; max-height: 85vh; overflow-y: auto; box-shadow: var(--shadow-xl);
+  animation: fadeInUp 0.3s ease-out;
+}
+.modal h2 { font-size: var(--text-xl); font-weight: 800; margin-bottom: var(--space-6); }
+.formGrid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin-bottom: var(--space-4); }
+.formGroup { display: flex; flex-direction: column; gap: var(--space-1); margin-bottom: var(--space-3); }
+.modalActions { display: flex; gap: var(--space-3); justify-content: flex-end; margin-top: var(--space-6); padding-top: var(--space-4); border-top: 1px solid var(--border-subtle); }
+.checkLabel { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); color: var(--text-secondary); cursor: pointer; }
+.checkLabel input { accent-color: var(--color-primary); }
+
+/* Profile Drawer */
+.profileOverlay {
+  position: fixed; inset: 0; z-index: var(--z-modal-backdrop); background: var(--bg-overlay);
+  animation: fadeIn 0.2s ease-out;
+}
+.profileDrawer {
+  position: fixed; top: 0; right: 0; bottom: 0; width: 440px; max-width: 95vw;
+  background: var(--bg-elevated); border-left: 1px solid var(--border-default);
+  overflow-y: auto; padding: var(--space-8); z-index: var(--z-modal);
+  animation: slideInRight 0.3s ease-out;
+}
+.profileClose {
+  position: absolute; top: var(--space-4); right: var(--space-4);
+  background: var(--bg-surface); border: 1px solid var(--border-default);
+  border-radius: var(--radius-full); width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; color: var(--text-secondary); font-size: 16px;
+  transition: all var(--transition-fast);
+}
+.profileClose:hover { background: var(--bg-surface-hover); color: var(--text-primary); }
+
+.profileHeader { text-align: center; margin-bottom: var(--space-6); padding-bottom: var(--space-6); border-bottom: 1px solid var(--border-subtle); }
+.profileAvatar {
+  width: 72px; height: 72px; display: flex; align-items: center; justify-content: center;
+  background: var(--gradient-primary); color: var(--text-inverse); border-radius: var(--radius-xl);
+  font-family: var(--font-display); font-size: var(--text-2xl); font-weight: 800; margin: 0 auto var(--space-4);
+}
+.profileHeader h2 { font-size: var(--text-xl); font-weight: 700; margin-bottom: var(--space-2); }
+
+.drawerSection { margin-bottom: var(--space-5); }
+.drawerSection h3 { font-size: var(--text-sm); font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: var(--space-3); }
+
+.infoGrid { display: flex; flex-direction: column; gap: var(--space-3); }
+.infoItem { display: flex; align-items: center; gap: var(--space-3); font-size: var(--text-sm); color: var(--text-secondary); }
+
+/* Schedule display */
+.scheduleGrid { display: flex; flex-direction: column; gap: var(--space-2); }
+.scheduleRow { display: flex; justify-content: space-between; align-items: center; padding: var(--space-2) var(--space-3); background: var(--bg-surface); border-radius: var(--radius-sm); font-size: var(--text-sm); }
+.schedDay { font-weight: 600; color: var(--text-primary); width: 40px; }
+.schedTime { color: var(--text-secondary); }
+
+/* Schedule editor */
+.scheduleEditor { display: flex; flex-direction: column; gap: var(--space-3); margin-bottom: var(--space-4); }
+.schedEditRow { display: flex; align-items: center; gap: var(--space-3); }
+.schedEditDay { font-weight: 600; width: 100px; font-size: var(--text-sm); }
+
+.drawerActions { display: flex; gap: var(--space-3); margin-top: var(--space-6); padding-top: var(--space-4); border-top: 1px solid var(--border-subtle); }
+
+@media (max-width: 768px) {
+  .staffGrid { grid-template-columns: 1fr; }
+  .formGrid { grid-template-columns: 1fr; }
+  .schedEditRow { flex-wrap: wrap; }
+}

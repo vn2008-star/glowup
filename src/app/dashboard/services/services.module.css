@@ -1,0 +1,279 @@
+/* ── Services Page ── */
+.page {
+  animation: fadeIn 0.4s ease-out;
+}
+.pageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: var(--space-8);
+}
+.pageHeader h1 {
+  font-size: var(--text-2xl);
+  font-weight: 800;
+  margin-bottom: var(--space-1);
+}
+.pageHeader p {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+/* ── Service Grid ── */
+.serviceGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-4);
+}
+.serviceCard {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: all var(--transition-base);
+}
+.serviceCard:hover {
+  border-color: var(--border-default);
+  box-shadow: var(--shadow-md);
+}
+.serviceCard.inactive {
+  opacity: 0.5;
+}
+
+/* Service Image on Card */
+.serviceImage {
+  width: 100%;
+  height: 160px;
+  overflow: hidden;
+  position: relative;
+}
+.serviceImage img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+.serviceCard:hover .serviceImage img {
+  transform: scale(1.05);
+}
+.serviceCardBody {
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  flex: 1;
+}
+.serviceCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.serviceCategory {
+  display: flex;
+  gap: var(--space-2);
+}
+.editBtn {
+  width: 32px;
+  height: 32px;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+.serviceCard:hover .editBtn {
+  opacity: 1;
+}
+.serviceName {
+  font-size: var(--text-base);
+  font-weight: 700;
+}
+.serviceDesc {
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+  line-height: var(--leading-relaxed);
+  flex: 1;
+}
+.serviceMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+}
+.servicePrice {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: 800;
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.serviceDuration {
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+
+/* ── Modal ── */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: var(--bg-overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-modal);
+  animation: fadeIn 0.2s ease-out;
+}
+.modal {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl);
+  padding: var(--space-8);
+  width: 90%;
+  max-width: 560px;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: fadeInUp 0.3s ease-out;
+}
+.modal h2 {
+  font-size: var(--text-xl);
+  font-weight: 800;
+  margin-bottom: var(--space-6);
+}
+
+/* ── Image Upload ── */
+.imageUploadSection {
+  margin-bottom: var(--space-5);
+}
+.imageDropzone {
+  width: 100%;
+  height: 140px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  border: 2px dashed var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.imageDropzone:hover {
+  border-color: var(--color-primary);
+  background: rgba(195, 126, 218, 0.04);
+}
+.uploadIcon { font-size: 1.5rem; }
+.uploadLabel { font-size: var(--text-sm); font-weight: 700; color: var(--text-primary); }
+.uploadHint { font-size: var(--text-xs); color: var(--text-tertiary); }
+.uploadingText { font-size: var(--text-sm); color: var(--color-primary); font-weight: 600; }
+
+.imagePreview {
+  width: 100%;
+  height: 180px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  position: relative;
+}
+.imagePreview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.imageOverlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+.imagePreview:hover .imageOverlay {
+  opacity: 1;
+}
+.imageChangeBtn,
+.imageRemoveBtn {
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+}
+.imageChangeBtn {
+  background: var(--color-primary);
+  color: #fff;
+}
+.imageRemoveBtn {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+/* ── Form ── */
+.formGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+.formGroup {
+  display: flex;
+  flex-direction: column;
+}
+.fullWidth {
+  grid-column: 1 / -1;
+}
+.formGroup textarea {
+  resize: vertical;
+}
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+/* ── Toggle ── */
+.toggleLabel {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.toggleLabel input {
+  display: none;
+}
+.toggleTrack {
+  width: 40px;
+  height: 22px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-full);
+  position: relative;
+  transition: all var(--transition-fast);
+}
+.toggleThumb {
+  width: 16px;
+  height: 16px;
+  background: var(--text-tertiary);
+  border-radius: var(--radius-full);
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  transition: all var(--transition-fast);
+}
+.toggleLabel input:checked ~ .toggleTrack {
+  background: var(--color-primary-200);
+  border-color: var(--color-primary);
+}
+.toggleLabel input:checked ~ .toggleTrack .toggleThumb {
+  transform: translateX(18px);
+  background: var(--color-primary);
+}
+
+.loading { text-align: center; padding: var(--space-12); color: var(--text-secondary); }
+.empty { text-align: center; padding: var(--space-12); display: flex; flex-direction: column; align-items: center; gap: var(--space-4); color: var(--text-secondary); }

@@ -1,0 +1,91 @@
+/* ── AI Receptionist / Inbox ── */
+.page { animation: fadeIn 0.4s ease-out; display: flex; flex-direction: column; height: calc(100vh - var(--header-height) - 3rem); }
+.pageHeader { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: var(--space-6); flex-shrink: 0; }
+.pageHeader h1 { font-size: var(--text-2xl); font-weight: 800; margin-bottom: var(--space-1); }
+.pageHeader p { font-size: var(--text-sm); color: var(--text-secondary); }
+
+/* ── Inbox Layout ── */
+.inboxLayout { display: grid; grid-template-columns: 340px 1fr; gap: 0; flex: 1; min-height: 0; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); overflow: hidden; }
+
+/* ── Conversation List ── */
+.convoList { background: var(--bg-elevated); border-right: 1px solid var(--border-subtle); display: flex; flex-direction: column; }
+.convoListHeader { padding: var(--space-4); display: flex; gap: var(--space-2); border-bottom: 1px solid var(--border-subtle); }
+.convoLoading, .convoEmpty { padding: var(--space-8); text-align: center; color: var(--text-secondary); font-size: var(--text-sm); display: flex; flex-direction: column; align-items: center; gap: var(--space-3); }
+.convoItems { flex: 1; overflow-y: auto; }
+.convoItem {
+  display: flex; gap: var(--space-3); padding: var(--space-3) var(--space-4);
+  cursor: pointer; transition: all var(--transition-fast); border-bottom: 1px solid var(--border-subtle);
+}
+.convoItem:hover { background: var(--bg-surface); }
+.convoActive { background: var(--bg-surface) !important; border-left: 3px solid var(--color-primary); }
+.convoUnread { background: var(--color-primary-50); }
+.convoIcon { font-size: 1.4rem; flex-shrink: 0; padding-top: 2px; }
+.convoInfo { flex: 1; min-width: 0; }
+.convoName { font-weight: 600; font-size: var(--text-sm); color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.convoPreview { font-size: var(--text-xs); color: var(--text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+.convoMeta { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+.convoTime { font-size: 10px; color: var(--text-tertiary); }
+.unreadBadge {
+  width: 20px; height: 20px; background: var(--color-primary); color: var(--text-inverse);
+  border-radius: var(--radius-full); font-size: 10px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* ── Chat Panel ── */
+.chatPanel { display: flex; flex-direction: column; background: var(--bg-card); }
+.chatHeader {
+  padding: var(--space-4) var(--space-5); border-bottom: 1px solid var(--border-subtle);
+  display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;
+}
+.chatHeader h3 { font-size: var(--text-base); font-weight: 700; }
+.chatChannel { font-size: var(--text-xs); color: var(--text-tertiary); }
+
+.chatMessages { flex: 1; overflow-y: auto; padding: var(--space-4) var(--space-5); display: flex; flex-direction: column; gap: var(--space-3); }
+.chatEmpty { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--text-tertiary); font-size: var(--text-sm); }
+.chatPlaceholder { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-tertiary); gap: var(--space-2); }
+.chatPlaceholder h3 { font-size: var(--text-lg); color: var(--text-secondary); }
+
+/* ── Messages ── */
+.message { display: flex; flex-direction: column; max-width: 75%; }
+.msg_client { align-self: flex-start; }
+.msg_staff { align-self: flex-end; }
+.msg_bot { align-self: flex-start; }
+.messageBubble {
+  padding: var(--space-3) var(--space-4); border-radius: var(--radius-lg); font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+}
+.msg_client .messageBubble { background: var(--bg-surface); color: var(--text-primary); border-bottom-left-radius: 4px; }
+.msg_staff .messageBubble { background: var(--color-primary); color: var(--text-inverse); border-bottom-right-radius: 4px; }
+.msg_bot .messageBubble { background: var(--color-accent-dark); color: white; border-bottom-left-radius: 4px; }
+.messageTime { font-size: 10px; color: var(--text-tertiary); margin-top: 2px; padding: 0 var(--space-2); }
+.msg_staff .messageTime { text-align: right; }
+
+/* ── Compose ── */
+.chatCompose { padding: var(--space-3) var(--space-4); border-top: 1px solid var(--border-subtle); flex-shrink: 0; }
+.composeForm { display: flex; gap: var(--space-2); align-items: center; }
+.quickReplies {
+  display: flex; flex-wrap: wrap; gap: var(--space-2); padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border-subtle); margin-bottom: var(--space-2);
+}
+.quickReply {
+  padding: var(--space-2) var(--space-3); background: var(--bg-surface); border: 1px solid var(--border-default);
+  border-radius: var(--radius-full); font-size: var(--text-xs); color: var(--text-secondary);
+  cursor: pointer; transition: all var(--transition-fast); max-width: 280px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.quickReply:hover { background: var(--bg-surface-hover); color: var(--text-primary); border-color: var(--border-strong); }
+
+/* ── Config Panel ── */
+.configPanel { flex: 1; overflow-y: auto; }
+.configCard { padding: var(--space-8); max-width: 700px; }
+.configCard h2 { font-size: var(--text-xl); font-weight: 700; margin-bottom: var(--space-2); }
+.configDesc { font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-6); }
+.configGroup { margin-bottom: var(--space-5); }
+.faqRow { display: flex; gap: var(--space-2); margin-bottom: var(--space-2); align-items: center; }
+.faqRow .input { flex: 1; }
+
+@media (max-width: 768px) {
+  .inboxLayout { grid-template-columns: 1fr; }
+  .convoList { max-height: 300px; }
+  .message { max-width: 90%; }
+}

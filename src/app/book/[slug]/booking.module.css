@@ -1,0 +1,709 @@
+/* ── Public Booking Page ── */
+/* Client-facing — must feel polished, premium, trustworthy */
+
+.page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0f0f14 0%, #1a1520 50%, #0f1419 100%);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 2rem 1rem;
+  font-family: var(--font-body, 'Inter', -apple-system, sans-serif);
+}
+
+.container {
+  width: 100%;
+  max-width: 640px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* ── Header / Brand ── */
+.header {
+  text-align: center;
+  padding: 1.5rem 0;
+}
+.businessBrand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+}
+.businessLogo {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  object-fit: cover;
+}
+.businessLogoFallback {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #c37eda, #e8a87c);
+  color: #fff;
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+.businessName {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #f0f0f5;
+  line-height: 1.2;
+}
+.businessAddress {
+  font-size: 0.8rem;
+  color: #8b8b9e;
+  margin-top: 2px;
+}
+
+/* ── Progress Steps ── */
+.progress {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 0 1rem;
+}
+.progressStep {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  position: relative;
+}
+.progressStep::after {
+  content: '';
+  position: absolute;
+  top: 14px;
+  left: calc(50% + 14px);
+  width: calc(100% - 28px);
+  height: 2px;
+  background: #2a2a3d;
+}
+.progressStep:last-child::after { display: none; }
+.progressDone::after { background: #c37eda; }
+
+.progressDot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  background: #1e1e2e;
+  color: #5a5a7a;
+  border: 2px solid #2a2a3d;
+  z-index: 1;
+  transition: all 0.3s ease;
+}
+.progressActive .progressDot {
+  background: linear-gradient(135deg, #c37eda, #e8a87c);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 0 16px rgba(195, 126, 218, 0.4);
+}
+.progressDone .progressDot {
+  background: #c37eda;
+  color: #fff;
+  border-color: #c37eda;
+}
+.progressLabel {
+  font-size: 10px;
+  font-weight: 600;
+  color: #5a5a7a;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.progressActive .progressLabel { color: #f0f0f5; }
+.progressDone .progressLabel { color: #c37eda; }
+
+/* ── Step Content Container ── */
+.stepContent {
+  background: #16161f;
+  border-radius: 16px;
+  border: 1px solid #2a2a3d;
+  overflow: hidden;
+}
+.stepPanel {
+  padding: 2rem;
+  animation: fadeSlide 0.35s ease-out;
+}
+@keyframes fadeSlide {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.stepTitle {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #f0f0f5;
+  margin-bottom: 4px;
+}
+.stepSubtitle {
+  font-size: 0.85rem;
+  color: #8b8b9e;
+  margin-bottom: 1.5rem;
+}
+
+/* ── Step 0: Services ── */
+.serviceCategory { margin-bottom: 1.5rem; }
+.categoryName {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #c37eda;
+  margin-bottom: 0.75rem;
+}
+.serviceGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.serviceCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  background: #1e1e2e;
+  border: 1px solid #2a2a3d;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+  width: 100%;
+}
+.serviceCard:hover {
+  border-color: #c37eda;
+  background: #1e1e30;
+  transform: translateX(4px);
+}
+.serviceSelected {
+  border-color: #c37eda;
+  background: rgba(195, 126, 218, 0.08);
+  box-shadow: 0 0 20px rgba(195, 126, 218, 0.12);
+}
+.serviceWithImage {
+  flex-direction: row;
+  gap: 0;
+}
+.serviceThumb {
+  width: 64px;
+  height: 64px;
+  border-radius: 10px;
+  overflow: hidden;
+  flex-shrink: 0;
+  margin-right: 1rem;
+}
+.serviceThumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.serviceInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.serviceName {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #f0f0f5;
+}
+.serviceDesc {
+  font-size: 0.78rem;
+  color: #8b8b9e;
+}
+.serviceMeta {
+  font-size: 0.72rem;
+  color: #6b6b8a;
+  font-weight: 500;
+}
+.servicePrice {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #e8a87c;
+  white-space: nowrap;
+  font-family: var(--font-display, 'Inter', sans-serif);
+}
+
+/* ── Step 1: Staff ── */
+.staffGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.staffCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1.25rem 1rem;
+  background: #1e1e2e;
+  border: 1px solid #2a2a3d;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.staffCard:hover {
+  border-color: #c37eda;
+  transform: translateY(-2px);
+}
+.staffSelected {
+  border-color: #c37eda;
+  background: rgba(195, 126, 218, 0.08);
+  box-shadow: 0 0 20px rgba(195, 126, 218, 0.12);
+}
+.staffAvatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #c37eda55, #e8a87c55);
+  color: #f0f0f5;
+  font-weight: 800;
+  font-size: 0.9rem;
+}
+.staffName {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #f0f0f5;
+  text-align: center;
+}
+.staffSpecialty {
+  font-size: 0.7rem;
+  color: #8b8b9e;
+  text-align: center;
+}
+
+/* ── Step 2: Date & Time ── */
+.dateGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+.dateCard {
+  padding: 0.75rem;
+  background: #1e1e2e;
+  border: 1px solid #2a2a3d;
+  border-radius: 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #c0c0d8;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+.dateCard:hover {
+  border-color: #c37eda;
+  color: #f0f0f5;
+}
+.dateSelected {
+  background: rgba(195, 126, 218, 0.1);
+  border-color: #c37eda;
+  color: #f0f0f5;
+}
+.timeSectionTitle {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #8b8b9e;
+  margin-bottom: 0.75rem;
+}
+.timeGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(95px, 1fr));
+  gap: 0.5rem;
+}
+.timeSlot {
+  padding: 0.6rem 0.5rem;
+  background: #1e1e2e;
+  border: 1px solid #2a2a3d;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #c0c0d8;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+.timeSlot:hover {
+  border-color: #c37eda;
+  color: #f0f0f5;
+}
+.timeSelected {
+  background: linear-gradient(135deg, #c37eda, #e8a87c);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(195, 126, 218, 0.3);
+}
+.noSlots {
+  color: #6b6b8a;
+  font-size: 0.85rem;
+  font-style: italic;
+  padding: 1rem 0;
+}
+
+/* ── Step 3: Client Info Form ── */
+.clientForm {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.formRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.formGroup label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #8b8b9e;
+}
+.optionalLabel {
+  text-transform: none;
+  font-weight: 500;
+  color: #5a5a7a;
+}
+.formGroup input,
+.formGroup textarea {
+  padding: 0.75rem 1rem;
+  background: #1e1e2e;
+  border: 1px solid #2a2a3d;
+  border-radius: 10px;
+  color: #f0f0f5;
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.2s ease;
+  font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+.formGroup input:focus,
+.formGroup textarea:focus {
+  border-color: #c37eda;
+}
+.formGroup input::placeholder,
+.formGroup textarea::placeholder {
+  color: #4a4a6a;
+}
+.formGroup textarea { resize: vertical; }
+
+/* ── Step 4: Summary ── */
+.summaryCard {
+  background: #1e1e2e;
+  border: 1px solid #2a2a3d;
+  border-radius: 14px;
+  padding: 0;
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+.summaryRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.85rem 1.25rem;
+  border-bottom: 1px solid #23233a;
+}
+.summaryRow:last-child { border-bottom: none; }
+.summaryLabel {
+  font-size: 0.82rem;
+  color: #8b8b9e;
+}
+.summaryValue {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #f0f0f5;
+}
+.summaryTotal {
+  background: rgba(195, 126, 218, 0.06);
+}
+.summaryTotal .summaryValue {
+  font-size: 1.1rem;
+  color: #e8a87c;
+  font-family: var(--font-display, 'Inter', sans-serif);
+}
+.clientSummary {
+  padding: 1rem 1.25rem;
+  background: #1a1a28;
+  border-radius: 10px;
+  margin-bottom: 1.5rem;
+}
+.clientSummary p {
+  font-size: 0.85rem;
+  color: #c0c0d8;
+  line-height: 1.6;
+}
+.clientSummary strong {
+  color: #f0f0f5;
+}
+
+/* ── Buttons ── */
+.stepActions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1rem;
+}
+.backBtn {
+  background: none;
+  border: none;
+  color: #8b8b9e;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.5rem 0;
+  transition: color 0.2s ease;
+}
+.backBtn:hover { color: #f0f0f5; }
+.nextBtn {
+  padding: 0.75rem 1.75rem;
+  background: linear-gradient(135deg, #c37eda, #e8a87c);
+  border: none;
+  border-radius: 10px;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.nextBtn:hover {
+  box-shadow: 0 4px 20px rgba(195, 126, 218, 0.35);
+  transform: translateY(-1px);
+}
+.nextBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+.confirmBtn {
+  padding: 0.85rem 2rem;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  border: none;
+  border-radius: 10px;
+  color: #fff;
+  font-weight: 800;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.confirmBtn:hover {
+  box-shadow: 0 4px 20px rgba(34, 197, 94, 0.35);
+  transform: translateY(-1px);
+}
+.confirmBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ── Footer ── */
+.footer {
+  text-align: center;
+  padding: 1rem 0;
+}
+.footer p {
+  font-size: 0.7rem;
+  color: #4a4a6a;
+}
+.footer strong {
+  color: #c37eda;
+  font-weight: 700;
+}
+
+/* ── Loading State ── */
+.loadingState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 4rem 2rem;
+  color: #8b8b9e;
+}
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid #2a2a3d;
+  border-top-color: #c37eda;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Error State ── */
+.errorState {
+  text-align: center;
+  padding: 4rem 2rem;
+}
+.errorState h2 {
+  font-size: 1.5rem;
+  color: #f0f0f5;
+  margin-bottom: 0.5rem;
+}
+.errorState p {
+  color: #8b8b9e;
+  font-size: 0.9rem;
+}
+
+/* ── Success State ── */
+.successCard {
+  background: #16161f;
+  border: 1px solid #2a2a3d;
+  border-radius: 20px;
+  padding: 3rem 2rem;
+  text-align: center;
+  max-width: 480px;
+  margin: 2rem auto;
+  animation: fadeSlide 0.5s ease-out;
+}
+.successIcon {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1.5rem;
+  font-size: 2rem;
+  color: #fff;
+  font-weight: 800;
+  box-shadow: 0 0 30px rgba(34, 197, 94, 0.3);
+}
+.successCard h2 {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #f0f0f5;
+  margin-bottom: 0.25rem;
+}
+.successBusiness {
+  font-size: 0.9rem;
+  color: #c37eda;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+}
+.successDetails {
+  background: #1e1e2e;
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 1.5rem;
+}
+.successRow {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid #23233a;
+}
+.successRow:last-child { border-bottom: none; }
+.successRow span { font-size: 0.82rem; color: #8b8b9e; }
+.successRow strong { font-size: 0.85rem; color: #f0f0f5; }
+.successNote {
+  font-size: 0.82rem;
+  color: #6b6b8a;
+}
+
+/* ── Birthday ── */
+.birthdayHint {
+  font-size: 0.72rem;
+  color: #e8a87c;
+  font-weight: 500;
+  line-height: 1.4;
+}
+.birthdayPrompt {
+  background: linear-gradient(135deg, rgba(232, 168, 124, 0.08), rgba(195, 126, 218, 0.08));
+  border: 1px solid rgba(232, 168, 124, 0.2);
+  border-radius: 14px;
+  padding: 1.25rem;
+  margin: 1rem 0;
+  text-align: center;
+}
+.birthdayPromptTitle {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #f0f0f5;
+  margin-bottom: 4px;
+}
+.birthdayPromptText {
+  font-size: 0.8rem;
+  color: #8b8b9e;
+  margin-bottom: 1rem;
+  line-height: 1.5;
+}
+.birthdayPromptForm {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: center;
+}
+.birthdayPromptForm input {
+  padding: 0.6rem 0.75rem;
+  background: #1e1e2e;
+  border: 1px solid #2a2a3d;
+  border-radius: 8px;
+  color: #f0f0f5;
+  font-size: 0.85rem;
+  outline: none;
+}
+.birthdayPromptForm input:focus {
+  border-color: #e8a87c;
+}
+.birthdayPromptBtn {
+  padding: 0.6rem 1.25rem;
+  background: linear-gradient(135deg, #e8a87c, #c37eda);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+.birthdayPromptBtn:hover {
+  box-shadow: 0 4px 16px rgba(232, 168, 124, 0.3);
+  transform: translateY(-1px);
+}
+.birthdayPromptBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+.birthdayConfirmed {
+  font-size: 0.85rem;
+  color: #e8a87c;
+  font-weight: 600;
+  text-align: center;
+  margin: 1rem 0;
+}
+
+/* ── Responsive ── */
+@media (max-width: 480px) {
+  .page { padding: 1rem 0.5rem; }
+  .stepPanel { padding: 1.25rem; }
+  .formRow { grid-template-columns: 1fr; }
+  .dateGrid { grid-template-columns: repeat(3, 1fr); }
+  .timeGrid { grid-template-columns: repeat(3, 1fr); }
+  .progressLabel { display: none; }
+  .staffGrid { grid-template-columns: repeat(2, 1fr); }
+}

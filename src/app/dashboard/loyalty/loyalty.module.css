@@ -1,0 +1,61 @@
+.page { animation: fadeIn 0.4s ease-out; }
+.pageHeader { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: var(--space-8); }
+.pageHeader h1 { font-size: var(--text-2xl); font-weight: 800; margin-bottom: var(--space-1); }
+.pageHeader p { font-size: var(--text-sm); color: var(--text-secondary); }
+
+/* KPI Row */
+.kpiRow { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); margin-bottom: var(--space-8); }
+.kpiCard { display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--space-2); }
+.kpiLabel { font-size: var(--text-xs); color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+.kpiValue { font-family: var(--font-display); font-size: var(--text-3xl); font-weight: 800; color: var(--text-primary); }
+
+.tiersGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-4); margin-bottom: var(--space-8); }
+.tierCard {
+  display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--space-3); padding: var(--space-6);
+}
+.tierIcon {
+  width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;
+  border-radius: var(--radius-full); color: var(--text-inverse);
+  font-family: var(--font-display); font-weight: 800; font-size: var(--text-lg);
+}
+.tierCard h3 { font-size: var(--text-lg); font-weight: 700; }
+.tierThreshold { font-size: var(--text-sm); color: var(--text-tertiary); }
+.tierClients { font-family: var(--font-display); font-size: var(--text-xl); font-weight: 800; color: var(--text-primary); }
+.tierPerks { font-size: var(--text-xs); color: var(--text-secondary); line-height: var(--leading-relaxed); }
+
+.activityCard { padding: var(--space-6); }
+.activityCard h2 { font-size: var(--text-lg); font-weight: 700; margin-bottom: var(--space-5); }
+.activityList { display: flex; flex-direction: column; }
+.activityRow {
+  display: grid; grid-template-columns: 1fr 1fr auto 80px;
+  gap: var(--space-4); padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border-subtle); font-size: var(--text-sm);
+}
+.activityClient { font-weight: 600; color: var(--text-primary); }
+.activityAction { color: var(--text-secondary); }
+.activityPoints { font-weight: 700; text-align: right; }
+.positive { color: var(--color-success); }
+.negative { color: var(--color-danger); }
+.activityDate { color: var(--text-tertiary); text-align: right; }
+
+/* Edit Tiers Modal */
+.modalOverlay {
+  position: fixed; inset: 0; background: var(--bg-overlay); z-index: var(--z-modal-backdrop);
+  display: flex; align-items: center; justify-content: center; animation: fadeIn 0.2s ease-out;
+}
+.modal {
+  background: var(--bg-card); border: 1px solid var(--border-default); border-radius: var(--radius-xl);
+  padding: var(--space-8); width: 700px; max-width: 95vw; max-height: 85vh; overflow-y: auto;
+  animation: fadeInUp 0.3s ease-out;
+}
+.modal h2 { font-size: var(--text-xl); font-weight: 700; margin-bottom: var(--space-6); }
+.tierEditRow {
+  display: flex; gap: var(--space-3); align-items: center; margin-bottom: var(--space-3);
+}
+.modalActions { display: flex; justify-content: flex-end; gap: var(--space-3); margin-top: var(--space-6); padding-top: var(--space-4); border-top: 1px solid var(--border-subtle); }
+
+@media (max-width: 768px) {
+  .tiersGrid { grid-template-columns: repeat(2, 1fr); }
+  .kpiRow { grid-template-columns: 1fr; }
+  .tierEditRow { flex-direction: column; }
+}

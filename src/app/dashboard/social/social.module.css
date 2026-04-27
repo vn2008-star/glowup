@@ -1,0 +1,100 @@
+/* ── Social Media Engine ── */
+.page { animation: fadeIn 0.4s ease-out; }
+.pageHeader { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: var(--space-6); }
+.pageHeader h1 { font-size: var(--text-2xl); font-weight: 800; margin-bottom: var(--space-1); }
+.pageHeader p { font-size: var(--text-sm); color: var(--text-secondary); }
+
+.summaryGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-4); margin-bottom: var(--space-6); }
+.summaryCard { display: flex; flex-direction: column; align-items: center; gap: var(--space-2); }
+.summaryLabel { font-size: var(--text-xs); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-tertiary); }
+.summaryValue { font-family: var(--font-display); font-size: var(--text-3xl); font-weight: 800; color: var(--text-primary); }
+
+.tabs { display: flex; gap: var(--space-1); margin-bottom: var(--space-6); border-bottom: 1px solid var(--border-subtle); }
+.tab {
+  padding: var(--space-3) var(--space-5); background: none; border: none; border-bottom: 2px solid transparent;
+  font-size: var(--text-sm); font-weight: 600; color: var(--text-tertiary); cursor: pointer;
+  transition: all var(--transition-fast); margin-bottom: -1px;
+}
+.tab:hover { color: var(--text-primary); }
+.activeTab { color: var(--text-primary); border-bottom-color: var(--color-primary); }
+
+.loading { text-align: center; padding: var(--space-12); color: var(--text-secondary); }
+.empty { text-align: center; padding: var(--space-12); color: var(--text-secondary); }
+
+/* ── Post List ── */
+.postList { display: flex; flex-direction: column; gap: var(--space-4); }
+.postCard { padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-3); }
+.postHeader { display: flex; justify-content: space-between; align-items: center; }
+.postPlatforms { display: flex; gap: var(--space-2); }
+.platformIcon { font-size: 1.2rem; }
+.postContent { font-size: var(--text-sm); color: var(--text-secondary); line-height: var(--leading-relaxed); white-space: pre-line; }
+.postMeta { display: flex; align-items: center; gap: var(--space-3); }
+.postDate { font-size: var(--text-xs); color: var(--text-tertiary); }
+.postStats {
+  display: flex; gap: var(--space-4); font-size: var(--text-sm); color: var(--text-secondary);
+  padding-top: var(--space-3); border-top: 1px solid var(--border-subtle);
+}
+
+/* ── Calendar ── */
+.calendarCard { padding: var(--space-6); }
+.calendarNav { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4); }
+.calendarNav h3 { font-size: var(--text-lg); font-weight: 700; }
+.calendarGrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: var(--border-subtle); border-radius: var(--radius-md); overflow: hidden; }
+.calendarDayHeader {
+  padding: var(--space-2); text-align: center; font-size: var(--text-xs); font-weight: 600;
+  color: var(--text-tertiary); text-transform: uppercase; background: var(--bg-surface);
+}
+.calendarDay {
+  min-height: 80px; padding: var(--space-2); background: var(--bg-card);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.calendarDay.empty { background: var(--bg-elevated); }
+.dayNumber { font-size: var(--text-xs); font-weight: 600; color: var(--text-secondary); margin-bottom: 2px; }
+.calendarPost {
+  font-size: 10px; padding: 2px 4px; border-radius: 3px; cursor: pointer;
+  background: var(--color-primary-100); color: var(--color-primary); transition: all var(--transition-fast);
+}
+.calendarPost:hover { background: var(--color-primary-200); }
+.status_published { background: var(--color-success-bg); color: var(--color-success); }
+.status_scheduled { background: var(--color-info-bg); color: var(--color-info); }
+
+/* ── Templates ── */
+.templateGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--space-4); }
+.templateCard {
+  padding: var(--space-5); cursor: pointer; display: flex; flex-direction: column; gap: var(--space-3);
+  transition: all var(--transition-base);
+}
+.templateCard:hover { border-color: var(--color-primary); transform: translateY(-2px); }
+.templateCard h3 { font-size: var(--text-base); font-weight: 700; }
+.templateCard p { font-size: var(--text-sm); color: var(--text-secondary); flex: 1; }
+
+/* ── Modal ── */
+.modalOverlay {
+  position: fixed; inset: 0; background: var(--bg-overlay); z-index: var(--z-modal-backdrop);
+  display: flex; align-items: center; justify-content: center; animation: fadeIn 0.2s ease-out;
+}
+.modal {
+  background: var(--bg-card); border: 1px solid var(--border-default); border-radius: var(--radius-xl);
+  padding: var(--space-8); width: 600px; max-width: 95vw; max-height: 85vh; overflow-y: auto;
+  animation: fadeInUp 0.3s ease-out; box-shadow: var(--shadow-xl);
+}
+.modal h2 { font-size: var(--text-xl); font-weight: 700; margin-bottom: var(--space-6); }
+.formGroup { display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-4); }
+.formRow { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+.modalActions { display: flex; justify-content: flex-end; gap: var(--space-3); margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--border-subtle); }
+
+.platformPicker { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.platformBtn {
+  padding: var(--space-2) var(--space-4); border-radius: var(--radius-full);
+  background: var(--bg-surface); border: 1px solid var(--border-default);
+  color: var(--text-secondary); font-size: var(--text-sm); cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.platformBtn:hover { border-color: var(--border-strong); color: var(--text-primary); }
+.platformActive { background: var(--color-primary-100); border-color: var(--color-primary); color: var(--color-primary); }
+
+@media (max-width: 768px) {
+  .summaryGrid { grid-template-columns: repeat(2, 1fr); }
+  .formRow { grid-template-columns: 1fr; }
+  .templateGrid { grid-template-columns: 1fr; }
+}

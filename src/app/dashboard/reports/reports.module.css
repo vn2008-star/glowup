@@ -1,0 +1,41 @@
+.page { animation: fadeIn 0.4s ease-out; }
+.pageHeader { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: var(--space-8); }
+.pageHeader h1 { font-size: var(--text-2xl); font-weight: 800; margin-bottom: var(--space-1); }
+.pageHeader p { font-size: var(--text-sm); color: var(--text-secondary); }
+
+.kpiGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-4); margin-bottom: var(--space-6); }
+.kpiCard { display: flex; flex-direction: column; gap: var(--space-2); }
+.kpiLabel { font-size: var(--text-xs); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-tertiary); }
+.kpiValue { font-family: var(--font-display); font-size: var(--text-3xl); font-weight: 800; color: var(--text-primary); }
+.kpiChange { font-size: var(--text-xs); font-weight: 600; color: var(--text-tertiary); }
+.positive { color: var(--color-success); }
+
+.chartCard { padding: var(--space-6); margin-bottom: var(--space-6); }
+.chartCard h2 { font-size: var(--text-lg); font-weight: 700; margin-bottom: var(--space-6); }
+.barChart { display: flex; align-items: flex-end; justify-content: center; gap: var(--space-8); height: 200px; }
+.barGroup { display: flex; flex-direction: column; align-items: center; gap: var(--space-2); height: 100%; }
+.barWrapper { flex: 1; display: flex; align-items: flex-end; width: 60px; }
+.bar {
+  width: 100%; background: var(--gradient-primary); border-radius: var(--radius-md) var(--radius-md) 0 0;
+  display: flex; align-items: flex-start; justify-content: center; padding-top: var(--space-2);
+  transition: height 0.5s ease; min-height: 20px;
+}
+.barValue { font-size: var(--text-xs); font-weight: 700; color: var(--text-inverse); }
+.barLabel { font-size: var(--text-sm); font-weight: 600; color: var(--text-secondary); }
+
+.topServicesCard { padding: var(--space-6); }
+.topServicesCard h2 { font-size: var(--text-lg); font-weight: 700; margin-bottom: var(--space-5); }
+.servicesList { display: flex; flex-direction: column; gap: var(--space-3); }
+.serviceRow {
+  display: grid; grid-template-columns: 40px 1fr 100px 80px;
+  align-items: center; gap: var(--space-3); padding: var(--space-2) 0;
+}
+.serviceRank { font-family: var(--font-display); font-weight: 800; color: var(--text-tertiary); font-size: var(--text-sm); }
+.serviceInfo { display: flex; flex-direction: column; gap: var(--space-1); }
+.serviceName { font-size: var(--text-sm); font-weight: 600; color: var(--text-primary); }
+.serviceBar { height: 6px; background: var(--bg-surface); border-radius: var(--radius-full); overflow: hidden; }
+.serviceBarFill { height: 100%; background: var(--gradient-primary); border-radius: var(--radius-full); transition: width 0.5s ease; }
+.serviceBookings { font-size: var(--text-sm); color: var(--text-secondary); text-align: right; }
+.serviceRevenue { font-size: var(--text-sm); font-weight: 700; color: var(--text-primary); text-align: right; font-family: var(--font-display); }
+
+@media (max-width: 768px) { .kpiGrid { grid-template-columns: repeat(2, 1fr); } }

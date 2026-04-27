@@ -1,0 +1,56 @@
+.page { animation: fadeIn 0.4s ease-out; }
+.pageHeader { margin-bottom: var(--space-8); }
+.pageHeader h1 { font-size: var(--text-2xl); font-weight: 800; margin-bottom: var(--space-1); }
+.pageHeader p { font-size: var(--text-sm); color: var(--text-secondary); }
+
+.section { padding: var(--space-6); margin-bottom: var(--space-6); }
+.section h2 { font-size: var(--text-lg); font-weight: 700; margin-bottom: var(--space-5); padding-bottom: var(--space-3); border-bottom: 1px solid var(--border-subtle); }
+
+.formGrid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+.formGroup { display: flex; flex-direction: column; }
+.fullWidth { grid-column: 1 / -1; }
+
+.hoursList { display: flex; flex-direction: column; gap: var(--space-3); }
+.hoursRow { display: flex; align-items: center; gap: var(--space-4); padding: var(--space-2) 0; }
+.dayName { width: 100px; font-size: var(--text-sm); font-weight: 600; color: var(--text-primary); }
+.hoursInputs { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); color: var(--text-tertiary); }
+.closedToggle {
+  display: flex; align-items: center; gap: var(--space-2);
+  font-size: var(--text-sm); color: var(--text-tertiary); cursor: pointer; margin-left: auto;
+}
+
+.saveBar { display: flex; justify-content: flex-end; padding-top: var(--space-4); }
+
+/* Booking Link */
+.bookingLinkRow {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+}
+.bookingLinkRow input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Client Protection Toggle */
+.protectionToggle {
+  display: flex; align-items: center; gap: var(--space-3); cursor: pointer;
+  font-size: var(--text-sm); color: var(--text-primary); font-weight: 500;
+}
+.protectionToggle input { display: none; }
+.toggleTrack {
+  width: 44px; height: 24px; background: var(--bg-surface); border: 1px solid var(--border-default);
+  border-radius: var(--radius-full); position: relative; transition: all var(--transition-fast); flex-shrink: 0;
+}
+.toggleThumb {
+  width: 18px; height: 18px; background: var(--text-tertiary); border-radius: var(--radius-full);
+  position: absolute; top: 2px; left: 2px; transition: all var(--transition-fast);
+}
+.protectionToggle input:checked ~ .toggleTrack {
+  background: var(--color-primary-200); border-color: var(--color-primary);
+}
+.protectionToggle input:checked ~ .toggleTrack .toggleThumb {
+  transform: translateX(20px); background: var(--color-primary);
+}
+
+@media (max-width: 768px) { .formGrid { grid-template-columns: 1fr; } }

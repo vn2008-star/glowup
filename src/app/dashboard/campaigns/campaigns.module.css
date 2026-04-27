@@ -1,0 +1,292 @@
+/* ── Campaigns Page ── */
+.page { animation: fadeIn 0.4s ease-out; }
+
+.pageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: var(--space-6);
+}
+.pageHeader h1 {
+  font-size: var(--text-2xl);
+  font-weight: 800;
+  margin-bottom: var(--space-1);
+}
+.pageHeader p {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+/* ── Summary ── */
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+.summaryCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.summaryLabel {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-tertiary);
+}
+.summaryValue {
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  font-weight: 800;
+  color: var(--text-primary);
+}
+.summaryChange {
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+.positive { color: var(--color-success); }
+
+/* ── Tabs ── */
+.tabs {
+  display: flex;
+  gap: var(--space-1);
+  margin-bottom: var(--space-6);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.tab {
+  padding: var(--space-3) var(--space-5);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  margin-bottom: -1px;
+}
+.tab:hover { color: var(--text-primary); }
+.activeTab {
+  color: var(--text-primary);
+  border-bottom-color: var(--color-primary);
+}
+
+/* ── Campaign Cards ── */
+.campaignList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.campaignCard {
+  padding: var(--space-5);
+}
+.campaignHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--space-4);
+}
+.campaignHeader h3 {
+  font-size: var(--text-base);
+  font-weight: 700;
+  margin-bottom: var(--space-2);
+}
+.campaignMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.lastSent {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+.messagePreview {
+  padding: var(--space-4);
+  background: var(--bg-surface);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--color-primary);
+  margin-bottom: var(--space-4);
+}
+.messagePreview p {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: var(--leading-relaxed);
+  font-style: italic;
+}
+.campaignStats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-4);
+}
+.campaignStat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  background: var(--bg-surface);
+  border-radius: var(--radius-md);
+}
+.cStatValue {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 800;
+  color: var(--text-primary);
+}
+.cStatLabel {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+/* ── Automations ── */
+.automationList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.automationCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-5);
+}
+.automationInfo h3 {
+  font-size: var(--text-base);
+  font-weight: 700;
+  margin-bottom: var(--space-2);
+}
+.automationMeta {
+  display: flex;
+  gap: var(--space-4);
+}
+.trigger, .channel {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+/* ── Toggle ── */
+.toggleLabel {
+  display: flex;
+  cursor: pointer;
+}
+.toggleLabel input { display: none; }
+.toggleTrack {
+  width: 44px;
+  height: 24px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-full);
+  position: relative;
+  transition: all var(--transition-fast);
+}
+.toggleThumb {
+  width: 18px;
+  height: 18px;
+  background: var(--text-tertiary);
+  border-radius: var(--radius-full);
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  transition: all var(--transition-fast);
+}
+.toggleLabel input:checked ~ .toggleTrack {
+  background: var(--color-primary-200);
+  border-color: var(--color-primary);
+}
+.toggleLabel input:checked ~ .toggleTrack .toggleThumb {
+  transform: translateX(20px);
+  background: var(--color-primary);
+}
+
+/* ── Modal ── */
+.modalOverlay {
+  position: fixed; inset: 0; background: var(--bg-overlay); z-index: var(--z-modal-backdrop);
+  display: flex; align-items: center; justify-content: center; animation: fadeIn 0.2s ease-out;
+}
+.modal {
+  background: var(--bg-card); border: 1px solid var(--border-default); border-radius: var(--radius-xl);
+  padding: var(--space-8); width: 600px; max-width: 95vw; max-height: 85vh; overflow-y: auto;
+  animation: fadeInUp 0.3s ease-out; box-shadow: var(--shadow-xl);
+}
+.modal h2 { font-size: var(--text-xl); font-weight: 700; margin-bottom: var(--space-6); }
+.formGrid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+.formGroup { display: flex; flex-direction: column; gap: var(--space-1); }
+.modalActions { display: flex; justify-content: flex-end; gap: var(--space-3); margin-top: var(--space-6); padding-top: var(--space-4); border-top: 1px solid var(--border-subtle); }
+
+/* ── Holiday Cards ── */
+.holidayGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--space-4);
+}
+.holidayCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  position: relative;
+  overflow: hidden;
+}
+.holidayCard::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--gradient-primary);
+}
+.holidayHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.holidayEmoji {
+  font-size: 2rem;
+  line-height: 1;
+}
+.holidayName {
+  font-size: var(--text-base);
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.holidayDate {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+.holidayCountdown {
+  color: var(--color-primary);
+  font-weight: 700;
+}
+.holidayIdea {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  line-height: var(--leading-relaxed);
+  background: var(--bg-surface);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+}
+.holidayPreview {
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+  line-height: var(--leading-relaxed);
+  padding: var(--space-3);
+  background: var(--bg-elevated);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--color-primary);
+  font-style: italic;
+}
+.holidayActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .summaryGrid { grid-template-columns: 1fr; }
+  .campaignStats { grid-template-columns: repeat(2, 1fr); }
+  .formGrid { grid-template-columns: 1fr; }
+  .holidayGrid { grid-template-columns: 1fr; }
+}

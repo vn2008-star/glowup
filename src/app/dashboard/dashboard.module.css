@@ -1,0 +1,199 @@
+/* ── Dashboard Layout ── */
+.layout {
+  display: flex;
+  min-height: 100vh;
+  background: var(--bg-base);
+}
+
+/* ── Sidebar ── */
+.sidebar {
+  width: var(--sidebar-width);
+  background: var(--bg-elevated);
+  border-right: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: calc(var(--z-sticky) + 10);
+}
+.sidebarHeader {
+  padding: var(--space-5) var(--space-5);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.logo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: var(--text-lg);
+  color: var(--text-primary) !important;
+  text-decoration: none;
+}
+.logo svg { color: var(--color-primary); }
+
+.sidebarNav {
+  flex: 1;
+  padding: var(--space-4) var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  overflow-y: auto;
+}
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-secondary) !important;
+  text-decoration: none;
+  transition: all var(--transition-fast);
+}
+.navItem:hover {
+  background: var(--bg-surface);
+  color: var(--text-primary) !important;
+}
+.navItem svg {
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+.navItem:hover svg {
+  opacity: 1;
+}
+
+.navItemActive {
+  background: var(--bg-surface);
+  color: var(--text-primary) !important;
+}
+.navItemActive svg {
+  opacity: 1;
+  color: var(--color-primary);
+}
+
+.sidebarFooter {
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.salonInfo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.logoutButton {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+.logoutButton:hover {
+  background: var(--bg-surface);
+  color: var(--color-error, #ef4444);
+}
+.staffName {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+.salonAvatar {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--gradient-primary);
+  color: var(--text-inverse);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--text-sm);
+  border-radius: var(--radius-md);
+}
+.salonName {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.salonPlan {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+/* ── Main Content ── */
+.content {
+  flex: 1;
+  margin-left: var(--sidebar-width);
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-width: 0;
+}
+
+.topBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4) var(--space-6);
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border-subtle);
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+}
+.searchBar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  width: 360px;
+  transition: border-color var(--transition-fast);
+}
+.searchBar:focus-within {
+  border-color: var(--color-accent);
+}
+.searchBar svg {
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+.searchInput {
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  width: 100%;
+}
+.searchInput::placeholder {
+  color: var(--text-tertiary);
+}
+.topBarActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.mainContent {
+  flex: 1;
+  padding: var(--space-6);
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .sidebar { display: none; }
+  .content { margin-left: 0; }
+  .searchBar { width: 200px; }
+}
