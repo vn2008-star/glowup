@@ -2,6 +2,7 @@
    GlowUp Design System
    Premium Beauty Business Automation Platform
    ✦ "Soft Luxury" — Orchid × Blush Edition
+   Light-first with dark mode support
    ================================================ */
 
 /* Google Fonts loaded via <link> in layout.tsx */
@@ -13,72 +14,72 @@
   padding: 0;
 }
 
-/* --- Design Tokens --- */
+/* --- Design Tokens — LIGHT MODE (default) --- */
 :root {
   /* Brand Colors — Orchid meets Blush Pink */
-  --color-primary: #c9a0dc;
-  --color-primary-light: #dfc4ec;
-  --color-primary-dark: #a87cc4;
-  --color-primary-50: rgba(201, 160, 220, 0.08);
-  --color-primary-100: rgba(201, 160, 220, 0.15);
-  --color-primary-200: rgba(201, 160, 220, 0.25);
+  --color-primary: #a87cc4;
+  --color-primary-light: #c9a0dc;
+  --color-primary-dark: #8c5fad;
+  --color-primary-50: rgba(168, 124, 196, 0.08);
+  --color-primary-100: rgba(168, 124, 196, 0.15);
+  --color-primary-200: rgba(168, 124, 196, 0.25);
 
-  --color-accent: #f0a3b5;
-  --color-accent-light: #f6c2cf;
-  --color-accent-dark: #d4788e;
+  --color-accent: #d4788e;
+  --color-accent-light: #f0a3b5;
+  --color-accent-dark: #b85a70;
 
-  --color-success: #72d5a0;
-  --color-success-bg: rgba(114, 213, 160, 0.12);
-  --color-warning: #f5d76e;
-  --color-warning-bg: rgba(245, 215, 110, 0.12);
-  --color-danger: #f27983;
-  --color-danger-bg: rgba(242, 121, 131, 0.12);
-  --color-info: #7ecfc8;
-  --color-info-bg: rgba(126, 207, 200, 0.12);
+  --color-success: #2d9d6a;
+  --color-success-bg: rgba(45, 157, 106, 0.10);
+  --color-warning: #c5a035;
+  --color-warning-bg: rgba(197, 160, 53, 0.10);
+  --color-danger: #d44e58;
+  --color-danger-bg: rgba(212, 78, 88, 0.10);
+  --color-info: #3a9e97;
+  --color-info-bg: rgba(58, 158, 151, 0.10);
 
-  /* Surfaces — Warm plum-tinted dark mode */
-  --bg-base: #0e0b14;
-  --bg-elevated: #150f1e;
-  --bg-surface: #1c1528;
-  --bg-surface-hover: #261e36;
-  --bg-card: #1e1729;
-  --bg-card-hover: #2a2040;
-  --bg-input: #18122488;
-  --bg-glass: rgba(30, 23, 45, 0.7);
-  --bg-glass-hover: rgba(42, 32, 60, 0.8);
-  --bg-overlay: rgba(8, 5, 12, 0.65);
+  /* Surfaces — Warm cream light mode */
+  --bg-base: #faf7f5;
+  --bg-elevated: #ffffff;
+  --bg-surface: #f3eff0;
+  --bg-surface-hover: #ece6e9;
+  --bg-card: #ffffff;
+  --bg-card-hover: #fdf9fb;
+  --bg-input: rgba(168, 124, 196, 0.04);
+  --bg-glass: rgba(255, 255, 255, 0.75);
+  --bg-glass-hover: rgba(255, 255, 255, 0.88);
+  --bg-overlay: rgba(30, 20, 40, 0.35);
 
   /* Text */
-  --text-primary: #f2eef8;
-  --text-secondary: #b0a8c4;
-  --text-tertiary: #756d8a;
-  --text-inverse: #0e0b14;
-  --text-link: #d4a0e3;
+  --text-primary: #1e1528;
+  --text-secondary: #5e5270;
+  --text-tertiary: #9088a0;
+  --text-inverse: #ffffff;
+  --text-link: #8c5fad;
 
   /* Borders */
-  --border-subtle: rgba(201, 160, 220, 0.06);
-  --border-default: rgba(201, 160, 220, 0.1);
-  --border-strong: rgba(201, 160, 220, 0.2);
-  --border-accent: rgba(240, 163, 181, 0.35);
+  --border-subtle: rgba(168, 124, 196, 0.10);
+  --border-default: rgba(168, 124, 196, 0.18);
+  --border-strong: rgba(168, 124, 196, 0.30);
+  --border-accent: rgba(212, 120, 142, 0.35);
 
   /* Gradients */
-  --gradient-primary: linear-gradient(135deg, #c9a0dc 0%, #f0a3b5 100%);
-  --gradient-primary-reverse: linear-gradient(135deg, #f0a3b5 0%, #c9a0dc 100%);
-  --gradient-hero: linear-gradient(160deg, #0e0b14 0%, #1a1028 40%, #150f1e 100%);
-  --gradient-card: linear-gradient(145deg, rgba(30, 23, 45, 0.85), rgba(20, 15, 30, 0.6));
-  --gradient-glow: radial-gradient(ellipse at 50% 0%, rgba(201, 160, 220, 0.12) 0%, transparent 60%);
-  --gradient-shimmer: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.03) 50%, transparent 100%);
-  --gradient-warm: linear-gradient(135deg, rgba(201, 160, 220, 0.08) 0%, rgba(240, 163, 181, 0.06) 100%);
-  --gradient-sidebar: linear-gradient(180deg, #c9a0dc 0%, #f0a3b5 50%, #c9a0dc 100%);
+  --gradient-primary: linear-gradient(135deg, #a87cc4 0%, #d4788e 100%);
+  --gradient-primary-reverse: linear-gradient(135deg, #d4788e 0%, #a87cc4 100%);
+  --gradient-hero: linear-gradient(160deg, #faf7f5 0%, #f3eef6 40%, #faf7f5 100%);
+  --gradient-card: linear-gradient(145deg, rgba(255, 255, 255, 0.9), rgba(243, 238, 246, 0.5));
+  --gradient-glow: radial-gradient(ellipse at 50% 0%, rgba(168, 124, 196, 0.08) 0%, transparent 60%);
+  --gradient-shimmer: linear-gradient(90deg, transparent 0%, rgba(168, 124, 196, 0.04) 50%, transparent 100%);
+  --gradient-warm: linear-gradient(135deg, rgba(168, 124, 196, 0.06) 0%, rgba(212, 120, 142, 0.04) 100%);
+  --gradient-sidebar: linear-gradient(180deg, #a87cc4 0%, #d4788e 50%, #a87cc4 100%);
 
   /* Shadows */
-  --shadow-sm: 0 1px 3px rgba(8, 5, 12, 0.35);
-  --shadow-md: 0 4px 14px rgba(8, 5, 12, 0.45);
-  --shadow-lg: 0 8px 30px rgba(8, 5, 12, 0.5);
-  --shadow-xl: 0 16px 50px rgba(8, 5, 12, 0.6);
-  --shadow-glow: 0 0 30px rgba(201, 160, 220, 0.18);
-  --shadow-glow-primary: 0 0 30px rgba(240, 163, 181, 0.18);
-  --shadow-glow-soft: 0 4px 20px rgba(201, 160, 220, 0.12);
+  --shadow-sm: 0 1px 3px rgba(30, 21, 40, 0.06);
+  --shadow-md: 0 4px 14px rgba(30, 21, 40, 0.08);
+  --shadow-lg: 0 8px 30px rgba(30, 21, 40, 0.10);
+  --shadow-xl: 0 16px 50px rgba(30, 21, 40, 0.14);
+  --shadow-glow: 0 0 30px rgba(168, 124, 196, 0.12);
+  --shadow-glow-primary: 0 0 30px rgba(212, 120, 142, 0.12);
+  --shadow-glow-soft: 0 4px 20px rgba(168, 124, 196, 0.08);
 
   /* Typography */
   --font-display: 'Playfair Display', 'Outfit', serif;
@@ -149,6 +150,68 @@
   --z-toast: 500;
 }
 
+/* --- DARK MODE --- */
+[data-theme="dark"] {
+  --color-primary: #c9a0dc;
+  --color-primary-light: #dfc4ec;
+  --color-primary-dark: #a87cc4;
+  --color-primary-50: rgba(201, 160, 220, 0.08);
+  --color-primary-100: rgba(201, 160, 220, 0.15);
+  --color-primary-200: rgba(201, 160, 220, 0.25);
+
+  --color-accent: #f0a3b5;
+  --color-accent-light: #f6c2cf;
+  --color-accent-dark: #d4788e;
+
+  --color-success: #72d5a0;
+  --color-success-bg: rgba(114, 213, 160, 0.12);
+  --color-warning: #f5d76e;
+  --color-warning-bg: rgba(245, 215, 110, 0.12);
+  --color-danger: #f27983;
+  --color-danger-bg: rgba(242, 121, 131, 0.12);
+  --color-info: #7ecfc8;
+  --color-info-bg: rgba(126, 207, 200, 0.12);
+
+  --bg-base: #0e0b14;
+  --bg-elevated: #150f1e;
+  --bg-surface: #1c1528;
+  --bg-surface-hover: #261e36;
+  --bg-card: #1e1729;
+  --bg-card-hover: #2a2040;
+  --bg-input: #18122488;
+  --bg-glass: rgba(30, 23, 45, 0.7);
+  --bg-glass-hover: rgba(42, 32, 60, 0.8);
+  --bg-overlay: rgba(8, 5, 12, 0.65);
+
+  --text-primary: #f2eef8;
+  --text-secondary: #b0a8c4;
+  --text-tertiary: #756d8a;
+  --text-inverse: #0e0b14;
+  --text-link: #d4a0e3;
+
+  --border-subtle: rgba(201, 160, 220, 0.06);
+  --border-default: rgba(201, 160, 220, 0.1);
+  --border-strong: rgba(201, 160, 220, 0.2);
+  --border-accent: rgba(240, 163, 181, 0.35);
+
+  --gradient-primary: linear-gradient(135deg, #c9a0dc 0%, #f0a3b5 100%);
+  --gradient-primary-reverse: linear-gradient(135deg, #f0a3b5 0%, #c9a0dc 100%);
+  --gradient-hero: linear-gradient(160deg, #0e0b14 0%, #1a1028 40%, #150f1e 100%);
+  --gradient-card: linear-gradient(145deg, rgba(30, 23, 45, 0.85), rgba(20, 15, 30, 0.6));
+  --gradient-glow: radial-gradient(ellipse at 50% 0%, rgba(201, 160, 220, 0.12) 0%, transparent 60%);
+  --gradient-shimmer: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.03) 50%, transparent 100%);
+  --gradient-warm: linear-gradient(135deg, rgba(201, 160, 220, 0.08) 0%, rgba(240, 163, 181, 0.06) 100%);
+  --gradient-sidebar: linear-gradient(180deg, #c9a0dc 0%, #f0a3b5 50%, #c9a0dc 100%);
+
+  --shadow-sm: 0 1px 3px rgba(8, 5, 12, 0.35);
+  --shadow-md: 0 4px 14px rgba(8, 5, 12, 0.45);
+  --shadow-lg: 0 8px 30px rgba(8, 5, 12, 0.5);
+  --shadow-xl: 0 16px 50px rgba(8, 5, 12, 0.6);
+  --shadow-glow: 0 0 30px rgba(201, 160, 220, 0.18);
+  --shadow-glow-primary: 0 0 30px rgba(240, 163, 181, 0.18);
+  --shadow-glow-soft: 0 4px 20px rgba(201, 160, 220, 0.12);
+}
+
 /* --- Base Styles --- */
 html {
   font-size: 16px;
@@ -164,6 +227,7 @@ body {
   line-height: var(--leading-normal);
   min-height: 100vh;
   overflow-x: hidden;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 h1, h2, h3, h4, h5, h6 {
