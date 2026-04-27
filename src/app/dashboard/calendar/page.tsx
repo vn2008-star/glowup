@@ -55,10 +55,27 @@ export default function CalendarPage() {
     return d;
   });
 
-  // ── Data fetching ──
-  const fetchData = useCallback(async () => {
+  // ── Data fetching (optimized: staff/services/clients cached, only apts refresh) ──
+  const [initialLoaded, setInitialLoaded] = useState(false);
+
+  // Fetch staff, services, clients once
+  useEffect(() => {
     if (!tenant) return;
-    setLoading(true);
+    Promise.all([
+      queryData<Staff[]>("staff.list"),
+      queryData<Service[]>("services.list"),
+      queryData<Client[]>("clients.list"),
+    ]).then(([staffRes, svcRes, clientRes]) => {
+      setStaffMembers(staffRes.data || []);
+      setServices((svcRes.data || []).filter(s => s.is_active));
+      setClients(clientRes.data || []);
+    });
+  }, [tenant]);
+
+  // Fetch appointments on date/view change
+  const fetchAppointments = useCallback(async () => {
+    if (!tenant) return;
+    if (!initialLoaded) setLoading(true);
 
     let startDate: string, endDate: string;
 
@@ -73,26 +90,18 @@ export default function CalendarPage() {
       startDate = toDateStr(ws);
       endDate = toDateStr(we);
     } else {
-      // month — fetch full grid range
       startDate = toDateStr(monthDays[0]);
       endDate = toDateStr(monthDays[41]);
     }
 
-    const [aptsRes, staffRes, svcRes, clientRes] = await Promise.all([
-      queryData<FullAppointment[]>("appointments.list", view === "day" ? { date: startDate } : { startDate, endDate }),
-      queryData<Staff[]>("staff.list"),
-      queryData<Service[]>("services.list"),
-      queryData<Client[]>("clients.list"),
-    ]);
+    const aptsRes = await queryData<FullAppointment[]>("appointments.list", view === "day" ? { date: startDate } : { startDate, endDate });
     setAppointments(aptsRes.data || []);
-    setStaffMembers(staffRes.data || []);
-    setServices((svcRes.data || []).filter(s => s.is_active));
-    setClients(clientRes.data || []);
     setLoading(false);
+    setInitialLoaded(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenant, selectedDate, view]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { fetchAppointments(); }, [fetchAppointments]);
 
   // ── Navigation ──
   function changeDate(delta: number) {
