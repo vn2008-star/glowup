@@ -110,7 +110,7 @@ export default function BookingClient({ slug }: { slug: string }) {
   const availableDates = useMemo(() => {
     const dates: { value: string; label: string; dayName: string }[] = []
     const today = new Date()
-    for (let i = 1; i <= 14; i++) {
+    for (let i = 0; i <= 30; i++) {
       const d = new Date(today.getTime() + i * 24 * 60 * 60 * 1000)
       const dayName = d.toLocaleDateString('en-US', { weekday: 'long' })
       const isClosed = business?.hours?.[dayName]?.closed
