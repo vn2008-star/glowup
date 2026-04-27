@@ -690,8 +690,8 @@ export default function ClientsPage() {
 
             {/* Actions — WIRED */}
             <div className={styles.profileActions}>
-              <button className="btn btn-primary" style={{ flex: 1 }} onClick={openBookAppointment}>📅 Book Appointment</button>
-              <button className="btn btn-secondary" style={{ flex: 1 }} onClick={openEditProfile}>✏️ Edit Profile</button>
+              <button className="btn btn-primary" onClick={openBookAppointment}>📅 Book</button>
+              <button className="btn btn-secondary" onClick={openEditProfile}>✏️ Edit</button>
               <button className="btn btn-danger" onClick={() => handleDeleteClient(selectedClient.id)}>🗑️ Delete</button>
             </div>
           </div>
