@@ -30,6 +30,7 @@ export interface Staff {
   role: 'owner' | 'manager' | 'technician'
   email: string | null
   phone: string | null
+  photo_url: string | null
   specialties: string[]
   schedule: Record<string, unknown>
   commission_rate: number

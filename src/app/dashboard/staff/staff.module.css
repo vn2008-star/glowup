@@ -80,6 +80,33 @@
   background: var(--gradient-primary); color: var(--text-inverse); border-radius: var(--radius-xl);
   font-family: var(--font-display); font-size: var(--text-2xl); font-weight: 800; margin: 0 auto var(--space-4);
 }
+.profileAvatarImg {
+  width: 72px; height: 72px; border-radius: var(--radius-xl); object-fit: cover;
+  margin: 0 auto var(--space-4); display: block;
+}
+.staffAvatarImg {
+  width: 56px; height: 56px; border-radius: var(--radius-lg); object-fit: cover; flex-shrink: 0;
+}
+
+/* Photo Upload */
+.photoUploadSection {
+  display: flex; align-items: center; gap: var(--space-5);
+  margin-bottom: var(--space-6); padding-bottom: var(--space-5);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.photoUploadPreview {
+  width: 80px; height: 80px; border-radius: var(--radius-xl); overflow: hidden;
+  background: var(--bg-surface); border: 2px dashed var(--border-default);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  font-size: var(--text-2xl); color: var(--text-tertiary);
+  font-family: var(--font-display); font-weight: 800;
+}
+.photoUploadPreview img {
+  width: 100%; height: 100%; object-fit: cover;
+}
+.photoUploadControls {
+  display: flex; flex-direction: column; gap: var(--space-2);
+}
 .profileHeader h2 { font-size: var(--text-xl); font-weight: 700; margin-bottom: var(--space-2); }
 
 .drawerSection { margin-bottom: var(--space-5); }

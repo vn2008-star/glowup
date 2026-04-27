@@ -19,6 +19,9 @@ export default function StaffPage() {
     name: "", email: "", phone: "", role: "technician" as string,
     specialties: "" as string, commission_rate: 0, is_active: true,
   });
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   // Schedule editor state
   const [showScheduleModal, setShowScheduleModal] = useState(false);
@@ -37,6 +40,8 @@ export default function StaffPage() {
   function openNew() {
     setEditingStaff(null);
     setFormData({ name: "", email: "", phone: "", role: "technician", specialties: "", commission_rate: 0, is_active: true });
+    setPhotoFile(null);
+    setPhotoPreview(null);
     setShowModal(true);
   }
 
@@ -51,6 +56,8 @@ export default function StaffPage() {
       commission_rate: s.commission_rate,
       is_active: s.is_active,
     });
+    setPhotoFile(null);
+    setPhotoPreview(s.photo_url || null);
     setShowModal(true);
   }
 
@@ -65,9 +72,33 @@ export default function StaffPage() {
     setShowScheduleModal(true);
   }
 
+  async function uploadPhoto(): Promise<string | null> {
+    if (!photoFile) return null;
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", photoFile);
+      fd.append("folder", "staff");
+      const res = await fetch("/api/upload", { method: "POST", body: fd });
+      const json = await res.json();
+      return json.url || null;
+    } catch {
+      return null;
+    } finally {
+      setUploading(false);
+    }
+  }
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    const payload = {
+
+    // Upload photo if a new file was selected
+    let photo_url: string | null | undefined;
+    if (photoFile) {
+      photo_url = await uploadPhoto();
+    }
+
+    const payload: Record<string, unknown> = {
       name: formData.name,
       email: formData.email || null,
       phone: formData.phone || null,
@@ -76,6 +107,7 @@ export default function StaffPage() {
       commission_rate: formData.commission_rate,
       is_active: formData.is_active,
     };
+    if (photo_url !== undefined) payload.photo_url = photo_url;
 
     if (editingStaff) {
       const { data } = await queryData<Staff>("staff.update", { id: editingStaff.id, ...payload });
@@ -88,6 +120,8 @@ export default function StaffPage() {
       if (data) setStaffMembers((prev) => [...prev, data]);
     }
     setShowModal(false);
+    setPhotoFile(null);
+    setPhotoPreview(null);
   }
 
   async function handleDelete(id: string) {
@@ -133,7 +167,11 @@ export default function StaffPage() {
           {staffMembers.map((s) => (
             <div key={s.id} className={`card ${styles.staffCard} ${!s.is_active ? styles.inactive : ""}`} onClick={() => setSelectedStaff(s)}>
               <div className={styles.staffHeader}>
-                <div className={styles.staffAvatar}>{s.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}</div>
+                {s.photo_url ? (
+                  <img src={s.photo_url} alt={s.name} className={styles.staffAvatarImg} />
+                ) : (
+                  <div className={styles.staffAvatar}>{s.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}</div>
+                )}
                 <div>
                   <h3>{s.name}</h3>
                   <span className={styles.staffRole}>{s.role}</span>
@@ -177,9 +215,13 @@ export default function StaffPage() {
             <button className={styles.profileClose} onClick={() => setSelectedStaff(null)}>✕</button>
 
             <div className={styles.profileHeader}>
-              <div className={styles.profileAvatar}>
-                {selectedStaff.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
-              </div>
+              {selectedStaff.photo_url ? (
+                <img src={selectedStaff.photo_url} alt={selectedStaff.name} className={styles.profileAvatarImg} />
+              ) : (
+                <div className={styles.profileAvatar}>
+                  {selectedStaff.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                </div>
+              )}
               <h2>{selectedStaff.name}</h2>
               <span className={`badge ${selectedStaff.role === "owner" ? "badge-primary" : selectedStaff.role === "manager" ? "badge-info" : "badge-success"}`}>
                 {selectedStaff.role}
@@ -258,6 +300,38 @@ export default function StaffPage() {
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <h2>{editingStaff ? "Edit Staff Member" : "Add Staff Member"}</h2>
             <form onSubmit={handleSave}>
+              {/* Photo Upload */}
+              <div className={styles.photoUploadSection}>
+                <div className={styles.photoUploadPreview}>
+                  {photoPreview ? (
+                    <img src={photoPreview} alt="Preview" />
+                  ) : (
+                    <span>{formData.name ? formData.name.split(" ").map((n) => n[0]).join("").slice(0, 2) : "📷"}</span>
+                  )}
+                </div>
+                <div className={styles.photoUploadControls}>
+                  <label className="btn btn-secondary btn-sm" style={{ cursor: "pointer" }}>
+                    {photoPreview ? "Change Photo" : "Upload Photo"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      style={{ display: "none" }}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setPhotoFile(file);
+                          setPhotoPreview(URL.createObjectURL(file));
+                        }
+                      }}
+                    />
+                  </label>
+                  {photoPreview && (
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setPhotoFile(null); setPhotoPreview(null); }}>
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </div>
               <div className={styles.formGrid}>
                 <div className={styles.formGroup}>
                   <label className="label">Name *</label>
@@ -297,8 +371,8 @@ export default function StaffPage() {
                 )}
               </div>
               <div className={styles.modalActions}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">{editingStaff ? "Save Changes" : "Add Staff"}</button>
+                <button type="button" className="btn btn-secondary" onClick={() => { setShowModal(false); setPhotoFile(null); setPhotoPreview(null); }}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={uploading}>{uploading ? "Uploading..." : editingStaff ? "Save Changes" : "Add Staff"}</button>
               </div>
             </form>
           </div>
