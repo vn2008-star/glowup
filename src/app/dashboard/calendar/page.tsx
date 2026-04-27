@@ -202,9 +202,9 @@ export default function CalendarPage() {
         </div>
         <div className={styles.headerActions}>
           <div className={styles.navBtns}>
-            <button className="btn btn-ghost" onClick={() => changeDate(-1)}>←</button>
+            <button className="btn btn-ghost" onClick={() => changeDate(view === "week" ? -7 : -1)}>←</button>
             <button className="btn btn-ghost" onClick={() => setSelectedDate(new Date())}>Today</button>
-            <button className="btn btn-ghost" onClick={() => changeDate(1)}>→</button>
+            <button className="btn btn-ghost" onClick={() => changeDate(view === "week" ? 7 : 1)}>→</button>
           </div>
           <div className={styles.viewToggle}>
             <button className={`${styles.viewBtn} ${view === "day" ? styles.activeView : ""}`} onClick={() => setView("day")}>Day</button>
