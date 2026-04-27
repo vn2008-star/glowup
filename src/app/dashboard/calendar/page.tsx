@@ -668,8 +668,18 @@ export default function CalendarPage() {
                   </select>
                 </div>
                 <div className={styles.formGroup}>
-                  <label className="label">Date & Time *</label>
-                  <input className="input" type="datetime-local" value={formData.start_time} onChange={(e) => setFormData({ ...formData, start_time: e.target.value })} required />
+                  <label className="label">Date *</label>
+                  <input className="input" type="date" value={formData.start_time.split("T")[0] || ""} onChange={(e) => {
+                    const time = formData.start_time.split("T")[1] || "09:00";
+                    setFormData({ ...formData, start_time: `${e.target.value}T${time}` });
+                  }} required />
+                </div>
+                <div className={styles.formGroup}>
+                  <label className="label">Time *</label>
+                  <input className="input" type="time" value={formData.start_time.split("T")[1] || ""} onChange={(e) => {
+                    const date = formData.start_time.split("T")[0] || toDateStr(selectedDate);
+                    setFormData({ ...formData, start_time: `${date}T${e.target.value}` });
+                  }} required />
                 </div>
               </div>
               <div className={styles.formGroup}>
