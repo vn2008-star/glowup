@@ -1,6 +1,7 @@
 import styles from "./page.module.css";
 import Link from "next/link";
 import { GlowUpLogo } from "@/components/GlowUpLogo";
+import { LandingHeader } from "./LandingHeader";
 
 /* ─── Icon Components ─── */
 const CalendarIcon = () => (
@@ -109,19 +110,7 @@ export default function LandingPage() {
       <div className={styles.ambientOrb2} />
 
       {/* ── Header ── */}
-      <header className={styles.header}>
-        <div className={`container ${styles.headerInner}`}>
-          <Link href="/" className={styles.logo}>
-            <LogoIcon /> <span>GlowUp</span>
-          </Link>
-          <nav className={styles.nav}>
-            <a href="#features">Features</a>
-            <a href="#pricing">Pricing</a>
-            <Link href="/auth/login">Sign In</Link>
-            <Link href="/auth/signup" className="btn btn-sm btn-primary">Get Started</Link>
-          </nav>
-        </div>
-      </header>
+      <LandingHeader />
 
       {/* ── Hero ── */}
       <section className={styles.hero}>
