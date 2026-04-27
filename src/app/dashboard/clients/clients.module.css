@@ -465,7 +465,6 @@
 /* Actions */
 .profileActions {
   display: flex;
-  flex-wrap: wrap;
   gap: var(--space-2);
   padding-top: var(--space-4);
   border-top: 1px solid var(--border-subtle);
@@ -473,7 +472,6 @@
 }
 .profileActions button,
 .profileActions .btn {
-  flex: 1 1 auto;
   min-width: 0;
   font-size: var(--text-xs);
   padding: var(--space-2) var(--space-3);
