@@ -108,7 +108,17 @@ export default function CalendarPage() {
     }
   }
 
-  const dateLabel = selectedDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+  const dateLabel = (() => {
+    if (view === "week") {
+      const ws = new Date(selectedDate);
+      ws.setDate(ws.getDate() - ws.getDay() + 1); // Monday
+      const we = new Date(ws);
+      we.setDate(we.getDate() + 6); // Sunday
+      const fmt = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      return `${fmt(ws)} – ${fmt(we)}, ${we.getFullYear()}`;
+    }
+    return selectedDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+  })();
 
   // ── Open Slot Detection ──
   function getOpenSlots(staffId: string) {
