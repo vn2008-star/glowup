@@ -1,4 +1,5 @@
 'use client'
+import { useState } from 'react'
 // Dashboard layout v2 - updated nav items
 
 import styles from "./dashboard.module.css";
@@ -65,6 +66,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { tenant, currentStaff, loading } = useTenant();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   async function handleLogout() {
     clearTenantCache();
@@ -78,14 +80,29 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const planLabel = tenant?.plan ? tenant.plan.charAt(0).toUpperCase() + tenant.plan.slice(1) + ' Plan' : '';
   const initials = businessName.charAt(0).toUpperCase();
 
+  // Close mobile menu on route change
+  const handleNavClick = () => setMobileMenuOpen(false);
+
   return (
     <div className={styles.layout}>
+      {/* Mobile backdrop */}
+      {mobileMenuOpen && (
+        <div className={styles.mobileBackdrop} onClick={() => setMobileMenuOpen(false)} />
+      )}
+
       {/* Sidebar */}
-      <aside className={styles.sidebar}>
+      <aside className={`${styles.sidebar} ${mobileMenuOpen ? styles.sidebarOpen : ''}`}>
         <div className={styles.sidebarHeader}>
           <Link href="/" className={styles.logo}>
             <GlowUpIcon /> <span>GlowUp</span>
           </Link>
+          <button
+            className={styles.mobileClose}
+            onClick={() => setMobileMenuOpen(false)}
+            aria-label="Close menu"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+          </button>
         </div>
         <nav className={styles.sidebarNav}>
           {navItems.map((item) => (
@@ -93,6 +110,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
               key={item.href}
               href={item.href}
               className={`${styles.navItem} ${pathname === item.href ? styles.navItemActive : ''}`}
+              onClick={handleNavClick}
             >
               {item.icon}
               <span>{item.label}</span>
@@ -116,6 +134,13 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       {/* Main Content */}
       <div className={styles.content}>
         <header className={styles.topBar}>
+          <button
+            className={styles.hamburger}
+            onClick={() => setMobileMenuOpen(true)}
+            aria-label="Open menu"
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
+          </button>
           <div className={styles.searchBar}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
             <input type="text" placeholder="Search clients, appointments..." className={styles.searchInput} />

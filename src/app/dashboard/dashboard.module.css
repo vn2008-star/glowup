@@ -243,9 +243,131 @@
   padding: var(--space-6);
 }
 
+/* ── Hamburger (hidden on desktop) ── */
+.hamburger {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+.hamburger:hover {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+/* ── Mobile close button (hidden on desktop) ── */
+.mobileClose {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+.mobileClose:hover {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+/* ── Mobile backdrop ── */
+.mobileBackdrop {
+  display: none;
+}
+
 /* ── Responsive ── */
 @media (max-width: 768px) {
-  .sidebar { display: none; }
-  .content { margin-left: 0; }
-  .searchBar { width: 200px; }
+  .hamburger {
+    display: flex;
+    align-items: center;
+  }
+
+  .mobileClose {
+    display: flex;
+    align-items: center;
+  }
+
+  .sidebarHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    width: 280px;
+    z-index: 1000;
+  }
+
+  .sidebarOpen {
+    transform: translateX(0);
+  }
+
+  .mobileBackdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(4px);
+    z-index: 999;
+    animation: fadeIn 0.2s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  .content {
+    margin-left: 0;
+  }
+
+  .searchBar {
+    width: 100%;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .topBar {
+    gap: var(--space-3);
+  }
+
+  .topBarActions {
+    gap: var(--space-2);
+  }
+
+  .staffName {
+    display: none;
+  }
+
+  .mainContent {
+    padding: var(--space-4);
+  }
+}
+
+/* Landscape adjustments for smaller screens */
+@media (max-width: 768px) and (orientation: landscape) {
+  .sidebar {
+    width: 260px;
+  }
+
+  .sidebarNav {
+    padding: var(--space-2) var(--space-3);
+    gap: 0;
+  }
+
+  .navItem {
+    padding: var(--space-2) var(--space-4);
+  }
+
+  .sidebarFooter {
+    padding: var(--space-2) var(--space-4);
+  }
 }
