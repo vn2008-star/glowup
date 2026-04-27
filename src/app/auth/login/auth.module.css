@@ -62,7 +62,7 @@
   font-family: var(--font-display);
   font-size: 1.5rem;
   font-weight: 700;
-  background: linear-gradient(135deg, var(--color-gold) 0%, var(--color-rose) 50%, var(--color-lavender) 100%);
+  background: var(--gradient-primary);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -201,20 +201,22 @@
 .submitButton {
   width: 100%;
   padding: 0.875rem;
-  background: linear-gradient(135deg, var(--color-gold), var(--color-rose), var(--color-lavender));
+  background: var(--gradient-primary);
   border: none;
   border-radius: 12px;
-  color: white;
+  color: #ffffff;
   font-size: 1rem;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
   transition: all 0.3s ease;
   margin-top: 0.5rem;
+  box-shadow: var(--shadow-md), var(--shadow-glow-primary);
+  letter-spacing: 0.02em;
 }
 
 .submitButton:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(232, 168, 124, 0.3);
+  box-shadow: var(--shadow-lg), 0 0 30px rgba(212, 120, 142, 0.35);
 }
 
 .submitButton:disabled {
