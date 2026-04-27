@@ -126,7 +126,7 @@ export default function LandingPage() {
         <div className="container">
           <div className={styles.heroContent}>
             <div className={styles.heroBadge}>
-              <SparklesIcon /> Built for salons, spas & beauty professionals
+              <SparklesIcon /> Built for Nails, Lashes, Hair, Facial, and Waxing salons, spas & beauty professionals
             </div>
             <h1 className={styles.heroTitle}>
               Grow your beauty business <span className="gradient-text">on autopilot</span>
