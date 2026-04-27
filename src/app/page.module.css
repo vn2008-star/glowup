@@ -605,6 +605,47 @@
   background: var(--bg-surface);
 }
 
+/* ── Theme toggle (desktop — icon only) ── */
+.themeToggleBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
+  cursor: pointer;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-full);
+  transition: all var(--transition-fast);
+}
+.themeToggleBtn:hover {
+  background: var(--bg-surface);
+  color: var(--color-primary);
+  border-color: var(--border-strong);
+}
+
+/* ── Theme toggle (mobile — icon + label) ── */
+.themeToggleMobile {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: none;
+  border: none;
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text-primary);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  width: 100%;
+}
+.themeToggleMobile:hover {
+  background: var(--bg-surface);
+  color: var(--color-primary);
+}
+
 /* ── Mobile nav dropdown (hidden by default) ── */
 .mobileNav {
   display: none;
