@@ -40,6 +40,16 @@ export default function SettingsPage() {
     depositRequired: "No deposit",
     bufferMinutes: "0",
   });
+  const [reminderSettings, setReminderSettings] = useState({
+    enabled: true,
+    sms_enabled: true,
+    email_enabled: true,
+  });
+  const [reminderTemplates, setReminderTemplates] = useState({
+    sms: "Hi {client_name}! This is a reminder that your {service} appointment at {business_name} is tomorrow, {date} at {time}. Reply STOP to opt out.",
+    email_subject: "Appointment Reminder — {business_name}",
+    email: "Hi {client_name},\n\nThis is a friendly reminder about your upcoming appointment:\n\n📋 Service: {service}\n📅 Date: {date}\n🕐 Time: {time}\n📍 At: {business_name}\n\nNeed to reschedule? Please contact us as soon as possible.\n\nSee you soon!\n— {business_name}",
+  });
 
   // Load current settings from tenant
   const loadSettings = useCallback(() => {
@@ -55,6 +65,8 @@ export default function SettingsPage() {
       const s = tenant.settings as Record<string, unknown>;
       if (s.business_hours) setHours(s.business_hours as BusinessHours);
       if (s.booking) setBookingSettings(s.booking as typeof bookingSettings);
+      if (s.reminders) setReminderSettings({ ...reminderSettings, ...(s.reminders as Record<string, boolean>) });
+      if (s.reminder_templates) setReminderTemplates({ ...reminderTemplates, ...(s.reminder_templates as Record<string, string>) });
     }
 
     setLoading(false);
@@ -84,6 +96,8 @@ export default function SettingsPage() {
       ...(typeof tenant.settings === "object" && tenant.settings ? tenant.settings : {}),
       business_hours: hours,
       booking: bookingSettings,
+      reminders: reminderSettings,
+      reminder_templates: reminderTemplates,
     };
 
     const res = await fetch("/api/save-settings", {
@@ -277,6 +291,93 @@ export default function SettingsPage() {
             Configure AI →
           </Link>
         </div>
+      </div>
+
+      {/* Appointment Reminders */}
+      <div className={`card ${styles.section}`}>
+        <h2>🔔 Appointment Reminders</h2>
+        <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginBottom: "var(--space-4)" }}>
+          Automatically send reminders to clients 24 hours before their appointments. Reduces no-shows by up to 60%.
+        </p>
+
+        <div className={styles.reminderToggles}>
+          <label className={styles.protectionToggle}>
+            <input
+              type="checkbox"
+              checked={reminderSettings.enabled}
+              onChange={(e) => setReminderSettings({ ...reminderSettings, enabled: e.target.checked })}
+            />
+            <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
+            <span>Enable automatic reminders</span>
+          </label>
+
+          {reminderSettings.enabled && (
+            <>
+              <label className={styles.protectionToggle} style={{ marginLeft: "var(--space-6)" }}>
+                <input
+                  type="checkbox"
+                  checked={reminderSettings.sms_enabled}
+                  onChange={(e) => setReminderSettings({ ...reminderSettings, sms_enabled: e.target.checked })}
+                />
+                <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
+                <span>📱 SMS Reminders (via Twilio)</span>
+              </label>
+              <label className={styles.protectionToggle} style={{ marginLeft: "var(--space-6)" }}>
+                <input
+                  type="checkbox"
+                  checked={reminderSettings.email_enabled}
+                  onChange={(e) => setReminderSettings({ ...reminderSettings, email_enabled: e.target.checked })}
+                />
+                <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
+                <span>📧 Email Reminders (via Resend)</span>
+              </label>
+            </>
+          )}
+        </div>
+
+        {reminderSettings.enabled && (
+          <div className={styles.reminderTemplates}>
+            <h3 style={{ marginTop: "var(--space-5)", marginBottom: "var(--space-3)", fontSize: "var(--text-base)" }}>Message Templates</h3>
+            <small style={{ color: "var(--text-tertiary)", display: "block", marginBottom: "var(--space-3)" }}>
+              Merge tags: {'{client_name}'}, {'{service}'}, {'{staff}'}, {'{business_name}'}, {'{date}'}, {'{time}'}
+            </small>
+
+            {reminderSettings.sms_enabled && (
+              <div className={styles.formGroup}>
+                <label className="label">SMS Template</label>
+                <textarea
+                  className="input"
+                  rows={3}
+                  value={reminderTemplates.sms}
+                  onChange={(e) => setReminderTemplates({ ...reminderTemplates, sms: e.target.value })}
+                />
+                <small style={{ color: "var(--text-tertiary)" }}>Max ~160 chars recommended for single SMS</small>
+              </div>
+            )}
+
+            {reminderSettings.email_enabled && (
+              <>
+                <div className={styles.formGroup}>
+                  <label className="label">Email Subject</label>
+                  <input
+                    className="input"
+                    value={reminderTemplates.email_subject}
+                    onChange={(e) => setReminderTemplates({ ...reminderTemplates, email_subject: e.target.value })}
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label className="label">Email Body</label>
+                  <textarea
+                    className="input"
+                    rows={6}
+                    value={reminderTemplates.email}
+                    onChange={(e) => setReminderTemplates({ ...reminderTemplates, email: e.target.value })}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Booking Link */}
