@@ -163,11 +163,9 @@ export async function POST(request: Request) {
           .order('start_time', { ascending: true })
 
         if (payload?.date) {
-          const start = new Date(payload.date)
-          start.setHours(0, 0, 0, 0)
-          const end = new Date(payload.date)
-          end.setHours(23, 59, 59, 999)
-          query = query.gte('start_time', start.toISOString()).lte('start_time', end.toISOString())
+          // Use date string directly to avoid UTC/local timezone mismatch
+          const dateStr = payload.date; // e.g. "2026-04-28"
+          query = query.gte('start_time', `${dateStr}T00:00:00`).lte('start_time', `${dateStr}T23:59:59`)
         }
 
         if (payload?.startDate && payload?.endDate) {
