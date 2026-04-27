@@ -24,6 +24,8 @@ export default function CalendarPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState({ client_id: "", service_id: "", staff_id: "", start_time: "", notes: "" });
+  const [selectedApt, setSelectedApt] = useState<FullAppointment | null>(null);
+  const [editingApt, setEditingApt] = useState<FullAppointment | null>(null);
 
   // ── Date helpers ──
   function toDateStr(d: Date) {
@@ -371,7 +373,9 @@ export default function CalendarPage() {
                           top: `${getSlotPosition(apt.start_time)}px`,
                           height: `${getSlotHeight(apt.start_time, apt.end_time)}px`,
                           borderLeftColor: aptColor(apt.status),
+                          cursor: "pointer",
                         }}
+                        onClick={() => setSelectedApt(apt)}
                       >
                         <span className={styles.aptClient}>
                           {apt.client ? `${apt.client.first_name} ${apt.client.last_name || ""}` : "Walk-in"}
@@ -433,8 +437,8 @@ export default function CalendarPage() {
                         <div
                           key={apt.id}
                           className={styles.weekApt}
-                          style={{ top, height, borderLeftColor: aptColor(apt.status) }}
-                          onClick={() => { setSelectedDate(day); setView("day"); }}
+                          style={{ top, height, borderLeftColor: aptColor(apt.status), cursor: "pointer" }}
+                          onClick={() => setSelectedApt(apt)}
                         >
                           <span className={styles.weekAptClient}>
                             {apt.client ? apt.client.first_name : "Walk-in"}
@@ -497,12 +501,129 @@ export default function CalendarPage() {
         </div>
       )}
 
-      {/* ── New Appointment Modal ── */}
-      {showModal && (
-        <div className={styles.modalOverlay} onClick={() => setShowModal(false)}>
+      {/* ── Appointment Detail Modal ── */}
+      {selectedApt && (
+        <div className={styles.modalOverlay} onClick={() => setSelectedApt(null)}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <h2>New Appointment</h2>
-            <form onSubmit={handleAddAppointment}>
+            <div className={styles.detailHeader}>
+              <h2>Appointment Details</h2>
+              <button className={styles.detailClose} onClick={() => setSelectedApt(null)}>✕</button>
+            </div>
+            <div className={styles.detailBody}>
+              <div className={styles.detailRow}>
+                <span className={styles.detailLabel}>Client</span>
+                <span className={styles.detailValue}>
+                  {selectedApt.client ? `${selectedApt.client.first_name} ${selectedApt.client.last_name || ""}` : "Walk-in"}
+                </span>
+              </div>
+              <div className={styles.detailRow}>
+                <span className={styles.detailLabel}>Service</span>
+                <span className={styles.detailValue}>{selectedApt.service?.name || "—"}</span>
+              </div>
+              <div className={styles.detailRow}>
+                <span className={styles.detailLabel}>Staff</span>
+                <span className={styles.detailValue}>{selectedApt.staff_member?.name || "Unassigned"}</span>
+              </div>
+              <div className={styles.detailRow}>
+                <span className={styles.detailLabel}>Date & Time</span>
+                <span className={styles.detailValue}>
+                  {new Date(selectedApt.start_time).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}{" "}
+                  {new Date(selectedApt.start_time).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+                  {" – "}
+                  {new Date(selectedApt.end_time).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+                </span>
+              </div>
+              <div className={styles.detailRow}>
+                <span className={styles.detailLabel}>Status</span>
+                <span className={`${styles.detailStatus} ${styles[`status_${selectedApt.status}`]}`}>
+                  {selectedApt.status.charAt(0).toUpperCase() + selectedApt.status.slice(1)}
+                </span>
+              </div>
+              {selectedApt.total_price != null && (
+                <div className={styles.detailRow}>
+                  <span className={styles.detailLabel}>Price</span>
+                  <span className={styles.detailValue}>${Number(selectedApt.total_price).toFixed(2)}</span>
+                </div>
+              )}
+              {selectedApt.notes && (
+                <div className={styles.detailRow}>
+                  <span className={styles.detailLabel}>Notes</span>
+                  <span className={styles.detailValue}>{selectedApt.notes}</span>
+                </div>
+              )}
+            </div>
+            <div className={styles.detailActions}>
+              <button
+                className="btn btn-secondary"
+                onClick={() => {
+                  const apt = selectedApt;
+                  const startLocal = new Date(apt.start_time);
+                  const dateStr = toDateStr(startLocal);
+                  const timeStr = `${String(startLocal.getHours()).padStart(2, "0")}:${String(startLocal.getMinutes()).padStart(2, "0")}`;
+                  setEditingApt(apt);
+                  setFormData({
+                    client_id: apt.client_id || "",
+                    service_id: apt.service_id || "",
+                    staff_id: apt.staff_id || "",
+                    start_time: `${dateStr}T${timeStr}`,
+                    notes: apt.notes || "",
+                  });
+                  setSelectedApt(null);
+                  setShowModal(true);
+                }}
+              >
+                ✏️ Edit
+              </button>
+              <button
+                className={styles.deleteBtn}
+                onClick={async () => {
+                  if (!confirm("Delete this appointment?")) return;
+                  await queryData("appointments.delete", { id: selectedApt.id });
+                  setAppointments(prev => prev.filter(a => a.id !== selectedApt.id));
+                  setSelectedApt(null);
+                }}
+              >
+                🗑 Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── New / Edit Appointment Modal ── */}
+      {showModal && (
+        <div className={styles.modalOverlay} onClick={() => { setShowModal(false); setEditingApt(null); }}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <h2>{editingApt ? "Edit Appointment" : "New Appointment"}</h2>
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              if (editingApt) {
+                // Update existing
+                const service = services.find(s => s.id === formData.service_id);
+                const start = new Date(formData.start_time);
+                const end = new Date(start.getTime() + (service?.duration_minutes || 60) * 60000);
+                const res = await queryData<FullAppointment>("appointments.update", {
+                  id: editingApt.id,
+                  client_id: formData.client_id || null,
+                  service_id: formData.service_id,
+                  staff_id: formData.staff_id || null,
+                  start_time: start.toISOString(),
+                  end_time: end.toISOString(),
+                  total_price: service?.price || 0,
+                  notes: formData.notes || null,
+                });
+                if (res.data) {
+                  const updated = res.data as FullAppointment;
+                  setAppointments(prev => prev.map(a => a.id === editingApt.id ? updated : a));
+                }
+              } else {
+                await handleAddAppointment(e);
+                return;
+              }
+              setShowModal(false);
+              setEditingApt(null);
+              setFormData({ client_id: "", service_id: "", staff_id: "", start_time: "", notes: "" });
+            }}>
               <div className={styles.formGrid}>
                 <div className={styles.formGroup}>
                   <label className="label">Client</label>
@@ -535,8 +656,8 @@ export default function CalendarPage() {
                 <textarea className="input" rows={2} value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} />
               </div>
               <div className={styles.modalActions}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Book Appointment</button>
+                <button type="button" className="btn btn-secondary" onClick={() => { setShowModal(false); setEditingApt(null); }}>Cancel</button>
+                <button type="submit" className="btn btn-primary">{editingApt ? "Update Appointment" : "Book Appointment"}</button>
               </div>
             </form>
           </div>
