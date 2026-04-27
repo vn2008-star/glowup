@@ -53,6 +53,10 @@ export default function ClientsPage() {
   const [importLoading, setImportLoading] = useState(false);
   const [importResult, setImportResult] = useState<{ added: number; skipped: number } | null>(null);
 
+  // Multi-select state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
   // Book appointment state
   const [showBookModal, setShowBookModal] = useState(false);
   const [services, setServices] = useState<Service[]>([]);
@@ -179,6 +183,35 @@ export default function ClientsPage() {
     if (!confirm("Delete this client? This cannot be undone.")) return;
     await queryData("clients.delete", { id });
     setClients((prev) => prev.filter((c) => c.id !== id));
+    setSelectedClient(null);
+    setSelectedIds(prev => { const next = new Set(prev); next.delete(id); return next; });
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (selectedIds.size === filtered.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filtered.map(c => c.id)));
+    }
+  }
+
+  async function handleBulkDelete() {
+    if (!confirm(`Delete ${selectedIds.size} selected client(s)? This cannot be undone.`)) return;
+    setBulkDeleting(true);
+    for (const id of selectedIds) {
+      await queryData("clients.delete", { id });
+    }
+    setClients(prev => prev.filter(c => !selectedIds.has(c.id)));
+    setSelectedIds(new Set());
+    setBulkDeleting(false);
     setSelectedClient(null);
   }
 
@@ -318,6 +351,22 @@ export default function ClientsPage() {
         </div>
       )}
 
+      {/* Bulk Actions Bar */}
+      {selectedIds.size > 0 && (
+        <div className={styles.bulkBar}>
+          <div className={styles.bulkBarLeft}>
+            <input type="checkbox" checked={selectedIds.size === filtered.length} onChange={toggleSelectAll} className={styles.bulkCheckbox} />
+            <span>{selectedIds.size} client{selectedIds.size !== 1 ? 's' : ''} selected</span>
+          </div>
+          <div className={styles.bulkBarRight}>
+            <button className={styles.bulkClearBtn} onClick={() => setSelectedIds(new Set())}>Clear Selection</button>
+            <button className={styles.bulkDeleteBtn} onClick={handleBulkDelete} disabled={bulkDeleting}>
+              {bulkDeleting ? 'Deleting...' : `🗑️ Delete ${selectedIds.size}`}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Search + Filter */}
       <div className={styles.toolbar}>
         <input className={`input ${styles.searchInput}`} placeholder="Search clients..." value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -341,8 +390,15 @@ export default function ClientsPage() {
       ) : (
         <div className={styles.clientGrid}>
           {filtered.map((c) => (
-            <div key={c.id} className={`card ${styles.clientCard}`} onClick={() => setSelectedClient(c)}>
+            <div key={c.id} className={`card ${styles.clientCard} ${selectedIds.has(c.id) ? styles.clientCardSelected : ''}`} onClick={() => setSelectedClient(c)}>
               <div className={styles.clientHeader}>
+                <input
+                  type="checkbox"
+                  className={styles.clientCheckbox}
+                  checked={selectedIds.has(c.id)}
+                  onChange={(e) => { e.stopPropagation(); toggleSelect(c.id); }}
+                  onClick={(e) => e.stopPropagation()}
+                />
                 {c.photo_url ? (
                   <img src={c.photo_url} alt="" className={styles.clientAvatarImg} />
                 ) : (

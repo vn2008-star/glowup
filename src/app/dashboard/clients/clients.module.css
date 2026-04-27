@@ -576,6 +576,84 @@
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
 }
+.clientCardSelected {
+  border-color: var(--color-primary) !important;
+  background: rgba(195, 126, 218, 0.06) !important;
+  box-shadow: 0 0 0 1px var(--color-primary), var(--shadow-sm);
+}
+.clientCheckbox {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+  flex-shrink: 0;
+  border-radius: 4px;
+}
+
+/* ── Bulk Actions Bar ── */
+.bulkBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-5);
+  background: linear-gradient(135deg, rgba(195, 126, 218, 0.12), rgba(232, 168, 124, 0.08));
+  border: 1px solid rgba(195, 126, 218, 0.3);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-4);
+  animation: fadeIn 0.2s ease-out;
+}
+.bulkBarLeft {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.bulkCheckbox {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+.bulkBarRight {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.bulkClearBtn {
+  padding: var(--space-2) var(--space-4);
+  background: none;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.bulkClearBtn:hover {
+  border-color: var(--text-primary);
+  color: var(--text-primary);
+}
+.bulkDeleteBtn {
+  padding: var(--space-2) var(--space-4);
+  background: rgba(244, 63, 94, 0.15);
+  border: 1px solid rgba(244, 63, 94, 0.3);
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: #f43f5e;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.bulkDeleteBtn:hover {
+  background: rgba(244, 63, 94, 0.25);
+}
+.bulkDeleteBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
 .clientHeader {
   display: flex;
   align-items: center;
