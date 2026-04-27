@@ -21,19 +21,19 @@ export const PLANS: Record<string, PlanConfig> = {
     priceId: process.env.STRIPE_PRICE_STARTER || 'price_1TQeAqL9FTcxTGSWITgYCk5u',
     name: 'Starter',
     price: 25,
-    staffLimit: 1,
+    staffLimit: 4,
   },
   growth: {
     priceId: process.env.STRIPE_PRICE_GROWTH || 'price_1TQeBFL9FTcxTGSWF79jl49G',
     name: 'Growth',
     price: 75,
-    staffLimit: 5,
+    staffLimit: 10,
   },
   professional: {
     priceId: process.env.STRIPE_PRICE_PROFESSIONAL || 'price_1TQeBaL9FTcxTGSWKlpvL8v3',
     name: 'Professional',
     price: 150,
-    staffLimit: 15,
+    staffLimit: 20,
   },
 };
 
