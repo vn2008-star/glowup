@@ -108,7 +108,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
           <button onClick={handleLogout} className={styles.logoutButton} title="Sign out">
-            <LogoutIcon />
+            <LogoutIcon /> <span>Sign Out</span>
           </button>
         </div>
       </aside>

@@ -123,8 +123,8 @@
   padding: var(--space-4) var(--space-5);
   border-top: 1px solid var(--border-subtle);
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: var(--space-3);
 }
 .salonInfo {
   display: flex;
@@ -133,14 +133,19 @@
   min-width: 0;
 }
 .logoutButton {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   background: none;
   border: none;
   color: var(--text-tertiary);
   cursor: pointer;
-  padding: var(--space-2);
+  padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
   transition: all var(--transition-fast);
-  flex-shrink: 0;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  width: 100%;
 }
 .logoutButton:hover {
   background: var(--color-danger-bg);
