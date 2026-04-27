@@ -65,10 +65,36 @@
   color: var(--text-primary) !important;
   text-decoration: none;
   letter-spacing: -0.01em;
+  position: relative;
+}
+.logo span {
+  background: linear-gradient(
+    90deg,
+    var(--text-primary) 0%,
+    var(--text-primary) 40%,
+    var(--color-primary) 50%,
+    var(--color-accent) 55%,
+    var(--text-primary) 60%,
+    var(--text-primary) 100%
+  );
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: logoShimmer 4s ease-in-out infinite;
+}
+@keyframes logoShimmer {
+  0%, 100% { background-position: 100% 0; }
+  50% { background-position: -100% 0; }
 }
 .logo svg {
   color: var(--color-primary);
   filter: drop-shadow(0 0 8px rgba(201, 160, 220, 0.4));
+  animation: logoIconPulse 3s ease-in-out infinite;
+}
+@keyframes logoIconPulse {
+  0%, 100% { filter: drop-shadow(0 0 6px rgba(201, 160, 220, 0.3)); transform: scale(1); }
+  50% { filter: drop-shadow(0 0 14px rgba(240, 163, 181, 0.5)); transform: scale(1.05); }
 }
 .nav {
   display: flex;
