@@ -13,3 +13,6 @@ export async function queryData<T = unknown>(action: string, payload?: Record<st
 
   return res.json()
 }
+
+// Semantic alias for write operations (same underlying POST)
+export const mutateData = queryData;

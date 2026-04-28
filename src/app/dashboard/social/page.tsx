@@ -27,7 +27,7 @@ export default function SocialPage() {
   const { tenant } = useTenant();
   const [posts, setPosts] = useState<SocialPost[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"calendar" | "posts" | "templates">("posts");
+  const [activeTab, setActiveTab] = useState<"calendar" | "posts" | "templates" | "reviews" | "portfolio">("posts");
   const [showModal, setShowModal] = useState(false);
   const [editingPost, setEditingPost] = useState<SocialPost | null>(null);
   const [calendarMonth, setCalendarMonth] = useState(new Date().getMonth());
@@ -179,6 +179,12 @@ export default function SocialPage() {
         <button className={`${styles.tab} ${activeTab === "templates" ? styles.activeTab : ""}`} onClick={() => setActiveTab("templates")}>
           Templates
         </button>
+        <button className={`${styles.tab} ${activeTab === "reviews" ? styles.activeTab : ""}`} onClick={() => setActiveTab("reviews")}>
+          ⭐ Review Booster
+        </button>
+        <button className={`${styles.tab} ${activeTab === "portfolio" ? styles.activeTab : ""}`} onClick={() => setActiveTab("portfolio")}>
+          📸 Portfolio
+        </button>
       </div>
 
       {loading ? (
@@ -262,7 +268,7 @@ export default function SocialPage() {
             ))}
           </div>
         </div>
-      ) : (
+      ) : activeTab === "templates" ? (
         <div className={styles.templateGrid}>
           {TEMPLATES.map((t) => (
             <div key={t.value} className={`card ${styles.templateCard}`} onClick={() => openNew(t.value)}>
@@ -272,7 +278,145 @@ export default function SocialPage() {
             </div>
           ))}
         </div>
-      )}
+      ) : activeTab === "reviews" ? (
+        /* ═══ REVIEW BOOSTER TAB ═══ */
+        <div>
+          <div className={`card`} style={{ padding: 'var(--space-6)', marginBottom: 'var(--space-6)' }}>
+            <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: 'var(--text-xl)', marginBottom: 'var(--space-2)' }}>⭐ Review Booster</h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-6)' }}>Generate 1-tap review links for Google & Yelp. Send post-service to turn happy clients into 5-star reviews.</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-6)' }}>
+              {/* Google Review */}
+              <div style={{ padding: 'var(--space-5)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-subtle)', background: 'var(--bg-surface)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
+                  <span style={{ fontSize: '2rem' }}>🔍</span>
+                  <div>
+                    <h3 style={{ fontWeight: 700 }}>Google Business</h3>
+                    <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>4.5+ stars = 2x more bookings from search</p>
+                  </div>
+                </div>
+                <div style={{ marginBottom: 'var(--space-3)' }}>
+                  <label style={{ fontSize: 'var(--text-sm)', fontWeight: 600, display: 'block', marginBottom: 'var(--space-1)' }}>Your Google Place ID</label>
+                  <input className="input" placeholder="e.g. ChIJN1t_tDeuEmsRUsoyG83frY4" style={{ width: '100%' }} />
+                  <small style={{ color: 'var(--text-tertiary)', fontSize: '11px' }}>Find at: <a href="https://developers.google.com/maps/documentation/places/web-service/place-id" target="_blank" rel="noreferrer" style={{ color: 'var(--color-primary)' }}>Google Place ID Finder</a></small>
+                </div>
+                <div style={{ padding: 'var(--space-3)', background: 'var(--bg-card)', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
+                  <strong>Review Link:</strong><br />
+                  <code style={{ fontSize: '11px', wordBreak: 'break-all' }}>https://search.google.com/local/writereview?placeid=YOUR_PLACE_ID</code>
+                </div>
+              </div>
+              {/* Yelp Review */}
+              <div style={{ padding: 'var(--space-5)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-subtle)', background: 'var(--bg-surface)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
+                  <span style={{ fontSize: '2rem' }}>🟥</span>
+                  <div>
+                    <h3 style={{ fontWeight: 700 }}>Yelp</h3>
+                    <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>Top source for local beauty discovery</p>
+                  </div>
+                </div>
+                <div style={{ marginBottom: 'var(--space-3)' }}>
+                  <label style={{ fontSize: 'var(--text-sm)', fontWeight: 600, display: 'block', marginBottom: 'var(--space-1)' }}>Your Yelp Business URL</label>
+                  <input className="input" placeholder="e.g. https://www.yelp.com/biz/your-salon" style={{ width: '100%' }} />
+                </div>
+                <div style={{ padding: 'var(--space-3)', background: 'var(--bg-card)', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
+                  <strong>Review Link:</strong><br />
+                  <code style={{ fontSize: '11px', wordBreak: 'break-all' }}>https://www.yelp.com/writeareview/biz/YOUR_BIZ_ID</code>
+                </div>
+              </div>
+            </div>
+          </div>
+          {/* SMS Templates */}
+          <div className={`card`} style={{ padding: 'var(--space-6)' }}>
+            <h3 style={{ fontFamily: 'var(--font-heading)', fontSize: 'var(--text-lg)', marginBottom: 'var(--space-4)' }}>📱 Post-Service Review Request Templates</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-4)' }}>Sent automatically 2 hours after a completed appointment (configure in Campaigns → Automations).</p>
+            {[
+              { label: '5-Star Happy Client', msg: 'Hi {name}! Thanks for visiting us today! We loved working with you ❤️ If you have a moment, a quick review would mean the world: {review_link}', tone: 'Warm & personal' },
+              { label: 'Quick & Direct', msg: 'Hi {name}! How was your experience today? We\'d love your feedback → {review_link} Thank you! 🌟', tone: 'Professional & brief' },
+              { label: 'Incentive Offer', msg: 'Hi {name}! Leave us a Google review and get 50 loyalty points on your next visit! → {review_link} Thank you! 💕', tone: 'Value-driven' },
+            ].map((t, i) => (
+              <div key={i} style={{ padding: 'var(--space-4)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--space-3)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-2)' }}>
+                  <strong style={{ fontSize: 'var(--text-sm)' }}>{t.label}</strong>
+                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', background: 'var(--bg-surface)', padding: '2px 8px', borderRadius: 'var(--radius-full)' }}>{t.tone}</span>
+                </div>
+                <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', lineHeight: 1.5, whiteSpace: 'pre-line' }}>{t.msg}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : activeTab === "portfolio" ? (
+        /* ═══ INSTAGRAM PORTFOLIO SYNC TAB ═══ */
+        <div>
+          <div className={`card`} style={{ padding: 'var(--space-6)', marginBottom: 'var(--space-6)' }}>
+            <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: 'var(--text-xl)', marginBottom: 'var(--space-2)' }}>📸 Instagram Portfolio Sync</h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-6)' }}>Curate your best before & after photos into a portfolio that syncs to your public booking page and social feeds.</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--space-4)', marginBottom: 'var(--space-6)' }}>
+              <div style={{ padding: 'var(--space-5)', background: 'var(--bg-surface)', borderRadius: 'var(--radius-lg)', textAlign: 'center' }}>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-3xl)', fontWeight: 800, color: 'var(--color-primary)' }}>0</div>
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>Portfolio Posts</div>
+              </div>
+              <div style={{ padding: 'var(--space-5)', background: 'var(--bg-surface)', borderRadius: 'var(--radius-lg)', textAlign: 'center' }}>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-3xl)', fontWeight: 800, color: 'var(--color-primary)' }}>—</div>
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>Instagram Connected</div>
+              </div>
+              <div style={{ padding: 'var(--space-5)', background: 'var(--bg-surface)', borderRadius: 'var(--radius-lg)', textAlign: 'center' }}>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-3xl)', fontWeight: 800, color: 'var(--color-primary)' }}>0</div>
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>Booking Page Views</div>
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-6)' }}>
+              {/* Connect Instagram */}
+              <div style={{ padding: 'var(--space-5)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-subtle)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
+                  <span style={{ fontSize: '2rem' }}>📸</span>
+                  <div>
+                    <h3 style={{ fontWeight: 700 }}>Connect Instagram</h3>
+                    <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>Auto-pull your best posts into the portfolio</p>
+                  </div>
+                </div>
+                <div style={{ marginBottom: 'var(--space-3)' }}>
+                  <label style={{ fontSize: 'var(--text-sm)', fontWeight: 600, display: 'block', marginBottom: 'var(--space-1)' }}>Instagram Handle</label>
+                  <input className="input" placeholder="@yoursalon" style={{ width: '100%' }} />
+                </div>
+                <button className="btn btn-primary" style={{ width: '100%' }}>🔗 Connect Instagram</button>
+                <p style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: 'var(--space-2)', textAlign: 'center' }}>Uses Instagram Basic Display API</p>
+              </div>
+              {/* Manual Portfolio */}
+              <div style={{ padding: 'var(--space-5)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-subtle)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
+                  <span style={{ fontSize: '2rem' }}>🖼️</span>
+                  <div>
+                    <h3 style={{ fontWeight: 700 }}>Gallery → Portfolio</h3>
+                    <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>Push B&A photos from Gallery to your portfolio</p>
+                  </div>
+                </div>
+                <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', marginBottom: 'var(--space-3)', lineHeight: 1.5 }}>Your before & after photos from the Gallery page can be curated into a public portfolio shown on your booking page. Clients browsing your services will see real results.</p>
+                <button className="btn btn-outline" style={{ width: '100%' }} onClick={() => window.location.href = '/dashboard/gallery'}>Go to Gallery →</button>
+              </div>
+            </div>
+          </div>
+          {/* Portfolio Display Settings */}
+          <div className={`card`} style={{ padding: 'var(--space-6)' }}>
+            <h3 style={{ fontFamily: 'var(--font-heading)', fontSize: 'var(--text-lg)', marginBottom: 'var(--space-4)' }}>⚙️ Portfolio Display Settings</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
+              <div>
+                <label style={{ fontSize: 'var(--text-sm)', fontWeight: 600, display: 'block', marginBottom: 'var(--space-1)' }}>Display Style</label>
+                <select className="input" style={{ width: '100%' }}>
+                  <option>Grid (Instagram-style)</option>
+                  <option>Carousel (swipeable)</option>
+                  <option>Before/After Slider</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 'var(--text-sm)', fontWeight: 600, display: 'block', marginBottom: 'var(--space-1)' }}>Show on Booking Page</label>
+                <select className="input" style={{ width: '100%' }}>
+                  <option>Yes — show portfolio section</option>
+                  <option>No — hide from booking page</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {/* Create/Edit Modal */}
       {showModal && (

@@ -5,104 +5,402 @@ import { useTenant } from "@/lib/tenant-context";
 import { queryData } from "@/lib/api";
 import styles from "./reports.module.css";
 
-interface ReportData {
+/* ═══ Types ═══ */
+interface OverviewData {
   thisMonth: { revenue: number; appointments: number; newClients: number };
   lastMonth: { revenue: number; appointments: number; newClients: number };
   topServices: { name: string; bookings: number; revenue: number }[];
+  staffPerformance: { name: string; appointments: number; revenue: number }[];
+  noShowRate: number;
 }
+
+interface StaffPerf {
+  id: string; name: string; specialties: string[];
+  appointments: number; revenue: number; completed: number;
+  cancelled: number; noShows: number; commissionRate: number;
+  uniqueClients: number; avgTicket: number; completionRate: number;
+  commissionEarned: number;
+}
+
+interface RetentionClient {
+  id: string; first_name: string; last_name: string | null;
+  visit_count: number; last_visit: string | null;
+  daysSinceLastVisit: number; retentionRisk: 'active' | 'at_risk' | 'lost' | 'new';
+}
+
+interface ForecastData {
+  weeks: { label: string; booked: number; projected: number }[];
+  monthlyTrend: { month: string; revenue: number }[];
+  projectedMonthRevenue: number; bestCase: number; conservative: number;
+}
+
+interface PeakHoursData {
+  grid: Record<string, Record<number, number>>;
+  days: string[]; hours: number[]; maxCount: number;
+}
+
+const TABS = ["Overview", "Staff Performance", "Client Retention", "Revenue Forecast", "Peak Hours"] as const;
 
 export default function ReportsPage() {
   const { tenant } = useTenant();
-  const [data, setData] = useState<ReportData | null>(null);
+  const [activeTab, setActiveTab] = useState<string>(TABS[0]);
   const [loading, setLoading] = useState(true);
 
-  const fetchReports = useCallback(async () => {
+  // Data for each tab
+  const [overview, setOverview] = useState<OverviewData | null>(null);
+  const [staffPerf, setStaffPerf] = useState<StaffPerf[]>([]);
+  const [retention, setRetention] = useState<{ summary: { total: number; active: number; atRisk: number; lost: number; new: number; retentionRate: number }; clients: RetentionClient[] } | null>(null);
+  const [forecast, setForecast] = useState<ForecastData | null>(null);
+  const [peakHours, setPeakHours] = useState<PeakHoursData | null>(null);
+  const [retFilter, setRetFilter] = useState<string>("all");
+
+  const fetchTabData = useCallback(async () => {
     if (!tenant) return;
     setLoading(true);
-    const { data: reportData } = await queryData<ReportData>("reports.overview");
-    setData(reportData);
-    setLoading(false);
-  }, [tenant]);
+    try {
+      switch (activeTab) {
+        case "Overview": {
+          const { data } = await queryData<OverviewData>("reports.overview");
+          setOverview(data);
+          break;
+        }
+        case "Staff Performance": {
+          const { data } = await queryData<{ staffPerformance: StaffPerf[] }>("reports.staff-performance");
+          setStaffPerf(data?.staffPerformance || []);
+          break;
+        }
+        case "Client Retention": {
+          const { data } = await queryData<typeof retention>("reports.retention");
+          setRetention(data);
+          break;
+        }
+        case "Revenue Forecast": {
+          const { data } = await queryData<ForecastData>("reports.forecast");
+          setForecast(data);
+          break;
+        }
+        case "Peak Hours": {
+          const { data } = await queryData<PeakHoursData>("reports.peak-hours");
+          setPeakHours(data);
+          break;
+        }
+      }
+    } finally { setLoading(false); }
+  }, [tenant, activeTab]);
 
-  useEffect(() => { fetchReports(); }, [fetchReports]);
+  useEffect(() => { fetchTabData(); }, [fetchTabData]);
 
-  const thisMonth = data?.thisMonth || { revenue: 0, appointments: 0, newClients: 0 };
-  const lastMonth = data?.lastMonth || { revenue: 0, appointments: 0, newClients: 0 };
-  const revenueGrowth = lastMonth.revenue > 0
-    ? Math.round(((thisMonth.revenue - lastMonth.revenue) / lastMonth.revenue) * 100)
-    : 0;
-  const apptGrowth = thisMonth.appointments - lastMonth.appointments;
-  const clientGrowth = thisMonth.newClients - lastMonth.newClients;
-  const avgTicket = thisMonth.appointments > 0 ? Math.round(thisMonth.revenue / thisMonth.appointments) : 0;
-  const topServices = data?.topServices || [];
-  const maxBookings = topServices.length > 0 ? topServices[0].bookings : 1;
+  const fmt = (n: number) => `$${n.toLocaleString()}`;
 
   return (
     <div className={styles.page}>
       <div className={styles.pageHeader}>
         <div>
           <h1>Reports & Analytics</h1>
-          <p>Business performance overview</p>
+          <p>Comprehensive business intelligence dashboard</p>
         </div>
       </div>
 
+      {/* Tab Navigation */}
+      <div className={styles.tabs}>
+        {TABS.map(tab => (
+          <button key={tab} className={`${styles.tab} ${activeTab === tab ? styles.tabActive : ''}`} onClick={() => setActiveTab(tab)}>
+            {tab}
+          </button>
+        ))}
+      </div>
+
       {loading ? (
-        <div style={{ padding: "2rem", textAlign: "center", color: "var(--text-secondary)" }}>Loading reports...</div>
+        <div style={{ padding: "3rem", textAlign: "center", color: "var(--text-secondary)" }}>Loading analytics...</div>
       ) : (
         <>
-          {/* KPI Cards */}
-          <div className={styles.kpiGrid}>
-            <div className={`card ${styles.kpiCard}`}>
-              <span className={styles.kpiLabel}>Monthly Revenue</span>
-              <span className={styles.kpiValue}>${thisMonth.revenue.toLocaleString()}</span>
-              <span className={`${styles.kpiChange} ${revenueGrowth >= 0 ? styles.positive : styles.negative}`}>
-                {revenueGrowth >= 0 ? "+" : ""}{revenueGrowth}% vs last month
-              </span>
-            </div>
-            <div className={`card ${styles.kpiCard}`}>
-              <span className={styles.kpiLabel}>Appointments</span>
-              <span className={styles.kpiValue}>{thisMonth.appointments}</span>
-              <span className={`${styles.kpiChange} ${apptGrowth >= 0 ? styles.positive : styles.negative}`}>
-                {apptGrowth >= 0 ? "+" : ""}{apptGrowth} vs last month
-              </span>
-            </div>
-            <div className={`card ${styles.kpiCard}`}>
-              <span className={styles.kpiLabel}>New Clients</span>
-              <span className={styles.kpiValue}>{thisMonth.newClients}</span>
-              <span className={`${styles.kpiChange} ${clientGrowth >= 0 ? styles.positive : styles.negative}`}>
-                {clientGrowth >= 0 ? "+" : ""}{clientGrowth} vs last month
-              </span>
-            </div>
-            <div className={`card ${styles.kpiCard}`}>
-              <span className={styles.kpiLabel}>Avg. Ticket</span>
-              <span className={styles.kpiValue}>${avgTicket}</span>
-              <span className={styles.kpiChange}>per appointment</span>
-            </div>
-          </div>
+          {/* ═══ OVERVIEW TAB ═══ */}
+          {activeTab === "Overview" && overview && (
+            <>
+              <div className={styles.kpiGrid}>
+                <div className={`card ${styles.kpiCard}`}>
+                  <span className={styles.kpiLabel}>Monthly Revenue</span>
+                  <span className={styles.kpiValue}>{fmt(overview.thisMonth.revenue)}</span>
+                  <span className={`${styles.kpiChange} ${overview.thisMonth.revenue >= overview.lastMonth.revenue ? styles.positive : styles.negative}`}>
+                    {overview.lastMonth.revenue > 0 ? `${overview.thisMonth.revenue >= overview.lastMonth.revenue ? '+' : ''}${Math.round(((overview.thisMonth.revenue - overview.lastMonth.revenue) / overview.lastMonth.revenue) * 100)}%` : '—'} vs last month
+                  </span>
+                </div>
+                <div className={`card ${styles.kpiCard}`}>
+                  <span className={styles.kpiLabel}>Appointments</span>
+                  <span className={styles.kpiValue}>{overview.thisMonth.appointments}</span>
+                  <span className={`${styles.kpiChange} ${overview.thisMonth.appointments >= overview.lastMonth.appointments ? styles.positive : styles.negative}`}>
+                    {overview.thisMonth.appointments - overview.lastMonth.appointments >= 0 ? '+' : ''}{overview.thisMonth.appointments - overview.lastMonth.appointments} vs last month
+                  </span>
+                </div>
+                <div className={`card ${styles.kpiCard}`}>
+                  <span className={styles.kpiLabel}>New Clients</span>
+                  <span className={styles.kpiValue}>{overview.thisMonth.newClients}</span>
+                  <span className={`${styles.kpiChange} ${overview.thisMonth.newClients >= overview.lastMonth.newClients ? styles.positive : styles.negative}`}>
+                    {overview.thisMonth.newClients - overview.lastMonth.newClients >= 0 ? '+' : ''}{overview.thisMonth.newClients - overview.lastMonth.newClients} vs last month
+                  </span>
+                </div>
+                <div className={`card ${styles.kpiCard}`}>
+                  <span className={styles.kpiLabel}>No-Show Rate</span>
+                  <span className={styles.kpiValue}>{overview.noShowRate || 0}%</span>
+                  <span className={styles.kpiChange}>industry avg: 15%</span>
+                </div>
+              </div>
 
-          {/* Top Services */}
-          <div className={`card ${styles.topServicesCard}`}>
-            <h2>Top Services</h2>
-            {topServices.length === 0 ? (
-              <p style={{ color: "var(--text-secondary)", padding: "1rem 0" }}>No completed appointments yet. Book and complete services to see rankings.</p>
-            ) : (
-              <div className={styles.servicesList}>
-                {topServices.map((s, i) => (
-                  <div key={s.name} className={styles.serviceRow}>
-                    <span className={styles.serviceRank}>#{i + 1}</span>
-                    <div className={styles.serviceInfo}>
-                      <span className={styles.serviceName}>{s.name}</span>
-                      <div className={styles.serviceBar}>
-                        <div className={styles.serviceBarFill} style={{ width: `${(s.bookings / maxBookings) * 100}%` }} />
+              <div className={`card ${styles.topServicesCard}`}>
+                <h2>Top Services</h2>
+                {overview.topServices.length === 0 ? (
+                  <p style={{ color: "var(--text-secondary)", padding: "1rem 0" }}>No completed appointments yet.</p>
+                ) : (
+                  <div className={styles.servicesList}>
+                    {overview.topServices.map((s, i) => (
+                      <div key={s.name} className={styles.serviceRow}>
+                        <span className={styles.serviceRank}>#{i + 1}</span>
+                        <div className={styles.serviceInfo}>
+                          <span className={styles.serviceName}>{s.name}</span>
+                          <div className={styles.serviceBar}>
+                            <div className={styles.serviceBarFill} style={{ width: `${(s.bookings / (overview.topServices[0]?.bookings || 1)) * 100}%` }} />
+                          </div>
+                        </div>
+                        <span className={styles.serviceBookings}>{s.bookings} bookings</span>
+                        <span className={styles.serviceRevenue}>{fmt(s.revenue)}</span>
                       </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* ═══ STAFF PERFORMANCE TAB ═══ */}
+          {activeTab === "Staff Performance" && (
+            <>
+              {staffPerf.length === 0 ? (
+                <div className="card" style={{ padding: "3rem", textAlign: "center", color: "var(--text-secondary)" }}>
+                  <h3 style={{ marginBottom: "var(--space-2)" }}>No Staff Data Yet</h3>
+                  <p>Complete appointments to see staff performance metrics.</p>
+                </div>
+              ) : (
+                <div className={styles.staffGrid}>
+                  {staffPerf.map((s, i) => (
+                    <div key={s.id} className={styles.perfCard} style={i === 0 ? { borderColor: 'rgba(201,160,220,0.4)', boxShadow: 'var(--shadow-glow-soft)' } : {}}>
+                      <div className={styles.perfCardHeader}>
+                        <div className={styles.perfAvatar}>{s.name.charAt(0)}</div>
+                        <div>
+                          <div className={styles.perfName}>{i === 0 && '🏆 '}{s.name}</div>
+                          <div className={styles.perfRole}>{s.specialties?.[0] || 'Team Member'}</div>
+                        </div>
+                      </div>
+                      <div className={styles.perfStats}>
+                        <div className={styles.perfStat}>
+                          <div className={styles.perfStatValue}>{fmt(s.revenue)}</div>
+                          <div className={styles.perfStatLabel}>Revenue</div>
+                        </div>
+                        <div className={styles.perfStat}>
+                          <div className={styles.perfStatValue}>{s.completed}</div>
+                          <div className={styles.perfStatLabel}>Completed</div>
+                        </div>
+                        <div className={styles.perfStat}>
+                          <div className={styles.perfStatValue}>{fmt(s.avgTicket)}</div>
+                          <div className={styles.perfStatLabel}>Avg Ticket</div>
+                        </div>
+                        <div className={styles.perfStat}>
+                          <div className={styles.perfStatValue}>{s.uniqueClients}</div>
+                          <div className={styles.perfStatLabel}>Clients</div>
+                        </div>
+                      </div>
+                      <div className={styles.perfBar}>
+                        <div className={styles.perfBarLabel}>
+                          <span>Completion Rate</span>
+                          <span>{s.completionRate}%</span>
+                        </div>
+                        <div className={styles.perfBarTrack}>
+                          <div className={styles.perfBarFill} style={{ width: `${s.completionRate}%` }} />
+                        </div>
+                      </div>
+                      {s.commissionRate > 0 && (
+                        <div style={{ marginTop: 'var(--space-3)', fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
+                          💰 Commission ({s.commissionRate}%): <strong>{fmt(s.commissionEarned)}</strong>
+                        </div>
+                      )}
                     </div>
-                    <span className={styles.serviceBookings}>{s.bookings} bookings</span>
-                    <span className={styles.serviceRevenue}>${s.revenue.toLocaleString()}</span>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ═══ CLIENT RETENTION TAB ═══ */}
+          {activeTab === "Client Retention" && retention && (
+            <>
+              <div className={styles.retentionSummary}>
+                <div className={styles.retCard}>
+                  <div className={styles.retValue} style={{ color: 'var(--color-primary)' }}>{retention.summary.retentionRate}%</div>
+                  <div className={styles.retLabel}>Retention Rate</div>
+                </div>
+                <div className={styles.retCard}>
+                  <div className={styles.retValue} style={{ color: 'var(--color-success)' }}>{retention.summary.active}</div>
+                  <div className={styles.retLabel}>Active</div>
+                </div>
+                <div className={styles.retCard}>
+                  <div className={styles.retValue} style={{ color: '#d97706' }}>{retention.summary.atRisk}</div>
+                  <div className={styles.retLabel}>At Risk</div>
+                </div>
+                <div className={styles.retCard}>
+                  <div className={styles.retValue} style={{ color: 'var(--color-error)' }}>{retention.summary.lost}</div>
+                  <div className={styles.retLabel}>Lost (90+ days)</div>
+                </div>
+                <div className={styles.retCard}>
+                  <div className={styles.retValue} style={{ color: '#3b82f6' }}>{retention.summary.new}</div>
+                  <div className={styles.retLabel}>New / No Visit</div>
+                </div>
+              </div>
+
+              <div className={`card ${styles.retListCard}`}>
+                <h2>Client Health</h2>
+                <div className={styles.retFilters}>
+                  {["all", "active", "at_risk", "lost", "new"].map(f => (
+                    <button key={f} className={`${styles.retFilterBtn} ${retFilter === f ? styles.retFilterActive : ''}`} onClick={() => setRetFilter(f)}>
+                      {f === 'all' ? 'All' : f === 'at_risk' ? 'At Risk' : f.charAt(0).toUpperCase() + f.slice(1)}
+                    </button>
+                  ))}
+                </div>
+                {retention.clients.filter(c => retFilter === 'all' || c.retentionRisk === retFilter).slice(0, 25).map(c => (
+                  <div key={c.id} className={styles.retRow}>
+                    <span className={`${styles.retBadge} ${
+                      c.retentionRisk === 'active' ? styles.retBadgeActive :
+                      c.retentionRisk === 'at_risk' ? styles.retBadgeRisk :
+                      c.retentionRisk === 'lost' ? styles.retBadgeLost : styles.retBadgeNew
+                    }`}>
+                      {c.retentionRisk === 'active' ? '🟢' : c.retentionRisk === 'at_risk' ? '🟡' : c.retentionRisk === 'lost' ? '🔴' : '🔵'}
+                    </span>
+                    <span className={styles.retName}>{c.first_name} {c.last_name || ''}</span>
+                    <span className={styles.retVisits}>{c.visit_count} visits</span>
+                    <span className={styles.retDays} style={{ color: c.daysSinceLastVisit > 90 ? 'var(--color-error)' : c.daysSinceLastVisit > 45 ? '#d97706' : 'var(--text-secondary)' }}>
+                      {c.daysSinceLastVisit > 900 ? 'No visits' : `${c.daysSinceLastVisit}d ago`}
+                    </span>
                   </div>
                 ))}
               </div>
-            )}
-          </div>
+            </>
+          )}
+
+          {/* ═══ REVENUE FORECAST TAB ═══ */}
+          {activeTab === "Revenue Forecast" && forecast && (
+            <>
+              <div className={styles.kpiGrid}>
+                <div className={`card ${styles.kpiCard}`}>
+                  <span className={styles.kpiLabel}>Projected (4 Weeks)</span>
+                  <span className={styles.kpiValue}>{fmt(forecast.projectedMonthRevenue)}</span>
+                  <span className={styles.kpiChange}>from booked appointments</span>
+                </div>
+                <div className={`card ${styles.kpiCard}`}>
+                  <span className={styles.kpiLabel}>Best Case</span>
+                  <span className={styles.kpiValue} style={{ color: 'var(--color-success)' }}>{fmt(forecast.bestCase)}</span>
+                  <span className={styles.kpiChange}>+30% walk-ins & upsells</span>
+                </div>
+                <div className={`card ${styles.kpiCard}`}>
+                  <span className={styles.kpiLabel}>Conservative</span>
+                  <span className={styles.kpiValue} style={{ color: '#d97706' }}>{fmt(forecast.conservative)}</span>
+                  <span className={styles.kpiChange}>-15% cancellations</span>
+                </div>
+                <div className={`card ${styles.kpiCard}`}>
+                  <span className={styles.kpiLabel}>Avg Weekly</span>
+                  <span className={styles.kpiValue}>{fmt(Math.round(forecast.projectedMonthRevenue / 4))}</span>
+                  <span className={styles.kpiChange}>per week projected</span>
+                </div>
+              </div>
+
+              <div className={styles.forecastGrid}>
+                <div className={`card ${styles.forecastCard}`}>
+                  <h2>📅 Weekly Forecast</h2>
+                  <div className={styles.barChart}>
+                    {forecast.weeks.map(w => {
+                      const maxVal = Math.max(...forecast.weeks.map(x => x.projected), 1);
+                      return (
+                        <div key={w.label} className={styles.barRow}>
+                          <span className={styles.barLabel}>{w.label}</span>
+                          <div className={styles.barTrack}>
+                            <div className={`${styles.barFill} ${styles.barFillBooked}`} style={{ width: `${(w.booked / maxVal) * 100}%` }}>
+                              <span className={styles.barAmount}>{fmt(w.booked)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className={`card ${styles.forecastCard}`}>
+                  <h2>📈 6-Month Trend</h2>
+                  <div className={styles.trendChart}>
+                    {forecast.monthlyTrend.map(m => {
+                      const maxRev = Math.max(...forecast.monthlyTrend.map(x => x.revenue), 1);
+                      const pct = (m.revenue / maxRev) * 100;
+                      return (
+                        <div key={m.month} className={styles.trendBar} style={{ height: `${Math.max(pct, 5)}%` }}>
+                          {pct > 20 && <span className={styles.trendBarValue}>{fmt(m.revenue)}</span>}
+                          <span className={styles.trendBarLabel}>{m.month}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* ═══ PEAK HOURS HEATMAP TAB ═══ */}
+          {activeTab === "Peak Hours" && peakHours && (
+            <div className={`card ${styles.heatmapCard}`}>
+              <h2>🔥 Peak Hours Heatmap</h2>
+              <p>Appointment density over the past 3 months. Darker = busier.</p>
+
+              <div className={styles.heatmapGrid} style={{ gridTemplateColumns: `80px repeat(${peakHours.hours.length}, 1fr)` }}>
+                {/* Header row */}
+                <div />
+                {peakHours.hours.map(h => (
+                  <div key={h} className={styles.heatmapHeader}>
+                    {h > 12 ? `${h - 12}pm` : h === 12 ? '12pm' : `${h}am`}
+                  </div>
+                ))}
+
+                {/* Data rows */}
+                {peakHours.days.map(day => (
+                  <>
+                    <div key={`label-${day}`} className={styles.heatmapDayLabel}>{day.slice(0, 3)}</div>
+                    {peakHours.hours.map(hour => {
+                      const count = peakHours.grid[day]?.[hour] || 0;
+                      const intensity = count / peakHours.maxCount;
+                      const bg = count === 0
+                        ? 'var(--bg-surface)'
+                        : `rgba(201, 160, 220, ${0.15 + intensity * 0.75})`;
+                      const textColor = intensity > 0.5 ? 'white' : 'var(--text-secondary)';
+                      return (
+                        <div
+                          key={`${day}-${hour}`}
+                          className={styles.heatmapCell}
+                          style={{ background: bg, color: textColor }}
+                          title={`${day} ${hour > 12 ? hour - 12 : hour}${hour >= 12 ? 'pm' : 'am'}: ${count} appointments`}
+                        >
+                          {count > 0 ? count : ''}
+                        </div>
+                      );
+                    })}
+                  </>
+                ))}
+              </div>
+
+              <div className={styles.heatmapLegend}>
+                <span>Low</span>
+                <div className={styles.heatmapLegendBar}>
+                  {[0.15, 0.3, 0.45, 0.6, 0.75, 0.9].map(op => (
+                    <div key={op} className={styles.heatmapLegendSwatch} style={{ background: `rgba(201, 160, 220, ${op})` }} />
+                  ))}
+                </div>
+                <span>High</span>
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>

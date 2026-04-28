@@ -1,41 +1,115 @@
-.page { animation: fadeIn 0.4s ease-out; }
-.pageHeader { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: var(--space-8); }
-.pageHeader h1 { font-size: var(--text-2xl); font-weight: 800; margin-bottom: var(--space-1); }
-.pageHeader p { font-size: var(--text-sm); color: var(--text-secondary); }
+/* ═══ Reports & Analytics — 5-Tab Hub ═══ */
+.page { padding: var(--space-8); max-width: 1200px; }
+.pageHeader { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: var(--space-6); }
+.pageHeader h1 { font-family: var(--font-display); font-size: var(--text-3xl); font-weight: 800; letter-spacing: -0.02em; }
+.pageHeader p { color: var(--text-secondary); margin-top: var(--space-1); }
 
-.kpiGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-4); margin-bottom: var(--space-6); }
-.kpiCard { display: flex; flex-direction: column; gap: var(--space-2); }
-.kpiLabel { font-size: var(--text-xs); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-tertiary); }
-.kpiValue { font-family: var(--font-display); font-size: var(--text-3xl); font-weight: 800; color: var(--text-primary); }
-.kpiChange { font-size: var(--text-xs); font-weight: 600; color: var(--text-tertiary); }
+/* Tabs */
+.tabs { display: flex; gap: var(--space-1); border-bottom: 2px solid var(--border-subtle); margin-bottom: var(--space-8); overflow-x: auto; }
+.tab { padding: var(--space-3) var(--space-5); font-size: var(--text-sm); font-weight: 600; color: var(--text-secondary); cursor: pointer; border: none; background: none; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all var(--transition-fast); white-space: nowrap; }
+.tab:hover { color: var(--text-primary); }
+.tabActive { color: var(--color-primary); border-bottom-color: var(--color-primary); }
+
+/* KPI Grid */
+.kpiGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-4); margin-bottom: var(--space-8); }
+.kpiCard { padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-1); }
+.kpiLabel { font-size: var(--text-xs); font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em; }
+.kpiValue { font-family: var(--font-display); font-size: var(--text-3xl); font-weight: 800; }
+.kpiChange { font-size: var(--text-sm); font-weight: 500; }
 .positive { color: var(--color-success); }
+.negative { color: var(--color-error); }
 
-.chartCard { padding: var(--space-6); margin-bottom: var(--space-6); }
-.chartCard h2 { font-size: var(--text-lg); font-weight: 700; margin-bottom: var(--space-6); }
-.barChart { display: flex; align-items: flex-end; justify-content: center; gap: var(--space-8); height: 200px; }
-.barGroup { display: flex; flex-direction: column; align-items: center; gap: var(--space-2); height: 100%; }
-.barWrapper { flex: 1; display: flex; align-items: flex-end; width: 60px; }
-.bar {
-  width: 100%; background: var(--gradient-primary); border-radius: var(--radius-md) var(--radius-md) 0 0;
-  display: flex; align-items: flex-start; justify-content: center; padding-top: var(--space-2);
-  transition: height 0.5s ease; min-height: 20px;
-}
-.barValue { font-size: var(--text-xs); font-weight: 700; color: var(--text-inverse); }
-.barLabel { font-size: var(--text-sm); font-weight: 600; color: var(--text-secondary); }
-
+/* Top Services */
 .topServicesCard { padding: var(--space-6); }
-.topServicesCard h2 { font-size: var(--text-lg); font-weight: 700; margin-bottom: var(--space-5); }
+.topServicesCard h2 { font-family: var(--font-heading); font-size: var(--text-lg); margin-bottom: var(--space-4); }
 .servicesList { display: flex; flex-direction: column; gap: var(--space-3); }
-.serviceRow {
-  display: grid; grid-template-columns: 40px 1fr 100px 80px;
-  align-items: center; gap: var(--space-3); padding: var(--space-2) 0;
-}
-.serviceRank { font-family: var(--font-display); font-weight: 800; color: var(--text-tertiary); font-size: var(--text-sm); }
-.serviceInfo { display: flex; flex-direction: column; gap: var(--space-1); }
-.serviceName { font-size: var(--text-sm); font-weight: 600; color: var(--text-primary); }
+.serviceRow { display: flex; align-items: center; gap: var(--space-4); padding: var(--space-3); border-radius: var(--radius-md); transition: background var(--transition-fast); }
+.serviceRow:hover { background: var(--bg-surface); }
+.serviceRank { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 800; color: var(--color-primary); min-width: 32px; }
+.serviceInfo { flex: 1; display: flex; flex-direction: column; gap: var(--space-1); }
+.serviceName { font-weight: 600; font-size: var(--text-sm); }
 .serviceBar { height: 6px; background: var(--bg-surface); border-radius: var(--radius-full); overflow: hidden; }
-.serviceBarFill { height: 100%; background: var(--gradient-primary); border-radius: var(--radius-full); transition: width 0.5s ease; }
-.serviceBookings { font-size: var(--text-sm); color: var(--text-secondary); text-align: right; }
-.serviceRevenue { font-size: var(--text-sm); font-weight: 700; color: var(--text-primary); text-align: right; font-family: var(--font-display); }
+.serviceBarFill { height: 100%; background: var(--gradient-primary); border-radius: var(--radius-full); transition: width 0.6s ease-out; }
+.serviceBookings { font-size: var(--text-sm); color: var(--text-secondary); min-width: 90px; text-align: right; }
+.serviceRevenue { font-size: var(--text-sm); font-weight: 600; min-width: 70px; text-align: right; }
 
-@media (max-width: 768px) { .kpiGrid { grid-template-columns: repeat(2, 1fr); } }
+/* ═══ Staff Performance Tab ═══ */
+.staffGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--space-4); margin-bottom: var(--space-8); }
+.perfCard { padding: var(--space-5); border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); background: var(--bg-card); }
+.perfCardHeader { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-4); }
+.perfAvatar { width: 44px; height: 44px; border-radius: var(--radius-full); background: var(--gradient-primary); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: var(--text-lg); }
+.perfName { font-weight: 700; font-size: var(--text-base); }
+.perfRole { font-size: var(--text-xs); color: var(--text-tertiary); }
+.perfStats { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+.perfStat { text-align: center; padding: var(--space-2); background: var(--bg-surface); border-radius: var(--radius-md); }
+.perfStatValue { font-family: var(--font-display); font-size: var(--text-xl); font-weight: 800; color: var(--color-primary); }
+.perfStatLabel { font-size: var(--text-xs); color: var(--text-tertiary); }
+.perfBar { margin-top: var(--space-3); }
+.perfBarLabel { display: flex; justify-content: space-between; font-size: var(--text-xs); color: var(--text-secondary); margin-bottom: var(--space-1); }
+.perfBarTrack { height: 8px; background: var(--bg-surface); border-radius: var(--radius-full); overflow: hidden; }
+.perfBarFill { height: 100%; background: var(--gradient-primary); border-radius: var(--radius-full); transition: width 0.6s ease-out; }
+
+/* ═══ Retention Tab ═══ */
+.retentionSummary { display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--space-4); margin-bottom: var(--space-8); }
+.retCard { padding: var(--space-4); text-align: center; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); background: var(--bg-card); }
+.retValue { font-family: var(--font-display); font-size: var(--text-2xl); font-weight: 800; }
+.retLabel { font-size: var(--text-xs); color: var(--text-tertiary); margin-top: var(--space-1); }
+.retListCard { padding: var(--space-6); }
+.retListCard h2 { font-family: var(--font-heading); font-size: var(--text-lg); margin-bottom: var(--space-4); }
+.retFilters { display: flex; gap: var(--space-2); margin-bottom: var(--space-4); }
+.retFilterBtn { padding: var(--space-2) var(--space-4); font-size: var(--text-xs); font-weight: 600; border: 1px solid var(--border-default); border-radius: var(--radius-full); background: transparent; color: var(--text-secondary); cursor: pointer; transition: all var(--transition-fast); }
+.retFilterActive { background: var(--color-primary); color: white; border-color: var(--color-primary); }
+.retRow { display: flex; align-items: center; gap: var(--space-4); padding: var(--space-3) var(--space-2); border-bottom: 1px solid var(--border-subtle); }
+.retRow:last-child { border-bottom: none; }
+.retName { flex: 1; font-weight: 600; font-size: var(--text-sm); }
+.retVisits { font-size: var(--text-sm); color: var(--text-secondary); min-width: 80px; }
+.retDays { font-size: var(--text-sm); min-width: 100px; text-align: right; }
+.retBadge { padding: 2px 10px; border-radius: var(--radius-full); font-size: var(--text-xs); font-weight: 700; }
+.retBadgeActive { background: rgba(34, 197, 94, 0.1); color: var(--color-success); }
+.retBadgeRisk { background: rgba(251, 191, 36, 0.1); color: #d97706; }
+.retBadgeLost { background: rgba(239, 68, 68, 0.1); color: var(--color-error); }
+.retBadgeNew { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
+
+/* ═══ Forecast Tab ═══ */
+.forecastGrid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6); margin-bottom: var(--space-8); }
+.forecastCard { padding: var(--space-6); }
+.forecastCard h2 { font-family: var(--font-heading); font-size: var(--text-lg); margin-bottom: var(--space-5); }
+.projectionRow { display: flex; justify-content: space-between; align-items: center; padding: var(--space-3) 0; border-bottom: 1px solid var(--border-subtle); }
+.projectionRow:last-child { border-bottom: none; }
+.projLabel { font-size: var(--text-sm); color: var(--text-secondary); }
+.projValue { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 700; }
+.barChart { display: flex; flex-direction: column; gap: var(--space-3); }
+.barRow { display: flex; align-items: center; gap: var(--space-3); }
+.barLabel { font-size: var(--text-sm); font-weight: 600; min-width: 60px; }
+.barTrack { flex: 1; height: 28px; background: var(--bg-surface); border-radius: var(--radius-md); overflow: hidden; position: relative; }
+.barFill { height: 100%; border-radius: var(--radius-md); transition: width 0.6s ease-out; display: flex; align-items: center; padding-left: var(--space-3); }
+.barFillBooked { background: var(--gradient-primary); }
+.barFillProjected { background: rgba(201, 160, 220, 0.25); position: absolute; top: 0; left: 0; height: 100%; }
+.barAmount { font-size: var(--text-xs); font-weight: 700; color: white; white-space: nowrap; }
+.trendChart { display: flex; align-items: flex-end; gap: var(--space-2); height: 200px; padding-top: var(--space-4); }
+.trendBar { flex: 1; background: var(--gradient-primary); border-radius: var(--radius-sm) var(--radius-sm) 0 0; transition: height 0.6s ease-out; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; min-width: 40px; position: relative; cursor: pointer; }
+.trendBar:hover { opacity: 0.85; }
+.trendBarValue { font-size: 10px; font-weight: 700; color: white; padding: var(--space-1); white-space: nowrap; }
+.trendBarLabel { font-size: var(--text-xs); color: var(--text-tertiary); margin-top: var(--space-2); position: absolute; bottom: -24px; }
+
+/* ═══ Peak Hours Heatmap ═══ */
+.heatmapCard { padding: var(--space-6); overflow-x: auto; }
+.heatmapCard h2 { font-family: var(--font-heading); font-size: var(--text-lg); margin-bottom: var(--space-2); }
+.heatmapCard p { font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-5); }
+.heatmapGrid { display: grid; gap: 3px; }
+.heatmapHeader { font-size: var(--text-xs); font-weight: 600; color: var(--text-tertiary); text-align: center; padding: var(--space-1); }
+.heatmapDayLabel { font-size: var(--text-xs); font-weight: 600; color: var(--text-secondary); display: flex; align-items: center; padding-right: var(--space-2); }
+.heatmapCell { width: 100%; aspect-ratio: 1.6; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; cursor: pointer; transition: all var(--transition-fast); min-width: 50px; }
+.heatmapCell:hover { transform: scale(1.1); z-index: 2; box-shadow: var(--shadow-md); }
+.heatmapLegend { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-4); justify-content: center; }
+.heatmapLegend span { font-size: var(--text-xs); color: var(--text-tertiary); }
+.heatmapLegendBar { display: flex; gap: 2px; }
+.heatmapLegendSwatch { width: 20px; height: 12px; border-radius: 2px; }
+
+/* ═══ Responsive ═══ */
+@media (max-width: 768px) {
+  .kpiGrid { grid-template-columns: repeat(2, 1fr); }
+  .retentionSummary { grid-template-columns: repeat(2, 1fr); }
+  .forecastGrid { grid-template-columns: 1fr; }
+  .staffGrid { grid-template-columns: 1fr; }
+}

@@ -123,6 +123,7 @@ export interface ServiceHistory {
   appointment_id: string | null
   date: string
   notes: string | null
+  formula: string | null
   before_photo_urls: string[]
   after_photo_urls: string[]
   specifications: Record<string, unknown>
@@ -178,5 +179,57 @@ export interface Message {
   sender_name: string | null
   content: string
   metadata: Record<string, unknown>
+  created_at: string
+}
+
+export interface WaitlistEntry {
+  id: string
+  tenant_id: string
+  client_id: string
+  service_id: string | null
+  staff_id: string | null
+  preferred_date: string | null
+  preferred_time_start: string | null
+  preferred_time_end: string | null
+  status: 'waiting' | 'notified' | 'booked' | 'expired'
+  notes: string | null
+  created_at: string
+  // Joined
+  client?: Client
+  service?: Service
+  staff_member?: Staff
+}
+
+export interface Package {
+  id: string
+  tenant_id: string
+  name: string
+  description: string | null
+  type: 'bundle' | 'membership'
+  services: { service_id: string; quantity: number; name?: string }[]
+  price: number
+  original_price: number | null
+  validity_days: number
+  max_redemptions: number | null
+  times_sold: number
+  revenue_generated: number
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface GiftCard {
+  id: string
+  tenant_id: string
+  code: string
+  initial_amount: number
+  balance: number
+  purchaser_name: string | null
+  purchaser_email: string | null
+  recipient_name: string | null
+  recipient_email: string | null
+  message: string | null
+  status: 'active' | 'redeemed' | 'expired'
+  expires_at: string | null
   created_at: string
 }

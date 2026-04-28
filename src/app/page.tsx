@@ -117,7 +117,9 @@ export default function LandingPage() {
         <div className="container">
           <div className={styles.heroContent}>
             <div className={styles.heroBadge}>
-              ✦ Built for Nails, Lashes, Hair, Facial, and Waxing salons, spas & beauty professionals
+              ✦ Built for Hair, Skin, Nails, Lashes, Brows, Makeup & Waxing professionals
+              <br />
+              — from solo artists to full-service salons & spas
             </div>
             <h1 className={styles.heroTitle}>
               Grow your beauty business <span className="gradient-text">on autopilot</span>

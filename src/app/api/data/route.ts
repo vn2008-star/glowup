@@ -697,6 +697,352 @@ export async function POST(request: Request) {
         })
       }
 
+      // ─── WAITLIST ───
+      case 'waitlist.list': {
+        const { data, error } = await svc
+          .from('waitlist')
+          .select('*, client:clients(id, first_name, last_name, phone, email), service:services(id, name, price), staff_member:staff(id, name)')
+          .eq('tenant_id', tenantId)
+          .order('created_at', { ascending: false })
+        return NextResponse.json({ data, error: error?.message })
+      }
+
+      case 'waitlist.add': {
+        const { data, error } = await svc
+          .from('waitlist')
+          .insert({ ...payload, tenant_id: tenantId })
+          .select()
+          .single()
+        return NextResponse.json({ data, error: error?.message })
+      }
+
+      case 'waitlist.update': {
+        const { id, ...fields } = payload
+        const { data, error } = await svc
+          .from('waitlist')
+          .update(fields)
+          .eq('id', id)
+          .eq('tenant_id', tenantId)
+          .select()
+          .single()
+        return NextResponse.json({ data, error: error?.message })
+      }
+
+      case 'waitlist.delete': {
+        const { error } = await svc
+          .from('waitlist')
+          .delete()
+          .eq('id', payload.id)
+          .eq('tenant_id', tenantId)
+        return NextResponse.json({ success: !error, error: error?.message })
+      }
+
+      // ─── PACKAGES ───
+      case 'packages.list': {
+        const { data, error } = await svc
+          .from('packages')
+          .select('*')
+          .eq('tenant_id', tenantId)
+          .order('created_at', { ascending: false })
+        return NextResponse.json({ data, error: error?.message })
+      }
+
+      case 'packages.add': {
+        const { data, error } = await svc
+          .from('packages')
+          .insert({ ...payload, tenant_id: tenantId })
+          .select()
+          .single()
+        return NextResponse.json({ data, error: error?.message })
+      }
+
+      case 'packages.update': {
+        const { id, ...fields } = payload
+        const { data, error } = await svc
+          .from('packages')
+          .update(fields)
+          .eq('id', id)
+          .eq('tenant_id', tenantId)
+          .select()
+          .single()
+        return NextResponse.json({ data, error: error?.message })
+      }
+
+      case 'packages.delete': {
+        const { error } = await svc
+          .from('packages')
+          .delete()
+          .eq('id', payload.id)
+          .eq('tenant_id', tenantId)
+        return NextResponse.json({ success: !error, error: error?.message })
+      }
+
+      // ─── GIFT CARDS ───
+      case 'giftcards.list': {
+        const { data, error } = await svc
+          .from('gift_cards')
+          .select('*')
+          .eq('tenant_id', tenantId)
+          .order('created_at', { ascending: false })
+        return NextResponse.json({ data, error: error?.message })
+      }
+
+      case 'giftcards.create': {
+        const code = Array.from({ length: 12 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('')
+        const { data, error } = await svc
+          .from('gift_cards')
+          .insert({ ...payload, code, tenant_id: tenantId })
+          .select()
+          .single()
+        return NextResponse.json({ data, error: error?.message })
+      }
+
+      case 'giftcards.redeem': {
+        const { code: redeemCode, amount } = payload
+        const { data: card, error: findErr } = await svc
+          .from('gift_cards')
+          .select('*')
+          .eq('code', redeemCode)
+          .eq('tenant_id', tenantId)
+          .eq('status', 'active')
+          .single()
+        if (findErr || !card) return NextResponse.json({ data: null, error: 'Gift card not found or inactive' })
+        if (card.balance < amount) return NextResponse.json({ data: null, error: `Insufficient balance. Available: $${card.balance}` })
+        const newBalance = card.balance - amount
+        const newStatus = newBalance <= 0 ? 'redeemed' : 'active'
+        const { data, error } = await svc
+          .from('gift_cards')
+          .update({ balance: newBalance, status: newStatus })
+          .eq('id', card.id)
+          .select()
+          .single()
+        return NextResponse.json({ data, error: error?.message })
+      }
+
+      // ─── SERVICE HISTORY ───
+      case 'service-history.list': {
+        const { client_id } = payload
+        const { data, error } = await svc
+          .from('service_history')
+          .select('*, staff_member:staff(id, name), service:services(id, name, category)')
+          .eq('tenant_id', tenantId)
+          .eq('client_id', client_id)
+          .order('date', { ascending: false })
+          .limit(50)
+        return NextResponse.json({ data, error: error?.message })
+      }
+
+      case 'service-history.add': {
+        const { data, error } = await svc
+          .from('service_history')
+          .insert({ ...payload, tenant_id: tenantId })
+          .select()
+          .single()
+        return NextResponse.json({ data, error: error?.message })
+      }
+
+      case 'service-history.update': {
+        const { id: shId, ...shFields } = payload
+        const { data, error } = await svc
+          .from('service_history')
+          .update(shFields)
+          .eq('id', shId)
+          .eq('tenant_id', tenantId)
+          .select()
+          .single()
+        return NextResponse.json({ data, error: error?.message })
+      }
+
+      // ─── GALLERY (before/after photos from service_history) ───
+      case 'gallery.list': {
+        const { data, error } = await svc
+          .from('service_history')
+          .select('*, staff_member:staff(id, name), service:services(id, name, category), client:clients(id, first_name, last_name)')
+          .eq('tenant_id', tenantId)
+          .or('before_photo_urls.neq.{},after_photo_urls.neq.{}')
+          .order('date', { ascending: false })
+          .limit(payload?.limit || 50)
+        return NextResponse.json({ data, error: error?.message })
+      }
+
+      // ─── ADVANCED REPORTS ───
+      case 'reports.staff-performance': {
+        const now = new Date()
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+        const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString()
+
+        const [aptsRes, staffRes] = await Promise.all([
+          svc.from('appointments').select('*').eq('tenant_id', tenantId)
+            .gte('start_time', monthStart).lte('start_time', monthEnd),
+          svc.from('staff').select('id, name, schedule, commission_rate, is_active, specialties').eq('tenant_id', tenantId)
+        ])
+
+        const apts = aptsRes.data || []
+        const staffList = staffRes.data || []
+        const perfMap: Record<string, {
+          id: string; name: string; specialties: string[];
+          appointments: number; revenue: number; completed: number;
+          cancelled: number; noShows: number; commissionRate: number;
+          clients: Set<string>;
+        }> = {}
+
+        for (const s of staffList) {
+          perfMap[s.id] = {
+            id: s.id, name: s.name, specialties: s.specialties || [],
+            appointments: 0, revenue: 0, completed: 0, cancelled: 0, noShows: 0,
+            commissionRate: s.commission_rate || 0, clients: new Set()
+          }
+        }
+
+        for (const a of apts) {
+          if (!a.staff_id || !perfMap[a.staff_id]) continue
+          const p = perfMap[a.staff_id]
+          p.appointments++
+          if (a.status === 'completed') { p.completed++; p.revenue += a.total_price || 0 }
+          if (a.status === 'cancelled') p.cancelled++
+          if (a.status === 'no_show') p.noShows++
+          if (a.client_id) p.clients.add(a.client_id)
+        }
+
+        const staffPerformance = Object.values(perfMap).map(p => ({
+          ...p,
+          uniqueClients: p.clients.size,
+          avgTicket: p.completed > 0 ? Math.round(p.revenue / p.completed) : 0,
+          completionRate: p.appointments > 0 ? Math.round((p.completed / p.appointments) * 100) : 0,
+          commissionEarned: Math.round(p.revenue * (p.commissionRate / 100)),
+          clients: undefined
+        })).sort((a, b) => b.revenue - a.revenue)
+
+        return NextResponse.json({ data: { staffPerformance, period: { start: monthStart, end: monthEnd } } })
+      }
+
+      case 'reports.retention': {
+        const { data: clients } = await svc
+          .from('clients')
+          .select('id, first_name, last_name, email, phone, visit_count, last_visit, status, created_at')
+          .eq('tenant_id', tenantId)
+
+        const now = new Date()
+        const clientList = clients || []
+        let active = 0, atRisk = 0, lost = 0, newCount = 0
+
+        const scored = clientList.map(c => {
+          const lastVisit = c.last_visit ? new Date(c.last_visit) : null
+          const daysSince = lastVisit ? Math.floor((now.getTime() - lastVisit.getTime()) / 86400000) : 999
+          let risk: 'active' | 'at_risk' | 'lost' | 'new' = 'active'
+
+          if (c.visit_count === 0 || !lastVisit) { risk = 'new'; newCount++ }
+          else if (daysSince > 90) { risk = 'lost'; lost++ }
+          else if (daysSince > 45) { risk = 'at_risk'; atRisk++ }
+          else { active++ }
+
+          return { ...c, daysSinceLastVisit: daysSince, retentionRisk: risk }
+        })
+
+        const total = clientList.length || 1
+        return NextResponse.json({
+          data: {
+            summary: { total: clientList.length, active, atRisk, lost, new: newCount, retentionRate: Math.round((active / total) * 100) },
+            clients: scored.sort((a, b) => a.daysSinceLastVisit - b.daysSinceLastVisit)
+          }
+        })
+      }
+
+      case 'reports.forecast': {
+        const now = new Date()
+        // Next 4 weeks of booked appointments
+        const forecastEnd = new Date(now.getTime() + 28 * 86400000).toISOString()
+        const { data: upcoming } = await svc
+          .from('appointments')
+          .select('start_time, total_price, status')
+          .eq('tenant_id', tenantId)
+          .gte('start_time', now.toISOString())
+          .lte('start_time', forecastEnd)
+          .in('status', ['pending', 'confirmed'])
+
+        // Past 6 months for historical trend
+        const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 6, 1).toISOString()
+        const { data: historical } = await svc
+          .from('appointments')
+          .select('start_time, total_price, status')
+          .eq('tenant_id', tenantId)
+          .gte('start_time', sixMonthsAgo)
+          .lte('start_time', now.toISOString())
+          .eq('status', 'completed')
+
+        // Weekly forecast from booked
+        const weeks: { label: string; booked: number; projected: number }[] = []
+        for (let w = 0; w < 4; w++) {
+          const wStart = new Date(now.getTime() + w * 7 * 86400000)
+          const wEnd = new Date(wStart.getTime() + 7 * 86400000)
+          const weekApts = (upcoming || []).filter(a => {
+            const d = new Date(a.start_time)
+            return d >= wStart && d < wEnd
+          })
+          const booked = weekApts.reduce((s, a) => s + (a.total_price || 0), 0)
+          weeks.push({
+            label: `Week ${w + 1}`,
+            booked,
+            projected: Math.round(booked * 1.15) // 15% walk-in/add-on buffer
+          })
+        }
+
+        // Monthly historical trend
+        const monthlyTrend: { month: string; revenue: number }[] = []
+        for (let m = 5; m >= 0; m--) {
+          const mDate = new Date(now.getFullYear(), now.getMonth() - m, 1)
+          const mEnd = new Date(now.getFullYear(), now.getMonth() - m + 1, 0, 23, 59, 59)
+          const mLabel = mDate.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
+          const mRevenue = (historical || [])
+            .filter(a => { const d = new Date(a.start_time); return d >= mDate && d <= mEnd })
+            .reduce((s, a) => s + (a.total_price || 0), 0)
+          monthlyTrend.push({ month: mLabel, revenue: mRevenue })
+        }
+
+        const totalBooked = weeks.reduce((s, w) => s + w.booked, 0)
+        return NextResponse.json({
+          data: {
+            weeks,
+            monthlyTrend,
+            projectedMonthRevenue: totalBooked,
+            bestCase: Math.round(totalBooked * 1.3),
+            conservative: Math.round(totalBooked * 0.85),
+          }
+        })
+      }
+
+      case 'reports.peak-hours': {
+        const threeMonthsAgo = new Date()
+        threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
+        const { data: apts } = await svc
+          .from('appointments')
+          .select('start_time')
+          .eq('tenant_id', tenantId)
+          .gte('start_time', threeMonthsAgo.toISOString())
+          .in('status', ['completed', 'confirmed', 'pending'])
+
+        // Build 7x13 grid (Mon-Sun × 8am-8pm)
+        const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+        const hours = Array.from({ length: 13 }, (_, i) => i + 8) // 8-20
+        const grid: Record<string, Record<number, number>> = {}
+        for (const d of days) { grid[d] = {}; for (const h of hours) grid[d][h] = 0 }
+
+        for (const a of (apts || [])) {
+          const d = new Date(a.start_time)
+          const dayName = days[(d.getDay() + 6) % 7] // JS Sunday=0, shift to Monday=0
+          const hour = d.getHours()
+          if (hour >= 8 && hour <= 20 && grid[dayName]) {
+            grid[dayName][hour] = (grid[dayName][hour] || 0) + 1
+          }
+        }
+
+        // Find max for color scaling
+        let maxCount = 1
+        for (const d of days) for (const h of hours) if (grid[d][h] > maxCount) maxCount = grid[d][h]
+
+        return NextResponse.json({ data: { grid, days, hours, maxCount } })
+      }
+
       default:
         return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 })
     }

@@ -193,17 +193,22 @@
 }
 .heroBadge {
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-4);
-  background: var(--color-primary-50);
-  border: 1px solid var(--color-primary-200);
-  border-radius: var(--radius-full);
-  font-size: var(--text-sm);
-  font-weight: 500;
+  gap: 2px;
+  padding: var(--space-3) var(--space-6);
+  background: linear-gradient(135deg, rgba(201, 160, 220, 0.12) 0%, rgba(240, 163, 181, 0.10) 100%);
+  border: 1px solid rgba(201, 160, 220, 0.3);
+  border-radius: var(--radius-xl);
+  font-size: var(--text-base);
+  font-weight: 700;
   color: var(--color-primary);
   margin-bottom: var(--space-8);
   animation: fadeInDown 0.6s ease-out;
+  box-shadow: 0 0 24px rgba(201, 160, 220, 0.15), 0 2px 8px rgba(0, 0, 0, 0.04);
+  letter-spacing: 0.01em;
+  line-height: 1.6;
+  text-align: center;
 }
 .heroBadge svg {
   width: 16px;
