@@ -550,7 +550,10 @@ export default function StaffPage() {
       {showScheduleModal && selectedStaff && (
         <div className={styles.modalOverlay} onClick={() => setShowScheduleModal(false)}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()} style={{ padding: "var(--space-8)" }}>
-            <h2>Schedule — {selectedStaff.name}</h2>
+            <h2 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              Schedule — {selectedStaff.name}
+              <button type="button" style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--text-secondary)', lineHeight: 1 }} onClick={() => setShowScheduleModal(false)}>×</button>
+            </h2>
             <form onSubmit={handleSaveSchedule}>
               <div className={styles.scheduleEditor}>
                 {DAYS.map((day) => (
@@ -574,8 +577,8 @@ export default function StaffPage() {
                   </div>
                 ))}
               </div>
-              <div className={styles.modalActions}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowScheduleModal(false)}>Cancel</button>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-6)', paddingTop: 'var(--space-4)', borderTop: '1px solid var(--border-subtle)' }}>
+                <button type="button" className="btn btn-secondary" onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); setShowScheduleModal(false); }}>Cancel</button>
                 <button type="submit" className="btn btn-primary">Save Schedule</button>
               </div>
             </form>
