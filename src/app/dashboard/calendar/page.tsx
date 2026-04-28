@@ -26,6 +26,7 @@ export default function CalendarPage() {
   const [formData, setFormData] = useState({ client_id: "", service_id: "", staff_id: "", start_time: "", notes: "" });
   const [selectedApt, setSelectedApt] = useState<FullAppointment | null>(null);
   const [editingApt, setEditingApt] = useState<FullAppointment | null>(null);
+  const [activeStaffFilter, setActiveStaffFilter] = useState<string[]>([]);
 
   // ── Date helpers ──
   function toDateStr(d: Date) {
@@ -413,9 +414,85 @@ export default function CalendarPage() {
             })}
           </div>
         </div>
-      ) : view === "week" ? (
+      ) : view === "week" ? (() => {
         /* ════════════════ WEEK VIEW (Time Grid) ════════════════ */
+        // Staff color palette
+        const STAFF_COLORS = [
+          "#a87cc4", "#d4788e", "#3a9e97", "#c5a035", "#5c8fd6",
+          "#e07b53", "#6dba7a", "#9b6fc2", "#d6a74a", "#58b4d1",
+        ];
+        const staffColorMap: Record<string, string> = {};
+        staffMembers.forEach((s, i) => {
+          staffColorMap[s.id] = STAFF_COLORS[i % STAFF_COLORS.length];
+        });
+        const getStaffColor = (staffId?: string | null) => staffId && staffColorMap[staffId] ? staffColorMap[staffId] : "var(--text-tertiary)";
+        const getStaffName = (staffId?: string | null) => staffMembers.find(s => s.id === staffId)?.name || "Unassigned";
+
+        // Filter appointments by active staff filter
+        const visibleApts = activeStaffFilter.length === 0
+          ? appointments
+          : appointments.filter(a => a.staff_id && activeStaffFilter.includes(a.staff_id));
+
+        // Overlap grouping: assign column index & total columns for each apt in a day
+        function layoutOverlaps(apts: FullAppointment[]) {
+          if (apts.length === 0) return [];
+          const sorted = [...apts].sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+          const result: { apt: FullAppointment; col: number; totalCols: number }[] = [];
+          const groups: FullAppointment[][] = [];
+          let currentGroup: FullAppointment[] = [];
+          let currentGroupEnd = 0;
+          for (const apt of sorted) {
+            const aptStart = new Date(apt.start_time).getTime();
+            const aptEnd = new Date(apt.end_time).getTime();
+            if (currentGroup.length === 0 || aptStart < currentGroupEnd) {
+              currentGroup.push(apt);
+              currentGroupEnd = Math.max(currentGroupEnd, aptEnd);
+            } else {
+              groups.push(currentGroup);
+              currentGroup = [apt];
+              currentGroupEnd = aptEnd;
+            }
+          }
+          if (currentGroup.length > 0) groups.push(currentGroup);
+          for (const group of groups) {
+            const totalCols = group.length;
+            group.forEach((apt, col) => result.push({ apt, col, totalCols }));
+          }
+          return result;
+        }
+
+        return (
         <div className={styles.weekView}>
+          {/* Staff Filter Toggle */}
+          {staffMembers.length > 1 && (
+            <div className={styles.staffFilter}>
+              <button
+                className={`${styles.staffFilterBtn} ${activeStaffFilter.length === 0 ? styles.staffFilterActive : ""}`}
+                onClick={() => setActiveStaffFilter([])}
+              >
+                All Staff
+              </button>
+              {staffMembers.map(s => {
+                const color = getStaffColor(s.id);
+                const isActive = activeStaffFilter.includes(s.id);
+                return (
+                  <button
+                    key={s.id}
+                    className={`${styles.staffFilterBtn} ${isActive ? styles.staffFilterActive : ""}`}
+                    style={isActive ? { background: `${color}18`, borderColor: color, color } : undefined}
+                    onClick={() => {
+                      setActiveStaffFilter(prev =>
+                        prev.includes(s.id) ? prev.filter(id => id !== s.id) : [...prev, s.id]
+                      );
+                    }}
+                  >
+                    <span className={styles.staffFilterDot} style={{ background: color }} />
+                    {s.name}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           <div className={styles.weekGrid}>
             {/* Time axis */}
             <div className={styles.weekTimeAxis}>
@@ -429,7 +506,11 @@ export default function CalendarPage() {
             {/* Day columns */}
             {weekDays.map((day) => {
               const isToday = isSameDay(day, today);
-              const dayApts = aptsForDay(day);
+              const dayApts = visibleApts.filter(a => {
+                const d = new Date(a.start_time);
+                return d.getFullYear() === day.getFullYear() && d.getMonth() === day.getMonth() && d.getDate() === day.getDate();
+              });
+              const laid = layoutOverlaps(dayApts);
               return (
                 <div key={toDateStr(day)} className={`${styles.weekCol} ${isToday ? styles.weekColToday : ""}`}>
                   <div className={`${styles.weekColHeader} ${isToday ? styles.weekColHeaderToday : ""}`}>
@@ -446,20 +527,32 @@ export default function CalendarPage() {
                         onClick={() => openNewAppointment(day, HOURS[i])}
                       />
                     ))}
-                    {/* Appointment blocks */}
-                    {dayApts.map((apt) => {
+                    {/* Appointment blocks — side-by-side with staff colors */}
+                    {laid.map(({ apt, col, totalCols }) => {
                       const startD = new Date(apt.start_time);
                       const endD = new Date(apt.end_time);
                       const startH = startD.getHours() + startD.getMinutes() / 60;
                       const endH = endD.getHours() + endD.getMinutes() / 60;
                       const top = (startH - WORK_START) * SLOT_HEIGHT;
                       const height = Math.max((endH - startH) * SLOT_HEIGHT, 24);
+                      const staffColor = getStaffColor(apt.staff_id);
+                      const colWidth = 100 / totalCols;
+                      const leftPct = col * colWidth;
                       return (
                         <div
                           key={apt.id}
                           className={styles.weekApt}
-                          style={{ top, height, borderLeftColor: aptColor(apt.status), cursor: "pointer" }}
+                          style={{
+                            top,
+                            height,
+                            left: `calc(${leftPct}% + 1px)`,
+                            width: `calc(${colWidth}% - 2px)`,
+                            borderLeftColor: staffColor,
+                            background: `${staffColor}0c`,
+                            cursor: "pointer",
+                          }}
                           onClick={() => setSelectedApt(apt)}
+                          title={`${getStaffName(apt.staff_id)} • ${apt.client ? apt.client.first_name : "Walk-in"}`}
                         >
                           <span className={styles.weekAptClient}>
                             {apt.client ? apt.client.first_name : "Walk-in"}
@@ -467,6 +560,11 @@ export default function CalendarPage() {
                           <span className={styles.weekAptTime}>
                             {startD.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
                           </span>
+                          {totalCols <= 3 && (
+                            <span className={styles.weekAptStaff} style={{ color: staffColor }}>
+                              {getStaffName(apt.staff_id)}
+                            </span>
+                          )}
                         </div>
                       );
                     })}
@@ -476,7 +574,9 @@ export default function CalendarPage() {
             })}
           </div>
         </div>
-      ) : (
+        );
+      })()
+      : (
         /* ════════════════ MONTH VIEW ════════════════ */
         <div className={styles.monthView}>
           {/* Day-of-week headers */}
