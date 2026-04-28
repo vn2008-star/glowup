@@ -548,11 +548,11 @@ export default function StaffPage() {
 
       {/* ── Schedule Editor Modal ── */}
       {showScheduleModal && selectedStaff && (
-        <div className={styles.modalOverlay} onClick={() => setShowScheduleModal(false)}>
+        <div className={styles.modalOverlay} onClick={() => { setShowScheduleModal(false); setSelectedStaff(null); }}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()} style={{ padding: "var(--space-8)" }}>
             <h2 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               Schedule — {selectedStaff.name}
-              <button type="button" style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--text-secondary)', lineHeight: 1 }} onClick={() => setShowScheduleModal(false)}>×</button>
+              <button type="button" style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--text-secondary)', lineHeight: 1 }} onClick={() => { setShowScheduleModal(false); setSelectedStaff(null); }}>×</button>
             </h2>
             <form onSubmit={handleSaveSchedule}>
               <div className={styles.scheduleEditor}>
@@ -578,7 +578,7 @@ export default function StaffPage() {
                 ))}
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-6)', paddingTop: 'var(--space-4)', borderTop: '1px solid var(--border-subtle)' }}>
-                <button type="button" className="btn btn-secondary" onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); setShowScheduleModal(false); }}>Cancel</button>
+                <button type="button" className="btn btn-secondary" onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); setShowScheduleModal(false); setSelectedStaff(null); }}>Cancel</button>
                 <button type="submit" className="btn btn-primary">Save Schedule</button>
               </div>
             </form>
