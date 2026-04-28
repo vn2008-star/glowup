@@ -1,0 +1,58 @@
+/* ═══ Staff Agreement ═══ */
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: var(--z-modal); display: flex; align-items: center; justify-content: center; padding: var(--space-4); animation: fadeIn 0.2s ease-out; }
+.container { background: var(--bg-card); border-radius: var(--radius-xl); width: 800px; max-width: 95vw; max-height: 92vh; display: flex; flex-direction: column; box-shadow: var(--shadow-xl); animation: fadeInUp 0.3s ease-out; }
+
+.header { display: flex; justify-content: space-between; align-items: center; padding: var(--space-5) var(--space-6); border-bottom: 1px solid var(--border-subtle); flex-shrink: 0; }
+.header h2 { font-family: var(--font-heading); font-size: var(--text-xl); font-weight: 700; }
+.closeBtn { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary); line-height: 1; }
+
+.body { overflow-y: auto; padding: var(--space-6) var(--space-8); flex: 1; }
+
+/* Document styling */
+.document { font-family: 'Times New Roman', Georgia, serif; color: var(--text-primary); line-height: 1.7; }
+.docTitle { text-align: center; font-size: 1.4rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: var(--space-2); font-family: 'Times New Roman', Georgia, serif; }
+.docSubtitle { text-align: center; font-size: 0.95rem; font-weight: 400; color: var(--text-secondary); margin-bottom: var(--space-6); font-family: 'Times New Roman', Georgia, serif; }
+.docIntro { margin-bottom: var(--space-6); font-size: 0.95rem; }
+.docIntro strong { font-weight: 700; }
+
+.section { margin-bottom: var(--space-6); }
+.sectionTitle { font-size: 1.1rem; font-weight: 700; margin-bottom: var(--space-2); font-family: 'Times New Roman', Georgia, serif; }
+.section p { font-size: 0.92rem; margin-bottom: var(--space-2); }
+.section ul { margin: var(--space-2) 0; padding-left: var(--space-6); }
+.section li { font-size: 0.92rem; margin-bottom: var(--space-1); }
+
+/* Signature area */
+.signatureArea { margin-top: var(--space-8); padding-top: var(--space-6); border-top: 2px solid var(--border-default); }
+.signatureTitle { font-family: var(--font-heading); font-size: var(--text-lg); font-weight: 700; margin-bottom: var(--space-4); }
+
+.signatureRow { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6); margin-bottom: var(--space-4); }
+.signatureBlock { }
+.signatureLabel { font-size: var(--text-sm); font-weight: 600; color: var(--text-secondary); margin-bottom: var(--space-2); display: block; }
+
+.canvasWrapper { border: 2px dashed var(--border-default); border-radius: var(--radius-lg); overflow: hidden; cursor: crosshair; position: relative; background: white; }
+.canvasWrapper canvas { display: block; width: 100%; height: 120px; }
+.canvasHint { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: var(--text-sm); color: var(--text-tertiary); pointer-events: none; }
+.canvasSigned .canvasHint { display: none; }
+
+.clearBtn { font-size: var(--text-xs); color: var(--color-primary); background: none; border: none; cursor: pointer; margin-top: var(--space-1); padding: 0; }
+.clearBtn:hover { text-decoration: underline; }
+
+.dateField { font-size: var(--text-sm); padding: var(--space-2) var(--space-3); border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--bg-surface); color: var(--text-primary); width: 100%; }
+
+/* Signed badge */
+.signedBadge { display: inline-flex; align-items: center; gap: var(--space-1); padding: 3px 10px; border-radius: var(--radius-full); font-size: var(--text-xs); font-weight: 700; background: rgba(34, 197, 94, 0.12); color: var(--color-success); }
+.unsignedBadge { display: inline-flex; align-items: center; gap: var(--space-1); padding: 3px 10px; border-radius: var(--radius-full); font-size: var(--text-xs); font-weight: 700; background: rgba(245, 158, 11, 0.12); color: #f59e0b; }
+
+/* Footer actions */
+.footer { display: flex; justify-content: space-between; align-items: center; padding: var(--space-4) var(--space-6); border-top: 1px solid var(--border-subtle); flex-shrink: 0; gap: var(--space-3); }
+.footerActions { display: flex; gap: var(--space-2); }
+
+/* Already signed view */
+.signedView { text-align: center; padding: var(--space-4); background: rgba(34, 197, 94, 0.06); border-radius: var(--radius-lg); border: 1px solid rgba(34, 197, 94, 0.15); margin-top: var(--space-4); }
+.signedView img { max-height: 80px; margin: var(--space-2) auto; display: block; }
+.signedDate { font-size: var(--text-sm); color: var(--text-secondary); margin-top: var(--space-1); }
+
+@media (max-width: 768px) {
+  .signatureRow { grid-template-columns: 1fr; }
+  .body { padding: var(--space-4); }
+}

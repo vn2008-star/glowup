@@ -6,6 +6,7 @@ import { queryData } from "@/lib/api";
 import styles from "./staff.module.css";
 import type { Staff } from "@/lib/types";
 import { PROFESSIONAL_TYPES, getProfessionalType } from "./staff-specialties";
+import StaffAgreement from "./StaffAgreement";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -35,6 +36,8 @@ export default function StaffPage() {
   // Schedule editor state
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [scheduleData, setScheduleData] = useState<Record<string, { open: string; close: string; off: boolean }>>({});
+
+  const [agreementStaff, setAgreementStaff] = useState<Staff | null>(null);
 
   const fetchStaff = useCallback(async () => {
     if (!tenant) return;
@@ -298,6 +301,7 @@ export default function StaffPage() {
                 <div className={styles.staffActions}>
                   <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); openEdit(s); }}>✏️ Edit</button>
                   <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); openSchedule(s); }}>📅 Schedule</button>
+                  <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); setAgreementStaff(s); }}>{(s as any).agreement_signed_at ? '✅' : '📝'} Agreement</button>
                   <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); handleDelete(s.id); }} style={{ color: "var(--color-danger)" }}>🗑️</button>
                 </div>
               </div>
@@ -413,6 +417,7 @@ export default function StaffPage() {
               <div className={styles.drawerActions}>
                 <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => openEdit(selectedStaff)}>✏️ Edit Profile</button>
                 <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => openSchedule(selectedStaff)}>📅 Edit Schedule</button>
+                <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setAgreementStaff(selectedStaff)}>{(selectedStaff as any).agreement_signed_at ? '✅ View Agreement' : '📝 Sign Agreement'}</button>
                 <button className="btn btn-ghost" style={{ color: "var(--color-danger)" }} onClick={() => handleDelete(selectedStaff.id)}>🗑️</button>
               </div>
             </div>
@@ -576,6 +581,15 @@ export default function StaffPage() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* ── Staff Agreement Modal ── */}
+      {agreementStaff && (
+        <StaffAgreement
+          staff={agreementStaff}
+          onClose={() => setAgreementStaff(null)}
+          onSigned={() => { setAgreementStaff(null); fetchStaff(); }}
+        />
       )}
     </div>
   );
