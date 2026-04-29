@@ -45,6 +45,8 @@ export default function SettingsPage() {
     sms_enabled: true,
     email_enabled: true,
     one_hour_enabled: false,
+    one_hour_sms: true,
+    one_hour_email: false,
   });
   const [reminderTemplates, setReminderTemplates] = useState({
     sms: "Hi {client_name}! This is a reminder that your {service} appointment at {business_name} is tomorrow, {date} at {time}. Reply STOP to opt out.",
@@ -346,6 +348,28 @@ export default function SettingsPage() {
                 <p style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)", marginLeft: "52px", marginTop: "var(--space-1)" }}>
                   Sends a second reminder 1 hour before the appointment. Great for same-day bookings.
                 </p>
+                {reminderSettings.one_hour_enabled && (
+                  <div style={{ marginLeft: "var(--space-6)", marginTop: "var(--space-3)", display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+                    <label className={styles.protectionToggle}>
+                      <input
+                        type="checkbox"
+                        checked={reminderSettings.one_hour_sms}
+                        onChange={(e) => setReminderSettings({ ...reminderSettings, one_hour_sms: e.target.checked })}
+                      />
+                      <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
+                      <span>📱 via SMS (Twilio)</span>
+                    </label>
+                    <label className={styles.protectionToggle}>
+                      <input
+                        type="checkbox"
+                        checked={reminderSettings.one_hour_email}
+                        onChange={(e) => setReminderSettings({ ...reminderSettings, one_hour_email: e.target.checked })}
+                      />
+                      <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
+                      <span>📧 via Email (Resend)</span>
+                    </label>
+                  </div>
+                )}
               </div>
             </>
           )}
