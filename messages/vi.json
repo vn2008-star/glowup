@@ -453,6 +453,8 @@
     "selectService": "Chọn dịch vụ",
     "clientName": "Tên khách (tùy chọn)",
     "clientPhone": "Số điện thoại (tùy chọn)",
-    "createWalkIn": "Tạo khách vãng lai"
+    "createWalkIn": "Tạo khách vãng lai",
+    "clientBirthday": "Sinh nhật (tùy chọn)",
+    "birthdaySurprise": "Chúng tôi sẽ gửi ưu đãi đặc biệt vào ngày sinh nhật của bạn!"
   }
 }

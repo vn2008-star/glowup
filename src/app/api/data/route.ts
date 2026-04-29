@@ -1223,7 +1223,7 @@ export async function POST(request: Request) {
 
       // ── Walk-in: create instant appointment + optional client ──
       case 'appointments.walk-in': {
-        const { staff_id, service_id, client_name, client_phone } = payload
+        const { staff_id, service_id, client_name, client_phone, client_birthday } = payload
 
         if (!staff_id || !service_id) {
           return NextResponse.json({ error: 'staff_id and service_id required' }, { status: 400 })
@@ -1258,6 +1258,10 @@ export async function POST(request: Request) {
 
             if (existing) {
               clientId = existing.id
+              // Update birthday if provided
+              if (client_birthday) {
+                await svc.from('clients').update({ birthday: client_birthday }).eq('id', existing.id)
+              }
             }
           }
 
@@ -1270,6 +1274,7 @@ export async function POST(request: Request) {
                 first_name: firstName,
                 last_name: lastName,
                 phone: client_phone?.trim() || null,
+                birthday: client_birthday || null,
                 source: 'walk-in',
               })
               .select('id')

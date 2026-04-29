@@ -46,6 +46,7 @@ export default function CheckoutPage() {
   const [walkInService, setWalkInService] = useState("");
   const [walkInName, setWalkInName] = useState("");
   const [walkInPhone, setWalkInPhone] = useState("");
+  const [walkInBirthday, setWalkInBirthday] = useState("");
   const [creatingWalkIn, setCreatingWalkIn] = useState(false);
 
   // ── Data fetching ──
@@ -144,6 +145,7 @@ export default function CheckoutPage() {
       service_id: walkInService,
       client_name: walkInName || null,
       client_phone: walkInPhone || null,
+      client_birthday: walkInBirthday || null,
     });
 
     if (data) {
@@ -158,6 +160,7 @@ export default function CheckoutPage() {
       setWalkInService("");
       setWalkInName("");
       setWalkInPhone("");
+      setWalkInBirthday("");
     }
     setCreatingWalkIn(false);
   }
@@ -637,6 +640,16 @@ export default function CheckoutPage() {
                 onChange={(e) => setWalkInPhone(e.target.value)}
                 placeholder="(555) 123-4567"
               />
+
+              {/* Birthday (optional) */}
+              <label className={styles.formLabel}>🎂 {t("clientBirthday")}</label>
+              <input
+                type="date"
+                className={styles.formInput}
+                value={walkInBirthday}
+                onChange={(e) => setWalkInBirthday(e.target.value)}
+              />
+              <span className={styles.birthdayHint}>🎁 {t("birthdaySurprise")}</span>
             </div>
             <div className={styles.modalFooter}>
               <button

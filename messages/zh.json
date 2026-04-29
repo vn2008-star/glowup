@@ -323,6 +323,8 @@
     "selectService": "选择服务",
     "clientName": "客户姓名（可选）",
     "clientPhone": "电话（可选）",
-    "createWalkIn": "创建散客"
+    "createWalkIn": "创建散客",
+    "clientBirthday": "生日（可选）",
+    "birthdaySurprise": "我们将在您生日时送上特别惊喜！"
   }
 }

@@ -285,6 +285,8 @@
     "selectService": "서비스 선택",
     "clientName": "고객 이름 (선택)",
     "clientPhone": "전화번호 (선택)",
-    "createWalkIn": "워크인 생성"
+    "createWalkIn": "워크인 생성",
+    "clientBirthday": "생일 (선택)",
+    "birthdaySurprise": "생일에 특별한 서프라이즈를 보내드려요!"
   }
 }

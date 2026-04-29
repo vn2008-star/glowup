@@ -287,6 +287,8 @@
     "selectService": "Seleccionar servicio",
     "clientName": "Nombre del cliente (opcional)",
     "clientPhone": "Teléfono (opcional)",
-    "createWalkIn": "Crear visita sin cita"
+    "createWalkIn": "Crear visita sin cita",
+    "clientBirthday": "Cumpleaños (opcional)",
+    "birthdaySurprise": "¡Te enviaremos una sorpresa especial en tu cumpleaños!"
   }
 }

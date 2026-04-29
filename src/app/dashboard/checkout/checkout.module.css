@@ -673,6 +673,14 @@
 .walkInSubmitBtn:hover { opacity: 0.9; transform: translateY(-1px); }
 .walkInSubmitBtn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
+.birthdayHint {
+  display: block;
+  font-size: 12px;
+  color: var(--color-accent);
+  margin-top: var(--space-1);
+  font-style: italic;
+}
+
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }

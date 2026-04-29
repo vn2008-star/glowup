@@ -453,6 +453,8 @@
     "selectService": "Select Service",
     "clientName": "Client Name (optional)",
     "clientPhone": "Phone (optional)",
-    "createWalkIn": "Create Walk-in"
+    "createWalkIn": "Create Walk-in",
+    "clientBirthday": "Birthday (optional)",
+    "birthdaySurprise": "We'll surprise you with a special treat on your birthday!"
   }
 }
