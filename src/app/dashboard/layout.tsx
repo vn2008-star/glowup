@@ -8,7 +8,9 @@ import { usePathname, useRouter } from "next/navigation";
 import { useTenant, TenantProvider, clearTenantCache } from "@/lib/tenant-context";
 import { createClient } from "@/lib/supabase/client";
 import { GlowUpLogo } from "@/components/GlowUpLogo";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useTheme } from "@/lib/theme-context";
+import { useTranslations } from "next-intl";
 
 /* ─── Icons ─── */
 const GlowUpIcon = () => <GlowUpLogo size={24} />;
@@ -56,20 +58,20 @@ const CameraIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></svg>
 );
 
-const navItems = [
-  { href: "/dashboard", icon: <HomeIcon />, label: "Overview" },
-  { href: "/dashboard/calendar", icon: <CalendarIcon />, label: "Calendar" },
-  { href: "/dashboard/clients", icon: <UsersIcon />, label: "Clients" },
-  { href: "/dashboard/services", icon: <ScissorsIcon />, label: "Services" },
-  { href: "/dashboard/packages", icon: <GiftIcon />, label: "Packages" },
-  { href: "/dashboard/staff", icon: <StaffIcon />, label: "Staff" },
-  { href: "/dashboard/gallery", icon: <CameraIcon />, label: "Gallery" },
-  { href: "/dashboard/campaigns", icon: <MailIcon />, label: "Campaigns" },
-  { href: "/dashboard/social", icon: <ShareIcon />, label: "Social" },
-  { href: "/dashboard/loyalty", icon: <HeartIcon />, label: "Loyalty" },
-  { href: "/dashboard/inbox", icon: <InboxIcon />, label: "Inbox" },
-  { href: "/dashboard/reports", icon: <BarChartIcon />, label: "Reports" },
-  { href: "/dashboard/settings", icon: <SettingsIcon />, label: "Settings" },
+const navKeys = [
+  { href: "/dashboard", icon: <HomeIcon />, key: "overview" },
+  { href: "/dashboard/calendar", icon: <CalendarIcon />, key: "calendar" },
+  { href: "/dashboard/clients", icon: <UsersIcon />, key: "clients" },
+  { href: "/dashboard/services", icon: <ScissorsIcon />, key: "services" },
+  { href: "/dashboard/packages", icon: <GiftIcon />, key: "packages" },
+  { href: "/dashboard/staff", icon: <StaffIcon />, key: "staff" },
+  { href: "/dashboard/gallery", icon: <CameraIcon />, key: "gallery" },
+  { href: "/dashboard/campaigns", icon: <MailIcon />, key: "campaigns" },
+  { href: "/dashboard/social", icon: <ShareIcon />, key: "social" },
+  { href: "/dashboard/loyalty", icon: <HeartIcon />, key: "loyalty" },
+  { href: "/dashboard/inbox", icon: <InboxIcon />, key: "inbox" },
+  { href: "/dashboard/reports", icon: <BarChartIcon />, key: "reports" },
+  { href: "/dashboard/settings", icon: <SettingsIcon />, key: "settings" },
 ];
 
 function ThemeToggle() {
@@ -91,6 +93,8 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { tenant, currentStaff, loading } = useTenant();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const t = useTranslations('dashboard');
+  const tc = useTranslations('common');
 
   async function handleLogout() {
     clearTenantCache();
@@ -129,7 +133,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
           </button>
         </div>
         <nav className={styles.sidebarNav}>
-          {navItems.map((item) => (
+          {navKeys.map((item) => (
             <Link
               key={item.href}
               href={item.href}
@@ -137,7 +141,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
               onClick={handleNavClick}
             >
               {item.icon}
-              <span>{item.label}</span>
+              <span>{t(item.key as keyof typeof t)}</span>
             </Link>
           ))}
         </nav>
@@ -150,9 +154,10 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
           <div className={styles.footerActions}>
+            <LanguageSwitcher variant="sidebar" />
             <ThemeToggle />
-            <button onClick={handleLogout} className={styles.logoutButton} title="Sign out">
-              <LogoutIcon /> <span>Sign Out</span>
+            <button onClick={handleLogout} className={styles.logoutButton} title={tc('signOut')}>
+              <LogoutIcon /> <span>{tc('signOut')}</span>
             </button>
           </div>
         </div>
@@ -170,7 +175,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
           </button>
           <div className={styles.searchBar}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-            <input type="text" placeholder="Search clients, appointments..." className={styles.searchInput} />
+            <input type="text" placeholder={tc('search')} className={styles.searchInput} />
           </div>
           <div className={styles.topBarActions}>
             <span className={styles.staffName}>{currentStaff?.name}</span>

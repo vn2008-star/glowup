@@ -2,6 +2,7 @@ import styles from "./page.module.css";
 import Link from "next/link";
 import { GlowUpLogo } from "@/components/GlowUpLogo";
 import { LandingHeader } from "./LandingHeader";
+import { getTranslations } from "next-intl/server";
 
 /* ─── Icon Components ─── */
 const CalendarIcon = () => (
@@ -33,105 +34,65 @@ const ArrowRightIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg>
 );
 
-/* ─── Data ─── */
-const features = [
-  {
-    icon: <CalendarIcon />,
-    title: "Smart Booking",
-    description: "Online booking with real-time availability, automatic reminders, and deposit collection. Reduce no-shows by 60%.",
-  },
-  {
-    icon: <CameraIcon />,
-    title: "Photo Portfolio & Customer Relationship Management",
-    description: "Store before/after photos, nail designs, color formulas, and client preferences. Your complete beauty database.",
-  },
-  {
-    icon: <HeartIcon />,
-    title: "Retention Autopilot",
-    description: "Birthday specials, rebooking reminders, loyalty programs, and 'we miss you' campaigns — all automated.",
-  },
-  {
-    icon: <ShieldIcon />,
-    title: "Client Protection",
-    description: "Masked communications keep client data with the business, not the technician. Protected transitions when staff changes.",
-  },
-  {
-    icon: <TrendingIcon />,
-    title: "Social Media Engine",
-    description: "AI-generated posts from client photos, content calendar, ad templates, and review-to-post automation.",
-  },
-  {
-    icon: <BotIcon />,
-    title: "AI Receptionist",
-    description: "24/7 chatbot answers questions and books appointments from your website, Instagram, and Facebook.",
-  },
-];
-
-const plans = [
-  {
-    name: "Starter",
-    price: "25",
-    target: "1–4 staff",
-    features: ["Up to 4 staff members", "Online booking page", "Client Management + photos", "SMS reminders", "Basic dashboard"],
-    cta: "Start Free Trial",
-    highlighted: false,
-  },
-  {
-    name: "Growth",
-    price: "75",
-    target: "5–10 staff",
-    features: ["Up to 10 staff members", "Everything in Starter", "Campaign automation", "Loyalty & referrals", "Social media tools", "Birthday specials"],
-    cta: "Start Free Trial",
-    highlighted: true,
-  },
-  {
-    name: "Professional",
-    price: "150",
-    target: "11–20 staff",
-    features: ["Up to 20 staff members", "Everything in Growth", "Masked communications", "AI content generator", "Advanced analytics", "Churn detection", "Staff performance"],
-    cta: "Start Free Trial",
-    highlighted: false,
-  },
-];
-
-const stats = [
-  { value: "60%", label: "Less no-shows" },
-  { value: "3.2x", label: "More repeat visits" },
-  { value: "45%", label: "Revenue increase" },
-  { value: "$0", label: "Setup cost" },
-];
-
 /* ─── Page ─── */
-export default function LandingPage() {
+export default async function LandingPage() {
+  const t = await getTranslations('landing');
+  const tc = await getTranslations('common');
+
+  const features = [
+    { icon: <CalendarIcon />, title: t('feature1Title'), description: t('feature1Desc') },
+    { icon: <CameraIcon />, title: t('feature2Title'), description: t('feature2Desc') },
+    { icon: <HeartIcon />, title: t('feature3Title'), description: t('feature3Desc') },
+    { icon: <ShieldIcon />, title: t('feature4Title'), description: t('feature4Desc') },
+    { icon: <TrendingIcon />, title: t('feature5Title'), description: t('feature5Desc') },
+    { icon: <BotIcon />, title: t('feature6Title'), description: t('feature6Desc') },
+  ];
+
+  const plans = [
+    {
+      name: t('starterName'), price: "25", target: t('starterTarget'),
+      features: [t('starterF1'), t('starterF2'), t('starterF3'), t('starterF4'), t('starterF5')],
+      cta: t('startTrial'), highlighted: false,
+    },
+    {
+      name: t('growthName'), price: "75", target: t('growthTarget'),
+      features: [t('growthF1'), t('growthF2'), t('growthF3'), t('growthF4'), t('growthF5'), t('growthF6')],
+      cta: t('startTrial'), highlighted: true,
+    },
+    {
+      name: t('proName'), price: "150", target: t('proTarget'),
+      features: [t('proF1'), t('proF2'), t('proF3'), t('proF4'), t('proF5'), t('proF6'), t('proF7')],
+      cta: t('startTrial'), highlighted: false,
+    },
+  ];
+
+  const stats = [
+    { value: "60%", label: t('statsNoShows') },
+    { value: "3.2x", label: t('statsRepeat') },
+    { value: "45%", label: t('statsRevenue') },
+    { value: "$0", label: t('statsSetup') },
+  ];
+
   return (
     <main className={styles.main}>
-      {/* ── Ambient background ── */}
       <div className={styles.ambientOrb1} />
       <div className={styles.ambientOrb2} />
-
-      {/* ── Header ── */}
       <LandingHeader />
 
       {/* ── Hero ── */}
       <section className={styles.hero}>
         <div className="container">
           <div className={styles.heroContent}>
-            <div className={styles.heroBadge}>
-              ✦ Built for Hair, Skin, Nails, Lashes, Brows, Makeup & Waxing professionals
-              <br />
-              — from solo artists to full-service salons & spas
-            </div>
+            <div className={styles.heroBadge}>{t('badge')}</div>
             <h1 className={styles.heroTitle}>
-              Grow your beauty business <span className="gradient-text">on autopilot</span>
+              {t('heroTitle')} <span className="gradient-text">{t('heroHighlight')}</span>
             </h1>
-            <p className={styles.heroSubtitle}>
-              Smart booking, photo-based Customer Relationship Management, retention automation, and our new <strong>&ldquo;Fill My Openings&rdquo;</strong> campaign tool — instantly blast last-minute availability to clients and keep every chair full.
-            </p>
+            <p className={styles.heroSubtitle}>{t('heroSubtitle')}</p>
             <div className={styles.heroCta}>
               <Link href="/auth/signup" className="btn btn-lg btn-primary">
-                Start Free Trial <ArrowRightIcon />
+                {t('ctaPrimary')} <ArrowRightIcon />
               </Link>
-              <a href="#features" className="btn btn-lg btn-secondary">See How It Works</a>
+              <a href="#features" className="btn btn-lg btn-secondary">{t('ctaSecondary')}</a>
             </div>
             <div className={styles.heroStats}>
               {stats.map((stat) => (
@@ -149,8 +110,8 @@ export default function LandingPage() {
       <section id="features" className={styles.features}>
         <div className="container">
           <div className={styles.sectionHeader}>
-            <h2>Everything your salon needs to <span className="gradient-text">thrive</span></h2>
-            <p>Not just booking — a complete growth automation platform</p>
+            <h2>{t('featuresTitle')} <span className="gradient-text">{t('featuresHighlight')}</span></h2>
+            <p>{t('featuresSubtitle')}</p>
           </div>
           <div className={styles.featureGrid}>
             {features.map((feature) => (
@@ -168,26 +129,26 @@ export default function LandingPage() {
       <section className={styles.howItWorks}>
         <div className="container">
           <div className={styles.sectionHeader}>
-            <h2>Set up in <span className="gradient-text">minutes</span>, not months</h2>
-            <p>Get started in 3 simple steps</p>
+            <h2>{t('stepsTitle')} <span className="gradient-text">{t('stepsHighlight')}</span>{t('stepsTitleEnd')}</h2>
+            <p>{t('stepsSubtitle')}</p>
           </div>
           <div className={styles.stepsGrid}>
             <div className={styles.step}>
               <div className={styles.stepNumber}>1</div>
-              <h3>Add your services</h3>
-              <p>Enter your service menu with prices, duration, and photos. Takes 5 minutes.</p>
+              <h3>{t('step1Title')}</h3>
+              <p>{t('step1Desc')}</p>
             </div>
             <div className={styles.stepConnector} />
             <div className={styles.step}>
               <div className={styles.stepNumber}>2</div>
-              <h3>Share your booking link</h3>
-              <p>Add it to your Instagram bio, website, and Google profile. Clients book instantly.</p>
+              <h3>{t('step2Title')}</h3>
+              <p>{t('step2Desc')}</p>
             </div>
             <div className={styles.stepConnector} />
             <div className={styles.step}>
               <div className={styles.stepNumber}>3</div>
-              <h3>Watch your business grow</h3>
-              <p>Automated reminders, campaigns, and loyalty rewards keep clients coming back.</p>
+              <h3>{t('step3Title')}</h3>
+              <p>{t('step3Desc')}</p>
             </div>
           </div>
         </div>
@@ -197,20 +158,20 @@ export default function LandingPage() {
       <section id="pricing" className={styles.pricing}>
         <div className="container">
           <div className={styles.sectionHeader}>
-            <h2>Simple, transparent <span className="gradient-text">pricing</span></h2>
-            <p>Start free for 30 days. No credit card required.</p>
+            <h2>{t('pricingTitle')} <span className="gradient-text">{t('pricingHighlight')}</span></h2>
+            <p>{t('pricingSubtitle')}</p>
           </div>
           <div className={styles.pricingGrid}>
             {plans.map((plan) => (
               <div key={plan.name} className={`${styles.pricingCard} ${plan.highlighted ? styles.pricingHighlighted : ""}`}>
-                {plan.highlighted && <div className={styles.pricingBadge}>Most Popular</div>}
+                {plan.highlighted && <div className={styles.pricingBadge}>{t('mostPopular')}</div>}
                 <div className={styles.pricingHeader}>
                   <h3>{plan.name}</h3>
                   <p className={styles.pricingTarget}>{plan.target}</p>
                   <div className={styles.pricingPrice}>
                     <span className={styles.pricingCurrency}>$</span>
                     <span className={styles.pricingAmount}>{plan.price}</span>
-                    <span className={styles.pricingPeriod}>/mo</span>
+                    <span className={styles.pricingPeriod}>{t('perMonth')}</span>
                   </div>
                 </div>
                 <ul className={styles.pricingFeatures}>
@@ -231,10 +192,10 @@ export default function LandingPage() {
       <section className={styles.finalCta}>
         <div className="container">
           <div className={styles.ctaCard}>
-            <h2>Ready to fill your calendar <span className="gradient-text">automatically?</span></h2>
-            <p>Join hundreds of beauty businesses that grow on autopilot with GlowUp.</p>
+            <h2>{t('ctaTitle')} <span className="gradient-text">{t('ctaHighlight')}</span></h2>
+            <p>{t('ctaSubtitle')}</p>
             <Link href="/auth/signup" className="btn btn-lg btn-primary">
-              Start Your Free Trial <ArrowRightIcon />
+              {t('ctaButton')} <ArrowRightIcon />
             </Link>
           </div>
         </div>
@@ -247,21 +208,21 @@ export default function LandingPage() {
             <Link href="/" className={styles.logo}>
               <LogoIcon /> <span>GlowUp</span>
             </Link>
-            <p>AI-powered automation for beauty businesses.</p>
+            <p>{t('footerTagline')}</p>
           </div>
           <div className={styles.footerLinks}>
             <div>
-              <h4>Product</h4>
-              <a href="#features">Features</a>
-              <a href="#pricing">Pricing</a>
+              <h4>{t('footerProduct')}</h4>
+              <a href="#features">{tc('features')}</a>
+              <a href="#pricing">{tc('pricing')}</a>
             </div>
             <div>
-              <h4>Company</h4>
-              <a href="#">About</a>
-              <a href="#">Contact</a>
+              <h4>{t('footerCompany')}</h4>
+              <a href="#">{t('footerAbout')}</a>
+              <a href="#">{t('footerContact')}</a>
             </div>
           </div>
-          <p className={styles.copyright}>© 2026 GlowUp. All rights reserved.</p>
+          <p className={styles.copyright}>{t('copyright')}</p>
         </div>
       </footer>
     </main>

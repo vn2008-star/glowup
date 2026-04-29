@@ -1,8 +1,10 @@
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
+import { useTranslations } from 'next-intl'
 import styles from './page.module.css'
 import { GlowUpLogo } from '@/components/GlowUpLogo'
+import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { useTheme } from '@/lib/theme-context'
 
 const LogoIcon = () => <GlowUpLogo size={28} />;
@@ -17,6 +19,7 @@ const SunIcon = () => (
 export function LandingHeader() {
   const [menuOpen, setMenuOpen] = useState(false)
   const { theme, toggleTheme } = useTheme()
+  const t = useTranslations('common')
 
   return (
     <header className={styles.header}>
@@ -28,16 +31,17 @@ export function LandingHeader() {
           </Link>
           <button onClick={toggleTheme} className={styles.themeToggleBtn} title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}>
             {theme === 'light' ? <MoonIcon /> : <SunIcon />}
-            <span>{theme === 'light' ? 'Dark' : 'Light'}</span>
+            <span>{theme === 'light' ? t('dark') : t('light')}</span>
           </button>
         </div>
 
         {/* Desktop nav */}
         <nav className={styles.nav}>
-          <a href="#features">Features</a>
-          <a href="#pricing">Pricing</a>
-          <Link href="/auth/login">Sign In</Link>
-          <Link href="/auth/signup" className="btn btn-sm btn-primary">Get Started</Link>
+          <a href="#features">{t('features')}</a>
+          <a href="#pricing">{t('pricing')}</a>
+          <LanguageSwitcher variant="header" />
+          <Link href="/auth/login">{t('signIn')}</Link>
+          <Link href="/auth/signup" className="btn btn-sm btn-primary">{t('getStarted')}</Link>
         </nav>
 
         {/* Mobile hamburger */}
@@ -57,10 +61,11 @@ export function LandingHeader() {
       {/* Mobile dropdown */}
       {menuOpen && (
         <nav className={styles.mobileNav} onClick={() => setMenuOpen(false)}>
-          <a href="#features">Features</a>
-          <a href="#pricing">Pricing</a>
-          <Link href="/auth/login">Sign In</Link>
-          <Link href="/auth/signup" className="btn btn-sm btn-primary" style={{ width: '100%', justifyContent: 'center' }}>Get Started</Link>
+          <a href="#features">{t('features')}</a>
+          <a href="#pricing">{t('pricing')}</a>
+          <LanguageSwitcher variant="header" />
+          <Link href="/auth/login">{t('signIn')}</Link>
+          <Link href="/auth/signup" className="btn btn-sm btn-primary" style={{ width: '100%', justifyContent: 'center' }}>{t('getStarted')}</Link>
         </nav>
       )}
     </header>
