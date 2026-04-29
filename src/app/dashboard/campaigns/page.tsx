@@ -108,12 +108,21 @@ function detectOpenSlots(staff: Staff[], appointments: Appointment[], days: numb
 
     for (const s of staff) {
       if (!s.is_active) continue;
-      const sched = s.schedule as Record<string, { start?: string; end?: string; off?: boolean }> | null;
+      const sched = (s.schedule && typeof s.schedule === 'object' && Object.keys(s.schedule).length > 0)
+        ? s.schedule as Record<string, { start?: string; end?: string; off?: boolean }>
+        : null;
       const dayConfig = sched?.[dayName];
-      if (!dayConfig || dayConfig.off) continue;
 
-      const workStart = parseInt(dayConfig.start || "9", 10);
-      const workEnd = parseInt(dayConfig.end || "17", 10);
+      // If no schedule configured, default to Mon-Sat 9-5; skip Sunday
+      const isSunday = date.getDay() === 0;
+      if (dayConfig) {
+        if (dayConfig.off) continue;
+      } else if (isSunday) {
+        continue; // Default: closed on Sunday
+      }
+
+      const workStart = dayConfig?.start ? parseInt(dayConfig.start, 10) : 9;
+      const workEnd = dayConfig?.end ? parseInt(dayConfig.end, 10) : 17;
       if (workEnd <= workStart) continue;
 
       // Build booked intervals for this staff on this day
