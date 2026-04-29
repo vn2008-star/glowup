@@ -130,7 +130,8 @@
     "loyalty": "会员",
     "inbox": "收件箱",
     "reports": "报告",
-    "settings": "设置"
+    "settings": "设置",
+    "checkout": "结账"
   },
   "calendarPage": {
     "title": "日历",
@@ -280,5 +281,41 @@
     "h24Before": "24小时前", "h2Before": "2小时前", "h1Before": "1小时前",
     "estimatedCost": "预计月费", "smsCost": "短信费", "emailCost": "邮件费",
     "free": "免费", "perMonth": "/月", "basedOn": "基于"
+  },
+  "checkoutPage": {
+    "title": "结账 & 每日汇总",
+    "allStaff": "全部员工",
+    "todaysAppointments": "今日预约",
+    "total": "总计",
+    "noAppointments": "该日无预约",
+    "walkIn": "散客",
+    "done": "完成",
+    "confirmed": "已确认",
+    "selectAppointment": "选择预约开始结账",
+    "checkoutTitle": "结账",
+    "services": "服务 & 费用",
+    "upsell": "加售",
+    "addService": "添加服务",
+    "add": "添加",
+    "subtotal": "小计",
+    "tip": "小费",
+    "cash": "现金",
+    "card": "卡",
+    "mixed": "混合",
+    "processing": "处理中...",
+    "completeCheckout": "完成结账",
+    "checkedOut": "已结账",
+    "dailyTally": "每日汇总 — 收入分配",
+    "totalRevenue": "总收入",
+    "totalTips": "总小费",
+    "upsellRevenue": "加售收入",
+    "appointments": "预约",
+    "commissionPayout": "佣金支付",
+    "staffMember": "员工",
+    "upsells": "加售",
+    "tips": "小费",
+    "commission": "佣金",
+    "payout": "支付",
+    "ownerRevenue": "净收入"
   }
 }

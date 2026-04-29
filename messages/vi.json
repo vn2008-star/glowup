@@ -130,7 +130,8 @@
     "loyalty": "Khách thân thiết",
     "inbox": "Hộp thư",
     "reports": "Báo cáo",
-    "settings": "Cài đặt"
+    "settings": "Cài đặt",
+    "checkout": "Thanh toán"
   },
   "calendarPage": {
     "title": "Lịch hẹn",
@@ -410,5 +411,41 @@
     "free": "Miễn phí",
     "perMonth": "/tháng",
     "basedOn": "Dựa trên"
+  },
+  "checkoutPage": {
+    "title": "Thanh toán & Tổng kết ngày",
+    "allStaff": "Tất cả nhân viên",
+    "todaysAppointments": "Lịch hẹn hôm nay",
+    "total": "Tổng",
+    "noAppointments": "Không có lịch hẹn cho ngày này",
+    "walkIn": "Khách vãng lai",
+    "done": "Xong",
+    "confirmed": "Đã xác nhận",
+    "selectAppointment": "Chọn lịch hẹn để thanh toán",
+    "checkoutTitle": "Thanh toán",
+    "services": "Dịch vụ & Chi phí",
+    "upsell": "THÊM",
+    "addService": "Thêm dịch vụ",
+    "add": "Thêm",
+    "subtotal": "Tạm tính",
+    "tip": "Tiền bo",
+    "cash": "Tiền mặt",
+    "card": "Thẻ",
+    "mixed": "Kết hợp",
+    "processing": "Đang xử lý...",
+    "completeCheckout": "Hoàn tất thanh toán",
+    "checkedOut": "Đã thanh toán",
+    "dailyTally": "Tổng kết ngày — Chia doanh thu",
+    "totalRevenue": "Tổng doanh thu",
+    "totalTips": "Tổng tiền bo",
+    "upsellRevenue": "Doanh thu upsell",
+    "appointments": "Lịch hẹn",
+    "commissionPayout": "Hoa hồng",
+    "staffMember": "Nhân viên",
+    "upsells": "Upsell",
+    "tips": "Tiền bo",
+    "commission": "Hoa hồng",
+    "payout": "Chi trả",
+    "ownerRevenue": "Doanh thu ròng"
   }
 }

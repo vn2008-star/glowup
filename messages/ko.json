@@ -130,7 +130,8 @@
     "loyalty": "로열티",
     "inbox": "받은편지함",
     "reports": "리포트",
-    "settings": "설정"
+    "settings": "설정",
+    "checkout": "결제"
   },
   "calendarPage": {
     "title": "캘린더", "today": "오늘", "day": "일", "week": "주", "month": "월",
@@ -242,5 +243,41 @@
     "h24Before": "24시간 전", "h2Before": "2시간 전", "h1Before": "1시간 전",
     "estimatedCost": "예상 월 비용", "smsCost": "SMS 비용", "emailCost": "이메일 비용",
     "free": "무료", "perMonth": "/월", "basedOn": "기준"
+  },
+  "checkoutPage": {
+    "title": "결제 & 일일 정산",
+    "allStaff": "전체 직원",
+    "todaysAppointments": "오늘의 예약",
+    "total": "총계",
+    "noAppointments": "해당 날짜에 예약 없음",
+    "walkIn": "워크인",
+    "done": "완료",
+    "confirmed": "확정",
+    "selectAppointment": "결제할 예약을 선택하세요",
+    "checkoutTitle": "결제",
+    "services": "서비스 & 요금",
+    "upsell": "추가",
+    "addService": "서비스 추가",
+    "add": "추가",
+    "subtotal": "소계",
+    "tip": "팁",
+    "cash": "현금",
+    "card": "카드",
+    "mixed": "혼합",
+    "processing": "처리 중...",
+    "completeCheckout": "결제 완료",
+    "checkedOut": "결제 완료",
+    "dailyTally": "일일 정산 — 수익 분배",
+    "totalRevenue": "총 매출",
+    "totalTips": "총 팁",
+    "upsellRevenue": "추가 매출",
+    "appointments": "예약",
+    "commissionPayout": "커미션 지급",
+    "staffMember": "직원",
+    "upsells": "추가 판매",
+    "tips": "팁",
+    "commission": "커미션",
+    "payout": "지급액",
+    "ownerRevenue": "순수익"
   }
 }

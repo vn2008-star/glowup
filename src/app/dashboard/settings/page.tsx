@@ -375,8 +375,8 @@ export default function SettingsPage() {
           )}
         </div>
 
-        {/* Cost Estimator */}
-        {reminderSettings.enabled && (() => {
+        {/* Cost Estimator — disabled for now */}
+        {false && reminderSettings.enabled && (() => {
           const SMS_COST = 0.0079;
           const PHONE_COST = 1.15;
           const smsTimings = [reminderSettings.r24h_sms, reminderSettings.r2h_sms, reminderSettings.r1h_sms].filter(Boolean).length;

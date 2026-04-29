@@ -130,7 +130,8 @@
     "loyalty": "Loyalty",
     "inbox": "Inbox",
     "reports": "Reports",
-    "settings": "Settings"
+    "settings": "Settings",
+    "checkout": "Checkout"
   },
   "calendarPage": {
     "title": "Calendar",
@@ -410,5 +411,41 @@
     "free": "Free",
     "perMonth": "/mo",
     "basedOn": "Based on"
+  },
+  "checkoutPage": {
+    "title": "Checkout & Daily Tally",
+    "allStaff": "All Staff",
+    "todaysAppointments": "Today's Appointments",
+    "total": "Total",
+    "noAppointments": "No appointments for this date",
+    "walkIn": "Walk-in",
+    "done": "Done",
+    "confirmed": "Confirmed",
+    "selectAppointment": "Select an appointment to start checkout",
+    "checkoutTitle": "Checkout",
+    "services": "Services & Charges",
+    "upsell": "UPSELL",
+    "addService": "Add service (upsell)",
+    "add": "Add",
+    "subtotal": "Subtotal",
+    "tip": "Tip",
+    "cash": "Cash",
+    "card": "Card",
+    "mixed": "Mixed",
+    "processing": "Processing...",
+    "completeCheckout": "Complete Checkout",
+    "checkedOut": "Checked Out",
+    "dailyTally": "Daily Tally — Revenue Split",
+    "totalRevenue": "Total Revenue",
+    "totalTips": "Total Tips",
+    "upsellRevenue": "Upsell Revenue",
+    "appointments": "Appointments",
+    "commissionPayout": "Commission Payout",
+    "staffMember": "Staff Member",
+    "upsells": "Upsells",
+    "tips": "Tips",
+    "commission": "Commission",
+    "payout": "Payout",
+    "ownerRevenue": "Net Revenue"
   }
 }

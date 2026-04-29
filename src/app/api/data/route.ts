@@ -26,7 +26,7 @@ export async function POST(request: Request) {
   // Get tenant_id and staff role from staff record
   const { data: staffRecord } = await svc
     .from('staff')
-    .select('tenant_id, role')
+    .select('id, tenant_id, role')
     .eq('user_id', user.id)
     .single()
 
@@ -36,6 +36,7 @@ export async function POST(request: Request) {
 
   const tenantId = staffRecord.tenant_id
   const staffRole = staffRecord.role
+  const staffId = staffRecord.id
 
   // Helper: mask contact info for technicians when client protection is enabled
   async function shouldMaskContacts(): Promise<boolean> {
@@ -1041,6 +1042,183 @@ export async function POST(request: Request) {
         for (const d of days) for (const h of hours) if (grid[d][h] > maxCount) maxCount = grid[d][h]
 
         return NextResponse.json({ data: { grid, days, hours, maxCount } })
+      }
+
+      // ─── CHARGES & CHECKOUT ───
+      case 'charges.list': {
+        const { data, error } = await svc
+          .from('appointment_charges')
+          .select('*, service:services(*)')
+          .eq('appointment_id', payload.appointment_id)
+          .eq('tenant_id', tenantId)
+          .order('created_at', { ascending: true })
+        return NextResponse.json({ data, error: error?.message })
+      }
+
+      case 'charges.add': {
+        const { data, error } = await svc
+          .from('appointment_charges')
+          .insert({ ...payload, tenant_id: tenantId })
+          .select('*, service:services(*)')
+          .single()
+        return NextResponse.json({ data, error: error?.message })
+      }
+
+      case 'charges.delete': {
+        const { error } = await svc
+          .from('appointment_charges')
+          .delete()
+          .eq('id', payload.id)
+          .eq('tenant_id', tenantId)
+        return NextResponse.json({ success: !error, error: error?.message })
+      }
+
+      case 'appointments.checkout': {
+        // Mark appointment as completed with payment info
+        const { id, payment_method, tip_amount, total_price } = payload
+        const { data, error } = await svc
+          .from('appointments')
+          .update({
+            status: 'completed',
+            payment_method,
+            tip_amount: tip_amount || 0,
+            total_price,
+            checked_out_at: new Date().toISOString(),
+            checked_out_by: staffId,
+          })
+          .eq('id', id)
+          .eq('tenant_id', tenantId)
+          .select('*, client:clients(*), staff_member:staff(*), service:services(*)')
+          .single()
+        return NextResponse.json({ data, error: error?.message })
+      }
+
+      case 'reports.daily-tally': {
+        // Only owners/managers can see full tally
+        const targetDate = payload?.date || new Date().toISOString().split('T')[0]
+        const dayStart = `${targetDate}T00:00:00`
+        const dayEnd = `${targetDate}T23:59:59`
+
+        // Get all completed/checked-out appointments for the day
+        const { data: apts } = await svc
+          .from('appointments')
+          .select('*, client:clients(*), staff_member:staff(*), service:services(*)')
+          .eq('tenant_id', tenantId)
+          .gte('start_time', dayStart)
+          .lte('start_time', dayEnd)
+          .eq('status', 'completed')
+          .order('start_time', { ascending: true })
+
+        // Get all charges for these appointments
+        const aptIds = (apts || []).map(a => a.id)
+        let charges: Record<string, unknown>[] = []
+        if (aptIds.length > 0) {
+          const { data: ch } = await svc
+            .from('appointment_charges')
+            .select('*, service:services(*)')
+            .eq('tenant_id', tenantId)
+            .in('appointment_id', aptIds)
+          charges = ch || []
+        }
+
+        // Get all staff for the tenant
+        const { data: allStaff } = await svc
+          .from('staff')
+          .select('*')
+          .eq('tenant_id', tenantId)
+          .eq('is_active', true)
+
+        // Aggregate by staff
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const staffMap: Record<string, any> = {}
+        for (const s of (allStaff || [])) {
+          staffMap[s.id] = {
+            id: s.id, name: s.name, role: s.role,
+            commission_rate: s.commission_rate || 0,
+            services_total: 0, tips_total: 0, upsell_total: 0,
+            cash_total: 0, card_total: 0,
+            appointments: 0, commission_earned: 0,
+          }
+        }
+
+        // Process appointments
+        for (const apt of (apts || [])) {
+          const sid = apt.staff_id || 'unassigned'
+          if (!staffMap[sid]) {
+            staffMap[sid] = {
+              id: sid, name: 'Unassigned', role: 'technician',
+              commission_rate: 0,
+              services_total: 0, tips_total: 0, upsell_total: 0,
+              cash_total: 0, card_total: 0,
+              appointments: 0, commission_earned: 0,
+            }
+          }
+          const entry = staffMap[sid]
+          entry.appointments++
+          entry.tips_total += Number(apt.tip_amount || 0)
+
+          // Determine payment method split
+          const aptTotal = Number(apt.total_price || 0)
+          if (apt.payment_method === 'cash') entry.cash_total += aptTotal + Number(apt.tip_amount || 0)
+          else if (apt.payment_method === 'card') entry.card_total += aptTotal + Number(apt.tip_amount || 0)
+          else if (apt.payment_method === 'mixed') {
+            entry.cash_total += aptTotal / 2
+            entry.card_total += aptTotal / 2 + Number(apt.tip_amount || 0)
+          }
+        }
+
+        // Process charges for commission calculation
+        for (const ch of charges) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const chAny = ch as any
+          const sid = chAny.staff_id || 'unassigned'
+          if (!staffMap[sid]) continue
+          const entry = staffMap[sid]
+          const amount = Number(chAny.amount || 0)
+
+          if (chAny.is_upsell) {
+            entry.upsell_total += amount
+          }
+          entry.services_total += amount
+
+          // Per-service commission rate: use service rate if set, else staff default
+          const serviceRate = chAny.service?.commission_rate
+          const effectiveRate = serviceRate != null ? serviceRate : entry.commission_rate
+          entry.commission_earned += amount * (effectiveRate / 100)
+        }
+
+        // Tips go 100% to staff
+        for (const sid of Object.keys(staffMap)) {
+          staffMap[sid].commission_earned += staffMap[sid].tips_total
+        }
+
+        const staffTally = Object.values(staffMap).filter(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (s: any) => s.appointments > 0 || s.services_total > 0
+        )
+
+        // Grand totals
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const totals = staffTally.reduce((acc: any, s: any) => ({
+          services: acc.services + s.services_total,
+          tips: acc.tips + s.tips_total,
+          upsells: acc.upsells + s.upsell_total,
+          cash: acc.cash + s.cash_total,
+          card: acc.card + s.card_total,
+          commission: acc.commission + s.commission_earned,
+          appointments: acc.appointments + s.appointments,
+        }), { services: 0, tips: 0, upsells: 0, cash: 0, card: 0, commission: 0, appointments: 0 })
+
+        return NextResponse.json({
+          data: {
+            date: targetDate,
+            staff: staffTally,
+            totals,
+            // Also include the role so frontend can filter
+            currentStaffId: staffId,
+            currentStaffRole: staffRole,
+          }
+        })
       }
 
       default:

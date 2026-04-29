@@ -130,7 +130,8 @@
     "loyalty": "Lealtad",
     "inbox": "Bandeja",
     "reports": "Reportes",
-    "settings": "Configuración"
+    "settings": "Configuración",
+    "checkout": "Cobro"
   },
   "calendarPage": {
     "title": "Calendario", "today": "Hoy", "day": "Día", "week": "Semana", "month": "Mes",
@@ -244,5 +245,41 @@
     "h24Before": "24h antes", "h2Before": "2h antes", "h1Before": "1h antes",
     "estimatedCost": "Costo mensual estimado", "smsCost": "Costo SMS", "emailCost": "Costo Email",
     "free": "Gratis", "perMonth": "/mes", "basedOn": "Basado en"
+  },
+  "checkoutPage": {
+    "title": "Cobro & Cierre Diario",
+    "allStaff": "Todo el equipo",
+    "todaysAppointments": "Citas de hoy",
+    "total": "Total",
+    "noAppointments": "Sin citas para esta fecha",
+    "walkIn": "Sin cita previa",
+    "done": "Listo",
+    "confirmed": "Confirmada",
+    "selectAppointment": "Selecciona una cita para cobrar",
+    "checkoutTitle": "Cobro",
+    "services": "Servicios & Cargos",
+    "upsell": "ADICIONAL",
+    "addService": "Agregar servicio",
+    "add": "Agregar",
+    "subtotal": "Subtotal",
+    "tip": "Propina",
+    "cash": "Efectivo",
+    "card": "Tarjeta",
+    "mixed": "Mixto",
+    "processing": "Procesando...",
+    "completeCheckout": "Completar Cobro",
+    "checkedOut": "Cobrado",
+    "dailyTally": "Cierre Diario — Reparto de Ingresos",
+    "totalRevenue": "Ingresos Totales",
+    "totalTips": "Total Propinas",
+    "upsellRevenue": "Ingresos Adicionales",
+    "appointments": "Citas",
+    "commissionPayout": "Pago de Comisión",
+    "staffMember": "Empleado",
+    "upsells": "Adicionales",
+    "tips": "Propinas",
+    "commission": "Comisión",
+    "payout": "Pago",
+    "ownerRevenue": "Ingreso Neto"
   }
 }

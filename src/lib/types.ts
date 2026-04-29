@@ -69,6 +69,7 @@ export interface Service {
   description: string | null
   duration_minutes: number
   price: number
+  commission_rate: number | null
   image_url: string | null
   is_active: boolean
   sort_order: number
@@ -87,11 +88,29 @@ export interface Appointment {
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'no_show'
   total_price: number | null
   notes: string | null
+  payment_method: 'cash' | 'card' | 'mixed' | 'other' | null
+  tip_amount: number
+  checked_out_at: string | null
+  checked_out_by: string | null
   created_at: string
   updated_at: string
   // Joined fields
   client?: Client
   staff_member?: Staff
+  service?: Service
+  charges?: AppointmentCharge[]
+}
+
+export interface AppointmentCharge {
+  id: string
+  tenant_id: string
+  appointment_id: string
+  staff_id: string | null
+  service_id: string | null
+  description: string
+  amount: number
+  is_upsell: boolean
+  created_at: string
   service?: Service
 }
 
