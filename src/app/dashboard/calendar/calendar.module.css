@@ -646,6 +646,8 @@
   padding: var(--space-8);
   width: 90%;
   max-width: 560px;
+  max-height: 90vh;
+  overflow-y: auto;
   box-shadow: var(--shadow-xl);
   animation: modalIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
@@ -671,7 +673,14 @@
   display: flex;
   gap: var(--space-3);
   justify-content: flex-end;
+  padding: var(--space-4) 0 0;
   margin-top: var(--space-6);
+  border-top: 1px solid var(--border-subtle);
+  position: sticky;
+  bottom: calc(-1 * var(--space-8));
+  background: var(--bg-card);
+  padding-bottom: var(--space-8);
+  z-index: 2;
 }
 
 /* ── Appointment Detail Modal ── */
