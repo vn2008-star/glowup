@@ -131,6 +131,8 @@ export default function BookingClient({ slug }: { slug: string }) {
     setSubmitting(true)
 
     try {
+      // Build a proper timezone-aware Date from the user's local date+time selection
+      const localStart = new Date(`${selectedDate}T${selectedTime}:00`)
       const res = await fetch('/api/public-booking', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -138,7 +140,7 @@ export default function BookingClient({ slug }: { slug: string }) {
           slug,
           service_id: selectedService.id,
           staff_id: selectedStaff?.id || null,
-          start_time: `${selectedDate}T${selectedTime}:00`,
+          start_time: localStart.toISOString(),
           duration_minutes: selectedService.duration_minutes,
           client_name: clientName,
           client_email: clientEmail,
