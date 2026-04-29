@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData } from "@/lib/api";
 import styles from "./gallery.module.css";
@@ -22,6 +23,7 @@ const CATEGORIES = ["All", "Hair", "Skin", "Nails", "Lashes", "Brows", "Makeup",
 
 export default function GalleryPage() {
   const { tenant } = useTenant();
+  const t = useTranslations("galleryPage");
   const [items, setItems] = useState<GalleryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("All");

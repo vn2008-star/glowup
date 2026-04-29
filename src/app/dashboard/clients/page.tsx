@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData } from "@/lib/api";
 import styles from "./clients.module.css";
@@ -22,6 +23,7 @@ function maskEmail(email: string | null): string | null {
 
 export default function ClientsPage() {
   const { tenant, currentStaff } = useTenant();
+  const t = useTranslations("clientsPage");
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -318,7 +320,7 @@ export default function ClientsPage() {
     <div className={styles.page}>
       <div className={styles.pageHeader}>
         <div className={styles.headerLeft}>
-          <h1>Clients</h1>
+          <h1>{t("title")}</h1>
           <p>{clients.length} total clients</p>
           {protectionEnabled && (
             <span className={styles.protectionBadge}>
@@ -339,7 +341,7 @@ export default function ClientsPage() {
             </button>
           )}
           <button className={styles.importBtn} onClick={() => { setShowImportModal(true); setImportData([]); setImportFileName(''); setImportResult(null); }}>📥 Import</button>
-          <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>+ Add Client</button>
+          <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>{t("addClient")}</button>
         </div>
       </div>
 

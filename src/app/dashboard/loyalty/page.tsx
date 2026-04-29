@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData } from "@/lib/api";
 import styles from "./loyalty.module.css";
@@ -28,6 +29,7 @@ const TIER_COLORS: Record<string, string> = {
 
 export default function LoyaltyPage() {
   const { tenant, refetch } = useTenant();
+  const t = useTranslations("loyaltyPage");
   const [tiers, setTiers] = useState<LoyaltyTier[]>([]);
   const [recentActivity, setRecentActivity] = useState<LoyaltyActivity[]>([]);
   const [totalPoints, setTotalPoints] = useState(0);
@@ -85,7 +87,7 @@ export default function LoyaltyPage() {
     return (
       <div className={styles.page}>
         <div className={styles.pageHeader}>
-          <h1>Loyalty Program</h1>
+          <h1>{t("title")}</h1>
           <p>Loading...</p>
         </div>
       </div>
@@ -96,7 +98,7 @@ export default function LoyaltyPage() {
     <div className={styles.page}>
       <div className={styles.pageHeader}>
         <div>
-          <h1>Loyalty Program</h1>
+          <h1>{t("title")}</h1>
           <p>Reward your clients and drive repeat visits</p>
         </div>
         <button className="btn btn-primary" onClick={openEditTiers}>Edit Tiers</button>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData } from "@/lib/api";
 import styles from "./services.module.css";
@@ -12,6 +13,7 @@ const CATEGORY_OPTIONS = SERVICE_CATEGORIES.map((c) => c.label);
 
 export default function ServicesPage() {
   const { tenant } = useTenant();
+  const t = useTranslations("servicesPage");
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -176,14 +178,14 @@ export default function ServicesPage() {
     <div className={styles.page}>
       <div className={styles.pageHeader}>
         <div>
-          <h1>Service Menu</h1>
+          <h1>{t("title")}</h1>
           <p>{activeServices.length} active services · {inactiveServices.length} inactive · {categoriesInUse.length} categories</p>
         </div>
         <div className={styles.headerActions}>
           <button className="btn btn-secondary" onClick={() => { setShowCatalog(true); setCatalogCategory(SERVICE_CATEGORIES[0]); setSelectedTemplates(new Set()); }}>
             📋 Browse Templates
           </button>
-          <button className="btn btn-primary" onClick={openNew}>+ Add Service</button>
+          <button className="btn btn-primary" onClick={openNew}>{t("addService")}</button>
         </div>
       </div>
 
@@ -220,7 +222,7 @@ export default function ServicesPage() {
       ) : services.length === 0 ? (
         <div className={styles.emptyState}>
           <div className={styles.emptyIcon}>✦</div>
-          <h2>Build Your Service Menu</h2>
+          <h2>Build Your {t("title")}</h2>
           <p>Choose from our curated templates organized by specialty, or create your own from scratch.</p>
           <div className={styles.emptyActions}>
             <button className="btn btn-primary btn-lg" onClick={() => { setShowCatalog(true); setCatalogCategory(SERVICE_CATEGORIES[0]); setSelectedTemplates(new Set()); }}>

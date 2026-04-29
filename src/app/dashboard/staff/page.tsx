@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData } from "@/lib/api";
 import styles from "./staff.module.css";
@@ -21,6 +22,7 @@ function formatPhone(value: string): string {
 
 export default function StaffPage() {
   const { tenant } = useTenant();
+  const t = useTranslations("staffPage");
   const [staffMembers, setStaffMembers] = useState<Staff[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -235,10 +237,10 @@ export default function StaffPage() {
     <div className={styles.page}>
       <div className={styles.pageHeader}>
         <div>
-          <h1>Staff Management</h1>
+          <h1>{t("title")}</h1>
           <p>{activeStaff.length} active · {inactiveStaff.length} inactive</p>
         </div>
-        <button className="btn btn-primary" onClick={openNew}>+ Add Staff</button>
+        <button className="btn btn-primary" onClick={openNew}>{t("addStaff")}</button>
       </div>
 
       {loading ? (

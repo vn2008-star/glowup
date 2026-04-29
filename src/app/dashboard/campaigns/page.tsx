@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData } from "@/lib/api";
 import styles from "./campaigns.module.css";
@@ -182,6 +183,7 @@ function formatHour(h: number): string {
 
 export default function CampaignsPage() {
   const { tenant, refetch } = useTenant();
+  const t = useTranslations("campaignsPage");
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"campaigns" | "automations" | "holidays" | "fill_openings">(() => {

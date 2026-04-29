@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData } from "@/lib/api";
 import styles from "./reports.module.css";
@@ -43,6 +44,7 @@ const TABS = ["Overview", "Staff Performance", "Client Retention", "Revenue Fore
 
 export default function ReportsPage() {
   const { tenant } = useTenant();
+  const t = useTranslations("reportsPage");
   const [activeTab, setActiveTab] = useState<string>(TABS[0]);
   const [loading, setLoading] = useState(true);
 

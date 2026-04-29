@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData } from "@/lib/api";
 import styles from "./inbox.module.css";
@@ -46,6 +47,7 @@ const CHANNEL_DETAILS = [
 
 export default function InboxPage() {
   const { tenant } = useTenant();
+  const t = useTranslations("inboxPage");
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [selectedConvo, setSelectedConvo] = useState<Conversation | null>(null);

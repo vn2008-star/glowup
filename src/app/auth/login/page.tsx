@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useState, Suspense } from 'react'
+import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 import styles from './auth.module.css'
 
@@ -11,6 +12,7 @@ function LoginForm() {
   const searchParams = useSearchParams()
   const redirect = searchParams.get('redirect') || '/dashboard'
   const supabase = createClient()
+  const t = useTranslations('auth')
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -66,8 +68,8 @@ function LoginForm() {
             </svg>
             <span className={styles.logoText}>GlowUp</span>
           </Link>
-          <h1 className={styles.authTitle}>Welcome back</h1>
-          <p className={styles.authSubtitle}>Sign in to manage your beauty business</p>
+          <h1 className={styles.authTitle}>{t('welcomeBack')}</h1>
+          <p className={styles.authSubtitle}>{t('signInSubtitle')}</p>
         </div>
 
         <button
@@ -82,18 +84,18 @@ function LoginForm() {
             <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
             <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
           </svg>
-          Continue with Google
+          {t('continueGoogle')}
         </button>
 
         <div className={styles.divider}>
-          <span>or</span>
+          <span>{t('or')}</span>
         </div>
 
         <form onSubmit={handleLogin} className={styles.authForm}>
           {error && <div className={styles.errorMessage}>{error}</div>}
 
           <div className={styles.formGroup}>
-            <label htmlFor="email">Email</label>
+            <label htmlFor="email">{t('email')}</label>
             <input
               id="email"
               type="email"
@@ -106,7 +108,7 @@ function LoginForm() {
           </div>
 
           <div className={styles.formGroup}>
-            <label htmlFor="password">Password</label>
+            <label htmlFor="password">{t('password')}</label>
             <input
               id="password"
               type="password"
@@ -119,7 +121,7 @@ function LoginForm() {
           </div>
 
           <Link href="/auth/forgot-password" className={styles.forgotLink}>
-            Forgot password?
+            {t('forgotPassword')}
           </Link>
 
           <button
@@ -127,13 +129,13 @@ function LoginForm() {
             className={styles.submitButton}
             disabled={loading}
           >
-            {loading ? 'Signing in...' : 'Sign In'}
+            {loading ? t('signingIn') : t('signInButton')}
           </button>
         </form>
 
         <p className={styles.authFooter}>
-          Don&apos;t have an account?{' '}
-          <Link href="/auth/signup">Start free trial</Link>
+          {t('noAccount')}{' '}
+          <Link href="/auth/signup">{t('startTrial')}</Link>
         </p>
       </div>
     </div>

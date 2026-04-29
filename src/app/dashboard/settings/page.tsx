@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 
 import { useTenant } from "@/lib/tenant-context";
@@ -22,6 +23,7 @@ const DEFAULT_HOURS: BusinessHours = DAYS.reduce((acc, day) => {
 
 export default function SettingsPage() {
   const { tenant, refetch } = useTenant();
+  const t = useTranslations("settingsPage");
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -140,7 +142,7 @@ export default function SettingsPage() {
     return (
       <div className={styles.page}>
         <div className={styles.pageHeader}>
-          <h1>Settings</h1>
+          <h1>{t("title")}</h1>
           <p>Loading...</p>
         </div>
       </div>
@@ -150,7 +152,7 @@ export default function SettingsPage() {
   return (
     <div className={styles.page}>
       <div className={styles.pageHeader}>
-        <h1>Settings</h1>
+        <h1>{t("title")}</h1>
         <p>Manage your salon profile, business hours, and preferences</p>
       </div>
 

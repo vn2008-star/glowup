@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData, mutateData } from "@/lib/api";
 import styles from "./packages.module.css";
@@ -25,6 +26,7 @@ const TABS = ["Packages", "Gift Cards"] as const;
 
 export default function PackagesPage() {
   const { tenant } = useTenant();
+  const t = useTranslations("packagesPage");
   const [tab, setTab] = useState<string>(TABS[0]);
   const [packages, setPackages] = useState<Package[]>([]);
   const [giftCards, setGiftCards] = useState<GiftCard[]>([]);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData } from "@/lib/api";
 import styles from "./social.module.css";
@@ -25,6 +26,7 @@ const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export default function SocialPage() {
   const { tenant } = useTenant();
+  const t = useTranslations("socialPage");
   const [posts, setPosts] = useState<SocialPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"calendar" | "posts" | "templates" | "reviews" | "portfolio">("posts");
@@ -142,10 +144,10 @@ export default function SocialPage() {
     <div className={styles.page}>
       <div className={styles.pageHeader}>
         <div>
-          <h1>Social Media Engine</h1>
+          <h1>{t("title")}</h1>
           <p>Create, schedule, and manage social content from one place</p>
         </div>
-        <button className="btn btn-primary" onClick={() => openNew()}>+ New Post</button>
+        <button className="btn btn-primary" onClick={() => openNew()}>{t("newPost")}</button>
       </div>
 
       {/* Summary */}
