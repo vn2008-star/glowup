@@ -367,6 +367,19 @@
   object-fit: cover;
   border: 3px solid var(--color-primary);
 }
+/* Drawer action buttons - sticky bottom */
+.drawerActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  margin: var(--space-6) calc(-1 * var(--space-8)) 0;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+}
 
 @media (max-width: 768px) {
   .staffGrid { grid-template-columns: 1fr; }
