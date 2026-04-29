@@ -316,6 +316,7 @@ export default function SettingsPage() {
 
           {reminderSettings.enabled && (
             <>
+              <p style={{ fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--text-secondary)", marginLeft: "var(--space-6)", marginTop: "var(--space-3)", textTransform: "uppercase", letterSpacing: "0.05em" }}>🕐 24-Hour Reminder</p>
               <label className={styles.protectionToggle} style={{ marginLeft: "var(--space-6)" }}>
                 <input
                   type="checkbox"
