@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 
 import { useTenant } from "@/lib/tenant-context";
+import { queryData } from "@/lib/api";
 import styles from "./settings.module.css";
 
 interface BusinessHours {
@@ -26,6 +27,7 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [clientCount, setClientCount] = useState(0);
 
   // Form state
   const [name, setName] = useState("");
@@ -79,6 +81,14 @@ export default function SettingsPage() {
   useEffect(() => {
     loadSettings();
   }, [loadSettings]);
+
+  // Fetch client count for cost estimator
+  useEffect(() => {
+    if (!tenant) return;
+    queryData<{ id: string }[]>("clients.list").then(({ data }) => {
+      setClientCount(data?.length || 0);
+    });
+  }, [tenant]);
 
   function updateHour(day: string, field: "open" | "close", value: string) {
     setHours((prev) => ({ ...prev, [day]: { ...prev[day], [field]: value } }));
@@ -362,6 +372,42 @@ export default function SettingsPage() {
             </div>
           )}
         </div>
+
+        {/* Cost Estimator */}
+        {reminderSettings.enabled && (() => {
+          const SMS_COST = 0.0079;
+          const PHONE_COST = 1.15;
+          const smsTimings = [reminderSettings.r24h_sms, reminderSettings.r2h_sms, reminderSettings.r1h_sms].filter(Boolean).length;
+          const emailTimings = [reminderSettings.r24h_email, reminderSettings.r2h_email, reminderSettings.r1h_email].filter(Boolean).length;
+          const appts = Math.round(clientCount * 1.5); // avg 1.5 appts/client/month
+          const smsCost = smsTimings > 0 ? (appts * smsTimings * SMS_COST) + PHONE_COST : 0;
+          const emailFree = appts * emailTimings;
+          const totalCost = smsCost;
+
+          return (
+            <div className={styles.costEstimator}>
+              <h3 className={styles.costEstTitle}>💰 Estimated Monthly Cost</h3>
+              <p className={styles.costEstSub}>Based on {clientCount} client{clientCount !== 1 ? "s" : ""} × ~{appts} appointments/month</p>
+              <div className={styles.costGrid}>
+                <div className={styles.costItem}>
+                  <span className={styles.costLabel}>📱 SMS ({smsTimings} reminder{smsTimings !== 1 ? "s" : ""}/appt)</span>
+                  <span className={styles.costValue}>{smsTimings > 0 ? `~$${smsCost.toFixed(2)}` : "—"}</span>
+                </div>
+                <div className={styles.costItem}>
+                  <span className={styles.costLabel}>📧 Email ({emailTimings} reminder{emailTimings !== 1 ? "s" : ""}/appt)</span>
+                  <span className={styles.costValue} style={{ color: "var(--color-success)" }}>{emailTimings > 0 ? `${emailFree} msgs — Free` : "—"}</span>
+                </div>
+                <div className={`${styles.costItem} ${styles.costTotal}`}>
+                  <span className={styles.costLabel}>Total estimated</span>
+                  <span className={styles.costValue}>{totalCost > 0 ? `~$${totalCost.toFixed(2)}/mo` : "Free"}</span>
+                </div>
+              </div>
+              <p className={styles.costFootnote}>
+                SMS: $0.0079/msg + $1.15/mo phone number (Twilio). Email: Free up to 3,000/mo (Resend).
+              </p>
+            </div>
+          );
+        })()}
 
         {reminderSettings.enabled && (
           <div className={styles.reminderTemplates}>
