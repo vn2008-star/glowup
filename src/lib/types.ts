@@ -99,7 +99,7 @@ export interface Campaign {
   id: string
   tenant_id: string
   name: string
-  type: 'birthday' | 'win_back' | 'rebooking' | 'review' | 'promo' | 'referral' | 'holiday'
+  type: 'birthday' | 'win_back' | 'rebooking' | 'review' | 'promo' | 'referral' | 'holiday' | 'fill_openings'
   template: Record<string, unknown>
   audience: Record<string, unknown>
   status: 'draft' | 'active' | 'paused' | 'completed'

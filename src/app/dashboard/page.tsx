@@ -202,6 +202,18 @@ export default function DashboardOverview() {
               </div>
             )}
           </div>
+
+          {/* Fill My Openings CTA */}
+          <a href="/dashboard/campaigns?tab=fill_openings" className={`card ${styles.fillCta}`} style={{ textDecoration: "none" }}>
+            <div className={styles.fillCtaContent}>
+              <span className={styles.fillCtaBolt}>⚡</span>
+              <div>
+                <h3 className={styles.fillCtaTitle}>Fill My Openings</h3>
+                <p className={styles.fillCtaDesc}>Blast last-minute availability to clients and keep every chair full</p>
+              </div>
+              <span className={styles.fillCtaArrow}>→</span>
+            </div>
+          </a>
         </div>
       </div>
     </div>

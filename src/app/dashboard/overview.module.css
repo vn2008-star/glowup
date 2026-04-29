@@ -243,6 +243,60 @@
   font-size: var(--text-sm);
 }
 
+/* ── Fill My Openings CTA ── */
+.fillCta {
+  background: var(--gradient-primary) !important;
+  border: none !important;
+  padding: var(--space-5) !important;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  position: relative;
+  overflow: hidden;
+}
+.fillCta::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 50%);
+  pointer-events: none;
+}
+.fillCta:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(195, 126, 218, 0.4);
+}
+.fillCtaContent {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  color: #fff;
+  position: relative;
+  z-index: 1;
+}
+.fillCtaBolt {
+  font-size: 2rem;
+  flex-shrink: 0;
+}
+.fillCtaTitle {
+  font-family: var(--font-heading);
+  font-size: var(--text-base);
+  font-weight: 800;
+  margin-bottom: 2px;
+}
+.fillCtaDesc {
+  font-size: var(--text-xs);
+  opacity: 0.9;
+}
+.fillCtaArrow {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  margin-left: auto;
+  flex-shrink: 0;
+  transition: transform var(--transition-fast);
+}
+.fillCta:hover .fillCtaArrow {
+  transform: translateX(4px);
+}
+
 /* ── Responsive ── */
 @media (max-width: 1024px) {
   .metricsGrid { grid-template-columns: repeat(2, 1fr); }

@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData } from "@/lib/api";
 import styles from "./campaigns.module.css";
-import type { Campaign } from "@/lib/types";
+import type { Campaign, Staff, Appointment, Client } from "@/lib/types";
 
 const CAMPAIGN_TYPES = [
   { value: "birthday", label: "Birthday", color: "badge-primary" },
@@ -14,6 +14,7 @@ const CAMPAIGN_TYPES = [
   { value: "promo", label: "Promotion", color: "badge-warning" },
   { value: "referral", label: "Referral", color: "badge-primary" },
   { value: "holiday", label: "Holiday", color: "badge-danger" },
+  { value: "fill_openings", label: "Fill My Openings", color: "badge-accent" },
 ];
 
 const DEFAULT_TEMPLATES: Record<string, string> = {
@@ -75,11 +76,113 @@ const RocketIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" /><path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" /><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0" /><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" /></svg>
 );
 
+const BoltIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg>
+);
+
+/* ─── Open Slot Types ─── */
+interface OpenSlot {
+  id: string;
+  staffId: string;
+  staffName: string;
+  date: Date;
+  startHour: number;
+  endHour: number;
+  durationMin: number;
+}
+
+type FillAudience = "all" | "active" | "at_risk" | "vip";
+
+const FILL_DEFAULT_MSG = `Hey {name}! ⚡ We just had an opening — {slots}. {discount}Book now before it's gone → `;
+
+function detectOpenSlots(staff: Staff[], appointments: Appointment[], days: number): OpenSlot[] {
+  const slots: OpenSlot[] = [];
+  const now = new Date();
+  const DAY_NAMES = ["sunday","monday","tuesday","wednesday","thursday","friday","saturday"];
+
+  for (let d = 0; d < days; d++) {
+    const date = new Date(now);
+    date.setDate(date.getDate() + d);
+    const dayName = DAY_NAMES[date.getDay()];
+    const dateStr = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;
+
+    for (const s of staff) {
+      if (!s.is_active) continue;
+      const sched = s.schedule as Record<string, { start?: string; end?: string; off?: boolean }> | null;
+      const dayConfig = sched?.[dayName];
+      if (!dayConfig || dayConfig.off) continue;
+
+      const workStart = parseInt(dayConfig.start || "9", 10);
+      const workEnd = parseInt(dayConfig.end || "17", 10);
+      if (workEnd <= workStart) continue;
+
+      // Build booked intervals for this staff on this day
+      const booked: { start: number; end: number }[] = [];
+      for (const apt of appointments) {
+        if (apt.staff_id !== s.id) continue;
+        const aptDate = new Date(apt.start_time);
+        const aptDateStr = `${aptDate.getFullYear()}-${String(aptDate.getMonth()+1).padStart(2,"0")}-${String(aptDate.getDate()).padStart(2,"0")}`;
+        if (aptDateStr !== dateStr) continue;
+        if (apt.status === "cancelled") continue;
+        const startH = aptDate.getHours() + aptDate.getMinutes() / 60;
+        const endDate = new Date(apt.end_time);
+        const endH = endDate.getHours() + endDate.getMinutes() / 60;
+        booked.push({ start: startH, end: endH });
+      }
+      booked.sort((a, b) => a.start - b.start);
+
+      // Find gaps >= 30 min
+      let cursor = workStart;
+      for (const b of booked) {
+        if (b.start > cursor && (b.start - cursor) >= 0.5) {
+          slots.push({
+            id: `${s.id}-${dateStr}-${cursor}`,
+            staffId: s.id,
+            staffName: s.name,
+            date: new Date(date),
+            startHour: cursor,
+            endHour: b.start,
+            durationMin: Math.round((b.start - cursor) * 60),
+          });
+        }
+        cursor = Math.max(cursor, b.end);
+      }
+      if (workEnd > cursor && (workEnd - cursor) >= 0.5) {
+        slots.push({
+          id: `${s.id}-${dateStr}-${cursor}`,
+          staffId: s.id,
+          staffName: s.name,
+          date: new Date(date),
+          startHour: cursor,
+          endHour: workEnd,
+          durationMin: Math.round((workEnd - cursor) * 60),
+        });
+      }
+    }
+  }
+  return slots;
+}
+
+function formatHour(h: number): string {
+  const hr = Math.floor(h);
+  const min = Math.round((h - hr) * 60);
+  const ampm = hr >= 12 ? "PM" : "AM";
+  const h12 = hr === 0 ? 12 : hr > 12 ? hr - 12 : hr;
+  return `${h12}:${String(min).padStart(2, "0")} ${ampm}`;
+}
+
 export default function CampaignsPage() {
   const { tenant, refetch } = useTenant();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"campaigns" | "automations" | "holidays">("campaigns");
+  const [activeTab, setActiveTab] = useState<"campaigns" | "automations" | "holidays" | "fill_openings">(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get("tab");
+      if (tab === "fill_openings" || tab === "automations" || tab === "holidays") return tab;
+    }
+    return "campaigns";
+  });
   const [showModal, setShowModal] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
   const [formData, setFormData] = useState({
@@ -91,6 +194,21 @@ export default function CampaignsPage() {
 
   // Automation toggles from tenant settings
   const [automationStates, setAutomationStates] = useState<Record<string, boolean>>({});
+
+  // ── Fill My Openings state ──
+  const [fillStep, setFillStep] = useState(1);
+  const [fillDays, setFillDays] = useState(3);
+  const [allSlots, setAllSlots] = useState<OpenSlot[]>([]);
+  const [selectedSlots, setSelectedSlots] = useState<Set<string>>(new Set());
+  const [fillMessage, setFillMessage] = useState(FILL_DEFAULT_MSG);
+  const [fillDiscount, setFillDiscount] = useState("");
+  const [fillAudience, setFillAudience] = useState<FillAudience>("all");
+  const [fillSending, setFillSending] = useState(false);
+  const [fillSent, setFillSent] = useState(false);
+  const [allStaff, setAllStaff] = useState<Staff[]>([]);
+  const [allClients, setAllClients] = useState<Client[]>([]);
+  const [allAppointments, setAllAppointments] = useState<Appointment[]>([]);
+
 
   const fetchCampaigns = useCallback(async () => {
     if (!tenant) return;
@@ -111,6 +229,106 @@ export default function CampaignsPage() {
   }, [tenant]);
 
   useEffect(() => { fetchCampaigns(); }, [fetchCampaigns]);
+
+  // ── Fill My Openings: fetch data when tab is activated ──
+  const loadFillData = useCallback(async () => {
+    if (!tenant) return;
+    const [staffRes, aptRes, clientRes] = await Promise.all([
+      queryData<Staff[]>("staff.list"),
+      queryData<Appointment[]>("appointments.list"),
+      queryData<Client[]>("clients.list"),
+    ]);
+    const staff = staffRes.data || [];
+    const apts = aptRes.data || [];
+    const clients = clientRes.data || [];
+    setAllStaff(staff);
+    setAllAppointments(apts);
+    setAllClients(clients);
+    setAllSlots(detectOpenSlots(staff, apts, fillDays));
+  }, [tenant, fillDays]);
+
+  useEffect(() => {
+    if (activeTab === "fill_openings") {
+      loadFillData();
+      setFillStep(1);
+      setSelectedSlots(new Set());
+      setFillMessage(FILL_DEFAULT_MSG);
+      setFillDiscount("");
+      setFillAudience("all");
+      setFillSent(false);
+    }
+  }, [activeTab, loadFillData]);
+
+  // Re-detect when days change
+  useEffect(() => {
+    if (activeTab === "fill_openings" && allStaff.length > 0) {
+      setAllSlots(detectOpenSlots(allStaff, allAppointments, fillDays));
+    }
+  }, [fillDays, activeTab, allStaff, allAppointments]);
+
+  function toggleSlot(id: string) {
+    setSelectedSlots(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function selectAllSlots() {
+    if (selectedSlots.size === allSlots.length) {
+      setSelectedSlots(new Set());
+    } else {
+      setSelectedSlots(new Set(allSlots.map(s => s.id)));
+    }
+  }
+
+  function getAudienceCount(audience: FillAudience): number {
+    switch (audience) {
+      case "all": return allClients.length;
+      case "active": return allClients.filter(c => c.status === "active").length;
+      case "at_risk": return allClients.filter(c => c.status === "at_risk").length;
+      case "vip": return allClients.filter(c => c.visit_count >= 10 || c.lifetime_spend >= 500).length;
+    }
+  }
+
+  function getSelectedSlotsText(): string {
+    const selected = allSlots.filter(s => selectedSlots.has(s.id));
+    if (selected.length === 0) return "";
+    const grouped = new Map<string, OpenSlot[]>();
+    selected.forEach(s => {
+      const key = s.date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key)!.push(s);
+    });
+    const parts: string[] = [];
+    grouped.forEach((slots, date) => {
+      const times = slots.map(s => `${formatHour(s.startHour)}`).join(", ");
+      parts.push(`${date} at ${times}`);
+    });
+    return parts.join("; ");
+  }
+
+  async function handleSendBlast() {
+    if (selectedSlots.size === 0) return;
+    setFillSending(true);
+    const recipientCount = getAudienceCount(fillAudience);
+    const payload = {
+      name: `Fill My Openings — ${new Date().toLocaleDateString()}`,
+      type: "fill_openings",
+      template: {
+        message: fillMessage,
+        discount: fillDiscount,
+        slots: getSelectedSlotsText(),
+        audience: fillAudience,
+      },
+      status: "completed",
+      metrics: { sent: recipientCount, opened: 0, booked: 0, revenue: 0 },
+    };
+    const { data } = await queryData<Campaign>("campaigns.add", payload);
+    if (data) setCampaigns(prev => [data, ...prev]);
+    setFillSending(false);
+    setFillSent(true);
+  }
 
   function openNew() {
     setEditingCampaign(null);
@@ -230,6 +448,9 @@ export default function CampaignsPage() {
       </div>
 
       <div className={styles.tabs}>
+        <button className={`${styles.tab} ${activeTab === "fill_openings" ? styles.activeTab : ""}`} onClick={() => setActiveTab("fill_openings")} style={activeTab !== "fill_openings" ? { color: "var(--color-primary)" } : {}}>
+          ⚡ Fill My Openings
+        </button>
         <button className={`${styles.tab} ${activeTab === "campaigns" ? styles.activeTab : ""}`} onClick={() => setActiveTab("campaigns")}>
           Campaigns ({campaigns.length})
         </button>
@@ -353,7 +574,169 @@ export default function CampaignsPage() {
             })}
           </div>
         </div>
-      ) : (
+      ) : activeTab === "fill_openings" ? (
+        <div className={styles.fillContainer}>
+          {/* Step indicator */}
+          <div className={styles.fillSteps}>
+            {["Select Openings", "Compose Message", "Choose Audience", "Preview & Send"].map((label, i) => {
+              const step = i + 1;
+              const cls = fillStep === step ? styles.fillStepActive : fillStep > step ? styles.fillStepDone : "";
+              return (
+                <React.Fragment key={step}>
+                  {i > 0 && <div className={styles.fillStepDivider} />}
+                  <div className={`${styles.fillStep} ${cls}`}>
+                    <span className={styles.fillStepNum}>{fillStep > step ? "✓" : step}</span>
+                    <span>{label}</span>
+                  </div>
+                </React.Fragment>
+              );
+            })}
+          </div>
+
+          {fillSent ? (
+            <div className={`card ${styles.fillSuccess}`}>
+              <div className="successEmoji">🚀</div>
+              <h3>Blast Sent Successfully!</h3>
+              <p>{getAudienceCount(fillAudience)} clients notified about {selectedSlots.size} open slot{selectedSlots.size !== 1 ? "s" : ""}.</p>
+              <button className="btn btn-primary" onClick={() => { setFillSent(false); setFillStep(1); setSelectedSlots(new Set()); }}>
+                Send Another Blast
+              </button>
+            </div>
+          ) : fillStep === 1 ? (
+            <>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "var(--space-3)" }}>
+                <div>
+                  <h3 style={{ fontWeight: 700, marginBottom: 4 }}>Open Slots Found: {allSlots.length}</h3>
+                  <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>Select the openings you want to fill</p>
+                </div>
+                <div className={styles.dateRangeBar}>
+                  {[1, 2, 3, 5, 7].map(d => (
+                    <button key={d} className={`${styles.dateRangeBtn} ${fillDays === d ? styles.dateRangeBtnActive : ""}`} onClick={() => setFillDays(d)}>
+                      {d === 1 ? "Today" : `Next ${d} days`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {allSlots.length > 0 && (
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <button className={styles.slotSelectAll} onClick={selectAllSlots}>
+                    {selectedSlots.size === allSlots.length ? "Deselect All" : `Select All (${allSlots.length})`}
+                  </button>
+                </div>
+              )}
+              {allSlots.length === 0 ? (
+                <div className={`card ${styles.noSlots}`}>
+                  <div className="noSlotsEmoji">🎉</div>
+                  <h3 style={{ fontWeight: 700, marginBottom: 8 }}>Fully Booked!</h3>
+                  <p>No open slots in the next {fillDays} day{fillDays !== 1 ? "s" : ""}. Try expanding the date range.</p>
+                </div>
+              ) : (
+                <div className={styles.slotGrid}>
+                  {allSlots.map(slot => (
+                    <div key={slot.id} className={`${styles.slotCard} ${selectedSlots.has(slot.id) ? styles.slotCardSelected : ""}`} onClick={() => toggleSlot(slot.id)}>
+                      <div className={styles.slotCheck}>{selectedSlots.has(slot.id) ? "✓" : ""}</div>
+                      <div className={styles.slotStaff}>{slot.staffName}</div>
+                      <div className={styles.slotDate}>{slot.date.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}</div>
+                      <div className={styles.slotTime}>
+                        {formatHour(slot.startHour)} – {formatHour(slot.endHour)}
+                        <span className={styles.slotDuration}>{slot.durationMin} min</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className={styles.fillNav}>
+                <div />
+                <button className="btn btn-primary" disabled={selectedSlots.size === 0} onClick={() => setFillStep(2)}>
+                  Next: Compose Message →
+                </button>
+              </div>
+            </>
+          ) : fillStep === 2 ? (
+            <div className={styles.fillCompose}>
+              <div>
+                <h3 style={{ fontWeight: 700, marginBottom: 4 }}>Compose Your Message</h3>
+                <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>Customize the blast message. Use merge tags for personalization.</p>
+              </div>
+              <div className={styles.formGroup}>
+                <label className="label">Message Template</label>
+                <textarea className="input" rows={5} value={fillMessage} onChange={e => setFillMessage(e.target.value)} />
+                <div className={styles.charCount}>{fillMessage.length} characters</div>
+                <small style={{ color: "var(--text-tertiary)" }}>
+                  Merge tags: {"{name}"}, {"{slots}"}, {"{discount}"}
+                </small>
+              </div>
+              <div className={styles.discountRow}>
+                <label className={styles.discountLabel}>💰 Optional Discount:</label>
+                <input className={`input ${styles.discountInput}`} value={fillDiscount} onChange={e => setFillDiscount(e.target.value)} placeholder="e.g., 15% off" />
+              </div>
+              <div className={styles.fillNav}>
+                <button className="btn btn-secondary" onClick={() => setFillStep(1)}>← Back</button>
+                <button className="btn btn-primary" onClick={() => setFillStep(3)}>Next: Choose Audience →</button>
+              </div>
+            </div>
+          ) : fillStep === 3 ? (
+            <>
+              <div>
+                <h3 style={{ fontWeight: 700, marginBottom: 4 }}>Choose Your Audience</h3>
+                <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>Who should receive this blast?</p>
+              </div>
+              <div className={styles.audienceGrid}>
+                {([
+                  { key: "all" as FillAudience, icon: "📣", title: "All Clients", desc: "Everyone in your client list" },
+                  { key: "active" as FillAudience, icon: "✅", title: "Active Clients", desc: "Clients who visited recently" },
+                  { key: "at_risk" as FillAudience, icon: "⚠️", title: "At-Risk Clients", desc: "Win them back with a deal" },
+                  { key: "vip" as FillAudience, icon: "👑", title: "VIP Clients", desc: "Top spenders & loyal regulars" },
+                ]).map(opt => (
+                  <div key={opt.key} className={`card ${styles.audienceCard} ${fillAudience === opt.key ? styles.audienceCardSelected : ""}`} onClick={() => setFillAudience(opt.key)}>
+                    <div className={styles.audienceIcon}>{opt.icon}</div>
+                    <h4>{opt.title}</h4>
+                    <p>{opt.desc}</p>
+                    <div className={styles.audienceCount}>{getAudienceCount(opt.key)} clients</div>
+                  </div>
+                ))}
+              </div>
+              <div className={styles.fillNav}>
+                <button className="btn btn-secondary" onClick={() => setFillStep(2)}>← Back</button>
+                <button className="btn btn-primary" onClick={() => setFillStep(4)}>Next: Preview & Send →</button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className={`card ${styles.fillPreview}`}>
+                <div className={styles.fillPreviewHeader}>
+                  <h3>⚡ Fill My Openings Blast Preview</h3>
+                </div>
+                <div className={styles.fillPreviewBody}>
+                  <div className={styles.previewMessage}>
+                    {fillMessage.replace("{name}", "Sarah").replace("{slots}", getSelectedSlotsText()).replace("{discount}", fillDiscount ? `${fillDiscount} — ` : "")}
+                  </div>
+                  <div className={styles.previewStats}>
+                    <div className={styles.previewStat}>
+                      <div className={styles.previewStatValue}>{selectedSlots.size}</div>
+                      <div className={styles.previewStatLabel}>Open Slots</div>
+                    </div>
+                    <div className={styles.previewStat}>
+                      <div className={styles.previewStatValue}>{getAudienceCount(fillAudience)}</div>
+                      <div className={styles.previewStatLabel}>Recipients</div>
+                    </div>
+                    <div className={styles.previewStat}>
+                      <div className={styles.previewStatValue}>{fillDiscount || "—"}</div>
+                      <div className={styles.previewStatLabel}>Discount</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className={styles.fillNav}>
+                <button className="btn btn-secondary" onClick={() => setFillStep(3)}>← Back</button>
+                <button className={styles.fillSendBtn} disabled={fillSending} onClick={handleSendBlast}>
+                  {fillSending ? "Sending..." : "🚀 Send Blast Now"}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      ) : activeTab === "automations" ? (
         <div className={styles.automationList}>
           {AUTOMATIONS_CONFIG.map((a) => (
             <div key={a.key} className={`card ${styles.automationCard}`}>
@@ -373,7 +756,7 @@ export default function CampaignsPage() {
             </div>
           ))}
         </div>
-      )}
+      ) : null}
 
       {/* Create/Edit Modal */}
       {showModal && (
