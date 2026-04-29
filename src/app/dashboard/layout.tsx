@@ -174,7 +174,6 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
           </div>
           <div className={styles.topBarActions}>
             <span className={styles.staffName}>{currentStaff?.name}</span>
-            <button className="btn btn-primary btn-sm">+ New Appointment</button>
           </div>
         </header>
         <main className={styles.mainContent}>
