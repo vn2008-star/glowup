@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData } from "@/lib/api";
 import styles from "./overview.module.css";
@@ -8,6 +9,7 @@ import type { Appointment, Client } from "@/lib/types";
 
 export default function DashboardOverview() {
   const { tenant, currentStaff } = useTenant();
+  const t = useTranslations("overviewPage");
 
   const [todayAppointments, setTodayAppointments] = useState<(Appointment & { client?: Client })[]>([]);
   const [metrics, setMetrics] = useState({
@@ -60,7 +62,7 @@ export default function DashboardOverview() {
 
   const now = new Date();
   const hour = now.getHours();
-  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const greeting = hour < 12 ? t("goodMorning") : hour < 17 ? t("goodAfternoon") : t("goodEvening");
   const staffName = currentStaff?.name?.split(" ")[0] || "there";
 
   const dayName = now.toLocaleDateString("en-US", { weekday: "long" });
@@ -74,8 +76,8 @@ export default function DashboardOverview() {
           <h1 className={styles.greetingText}>{greeting}, {staffName} ✨</h1>
           <p className={styles.greetingSub}>
             {metrics.todayAppointments > 0
-              ? `You have ${metrics.todayAppointments} appointment${metrics.todayAppointments > 1 ? "s" : ""} today`
-              : "No appointments today — perfect time to focus on growth!"}
+              ? t("appointmentsToday", { count: metrics.todayAppointments })
+              : t("noAppointmentsToday")}
           </p>
         </div>
         <div className={styles.dateDisplay}>
@@ -88,33 +90,33 @@ export default function DashboardOverview() {
         <div className={`card ${styles.metricCard}`}>
           <span className={styles.metricIcon}>💰</span>
           <div className={styles.metricInfo}>
-            <span className={styles.metricLabel}>TODAY&apos;S REVENUE</span>
+            <span className={styles.metricLabel}>{t("todaysRevenue")}</span>
             <span className={styles.metricValue}>{loading ? "..." : `$${metrics.todayRevenue}`}</span>
-            <span className={styles.metricChange}>{metrics.totalClients} total clients</span>
+            <span className={styles.metricChange}>{metrics.totalClients} {t("totalClients")}</span>
           </div>
         </div>
         <div className={`card ${styles.metricCard}`}>
           <span className={styles.metricIcon}>📅</span>
           <div className={styles.metricInfo}>
-            <span className={styles.metricLabel}>APPOINTMENTS TODAY</span>
+            <span className={styles.metricLabel}>{t("appointmentsLabel")}</span>
             <span className={styles.metricValue}>{loading ? "..." : metrics.todayAppointments}</span>
-            <span className={styles.metricChange}>{metrics.pendingCount} pending</span>
+            <span className={styles.metricChange}>{metrics.pendingCount} {t("pending")}</span>
           </div>
         </div>
         <div className={`card ${styles.metricCard}`}>
           <span className={styles.metricIcon}>✨</span>
           <div className={styles.metricInfo}>
-            <span className={styles.metricLabel}>NEW CLIENTS THIS WEEK</span>
+            <span className={styles.metricLabel}>{t("newClientsWeek")}</span>
             <span className={styles.metricValue}>{loading ? "..." : metrics.newClientsWeek}</span>
-            <span className={styles.metricChange}>{metrics.totalClients} total</span>
+            <span className={styles.metricChange}>{metrics.totalClients} {t("total")}</span>
           </div>
         </div>
         <div className={`card ${styles.metricCard}`}>
           <span className={styles.metricIcon}>💜</span>
           <div className={styles.metricInfo}>
-            <span className={styles.metricLabel}>RETENTION RATE</span>
+            <span className={styles.metricLabel}>{t("retentionRate")}</span>
             <span className={styles.metricValue}>{loading ? "..." : `${metrics.retentionRate}%`}</span>
-            <span className={styles.metricChange}>repeat visitors</span>
+            <span className={styles.metricChange}>{t("repeatVisitors")}</span>
           </div>
         </div>
       </div>
@@ -124,13 +126,13 @@ export default function DashboardOverview() {
         {/* Today's Schedule */}
         <div className={`card ${styles.scheduleCard}`}>
           <div className={styles.cardHeader}>
-            <h2>Today&apos;s Schedule</h2>
-            <a href="/dashboard/calendar" className={styles.viewAll}>View Calendar →</a>
+            <h2>{t("todaysSchedule")}</h2>
+            <a href="/dashboard/calendar" className={styles.viewAll}>{t("viewCalendar")}</a>
           </div>
           {loading ? (
-            <p className={styles.emptySchedule}>Loading appointments...</p>
+            <p className={styles.emptySchedule}>{t("loadingAppointments")}</p>
           ) : todayAppointments.length === 0 ? (
-            <p className={styles.emptySchedule}>No appointments scheduled for today</p>
+            <p className={styles.emptySchedule}>{t("noAppointments")}</p>
           ) : (
             <div className={styles.appointmentList}>
               {todayAppointments.map((apt) => {
@@ -158,9 +160,9 @@ export default function DashboardOverview() {
         <div className={styles.rightCol}>
           {/* Recent Clients */}
           <div className={`card ${styles.recentCard}`}>
-            <h2>Recent Clients</h2>
+            <h2>{t("recentClients")}</h2>
             {recentClients.length === 0 ? (
-              <p className={styles.emptySchedule}>No clients yet. Add your first client!</p>
+              <p className={styles.emptySchedule}>{t("noClientsYet")}</p>
             ) : (
               <div className={styles.recentList}>
                 {recentClients.map((c) => (
@@ -168,7 +170,7 @@ export default function DashboardOverview() {
                     <div className={styles.clientAvatar}>{c.first_name[0]}{c.last_name?.[0] || ""}</div>
                     <div className={styles.clientInfo}>
                       <span className={styles.clientName}>{c.first_name} {c.last_name || ""}</span>
-                      <span className={styles.clientMeta}>{c.visit_count} visits · ${c.lifetime_spend}</span>
+                      <span className={styles.clientMeta}>{c.visit_count} {t("visits")} · ${c.lifetime_spend}</span>
                     </div>
                   </div>
                 ))}
@@ -179,11 +181,11 @@ export default function DashboardOverview() {
           {/* At-Risk Clients */}
           <div className={`card ${styles.atRiskCard}`}>
             <div className={styles.scheduleHeader}>
-              <h2>⚠️ At-Risk Clients</h2>
-              <a href="/dashboard/campaigns" className={styles.viewAll}>Send Campaign</a>
+              <h2>{t("atRiskClients")}</h2>
+              <a href="/dashboard/campaigns" className={styles.viewAll}>{t("sendCampaign")}</a>
             </div>
             {atRiskClients.length === 0 ? (
-              <p className={styles.emptySchedule}>No at-risk clients — great retention!</p>
+              <p className={styles.emptySchedule}>{t("noAtRisk")}</p>
             ) : (
               <div className={styles.recentList}>
                 {atRiskClients.map((c) => (
@@ -194,7 +196,7 @@ export default function DashboardOverview() {
                     <div className={styles.clientInfo}>
                       <span className={styles.clientName}>{c.first_name} {c.last_name || ""}</span>
                       <span className={styles.clientMeta}>
-                        Last visit: {c.last_visit ? new Date(c.last_visit).toLocaleDateString() : "Never"}
+                        {t("lastVisit")}: {c.last_visit ? new Date(c.last_visit).toLocaleDateString() : t("never")}
                       </span>
                     </div>
                   </div>
@@ -208,8 +210,8 @@ export default function DashboardOverview() {
             <div className={styles.fillCtaContent}>
               <span className={styles.fillCtaBolt}>⚡</span>
               <div>
-                <h3 className={styles.fillCtaTitle}>Fill My Openings</h3>
-                <p className={styles.fillCtaDesc}>Blast last-minute availability to clients and keep every chair full</p>
+                <h3 className={styles.fillCtaTitle}>{t("fillMyOpenings")}</h3>
+                <p className={styles.fillCtaDesc}>{t("fillDesc")}</p>
               </div>
               <span className={styles.fillCtaArrow}>→</span>
             </div>

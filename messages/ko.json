@@ -131,5 +131,116 @@
     "inbox": "받은편지함",
     "reports": "리포트",
     "settings": "설정"
+  },
+  "calendarPage": {
+    "title": "캘린더", "today": "오늘", "day": "일", "week": "주", "month": "월",
+    "newAppointment": "+ 새 예약", "loadingCalendar": "캘린더 로딩 중...",
+    "staffAvailability": "직원 가용성", "booked": "예약됨", "open": "비어있음", "fillSlot": "예약하기",
+    "allStaff": "전체", "walkin": "워크인", "unassigned": "미배정",
+    "appointmentDetails": "예약 상세", "client": "고객", "service": "서비스",
+    "dateTime": "날짜 및 시간", "status": "상태", "price": "가격", "notes": "메모",
+    "edit": "수정", "delete": "삭제", "deleteConfirm": "이 예약을 삭제하시겠습니까?",
+    "editAppointment": "예약 수정", "newAppointmentTitle": "새 예약",
+    "selectService": "서비스 선택...", "anyAvailable": "가능한 직원",
+    "date": "날짜", "time": "시간", "cancel": "취소",
+    "updateAppointment": "예약 업데이트", "bookAppointment": "예약하기", "more": "더보기",
+    "previousMonth": "이전 달", "nextMonth": "다음 달",
+    "previousWeek": "이전 주", "nextWeek": "다음 주",
+    "previousDay": "이전 날", "nextDay": "다음 날"
+  },
+  "overviewPage": {
+    "goodMorning": "좋은 아침입니다", "goodAfternoon": "좋은 오후입니다", "goodEvening": "좋은 저녁입니다",
+    "appointmentsToday": "오늘 예약이 {count}건 있습니다",
+    "noAppointmentsToday": "오늘 예약 없음 — 성장에 집중할 좋은 기회!",
+    "todaysRevenue": "오늘의 매출", "totalClients": "전체 고객",
+    "appointmentsLabel": "오늘의 예약", "pending": "대기 중",
+    "newClientsWeek": "이번 주 신규 고객", "total": "전체",
+    "retentionRate": "재방문율", "repeatVisitors": "재방문 고객",
+    "todaysSchedule": "오늘의 일정", "viewCalendar": "캘린더 보기 →",
+    "loadingAppointments": "예약 로딩 중...", "noAppointments": "오늘 예약 없음",
+    "recentClients": "최근 고객", "noClientsYet": "아직 고객이 없습니다. 첫 고객을 추가하세요!",
+    "visits": "방문", "atRiskClients": "⚠️ 이탈 위험 고객", "sendCampaign": "캠페인 보내기",
+    "noAtRisk": "이탈 위험 고객 없음 — 훌륭한 유지율!", "lastVisit": "마지막 방문", "never": "없음",
+    "fillMyOpenings": "빈자리 채우기", "fillDesc": "빈 시간대를 고객에게 알려 모든 자리를 채웁니다"
+  },
+  "clientsPage": {
+    "title": "고객", "addClient": "+ 고객 추가", "searchPlaceholder": "고객 검색...",
+    "all": "전체", "active": "활성", "vip": "VIP", "atRisk": "위험",
+    "name": "이름", "phone": "전화", "email": "이메일",
+    "visits": "방문", "spent": "지출", "lastVisit": "마지막 방문",
+    "noClients": "고객을 찾을 수 없습니다", "addFirstClient": "첫 고객을 추가하세요",
+    "addNew": "새 고객 추가", "editClient": "고객 수정",
+    "firstName": "이름", "lastName": "성", "notes": "메모",
+    "save": "저장", "cancel": "취소", "deleteClient": "고객 삭제", "deleteConfirm": "이 고객을 삭제하시겠습니까?"
+  },
+  "servicesPage": {
+    "title": "서비스", "addService": "+ 서비스 추가", "searchPlaceholder": "서비스 검색...",
+    "all": "전체", "active": "활성", "inactive": "비활성",
+    "serviceName": "서비스명", "category": "카테고리", "duration": "소요시간", "price": "가격", "status": "상태",
+    "noServices": "서비스를 찾을 수 없습니다", "addFirstService": "첫 서비스를 추가하세요",
+    "addNew": "새 서비스 추가", "editService": "서비스 수정",
+    "name": "이름", "description": "설명", "durationMinutes": "소요시간(분)",
+    "save": "저장", "cancel": "취소", "deleteService": "서비스 삭제", "deleteConfirm": "이 서비스를 삭제하시겠습니까?"
+  },
+  "staffPage": {
+    "title": "직원", "addStaff": "+ 직원 추가", "searchPlaceholder": "직원 검색...",
+    "name": "이름", "role": "역할", "phone": "전화", "email": "이메일", "status": "상태",
+    "active": "재직", "inactive": "퇴직", "noStaff": "직원을 찾을 수 없습니다", "addFirstStaff": "첫 팀원을 추가하세요",
+    "addNew": "새 직원 추가", "editStaff": "직원 수정",
+    "firstName": "이름", "lastName": "성",
+    "save": "저장", "cancel": "취소", "deleteStaff": "직원 삭제", "deleteConfirm": "이 직원을 삭제하시겠습니까?"
+  },
+  "packagesPage": {
+    "title": "패키지", "addPackage": "+ 패키지 추가",
+    "name": "이름", "servicesIncluded": "포함 서비스", "price": "가격", "discount": "할인", "status": "상태",
+    "active": "활성", "inactive": "비활성", "noPackages": "아직 패키지가 없습니다",
+    "addNew": "새 패키지 추가", "editPackage": "패키지 수정", "packageName": "패키지명", "description": "설명",
+    "selectServices": "포함할 서비스 선택", "save": "저장", "cancel": "취소",
+    "deletePackage": "패키지 삭제", "deleteConfirm": "이 패키지를 삭제하시겠습니까?"
+  },
+  "galleryPage": {
+    "title": "갤러리", "addPhoto": "+ 사진 추가", "noPhotos": "아직 사진이 없습니다",
+    "addFirst": "첫 비포/애프터 사진을 추가하세요", "beforeAfter": "비포 & 애프터", "uploadPhoto": "사진 업로드",
+    "caption": "설명", "save": "저장", "cancel": "취소", "delete": "삭제", "deleteConfirm": "이 사진을 삭제하시겠습니까?"
+  },
+  "campaignsPage": {
+    "title": "캠페인", "newCampaign": "+ 새 캠페인", "fillMyOpenings": "빈자리 채우기",
+    "scheduled": "예약됨", "sent": "발송됨", "draft": "초안",
+    "noCampaigns": "아직 캠페인이 없습니다", "createFirst": "첫 마케팅 캠페인을 만드세요",
+    "subject": "제목", "recipients": "수신자", "status": "상태", "sentDate": "발송일", "openRate": "오픈율",
+    "send": "보내기", "save": "초안 저장", "cancel": "취소",
+    "deleteCampaign": "캠페인 삭제", "deleteConfirm": "이 캠페인을 삭제하시겠습니까?"
+  },
+  "socialPage": {
+    "title": "소셜", "newPost": "+ 새 게시물", "calendar": "캘린더", "posts": "게시물", "analytics": "분석",
+    "noPosts": "아직 게시물이 없습니다", "createFirst": "첫 소셜 미디어 게시물을 만드세요",
+    "caption": "설명", "platform": "플랫폼", "scheduledFor": "예약 시간", "status": "상태",
+    "save": "저장", "cancel": "취소", "delete": "삭제", "deleteConfirm": "이 게시물을 삭제하시겠습니까?"
+  },
+  "loyaltyPage": {
+    "title": "로열티", "program": "프로그램", "members": "회원", "rewards": "보상",
+    "points": "포인트", "status": "상태", "active": "활성",
+    "noProgram": "아직 로열티 프로그램이 없습니다", "setupFirst": "리워드 프로그램을 설정하세요"
+  },
+  "inboxPage": {
+    "title": "받은편지함", "conversations": "대화", "noMessages": "아직 메시지가 없습니다",
+    "typeMessage": "메시지 입력...", "send": "보내기", "aiReceptionist": "AI 리셉셔니스트",
+    "allMessages": "전체 메시지", "unread": "안 읽음"
+  },
+  "reportsPage": {
+    "title": "리포트", "revenue": "매출", "appointments": "예약", "clients": "고객", "staff": "직원",
+    "thisWeek": "이번 주", "thisMonth": "이번 달", "thisYear": "올해", "custom": "사용자 정의",
+    "totalRevenue": "총 매출", "totalAppointments": "총 예약", "newClients": "신규 고객", "avgTicket": "평균 단가",
+    "noData": "선택한 기간에 데이터 없음", "export": "내보내기"
+  },
+  "settingsPage": {
+    "title": "설정", "business": "비즈니스", "notifications": "알림", "billing": "결제", "integrations": "연동",
+    "businessName": "비즈니스 이름", "businessEmail": "비즈니스 이메일", "businessPhone": "비즈니스 전화",
+    "address": "주소", "timezone": "시간대", "save": "변경 저장", "saved": "저장되었습니다!",
+    "appointmentReminders": "예약 리마인더", "reminderTiming": "리마인더 타이밍",
+    "sms": "SMS", "emailChannel": "이메일",
+    "h24Before": "24시간 전", "h2Before": "2시간 전", "h1Before": "1시간 전",
+    "estimatedCost": "예상 월 비용", "smsCost": "SMS 비용", "emailCost": "이메일 비용",
+    "free": "무료", "perMonth": "/월", "basedOn": "기준"
   }
 }

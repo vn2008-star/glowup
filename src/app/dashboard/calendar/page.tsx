@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData } from "@/lib/api";
 import styles from "./calendar.module.css";
@@ -15,6 +16,7 @@ const DEFAULT_WORK_END = 18;
 
 export default function CalendarPage() {
   const { tenant } = useTenant();
+  const t = useTranslations("calendarPage");
   const [view, setView] = useState<"day" | "week" | "month">("week");
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [appointments, setAppointments] = useState<FullAppointment[]>([]);
@@ -278,7 +280,7 @@ export default function CalendarPage() {
       {/* ── Header ── */}
       <div className={styles.pageHeader}>
         <div className={styles.headerLeft}>
-          <h1>Calendar</h1>
+          <h1>{t("title")}</h1>
           <div className={styles.dateNav}>
             <button className={styles.navBtn} onClick={() => changeDate(-1)} title={view === "month" ? "Previous month" : view === "week" ? "Previous week" : "Previous day"}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
@@ -290,22 +292,22 @@ export default function CalendarPage() {
           </div>
         </div>
         <div className={styles.headerRight}>
-          <button className={styles.todayBtn} onClick={() => { setSelectedDate(new Date()); setView("day"); }}>Today</button>
+          <button className={styles.todayBtn} onClick={() => { setSelectedDate(new Date()); setView("day"); }}>{t("today")}</button>
           <div className={styles.viewToggle}>
             {(["day", "week", "month"] as const).map(v => (
               <button key={v} className={`${styles.viewBtn} ${view === v ? styles.activeView : ""}`} onClick={() => setView(v)}>
-                {v.charAt(0).toUpperCase() + v.slice(1)}
+                {t(v)}
               </button>
             ))}
           </div>
-          <button className="btn btn-primary" onClick={() => openNewAppointment()}>+ New Appointment</button>
+          <button className="btn btn-primary" onClick={() => openNewAppointment()}>{t("newAppointment")}</button>
         </div>
       </div>
 
       {loading ? (
         <div className={styles.loading}>
           <div className={styles.loadingSpinner} />
-          <span>Loading calendar...</span>
+          <span>{t("loadingCalendar")}</span>
         </div>
       ) : view === "day" ? (
         /* ════════════════ DAY VIEW ════════════════ */
@@ -314,7 +316,7 @@ export default function CalendarPage() {
           <div className={styles.availSummary}>
             <h3 className={styles.availTitle}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-              Staff Availability
+              {t("staffAvailability")}
             </h3>
             <div className={styles.availBars}>
               {(staffMembers.length > 0 ? staffMembers : [{ id: "unassigned", name: "Unassigned" } as Staff]).map((staff) => {
@@ -325,7 +327,7 @@ export default function CalendarPage() {
                   <div key={staff.id} className={styles.availItem}>
                     <div className={styles.availInfo}>
                       <span className={styles.availName}>{staff.name}</span>
-                      <span className={styles.availPct}>{util}% booked</span>
+                      <span className={styles.availPct}>{util}% {t("booked")}</span>
                     </div>
                     <div className={styles.availBarTrack}>
                       <div
@@ -333,7 +335,7 @@ export default function CalendarPage() {
                         style={{ width: `${util}%` }}
                       />
                     </div>
-                    <span className={styles.availOpen}>{openHours.toFixed(1)}h open</span>
+                    <span className={styles.availOpen}>{openHours.toFixed(1)}h {t("open")}</span>
                   </div>
                 );
               })}
@@ -383,7 +385,7 @@ export default function CalendarPage() {
                         title={`Open: ${formatHour(slot.start)} – ${formatHour(slot.end)}`}
                       >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                        <span>Fill Slot</span>
+                        <span>{t("fillSlot")}</span>
                       </div>
                     ))}
                     {/* Appointment blocks */}
@@ -400,7 +402,7 @@ export default function CalendarPage() {
                         onClick={() => setSelectedApt(apt)}
                       >
                         <span className={styles.aptClient}>
-                          {apt.client ? `${apt.client.first_name} ${apt.client.last_name || ""}` : "Walk-in"}
+                          {apt.client ? `${apt.client.first_name} ${apt.client.last_name || ""}` : t("walkin")}
                         </span>
                         <span className={styles.aptService}>{apt.service?.name || "Service"}</span>
                         <span className={styles.aptTime}>
@@ -470,7 +472,7 @@ export default function CalendarPage() {
                 className={`${styles.staffFilterBtn} ${activeStaffFilter.length === 0 ? styles.staffFilterActive : ""}`}
                 onClick={() => setActiveStaffFilter([])}
               >
-                All Staff
+                {t("allStaff")}
               </button>
               {staffMembers.map(s => {
                 const color = getStaffColor(s.id);
@@ -611,7 +613,7 @@ export default function CalendarPage() {
                         </div>
                       ))}
                       {dayApts.length > maxDots && (
-                        <span className={styles.monthMore}>+{dayApts.length - maxDots} more</span>
+                        <span className={styles.monthMore}>+{dayApts.length - maxDots} {t("more")}</span>
                       )}
                     </div>
                   )}
@@ -627,26 +629,26 @@ export default function CalendarPage() {
         <div className={styles.modalOverlay} onClick={() => setSelectedApt(null)}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <div className={styles.detailHeader}>
-              <h2>Appointment Details</h2>
+              <h2>{t("appointmentDetails")}</h2>
               <button className={styles.detailClose} onClick={() => setSelectedApt(null)}>✕</button>
             </div>
             <div className={styles.detailBody}>
               <div className={styles.detailRow}>
-                <span className={styles.detailLabel}>Client</span>
+                <span className={styles.detailLabel}>{t("client")}</span>
                 <span className={styles.detailValue}>
-                  {selectedApt.client ? `${selectedApt.client.first_name} ${selectedApt.client.last_name || ""}` : "Walk-in"}
+                  {selectedApt.client ? `${selectedApt.client.first_name} ${selectedApt.client.last_name || ""}` : t("walkin")}
                 </span>
               </div>
               <div className={styles.detailRow}>
-                <span className={styles.detailLabel}>Service</span>
+                <span className={styles.detailLabel}>{t("service")}</span>
                 <span className={styles.detailValue}>{selectedApt.service?.name || "—"}</span>
               </div>
               <div className={styles.detailRow}>
-                <span className={styles.detailLabel}>Staff</span>
-                <span className={styles.detailValue}>{selectedApt.staff_member?.name || "Unassigned"}</span>
+                <span className={styles.detailLabel}>{t("client")}</span>
+                <span className={styles.detailValue}>{selectedApt.staff_member?.name || t("unassigned")}</span>
               </div>
               <div className={styles.detailRow}>
-                <span className={styles.detailLabel}>Date & Time</span>
+                <span className={styles.detailLabel}>{t("dateTime")}</span>
                 <span className={styles.detailValue}>
                   {new Date(selectedApt.start_time).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}{" "}
                   {new Date(selectedApt.start_time).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
@@ -655,20 +657,20 @@ export default function CalendarPage() {
                 </span>
               </div>
               <div className={styles.detailRow}>
-                <span className={styles.detailLabel}>Status</span>
+                <span className={styles.detailLabel}>{t("status")}</span>
                 <span className={`${styles.detailStatus} ${styles[`status_${selectedApt.status}`]}`}>
                   {selectedApt.status.charAt(0).toUpperCase() + selectedApt.status.slice(1)}
                 </span>
               </div>
               {selectedApt.total_price != null && (
                 <div className={styles.detailRow}>
-                  <span className={styles.detailLabel}>Price</span>
+                  <span className={styles.detailLabel}>{t("price")}</span>
                   <span className={styles.detailValue}>${Number(selectedApt.total_price).toFixed(2)}</span>
                 </div>
               )}
               {selectedApt.notes && (
                 <div className={styles.detailRow}>
-                  <span className={styles.detailLabel}>Notes</span>
+                  <span className={styles.detailLabel}>{t("notes")}</span>
                   <span className={styles.detailValue}>{selectedApt.notes}</span>
                 </div>
               )}
@@ -715,7 +717,7 @@ export default function CalendarPage() {
       {showModal && (
         <div className={styles.modalOverlay} onClick={() => { setShowModal(false); setEditingApt(null); }}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <h2>{editingApt ? "Edit Appointment" : "New Appointment"}</h2>
+            <h2>{editingApt ? t("editAppointment") : t("newAppointmentTitle")}</h2>
             <form onSubmit={async (e) => {
               e.preventDefault();
               if (editingApt) {
@@ -749,21 +751,21 @@ export default function CalendarPage() {
                 <div className={styles.formGroup}>
                   <label className="label">Client</label>
                   <select className="input" value={formData.client_id} onChange={(e) => setFormData({ ...formData, client_id: e.target.value })}>
-                    <option value="">Walk-in</option>
+                    <option value="">{t("walkin")}</option>
                     {clients.map(c => <option key={c.id} value={c.id}>{c.first_name} {c.last_name || ""}</option>)}
                   </select>
                 </div>
                 <div className={styles.formGroup}>
                   <label className="label">Service *</label>
                   <select className="input" value={formData.service_id} onChange={(e) => setFormData({ ...formData, service_id: e.target.value })} required>
-                    <option value="">Select service...</option>
+                    <option value="">{t("selectService")}</option>
                     {services.map(s => <option key={s.id} value={s.id}>{s.name} — ${s.price} ({s.duration_minutes}min)</option>)}
                   </select>
                 </div>
                 <div className={styles.formGroup}>
                   <label className="label">Staff</label>
                   <select className="input" value={formData.staff_id} onChange={(e) => setFormData({ ...formData, staff_id: e.target.value })}>
-                    <option value="">Any available</option>
+                    <option value="">{t("anyAvailable")}</option>
                     {staffMembers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
                 </div>
@@ -787,8 +789,8 @@ export default function CalendarPage() {
                 <textarea className="input" rows={2} value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} />
               </div>
               <div className={styles.modalActions}>
-                <button type="button" className="btn btn-secondary" onClick={() => { setShowModal(false); setEditingApt(null); }}>Cancel</button>
-                <button type="submit" className="btn btn-primary">{editingApt ? "Update Appointment" : "Book Appointment"}</button>
+                <button type="button" className="btn btn-secondary" onClick={() => { setShowModal(false); setEditingApt(null); }}>{t("cancel")}</button>
+                <button type="submit" className="btn btn-primary">{editingApt ? t("updateAppointment") : t("bookAppointment")}</button>
               </div>
             </form>
           </div>

@@ -131,5 +131,118 @@
     "inbox": "Bandeja",
     "reports": "Reportes",
     "settings": "Configuración"
+  },
+  "calendarPage": {
+    "title": "Calendario", "today": "Hoy", "day": "Día", "week": "Semana", "month": "Mes",
+    "newAppointment": "+ Nueva Cita", "loadingCalendar": "Cargando calendario...",
+    "staffAvailability": "Disponibilidad del equipo", "booked": "reservado", "open": "libre", "fillSlot": "Reservar",
+    "allStaff": "Todos", "walkin": "Sin cita", "unassigned": "Sin asignar",
+    "appointmentDetails": "Detalles de la cita", "client": "Cliente", "service": "Servicio",
+    "dateTime": "Fecha y Hora", "status": "Estado", "price": "Precio", "notes": "Notas",
+    "edit": "Editar", "delete": "Eliminar", "deleteConfirm": "¿Eliminar esta cita?",
+    "editAppointment": "Editar Cita", "newAppointmentTitle": "Nueva Cita",
+    "selectService": "Seleccionar servicio...", "anyAvailable": "Cualquier disponible",
+    "date": "Fecha", "time": "Hora", "cancel": "Cancelar",
+    "updateAppointment": "Actualizar Cita", "bookAppointment": "Reservar Cita", "more": "más",
+    "previousMonth": "Mes anterior", "nextMonth": "Mes siguiente",
+    "previousWeek": "Semana anterior", "nextWeek": "Semana siguiente",
+    "previousDay": "Día anterior", "nextDay": "Día siguiente"
+  },
+  "overviewPage": {
+    "goodMorning": "Buenos días", "goodAfternoon": "Buenas tardes", "goodEvening": "Buenas noches",
+    "appointmentsToday": "Tienes {count} cita(s) hoy",
+    "noAppointmentsToday": "Sin citas hoy — ¡perfecto para enfocarte en crecer!",
+    "todaysRevenue": "INGRESOS DE HOY", "totalClients": "clientes totales",
+    "appointmentsLabel": "CITAS DE HOY", "pending": "pendientes",
+    "newClientsWeek": "NUEVOS CLIENTES ESTA SEMANA", "total": "total",
+    "retentionRate": "TASA DE RETENCIÓN", "repeatVisitors": "visitantes recurrentes",
+    "todaysSchedule": "Agenda de hoy", "viewCalendar": "Ver Calendario →",
+    "loadingAppointments": "Cargando citas...", "noAppointments": "Sin citas programadas para hoy",
+    "recentClients": "Clientes Recientes", "noClientsYet": "Aún sin clientes. ¡Añade tu primer cliente!",
+    "visits": "visitas", "atRiskClients": "⚠️ Clientes en Riesgo", "sendCampaign": "Enviar Campaña",
+    "noAtRisk": "Sin clientes en riesgo — ¡excelente retención!",
+    "lastVisit": "Última visita", "never": "Nunca",
+    "fillMyOpenings": "Llenar Espacios", "fillDesc": "Envía disponibilidad de último minuto y mantén todas las sillas ocupadas"
+  },
+  "clientsPage": {
+    "title": "Clientes", "addClient": "+ Añadir Cliente", "searchPlaceholder": "Buscar clientes...",
+    "all": "Todos", "active": "Activos", "vip": "VIP", "atRisk": "En Riesgo",
+    "name": "Nombre", "phone": "Teléfono", "email": "Email",
+    "visits": "Visitas", "spent": "Gasto", "lastVisit": "Última Visita",
+    "noClients": "No se encontraron clientes", "addFirstClient": "Añade tu primer cliente para comenzar",
+    "addNew": "Nuevo Cliente", "editClient": "Editar Cliente",
+    "firstName": "Nombre", "lastName": "Apellido", "notes": "Notas",
+    "save": "Guardar", "cancel": "Cancelar",
+    "deleteClient": "Eliminar Cliente", "deleteConfirm": "¿Eliminar este cliente? Esta acción no se puede deshacer."
+  },
+  "servicesPage": {
+    "title": "Servicios", "addService": "+ Añadir Servicio", "searchPlaceholder": "Buscar servicios...",
+    "all": "Todos", "active": "Activos", "inactive": "Inactivos",
+    "serviceName": "Nombre del servicio", "category": "Categoría", "duration": "Duración", "price": "Precio", "status": "Estado",
+    "noServices": "No se encontraron servicios", "addFirstService": "Añade tu primer servicio para comenzar",
+    "addNew": "Nuevo Servicio", "editService": "Editar Servicio",
+    "name": "Nombre", "description": "Descripción", "durationMinutes": "Duración (minutos)",
+    "save": "Guardar", "cancel": "Cancelar", "deleteService": "Eliminar Servicio", "deleteConfirm": "¿Eliminar este servicio?"
+  },
+  "staffPage": {
+    "title": "Equipo", "addStaff": "+ Añadir Personal", "searchPlaceholder": "Buscar personal...",
+    "name": "Nombre", "role": "Rol", "phone": "Teléfono", "email": "Email", "status": "Estado",
+    "active": "Activo", "inactive": "Inactivo", "noStaff": "No se encontró personal", "addFirstStaff": "Añade tu primer miembro del equipo",
+    "addNew": "Nuevo Personal", "editStaff": "Editar Personal",
+    "firstName": "Nombre", "lastName": "Apellido",
+    "save": "Guardar", "cancel": "Cancelar", "deleteStaff": "Eliminar Personal", "deleteConfirm": "¿Eliminar este miembro?"
+  },
+  "packagesPage": {
+    "title": "Paquetes", "addPackage": "+ Añadir Paquete",
+    "name": "Nombre", "servicesIncluded": "Servicios incluidos", "price": "Precio", "discount": "Descuento", "status": "Estado",
+    "active": "Activo", "inactive": "Inactivo", "noPackages": "Aún sin paquetes",
+    "addNew": "Nuevo Paquete", "editPackage": "Editar Paquete", "packageName": "Nombre del paquete", "description": "Descripción",
+    "selectServices": "Seleccionar servicios", "save": "Guardar", "cancel": "Cancelar",
+    "deletePackage": "Eliminar Paquete", "deleteConfirm": "¿Eliminar este paquete?"
+  },
+  "galleryPage": {
+    "title": "Galería", "addPhoto": "+ Añadir Foto", "noPhotos": "Aún sin fotos",
+    "addFirst": "Añade tus primeras fotos de antes y después", "beforeAfter": "Antes y Después", "uploadPhoto": "Subir Foto",
+    "caption": "Descripción", "save": "Guardar", "cancel": "Cancelar", "delete": "Eliminar", "deleteConfirm": "¿Eliminar esta foto?"
+  },
+  "campaignsPage": {
+    "title": "Campañas", "newCampaign": "+ Nueva Campaña", "fillMyOpenings": "Llenar Espacios",
+    "scheduled": "Programada", "sent": "Enviada", "draft": "Borrador",
+    "noCampaigns": "Aún sin campañas", "createFirst": "Crea tu primera campaña de marketing",
+    "subject": "Asunto", "recipients": "Destinatarios", "status": "Estado", "sentDate": "Fecha de envío", "openRate": "Tasa de apertura",
+    "send": "Enviar", "save": "Guardar borrador", "cancel": "Cancelar",
+    "deleteCampaign": "Eliminar Campaña", "deleteConfirm": "¿Eliminar esta campaña?"
+  },
+  "socialPage": {
+    "title": "Social", "newPost": "+ Nueva Publicación", "calendar": "Calendario", "posts": "Publicaciones", "analytics": "Analítica",
+    "noPosts": "Aún sin publicaciones", "createFirst": "Crea tu primera publicación en redes sociales",
+    "caption": "Descripción", "platform": "Plataforma", "scheduledFor": "Programado para", "status": "Estado",
+    "save": "Guardar", "cancel": "Cancelar", "delete": "Eliminar", "deleteConfirm": "¿Eliminar esta publicación?"
+  },
+  "loyaltyPage": {
+    "title": "Fidelización", "program": "Programa", "members": "Miembros", "rewards": "Recompensas",
+    "points": "Puntos", "status": "Estado", "active": "Activo",
+    "noProgram": "Aún sin programa de fidelización", "setupFirst": "Configura tu programa de fidelización"
+  },
+  "inboxPage": {
+    "title": "Bandeja", "conversations": "Conversaciones", "noMessages": "Aún sin mensajes",
+    "typeMessage": "Escribe un mensaje...", "send": "Enviar", "aiReceptionist": "Recepcionista IA",
+    "allMessages": "Todos los mensajes", "unread": "Sin leer"
+  },
+  "reportsPage": {
+    "title": "Informes", "revenue": "Ingresos", "appointments": "Citas", "clients": "Clientes", "staff": "Equipo",
+    "thisWeek": "Esta semana", "thisMonth": "Este mes", "thisYear": "Este año", "custom": "Personalizado",
+    "totalRevenue": "Ingresos totales", "totalAppointments": "Total citas", "newClients": "Nuevos clientes", "avgTicket": "Ticket medio",
+    "noData": "Sin datos para el periodo seleccionado", "export": "Exportar"
+  },
+  "settingsPage": {
+    "title": "Configuración", "business": "Negocio", "notifications": "Notificaciones", "billing": "Facturación", "integrations": "Integraciones",
+    "businessName": "Nombre del negocio", "businessEmail": "Email del negocio", "businessPhone": "Teléfono del negocio",
+    "address": "Dirección", "timezone": "Zona horaria", "save": "Guardar cambios", "saved": "¡Cambios guardados!",
+    "appointmentReminders": "Recordatorios de citas", "reminderTiming": "Tiempo del recordatorio",
+    "sms": "SMS", "emailChannel": "Email",
+    "h24Before": "24h antes", "h2Before": "2h antes", "h1Before": "1h antes",
+    "estimatedCost": "Costo mensual estimado", "smsCost": "Costo SMS", "emailCost": "Costo Email",
+    "free": "Gratis", "perMonth": "/mes", "basedOn": "Basado en"
   }
 }
