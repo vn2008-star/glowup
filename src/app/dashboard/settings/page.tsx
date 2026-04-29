@@ -42,11 +42,12 @@ export default function SettingsPage() {
   });
   const [reminderSettings, setReminderSettings] = useState({
     enabled: true,
-    sms_enabled: true,
-    email_enabled: true,
-    one_hour_enabled: false,
-    one_hour_sms: true,
-    one_hour_email: false,
+    r24h_sms: true,
+    r24h_email: true,
+    r2h_sms: false,
+    r2h_email: false,
+    r1h_sms: false,
+    r1h_email: false,
   });
   const [reminderTemplates, setReminderTemplates] = useState({
     sms: "Hi {client_name}! This is a reminder that your {service} appointment at {business_name} is tomorrow, {date} at {time}. Reply STOP to opt out.",
@@ -315,64 +316,50 @@ export default function SettingsPage() {
           </label>
 
           {reminderSettings.enabled && (
-            <>
-              <p style={{ fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--text-secondary)", marginLeft: "var(--space-6)", marginTop: "var(--space-3)", textTransform: "uppercase", letterSpacing: "0.05em" }}>🕐 24-Hour Reminder</p>
-              <label className={styles.protectionToggle} style={{ marginLeft: "var(--space-6)" }}>
-                <input
-                  type="checkbox"
-                  checked={reminderSettings.sms_enabled}
-                  onChange={(e) => setReminderSettings({ ...reminderSettings, sms_enabled: e.target.checked })}
-                />
-                <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
-                <span>📱 SMS Reminders (via Twilio)</span>
-              </label>
-              <label className={styles.protectionToggle} style={{ marginLeft: "var(--space-6)" }}>
-                <input
-                  type="checkbox"
-                  checked={reminderSettings.email_enabled}
-                  onChange={(e) => setReminderSettings({ ...reminderSettings, email_enabled: e.target.checked })}
-                />
-                <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
-                <span>📧 Email Reminders (via Resend)</span>
-              </label>
-
-              <div style={{ marginTop: "var(--space-4)", marginLeft: "var(--space-6)", paddingTop: "var(--space-4)", borderTop: "1px solid var(--border-subtle)" }}>
-                <label className={styles.protectionToggle}>
-                  <input
-                    type="checkbox"
-                    checked={reminderSettings.one_hour_enabled}
-                    onChange={(e) => setReminderSettings({ ...reminderSettings, one_hour_enabled: e.target.checked })}
-                  />
-                  <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
-                  <span>⏰ Additional 1-hour reminder before appointment</span>
-                </label>
-                <p style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)", marginLeft: "52px", marginTop: "var(--space-1)" }}>
-                  Sends a second reminder 1 hour before the appointment. Great for same-day bookings.
-                </p>
-                {reminderSettings.one_hour_enabled && (
-                  <div style={{ marginLeft: "var(--space-6)", marginTop: "var(--space-3)", display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-                    <label className={styles.protectionToggle}>
-                      <input
-                        type="checkbox"
-                        checked={reminderSettings.one_hour_sms}
-                        onChange={(e) => setReminderSettings({ ...reminderSettings, one_hour_sms: e.target.checked })}
-                      />
-                      <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
-                      <span>📱 via SMS (Twilio)</span>
-                    </label>
-                    <label className={styles.protectionToggle}>
-                      <input
-                        type="checkbox"
-                        checked={reminderSettings.one_hour_email}
-                        onChange={(e) => setReminderSettings({ ...reminderSettings, one_hour_email: e.target.checked })}
-                      />
-                      <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
-                      <span>📧 via Email (Resend)</span>
-                    </label>
-                  </div>
-                )}
+            <div className={styles.reminderGrid}>
+              {/* Header */}
+              <div className={styles.reminderGridHeader}>
+                <span>Timing</span>
+                <span>📱 SMS (Twilio)</span>
+                <span>📧 Email (Resend)</span>
               </div>
-            </>
+              {/* 24-Hour */}
+              <div className={styles.reminderGridRow}>
+                <span className={styles.reminderTimingLabel}>🕐 24 hours before</span>
+                <label className={styles.protectionToggle}>
+                  <input type="checkbox" checked={reminderSettings.r24h_sms} onChange={(e) => setReminderSettings({ ...reminderSettings, r24h_sms: e.target.checked })} />
+                  <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
+                </label>
+                <label className={styles.protectionToggle}>
+                  <input type="checkbox" checked={reminderSettings.r24h_email} onChange={(e) => setReminderSettings({ ...reminderSettings, r24h_email: e.target.checked })} />
+                  <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
+                </label>
+              </div>
+              {/* 2-Hour */}
+              <div className={styles.reminderGridRow}>
+                <span className={styles.reminderTimingLabel}>⏳ 2 hours before</span>
+                <label className={styles.protectionToggle}>
+                  <input type="checkbox" checked={reminderSettings.r2h_sms} onChange={(e) => setReminderSettings({ ...reminderSettings, r2h_sms: e.target.checked })} />
+                  <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
+                </label>
+                <label className={styles.protectionToggle}>
+                  <input type="checkbox" checked={reminderSettings.r2h_email} onChange={(e) => setReminderSettings({ ...reminderSettings, r2h_email: e.target.checked })} />
+                  <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
+                </label>
+              </div>
+              {/* 1-Hour */}
+              <div className={styles.reminderGridRow}>
+                <span className={styles.reminderTimingLabel}>⏰ 1 hour before</span>
+                <label className={styles.protectionToggle}>
+                  <input type="checkbox" checked={reminderSettings.r1h_sms} onChange={(e) => setReminderSettings({ ...reminderSettings, r1h_sms: e.target.checked })} />
+                  <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
+                </label>
+                <label className={styles.protectionToggle}>
+                  <input type="checkbox" checked={reminderSettings.r1h_email} onChange={(e) => setReminderSettings({ ...reminderSettings, r1h_email: e.target.checked })} />
+                  <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
+                </label>
+              </div>
+            </div>
           )}
         </div>
 
@@ -383,7 +370,7 @@ export default function SettingsPage() {
               Merge tags: {'{client_name}'}, {'{service}'}, {'{staff}'}, {'{business_name}'}, {'{date}'}, {'{time}'}
             </small>
 
-            {reminderSettings.sms_enabled && (
+            {(reminderSettings.r24h_sms || reminderSettings.r2h_sms || reminderSettings.r1h_sms) && (
               <div className={styles.formGroup}>
                 <label className="label">SMS Template</label>
                 <textarea
@@ -396,7 +383,7 @@ export default function SettingsPage() {
               </div>
             )}
 
-            {reminderSettings.email_enabled && (
+            {(reminderSettings.r24h_email || reminderSettings.r2h_email || reminderSettings.r1h_email) && (
               <>
                 <div className={styles.formGroup}>
                   <label className="label">Email Subject</label>
