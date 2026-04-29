@@ -446,6 +446,13 @@
     "tips": "Tiền bo",
     "commission": "Hoa hồng",
     "payout": "Chi trả",
-    "ownerRevenue": "Doanh thu ròng"
+    "ownerRevenue": "Doanh thu ròng",
+    "walkInBtn": "Khách vãng lai",
+    "walkInTitle": "Khách vãng lai mới",
+    "selectStaff": "Chọn nhân viên",
+    "selectService": "Chọn dịch vụ",
+    "clientName": "Tên khách (tùy chọn)",
+    "clientPhone": "Số điện thoại (tùy chọn)",
+    "createWalkIn": "Tạo khách vãng lai"
   }
 }

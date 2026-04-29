@@ -316,6 +316,13 @@
     "tips": "小费",
     "commission": "佣金",
     "payout": "支付",
-    "ownerRevenue": "净收入"
+    "ownerRevenue": "净收入",
+    "walkInBtn": "散客",
+    "walkInTitle": "新散客",
+    "selectStaff": "选择员工",
+    "selectService": "选择服务",
+    "clientName": "客户姓名（可选）",
+    "clientPhone": "电话（可选）",
+    "createWalkIn": "创建散客"
   }
 }

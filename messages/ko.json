@@ -278,6 +278,13 @@
     "tips": "팁",
     "commission": "커미션",
     "payout": "지급액",
-    "ownerRevenue": "순수익"
+    "ownerRevenue": "순수익",
+    "walkInBtn": "워크인",
+    "walkInTitle": "새 워크인",
+    "selectStaff": "직원 선택",
+    "selectService": "서비스 선택",
+    "clientName": "고객 이름 (선택)",
+    "clientPhone": "전화번호 (선택)",
+    "createWalkIn": "워크인 생성"
   }
 }

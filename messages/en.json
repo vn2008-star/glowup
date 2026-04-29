@@ -446,6 +446,13 @@
     "tips": "Tips",
     "commission": "Commission",
     "payout": "Payout",
-    "ownerRevenue": "Net Revenue"
+    "ownerRevenue": "Net Revenue",
+    "walkInBtn": "Walk-in",
+    "walkInTitle": "New Walk-in",
+    "selectStaff": "Select Staff",
+    "selectService": "Select Service",
+    "clientName": "Client Name (optional)",
+    "clientPhone": "Phone (optional)",
+    "createWalkIn": "Create Walk-in"
   }
 }

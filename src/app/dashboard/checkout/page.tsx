@@ -36,11 +36,17 @@ export default function CheckoutPage() {
   // Daily tally
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [tally, setTally] = useState<any>(null);
-  const [staffFilter, setStaffFilter] = useState("all");
 
-  // Current user info
-  const [currentStaffId, setCurrentStaffId] = useState("");
-  const [currentStaffRole, setCurrentStaffRole] = useState("");
+  // Staff selector (shared tablet mode)
+  const [activeStaffId, setActiveStaffId] = useState("all");
+
+  // Walk-in modal
+  const [showWalkIn, setShowWalkIn] = useState(false);
+  const [walkInStaff, setWalkInStaff] = useState("");
+  const [walkInService, setWalkInService] = useState("");
+  const [walkInName, setWalkInName] = useState("");
+  const [walkInPhone, setWalkInPhone] = useState("");
+  const [creatingWalkIn, setCreatingWalkIn] = useState(false);
 
   // ── Data fetching ──
   const fetchData = useCallback(async () => {
@@ -75,11 +81,7 @@ export default function CheckoutPage() {
     if (!tenant) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data } = await queryData<any>("reports.daily-tally", { date: selectedDate });
-    if (data) {
-      setTally(data);
-      setCurrentStaffId(data.currentStaffId);
-      setCurrentStaffRole(data.currentStaffRole);
-    }
+    if (data) setTally(data);
   }, [tenant, selectedDate]);
 
   useEffect(() => {
@@ -120,17 +122,45 @@ export default function CheckoutPage() {
     setSelectedApt(null);
   }
 
-  const isOwnerOrManager = currentStaffRole === "owner" || currentStaffRole === "manager";
+  function getInitials(name: string) {
+    return name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
+  }
 
-  // Filter appointments based on role
+  // Filter appointments by selected staff
   const filteredApts = appointments.filter((a) => {
-    if (isOwnerOrManager) {
-      if (staffFilter === "all") return true;
-      return a.staff_id === staffFilter;
-    }
-    // Technicians see only their own
-    return a.staff_id === currentStaffId;
+    if (activeStaffId === "all") return true;
+    return a.staff_id === activeStaffId;
   });
+
+  const activeStaff = staffMembers.filter((s) => s.is_active);
+
+  // ── Walk-in ──
+  async function handleCreateWalkIn() {
+    if (!walkInStaff || !walkInService) return;
+    setCreatingWalkIn(true);
+
+    const { data } = await queryData<FullAppointment>("appointments.walk-in", {
+      staff_id: walkInStaff,
+      service_id: walkInService,
+      client_name: walkInName || null,
+      client_phone: walkInPhone || null,
+    });
+
+    if (data) {
+      setAppointments((prev) =>
+        [...prev, data].sort(
+          (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+        )
+      );
+      setSelectedApt(data);
+      setShowWalkIn(false);
+      setWalkInStaff("");
+      setWalkInService("");
+      setWalkInName("");
+      setWalkInPhone("");
+    }
+    setCreatingWalkIn(false);
+  }
 
   // ── Charge management ──
   async function addUpsellCharge() {
@@ -163,7 +193,6 @@ export default function CheckoutPage() {
     if (!selectedApt || !paymentMethod) return;
     setCheckingOut(true);
 
-    // If no charges exist yet, auto-create the original service charge
     let currentCharges = charges;
     if (currentCharges.length === 0 && selectedApt.service) {
       const { data } = await queryData<AppointmentCharge>("charges.add", {
@@ -188,7 +217,6 @@ export default function CheckoutPage() {
     });
 
     if (data) {
-      // Update local state
       setAppointments((prev) =>
         prev.map((a) => (a.id === selectedApt.id ? { ...a, ...data } : a))
       );
@@ -210,24 +238,57 @@ export default function CheckoutPage() {
       <div className={styles.pageHeader}>
         <h1>{t("title")}</h1>
         <div className={styles.headerActions}>
-          {isOwnerOrManager && (
-            <select
-              className={styles.staffFilter}
-              value={staffFilter}
-              onChange={(e) => setStaffFilter(e.target.value)}
-            >
-              <option value="all">{t("allStaff")}</option>
-              {staffMembers.filter((s) => s.is_active).map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
-          )}
           <div className={styles.dateNav}>
             <button onClick={() => changeDate(-1)}>‹</button>
             <span className={styles.dateLabel}>{formatDate(selectedDate)}</span>
             <button onClick={() => changeDate(1)}>›</button>
           </div>
         </div>
+      </div>
+
+      {/* ── Staff Avatar Bar ── */}
+      <div className={styles.staffBar}>
+        <button
+          className={`${styles.staffAvatar} ${activeStaffId === "all" ? styles.staffAvatarActive : ""}`}
+          onClick={() => setActiveStaffId("all")}
+        >
+          <div className={styles.avatarCircle} style={{ background: "var(--color-primary)" }}>
+            ✦
+          </div>
+          <span className={styles.avatarName}>{t("allStaff")}</span>
+        </button>
+        {activeStaff.map((s, i) => {
+          const colors = [
+            "linear-gradient(135deg, #8B5CF6, #EC4899)",
+            "linear-gradient(135deg, #06B6D4, #3B82F6)",
+            "linear-gradient(135deg, #F59E0B, #EF4444)",
+            "linear-gradient(135deg, #10B981, #059669)",
+            "linear-gradient(135deg, #F472B6, #FB923C)",
+            "linear-gradient(135deg, #6366F1, #8B5CF6)",
+          ];
+          return (
+            <button
+              key={s.id}
+              className={`${styles.staffAvatar} ${activeStaffId === s.id ? styles.staffAvatarActive : ""}`}
+              onClick={() => setActiveStaffId(s.id)}
+            >
+              <div className={styles.avatarCircle} style={{ background: colors[i % colors.length] }}>
+                {s.photo_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={s.photo_url} alt={s.name} className={styles.avatarImg} />
+                ) : (
+                  getInitials(s.name)
+                )}
+              </div>
+              <span className={styles.avatarName}>{s.name.split(" ")[0]}</span>
+              {/* Show appointment count badge */}
+              {(() => {
+                const count = appointments.filter((a) => a.staff_id === s.id && !a.checked_out_at).length;
+                return count > 0 ? <span className={styles.avatarBadge}>{count}</span> : null;
+              })()}
+            </button>
+          );
+        })}
       </div>
 
       {loading ? (
@@ -242,13 +303,21 @@ export default function CheckoutPage() {
             <div className={styles.aptList}>
               <div className={styles.aptListHeader}>
                 <span>{t("todaysAppointments")}</span>
-                <span>{filteredApts.length} {t("total")}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+                  <span>{filteredApts.length} {t("total")}</span>
+                  <button className={styles.walkInBtn} onClick={() => setShowWalkIn(true)}>
+                    + {t("walkInBtn")}
+                  </button>
+                </div>
               </div>
               <div className={styles.aptListBody}>
                 {filteredApts.length === 0 ? (
                   <div className={styles.emptyState}>
                     <span style={{ fontSize: 40 }}>📋</span>
                     <p>{t("noAppointments")}</p>
+                    <button className={styles.walkInBtnLarge} onClick={() => setShowWalkIn(true)}>
+                      + {t("walkInBtn")}
+                    </button>
                   </div>
                 ) : (
                   filteredApts.map((apt) => (
@@ -329,7 +398,6 @@ export default function CheckoutPage() {
                       <span>{t("services")}</span>
                     </div>
 
-                    {/* Original service (always shown) */}
                     {charges.length === 0 && selectedApt.service && (
                       <div className={styles.chargeRow}>
                         <span className={styles.chargeName}>{selectedApt.service.name}</span>
@@ -337,7 +405,6 @@ export default function CheckoutPage() {
                       </div>
                     )}
 
-                    {/* Logged charges */}
                     {charges.map((ch) => (
                       <div key={ch.id} className={styles.chargeRow}>
                         <span className={styles.chargeName}>
@@ -353,7 +420,6 @@ export default function CheckoutPage() {
                       </div>
                     ))}
 
-                    {/* Add upsell */}
                     {!isCheckedOut && (
                       <div className={styles.addUpsellRow}>
                         <select value={upsellServiceId} onChange={(e) => setUpsellServiceId(e.target.value)}>
@@ -383,13 +449,11 @@ export default function CheckoutPage() {
                     </div>
                   ) : (
                     <div className={styles.paymentSection}>
-                      {/* Subtotal */}
                       <div className={styles.subtotalRow}>
                         <span>{t("subtotal")}</span>
                         <strong>${(charges.length > 0 ? chargesTotal : Number(selectedApt.service?.price || 0)).toFixed(2)}</strong>
                       </div>
 
-                      {/* Tip */}
                       <div className={styles.tipRow}>
                         <label>{t("tip")}</label>
                         <span>$</span>
@@ -404,13 +468,11 @@ export default function CheckoutPage() {
                         />
                       </div>
 
-                      {/* Total */}
                       <div className={styles.totalRow}>
                         <span>{t("total")}</span>
                         <span>${(charges.length > 0 ? grandTotal : Number(selectedApt.service?.price || 0) + tip).toFixed(2)}</span>
                       </div>
 
-                      {/* Payment method */}
                       <div className={styles.paymentMethods}>
                         {(["cash", "card", "mixed"] as const).map((m) => (
                           <button
@@ -426,7 +488,6 @@ export default function CheckoutPage() {
                         ))}
                       </div>
 
-                      {/* Checkout button */}
                       <button
                         className={styles.checkoutBtn}
                         onClick={handleCheckout}
@@ -441,8 +502,8 @@ export default function CheckoutPage() {
             </div>
           </div>
 
-          {/* ── Daily Tally (owner/manager only) ── */}
-          {isOwnerOrManager && tally && (
+          {/* ── Daily Tally ── */}
+          {tally && (
             <div className={styles.tallySection}>
               <div className={styles.tallyHeader}>
                 <h2>📊 {t("dailyTally")}</h2>
@@ -451,13 +512,10 @@ export default function CheckoutPage() {
                 </span>
               </div>
 
-              {/* KPI Cards */}
               <div className={styles.tallyKPIs}>
                 <div className={styles.tallyKPI}>
                   <div className="kpiLabel">{t("totalRevenue")}</div>
-                  <div className={`kpiValue ${styles.tallyKPI}`}>
-                    <span className="kpiValueAccent">${tally.totals.services.toFixed(2)}</span>
-                  </div>
+                  <div className="kpiValue kpiValueAccent">${tally.totals.services.toFixed(2)}</div>
                 </div>
                 <div className={styles.tallyKPI}>
                   <div className="kpiLabel">{t("totalTips")}</div>
@@ -477,7 +535,6 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              {/* Staff Breakdown Table */}
               <table className={styles.tallyTable}>
                 <thead>
                   <tr>
@@ -503,7 +560,6 @@ export default function CheckoutPage() {
                       <td className={styles.commissionCell}>${s.commission_earned.toFixed(2)}</td>
                     </tr>
                   ))}
-                  {/* Total row */}
                   <tr className={styles.tallyTotalRow}>
                     <td>{t("total")}</td>
                     <td>{tally.totals.appointments}</td>
@@ -516,7 +572,6 @@ export default function CheckoutPage() {
                 </tbody>
               </table>
 
-              {/* Payment Split */}
               <div className={styles.paymentSplit}>
                 <div className={styles.splitBadge}>
                   <span className={styles.splitIcon}>💵</span>
@@ -534,6 +589,66 @@ export default function CheckoutPage() {
             </div>
           )}
         </>
+      )}
+
+      {/* ── Walk-in Modal ── */}
+      {showWalkIn && (
+        <div className={styles.modalOverlay} onClick={() => setShowWalkIn(false)}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2>🚶 {t("walkInTitle")}</h2>
+              <button className={styles.modalClose} onClick={() => setShowWalkIn(false)}>✕</button>
+            </div>
+            <div className={styles.modalBody}>
+              {/* Staff */}
+              <label className={styles.formLabel}>{t("selectStaff")} *</label>
+              <select className={styles.formSelect} value={walkInStaff} onChange={(e) => setWalkInStaff(e.target.value)}>
+                <option value="">{t("selectStaff")}...</option>
+                {activeStaff.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+
+              {/* Service */}
+              <label className={styles.formLabel}>{t("selectService")} *</label>
+              <select className={styles.formSelect} value={walkInService} onChange={(e) => setWalkInService(e.target.value)}>
+                <option value="">{t("selectService")}...</option>
+                {services.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name} — ${s.price}</option>
+                ))}
+              </select>
+
+              {/* Client Name (optional) */}
+              <label className={styles.formLabel}>{t("clientName")}</label>
+              <input
+                type="text"
+                className={styles.formInput}
+                value={walkInName}
+                onChange={(e) => setWalkInName(e.target.value)}
+                placeholder="Jane Smith"
+              />
+
+              {/* Phone (optional) */}
+              <label className={styles.formLabel}>{t("clientPhone")}</label>
+              <input
+                type="tel"
+                className={styles.formInput}
+                value={walkInPhone}
+                onChange={(e) => setWalkInPhone(e.target.value)}
+                placeholder="(555) 123-4567"
+              />
+            </div>
+            <div className={styles.modalFooter}>
+              <button
+                className={styles.walkInSubmitBtn}
+                onClick={handleCreateWalkIn}
+                disabled={!walkInStaff || !walkInService || creatingWalkIn}
+              >
+                {creatingWalkIn ? t("processing") : `🚶 ${t("createWalkIn")}`}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

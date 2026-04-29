@@ -1221,6 +1221,90 @@ export async function POST(request: Request) {
         })
       }
 
+      // ── Walk-in: create instant appointment + optional client ──
+      case 'appointments.walk-in': {
+        const { staff_id, service_id, client_name, client_phone } = payload
+
+        if (!staff_id || !service_id) {
+          return NextResponse.json({ error: 'staff_id and service_id required' }, { status: 400 })
+        }
+
+        // Get service details for duration & price
+        const { data: svcData } = await svc
+          .from('services')
+          .select('*')
+          .eq('id', service_id)
+          .single()
+
+        if (!svcData) {
+          return NextResponse.json({ error: 'Service not found' }, { status: 404 })
+        }
+
+        // Optionally create or find client
+        let clientId: string | null = null
+        if (client_name && client_name.trim()) {
+          const nameParts = client_name.trim().split(' ')
+          const firstName = nameParts[0]
+          const lastName = nameParts.slice(1).join(' ') || null
+
+          // Check if client with same name+phone already exists
+          if (client_phone && client_phone.trim()) {
+            const { data: existing } = await svc
+              .from('clients')
+              .select('id')
+              .eq('tenant_id', tenantId)
+              .eq('phone', client_phone.trim())
+              .maybeSingle()
+
+            if (existing) {
+              clientId = existing.id
+            }
+          }
+
+          // Create new client if not found
+          if (!clientId) {
+            const { data: newClient } = await svc
+              .from('clients')
+              .insert({
+                tenant_id: tenantId,
+                first_name: firstName,
+                last_name: lastName,
+                phone: client_phone?.trim() || null,
+                source: 'walk-in',
+              })
+              .select('id')
+              .single()
+            if (newClient) clientId = newClient.id
+          }
+        }
+
+        // Create appointment starting now
+        const now = new Date()
+        const durationMs = (svcData.duration_minutes || 60) * 60 * 1000
+        const endTime = new Date(now.getTime() + durationMs)
+
+        const { data: newApt, error: aptErr } = await svc
+          .from('appointments')
+          .insert({
+            tenant_id: tenantId,
+            client_id: clientId,
+            staff_id,
+            service_id,
+            start_time: now.toISOString(),
+            end_time: endTime.toISOString(),
+            total_price: svcData.price,
+            status: 'confirmed',
+            notes: clientId ? null : 'Walk-in',
+          })
+          .select('*, client:clients(*), staff_member:staff(*), service:services(*)')
+          .single()
+
+        if (aptErr) {
+          return NextResponse.json({ error: aptErr.message }, { status: 500 })
+        }
+        return NextResponse.json({ data: newApt })
+      }
+
       default:
         return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 })
     }

@@ -280,6 +280,13 @@
     "tips": "Propinas",
     "commission": "Comisión",
     "payout": "Pago",
-    "ownerRevenue": "Ingreso Neto"
+    "ownerRevenue": "Ingreso Neto",
+    "walkInBtn": "Sin cita",
+    "walkInTitle": "Nueva visita sin cita",
+    "selectStaff": "Seleccionar empleado",
+    "selectService": "Seleccionar servicio",
+    "clientName": "Nombre del cliente (opcional)",
+    "clientPhone": "Teléfono (opcional)",
+    "createWalkIn": "Crear visita sin cita"
   }
 }

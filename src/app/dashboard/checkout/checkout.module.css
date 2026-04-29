@@ -9,7 +9,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: var(--space-6);
+  margin-bottom: var(--space-4);
   flex-wrap: wrap;
   gap: var(--space-3);
 }
@@ -56,14 +56,89 @@
   min-width: 160px;
   text-align: center;
 }
-.staffFilter {
-  background: var(--surface-secondary);
-  border: 1px solid var(--border-primary);
-  border-radius: var(--radius-md);
-  color: var(--text-primary);
+
+/* ── Staff Avatar Bar ── */
+.staffBar {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-1);
+  margin-bottom: var(--space-4);
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.staffBar::-webkit-scrollbar { display: none; }
+
+.staffAvatar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
   padding: var(--space-2) var(--space-3);
-  font-size: var(--text-sm);
+  border: 2px solid transparent;
+  border-radius: var(--radius-xl);
+  background: var(--surface-primary);
   cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 72px;
+  position: relative;
+}
+.staffAvatar:hover {
+  background: var(--surface-secondary);
+  transform: translateY(-2px);
+}
+.staffAvatarActive {
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 15%, transparent);
+}
+.avatarCircle {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 700;
+  font-size: var(--text-sm);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.avatarImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+.avatarName {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  max-width: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.staffAvatarActive .avatarName {
+  color: var(--color-primary);
+}
+.avatarBadge {
+  position: absolute;
+  top: 2px;
+  right: 6px;
+  background: var(--color-accent);
+  color: white;
+  font-size: 10px;
+  font-weight: 800;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
 }
 
 /* ── Main Layout ── */
@@ -85,7 +160,7 @@
   overflow: hidden;
 }
 .aptListHeader {
-  padding: var(--space-4);
+  padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--border-primary);
   font-weight: 600;
   font-size: var(--text-sm);
@@ -98,6 +173,39 @@
   max-height: 600px;
   overflow-y: auto;
 }
+
+/* Walk-in Buttons */
+.walkInBtn {
+  background: linear-gradient(135deg, var(--color-accent), var(--color-primary));
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: var(--space-1) var(--space-2);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  white-space: nowrap;
+}
+.walkInBtn:hover { opacity: 0.85; }
+
+.walkInBtnLarge {
+  margin-top: var(--space-3);
+  background: linear-gradient(135deg, var(--color-accent), var(--color-primary));
+  color: white;
+  border: none;
+  border-radius: var(--radius-lg);
+  padding: var(--space-3) var(--space-5);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.walkInBtnLarge:hover {
+  opacity: 0.9;
+  transform: scale(1.02);
+}
+
 .aptItem {
   display: flex;
   align-items: center;
@@ -127,10 +235,7 @@
 .aptDotConfirmed { background: var(--color-primary); }
 .aptDotCompleted { background: var(--color-success); }
 .aptDotCancelled { background: var(--color-danger); }
-.aptInfo {
-  flex: 1;
-  min-width: 0;
-}
+.aptInfo { flex: 1; min-width: 0; }
 .aptTime {
   font-size: var(--text-xs);
   color: var(--text-tertiary);
@@ -147,11 +252,6 @@
 .aptService {
   font-size: var(--text-xs);
   color: var(--text-secondary);
-}
-.aptPrice {
-  font-size: var(--text-sm);
-  font-weight: 700;
-  color: var(--color-primary);
 }
 .aptStatus {
   font-size: 10px;
@@ -241,9 +341,7 @@
 }
 
 /* ── Charges Section ── */
-.chargesSection {
-  padding: var(--space-4) var(--space-5);
-}
+.chargesSection { padding: var(--space-4) var(--space-5); }
 .chargesTitle {
   font-size: var(--text-sm);
   font-weight: 600;
@@ -263,11 +361,7 @@
   margin-bottom: var(--space-2);
   border: 1px solid var(--border-secondary);
 }
-.chargeName {
-  font-size: var(--text-sm);
-  color: var(--text-primary);
-  font-weight: 500;
-}
+.chargeName { font-size: var(--text-sm); color: var(--text-primary); font-weight: 500; }
 .chargeUpsell {
   font-size: 10px;
   font-weight: 700;
@@ -297,11 +391,7 @@
 .chargeDelete:hover { color: var(--color-danger); }
 
 /* ── Add Upsell ── */
-.addUpsellRow {
-  display: flex;
-  gap: var(--space-2);
-  margin-top: var(--space-2);
-}
+.addUpsellRow { display: flex; gap: var(--space-2); margin-top: var(--space-2); }
 .addUpsellRow select {
   flex: 1;
   background: var(--surface-secondary);
@@ -339,10 +429,7 @@
   font-size: var(--text-sm);
   color: var(--text-secondary);
 }
-.subtotalRow strong {
-  color: var(--text-primary);
-  font-size: var(--text-base);
-}
+.subtotalRow strong { color: var(--text-primary); font-size: var(--text-base); }
 .totalRow {
   display: flex;
   justify-content: space-between;
@@ -351,11 +438,7 @@
   border-top: 2px solid var(--border-primary);
   margin-top: var(--space-2);
 }
-.totalRow span:first-child {
-  font-size: var(--text-base);
-  font-weight: 700;
-  color: var(--text-primary);
-}
+.totalRow span:first-child { font-size: var(--text-base); font-weight: 700; color: var(--text-primary); }
 .totalRow span:last-child {
   font-size: var(--text-xl);
   font-weight: 800;
@@ -363,17 +446,8 @@
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
-.tipRow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) 0;
-}
-.tipRow label {
-  font-size: var(--text-sm);
-  color: var(--text-secondary);
-  min-width: 40px;
-}
+.tipRow { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) 0; }
+.tipRow label { font-size: var(--text-sm); color: var(--text-secondary); min-width: 40px; }
 .tipInput {
   width: 100px;
   background: var(--surface-secondary);
@@ -384,11 +458,7 @@
   font-size: var(--text-sm);
   text-align: right;
 }
-.paymentMethods {
-  display: flex;
-  gap: var(--space-2);
-  margin: var(--space-3) 0;
-}
+.paymentMethods { display: flex; gap: var(--space-2); margin: var(--space-3) 0; }
 .paymentBtn {
   flex: 1;
   padding: var(--space-3);
@@ -402,20 +472,13 @@
   text-align: center;
   transition: all 0.15s;
 }
-.paymentBtn:hover {
-  border-color: var(--color-primary);
-  color: var(--text-primary);
-}
+.paymentBtn:hover { border-color: var(--color-primary); color: var(--text-primary); }
 .paymentBtnActive {
   border-color: var(--color-primary);
   background: color-mix(in srgb, var(--color-primary) 10%, transparent);
   color: var(--color-primary);
 }
-.paymentIcon {
-  font-size: var(--text-xl);
-  display: block;
-  margin-bottom: var(--space-1);
-}
+.paymentIcon { font-size: var(--text-xl); display: block; margin-bottom: var(--space-1); }
 .checkoutBtn {
   width: 100%;
   padding: var(--space-4);
@@ -463,11 +526,7 @@
   align-items: center;
   justify-content: space-between;
 }
-.tallyHeader h2 {
-  font-size: var(--text-lg);
-  font-weight: 700;
-  color: var(--text-primary);
-}
+.tallyHeader h2 { font-size: var(--text-lg); font-weight: 700; color: var(--text-primary); }
 .tallyKPIs {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -481,30 +540,7 @@
   background: var(--surface-secondary);
   border-radius: var(--radius-lg);
 }
-.tallyKPI .kpiLabel {
-  font-size: var(--text-xs);
-  color: var(--text-tertiary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: var(--space-1);
-}
-.tallyKPI .kpiValue {
-  font-size: var(--text-xl);
-  font-weight: 800;
-  color: var(--text-primary);
-}
-.tallyKPI .kpiValueSuccess {
-  color: var(--color-success);
-}
-.tallyKPI .kpiValueAccent {
-  background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-.tallyTable {
-  width: 100%;
-  border-collapse: collapse;
-}
+.tallyTable { width: 100%; border-collapse: collapse; }
 .tallyTable th {
   padding: var(--space-3) var(--space-4);
   text-align: left;
@@ -530,10 +566,7 @@
   background: var(--surface-secondary);
   border-top: 2px solid var(--border-primary);
 }
-.commissionCell {
-  font-weight: 700;
-  color: var(--color-success);
-}
+.commissionCell { font-weight: 700; color: var(--color-success); }
 .paymentSplit {
   display: flex;
   gap: var(--space-4);
@@ -551,6 +584,103 @@
   font-weight: 600;
 }
 .splitIcon { font-size: var(--text-lg); }
+
+/* ── Walk-in Modal ── */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease;
+}
+.modal {
+  background: var(--surface-primary);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border-primary);
+  width: 100%;
+  max-width: 440px;
+  margin: var(--space-4);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+  animation: slideUp 0.25s ease;
+}
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--border-primary);
+}
+.modalHeader h2 { font-size: var(--text-lg); font-weight: 700; color: var(--text-primary); }
+.modalClose {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: var(--text-lg);
+  cursor: pointer;
+  padding: var(--space-1);
+  border-radius: var(--radius-sm);
+  transition: all 0.15s;
+}
+.modalClose:hover { background: var(--surface-hover); color: var(--text-primary); }
+.modalBody {
+  padding: var(--space-4) var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.modalFooter { padding: var(--space-3) var(--space-5) var(--space-5); }
+
+/* Form Controls */
+.formLabel {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-top: var(--space-2);
+}
+.formSelect,
+.formInput {
+  background: var(--surface-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  padding: var(--space-3);
+  font-size: var(--text-sm);
+  width: 100%;
+  transition: border-color 0.15s;
+}
+.formSelect:focus,
+.formInput:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 15%, transparent);
+}
+.walkInSubmitBtn {
+  width: 100%;
+  padding: var(--space-4);
+  background: linear-gradient(135deg, var(--color-accent), var(--color-primary));
+  color: white;
+  border: none;
+  border-radius: var(--radius-lg);
+  font-size: var(--text-base);
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.walkInSubmitBtn:hover { opacity: 0.9; transform: translateY(-1px); }
+.walkInSubmitBtn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
 
 /* ── Loading ── */
 .loadingState {
