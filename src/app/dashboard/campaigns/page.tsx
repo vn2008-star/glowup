@@ -311,7 +311,7 @@ export default function CampaignsPage() {
     });
     const parts: string[] = [];
     grouped.forEach((slots, date) => {
-      const times = slots.map(s => `${formatHour(s.startHour)}`).join(", ");
+      const times = slots.map(s => `${formatHour(s.startHour)} – ${formatHour(s.endHour)}`).join(", ");
       parts.push(`${date} at ${times}`);
     });
     return parts.join("; ");
