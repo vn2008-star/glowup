@@ -44,6 +44,7 @@ export default function SettingsPage() {
     enabled: true,
     sms_enabled: true,
     email_enabled: true,
+    one_hour_enabled: false,
   });
   const [reminderTemplates, setReminderTemplates] = useState({
     sms: "Hi {client_name}! This is a reminder that your {service} appointment at {business_name} is tomorrow, {date} at {time}. Reply STOP to opt out.",
@@ -297,7 +298,7 @@ export default function SettingsPage() {
       <div className={`card ${styles.section}`}>
         <h2>🔔 Appointment Reminders</h2>
         <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginBottom: "var(--space-4)" }}>
-          Automatically send reminders to clients 24 hours before their appointments. Reduces no-shows by up to 60%.
+          Automatically send reminders to clients before their appointments. Reduces no-shows by up to 60%.
         </p>
 
         <div className={styles.reminderToggles}>
@@ -331,6 +332,21 @@ export default function SettingsPage() {
                 <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
                 <span>📧 Email Reminders (via Resend)</span>
               </label>
+
+              <div style={{ marginTop: "var(--space-4)", marginLeft: "var(--space-6)", paddingTop: "var(--space-4)", borderTop: "1px solid var(--border-subtle)" }}>
+                <label className={styles.protectionToggle}>
+                  <input
+                    type="checkbox"
+                    checked={reminderSettings.one_hour_enabled}
+                    onChange={(e) => setReminderSettings({ ...reminderSettings, one_hour_enabled: e.target.checked })}
+                  />
+                  <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
+                  <span>⏰ Additional 1-hour reminder before appointment</span>
+                </label>
+                <p style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)", marginLeft: "52px", marginTop: "var(--space-1)" }}>
+                  Sends a second reminder 1 hour before the appointment. Great for same-day bookings.
+                </p>
+              </div>
             </>
           )}
         </div>
