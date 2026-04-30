@@ -56,6 +56,10 @@ export default function InboxPage() {
   const [activeTab, setActiveTab] = useState<"inbox" | "config">("inbox");
   const [filter, setFilter] = useState<"all" | "open" | "closed">("all");
   const [showQuickReplies, setShowQuickReplies] = useState(false);
+  const [aiTyping, setAiTyping] = useState(false);
+  const [testAiInput, setTestAiInput] = useState("");
+  const [testAiResponse, setTestAiResponse] = useState("");
+  const [testAiLoading, setTestAiLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Bot config state
@@ -169,6 +173,65 @@ export default function InboxPage() {
       setConfigSaved(true);
       setTimeout(() => setConfigSaved(false), 3000);
     }
+  }
+
+  // Trigger AI reply for a conversation
+  async function handleAiReply() {
+    if (!selectedConvo || !tenant || aiTyping) return;
+
+    // Get the last client message to respond to
+    const lastClientMsg = [...messages].reverse().find(m => m.sender_type === "client");
+    const prompt = lastClientMsg?.content || "Hi, I'd like to learn about your services.";
+
+    setAiTyping(true);
+    try {
+      const res = await fetch("/api/ai-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: prompt,
+          slug: tenant.slug,
+          conversation_id: selectedConvo.id,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.message) {
+          setMessages(prev => [...prev, data.message]);
+          setConversations(prev => prev.map(c =>
+            c.id === selectedConvo.id ? { ...c, last_message: data.message.content, last_message_at: data.message.created_at } : c
+          ));
+        }
+      }
+    } catch (err) {
+      console.error("AI reply failed:", err);
+    }
+    setAiTyping(false);
+    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+  }
+
+  // Test AI in config panel
+  async function handleTestAi() {
+    if (!testAiInput.trim() || !tenant || testAiLoading) return;
+    setTestAiLoading(true);
+    setTestAiResponse("");
+    try {
+      const res = await fetch("/api/ai-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: testAiInput, slug: tenant.slug }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setTestAiResponse(data.response || "No response");
+      } else {
+        setTestAiResponse("Error: AI could not respond. Check your API key.");
+      }
+    } catch {
+      setTestAiResponse("Error: Could not connect to AI service.");
+    }
+    setTestAiLoading(false);
   }
 
   const openCount = conversations.filter((c) => c.status === "open").length;
@@ -336,6 +399,38 @@ export default function InboxPage() {
             </div>
           </div>
 
+          {/* Test AI */}
+          <div className={`card ${styles.configCard}`}>
+            <h2>🧪 Test Your AI</h2>
+            <p className={styles.configDesc}>Send a test message to see how your AI receptionist responds with your current settings.</p>
+            <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.75rem" }}>
+              <input
+                className="input"
+                value={testAiInput}
+                onChange={(e) => setTestAiInput(e.target.value)}
+                placeholder="Try: What are your hours? or I want to book a facial"
+                style={{ flex: 1 }}
+                onKeyDown={(e) => e.key === "Enter" && handleTestAi()}
+              />
+              <button className="btn btn-primary btn-sm" onClick={handleTestAi} disabled={testAiLoading || !testAiInput.trim()}>
+                {testAiLoading ? "Thinking..." : "Send"}
+              </button>
+            </div>
+            {testAiResponse && (
+              <div style={{
+                padding: "12px 16px",
+                borderRadius: "12px",
+                background: "rgba(195, 126, 218, 0.08)",
+                border: "1px solid rgba(195, 126, 218, 0.2)",
+                fontSize: "var(--text-sm)",
+                lineHeight: 1.6,
+                whiteSpace: "pre-wrap",
+              }}>
+                <span style={{ fontWeight: 600, color: "var(--primary)" }}>🤖 AI:</span> {testAiResponse}
+              </div>
+            )}
+          </div>
+
           {/* Save */}
           <div className={styles.configSaveBar}>
             <button className="btn btn-primary btn-lg" onClick={saveBotConfig}>
@@ -424,6 +519,13 @@ export default function InboxPage() {
                       </div>
                     ))
                   )}
+                  {aiTyping && (
+                    <div className={`${styles.message} ${styles.msg_bot}`}>
+                      <div className={styles.messageBubble}>
+                        <p style={{ color: "var(--text-tertiary)", fontStyle: "italic" }}>🤖 AI is typing...</p>
+                      </div>
+                    </div>
+                  )}
                   <div ref={messagesEndRef} />
                 </div>
 
@@ -440,6 +542,9 @@ export default function InboxPage() {
                   <form onSubmit={handleSendMessage} className={styles.composeForm}>
                     <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowQuickReplies(!showQuickReplies)} title="Quick replies">⚡</button>
                     <input className="input" value={messageText} onChange={(e) => setMessageText(e.target.value)} placeholder="Type a message..." style={{ flex: 1 }} />
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={handleAiReply} disabled={aiTyping} title="Let AI reply" style={{ fontSize: "1.1rem" }}>
+                      {aiTyping ? "⏳" : "🤖"}
+                    </button>
                     <button type="submit" className="btn btn-primary btn-sm" disabled={!messageText.trim()}>Send</button>
                   </form>
                 </div>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import styles from './booking.module.css'
+import ChatWidget from './ChatWidget'
 
 /* ── Types ── */
 interface ServiceInfo { id: string; name: string; category: string; description: string | null; duration_minutes: number; price: number; sort_order: number; image_url: string | null }
@@ -352,7 +353,7 @@ export default function BookingClient({ slug }: { slug: string }) {
                     <div className={styles.staffAvatar}>{s.name.split(' ').map(n => n[0]).join('')}</div>
                     <span className={styles.staffName}>{s.name}</span>
                     {s.specialties?.length > 0 && (
-                      <span className={styles.staffSpecialty}>{s.specialties.slice(0, 2).join(', ')}</span>
+                      <span className={styles.staffSpecialty}>{[...new Set(s.specialties)].slice(0, 2).join(', ')}</span>
                     )}
                   </button>
                 ))}
@@ -501,6 +502,9 @@ export default function BookingClient({ slug }: { slug: string }) {
           <p>Powered by <strong>GlowUp</strong></p>
         </div>
       </div>
+
+      {/* AI Chat Widget */}
+      {business && <ChatWidget slug={slug} businessName={business.name} />}
     </div>
   )
 }
