@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useState, Suspense } from 'react'
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
+import { GlowUpLogo } from '@/components/GlowUpLogo'
 import styles from './auth.module.css'
 
 function LoginForm() {
@@ -57,15 +58,7 @@ function LoginForm() {
       <div className={styles.authCard}>
         <div className={styles.authHeader}>
           <Link href="/" className={styles.logoLink}>
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="url(#sparkGrad)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <defs>
-                <linearGradient id="sparkGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#e8a87c" />
-                  <stop offset="100%" stopColor="#d4a0e8" />
-                </linearGradient>
-              </defs>
-              <path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z" />
-            </svg>
+            <GlowUpLogo size={36} />
             <span className={styles.logoText}>GlowUp</span>
           </Link>
           <h1 className={styles.authTitle}>{t('welcomeBack')}</h1>

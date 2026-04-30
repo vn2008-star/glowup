@@ -119,6 +119,7 @@
   },
   "dashboard": {
     "overview": "Tổng quan",
+    "quickStart": "Hướng Dẫn",
     "calendar": "Lịch hẹn",
     "clients": "Khách hàng",
     "services": "Dịch vụ",

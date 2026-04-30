@@ -1,0 +1,276 @@
+/* ── Quick Start Guide ── */
+.page {
+  animation: fadeIn 0.4s ease-out;
+  max-width: 860px;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Header */
+.header {
+  margin-bottom: var(--space-8);
+}
+.header h1 {
+  font-size: var(--text-2xl);
+  font-weight: 800;
+  margin-bottom: var(--space-2);
+}
+.header p {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: var(--leading-relaxed);
+}
+
+/* Progress Bar */
+.progressSection {
+  margin-bottom: var(--space-8);
+}
+.progressMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
+}
+.progressLabel {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.progressCount {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--color-primary);
+}
+.progressTrack {
+  width: 100%;
+  height: 8px;
+  background: var(--bg-surface);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+}
+.progressFill {
+  height: 100%;
+  background: var(--gradient-primary);
+  border-radius: var(--radius-full);
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+.progressFill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  animation: shimmer 2s infinite;
+}
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* Section Label */
+.sectionLabel {
+  font-size: var(--text-xs);
+  font-weight: 800;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+/* Steps List */
+.stepsList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-bottom: var(--space-8);
+}
+
+/* Step Card */
+.stepCard {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  text-decoration: none;
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+}
+.stepCard:hover {
+  border-color: var(--color-primary-200);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(195, 126, 218, 0.12);
+}
+.stepCardDone {
+  opacity: 0.65;
+}
+.stepCardDone:hover {
+  opacity: 0.85;
+}
+
+/* Step Number */
+.stepNumber {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
+  font-weight: 800;
+  background: var(--bg-surface);
+  color: var(--text-tertiary);
+  border: 2px solid var(--border-subtle);
+  transition: all 0.25s ease;
+}
+.stepCard:hover .stepNumber {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+.stepNumberDone {
+  background: var(--color-primary) !important;
+  border-color: var(--color-primary) !important;
+  color: white !important;
+  box-shadow: 0 2px 8px rgba(195, 126, 218, 0.35);
+}
+
+/* Step Content */
+.stepContent {
+  flex: 1;
+  min-width: 0;
+}
+.stepTitle {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+.stepDesc {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  line-height: var(--leading-relaxed);
+}
+
+/* Step Status */
+.stepStatus {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.stepBadge {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-full);
+  background: rgba(195, 126, 218, 0.1);
+  color: var(--color-primary);
+}
+.stepBadgeDone {
+  background: rgba(34, 197, 94, 0.1);
+  color: var(--color-success);
+}
+.stepArrow {
+  font-size: var(--text-base);
+  color: var(--text-tertiary);
+  transition: all 0.2s ease;
+}
+.stepCard:hover .stepArrow {
+  color: var(--color-primary);
+  transform: translateX(3px);
+}
+
+/* Step Connector Line */
+.stepConnector {
+  width: 2px;
+  height: 16px;
+  margin-left: 40px; /* aligned with center of stepNumber */
+  background: var(--border-subtle);
+  border-radius: 1px;
+}
+.stepConnectorDone {
+  background: var(--color-primary);
+}
+
+/* ── Advanced Features ── */
+.advancedGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-8);
+}
+.advancedCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  text-decoration: none;
+  transition: all 0.25s ease;
+  cursor: pointer;
+}
+.advancedCard:hover {
+  border-color: var(--color-primary-200);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(195, 126, 218, 0.12);
+}
+.advancedIcon {
+  font-size: 28px;
+  line-height: 1;
+}
+.advancedTitle {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.advancedDesc {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  line-height: var(--leading-relaxed);
+}
+
+/* Completion Banner */
+.completionBanner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  background: linear-gradient(135deg, rgba(195,126,218,0.08), rgba(240,163,181,0.06));
+  border: 1px solid rgba(195, 126, 218, 0.2);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-8);
+}
+.completionEmoji {
+  font-size: 42px;
+  line-height: 1;
+}
+.completionText h3 {
+  font-size: var(--text-base);
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: var(--space-1);
+}
+.completionText p {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: var(--leading-relaxed);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .advancedGrid { grid-template-columns: 1fr; }
+  .stepCard { padding: var(--space-3) var(--space-4); }
+  .completionBanner { flex-direction: column; text-align: center; }
+}

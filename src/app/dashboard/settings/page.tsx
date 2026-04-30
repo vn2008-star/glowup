@@ -55,10 +55,24 @@ export default function SettingsPage() {
     r1h_sms: false,
     r1h_email: false,
   });
+  const [staffReminderSettings, setStaffReminderSettings] = useState({
+    enabled: false,
+    r24h_sms: false,
+    r24h_email: true,
+    r2h_sms: false,
+    r2h_email: false,
+    r1h_sms: true,
+    r1h_email: false,
+  });
   const [reminderTemplates, setReminderTemplates] = useState({
     sms: "Hi {client_name}! This is a reminder that your {service} appointment at {business_name} is tomorrow, {date} at {time}. Reply STOP to opt out.",
     email_subject: "Appointment Reminder — {business_name}",
     email: "Hi {client_name},\n\nThis is a friendly reminder about your upcoming appointment:\n\n📋 Service: {service}\n📅 Date: {date}\n🕐 Time: {time}\n📍 At: {business_name}\n\nNeed to reschedule? Please contact us as soon as possible.\n\nSee you soon!\n— {business_name}",
+  });
+  const [staffReminderTemplates, setStaffReminderTemplates] = useState({
+    sms: "Hi {staff_name}, reminder: {client_name} has a {service} appointment with you on {date} at {time}.",
+    email_subject: "Upcoming Appointment — {client_name} at {time}",
+    email: "Hi {staff_name},\n\nYou have an upcoming appointment:\n\n👤 Client: {client_name}\n📋 Service: {service}\n📅 Date: {date}\n🕐 Time: {time}\n📍 At: {business_name}\n\nPlease make sure you're prepared and on time.\n\n— {business_name}",
   });
 
   // Load current settings from tenant
@@ -77,7 +91,9 @@ export default function SettingsPage() {
       if (s.business_hours) setHours(s.business_hours as BusinessHours);
       if (s.booking) setBookingSettings(s.booking as typeof bookingSettings);
       if (s.reminders) setReminderSettings({ ...reminderSettings, ...(s.reminders as Record<string, boolean>) });
+      if (s.staff_reminders) setStaffReminderSettings({ ...staffReminderSettings, ...(s.staff_reminders as Record<string, boolean>) });
       if (s.reminder_templates) setReminderTemplates({ ...reminderTemplates, ...(s.reminder_templates as Record<string, string>) });
+      if (s.staff_reminder_templates) setStaffReminderTemplates({ ...staffReminderTemplates, ...(s.staff_reminder_templates as Record<string, string>) });
     }
 
     setLoading(false);
@@ -116,7 +132,9 @@ export default function SettingsPage() {
       business_hours: hours,
       booking: bookingSettings,
       reminders: reminderSettings,
+      staff_reminders: staffReminderSettings,
       reminder_templates: reminderTemplates,
+      staff_reminder_templates: staffReminderTemplates,
     };
 
     const res = await fetch("/api/save-settings", {
@@ -361,10 +379,11 @@ export default function SettingsPage() {
       <div className={`card ${styles.section}`}>
         <h2>🔔 Appointment Reminders</h2>
         <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginBottom: "var(--space-4)" }}>
-          Automatically send reminders to clients before their appointments. Reduces no-shows by up to 60%.
+          Automatically send reminders before appointments. Reduces no-shows by up to 60%.
         </p>
 
-        <div className={styles.reminderToggles}>
+        {/* Enable toggles */}
+        <div className={styles.reminderEnableRow}>
           <label className={styles.protectionToggle}>
             <input
               type="checkbox"
@@ -372,133 +391,222 @@ export default function SettingsPage() {
               onChange={(e) => setReminderSettings({ ...reminderSettings, enabled: e.target.checked })}
             />
             <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
-            <span>Enable automatic reminders</span>
+            <span>👤 Client reminders</span>
           </label>
-
-          {reminderSettings.enabled && (
-            <div className={styles.reminderGrid}>
-              {/* Header */}
-              <div className={styles.reminderGridHeader}>
-                <span>Timing</span>
-                <span>📱 SMS (Twilio)</span>
-                <span>📧 Email (Resend)</span>
-              </div>
-              {/* 24-Hour */}
-              <div className={styles.reminderGridRow}>
-                <span className={styles.reminderTimingLabel}>🕐 24 hours before</span>
-                <label className={styles.protectionToggle}>
-                  <input type="checkbox" checked={reminderSettings.r24h_sms} onChange={(e) => setReminderSettings({ ...reminderSettings, r24h_sms: e.target.checked })} />
-                  <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
-                </label>
-                <label className={styles.protectionToggle}>
-                  <input type="checkbox" checked={reminderSettings.r24h_email} onChange={(e) => setReminderSettings({ ...reminderSettings, r24h_email: e.target.checked })} />
-                  <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
-                </label>
-              </div>
-              {/* 2-Hour */}
-              <div className={styles.reminderGridRow}>
-                <span className={styles.reminderTimingLabel}>⏳ 2 hours before</span>
-                <label className={styles.protectionToggle}>
-                  <input type="checkbox" checked={reminderSettings.r2h_sms} onChange={(e) => setReminderSettings({ ...reminderSettings, r2h_sms: e.target.checked })} />
-                  <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
-                </label>
-                <label className={styles.protectionToggle}>
-                  <input type="checkbox" checked={reminderSettings.r2h_email} onChange={(e) => setReminderSettings({ ...reminderSettings, r2h_email: e.target.checked })} />
-                  <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
-                </label>
-              </div>
-              {/* 1-Hour */}
-              <div className={styles.reminderGridRow}>
-                <span className={styles.reminderTimingLabel}>⏰ 1 hour before</span>
-                <label className={styles.protectionToggle}>
-                  <input type="checkbox" checked={reminderSettings.r1h_sms} onChange={(e) => setReminderSettings({ ...reminderSettings, r1h_sms: e.target.checked })} />
-                  <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
-                </label>
-                <label className={styles.protectionToggle}>
-                  <input type="checkbox" checked={reminderSettings.r1h_email} onChange={(e) => setReminderSettings({ ...reminderSettings, r1h_email: e.target.checked })} />
-                  <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
-                </label>
-              </div>
-            </div>
-          )}
+          <label className={styles.protectionToggle}>
+            <input
+              type="checkbox"
+              checked={staffReminderSettings.enabled}
+              onChange={(e) => setStaffReminderSettings({ ...staffReminderSettings, enabled: e.target.checked })}
+            />
+            <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
+            <span>💇 Staff reminders</span>
+          </label>
         </div>
 
-        {/* Cost Estimator — disabled for now */}
-        {false && reminderSettings.enabled && (() => {
-          const SMS_COST = 0.0079;
-          const PHONE_COST = 1.15;
-          const smsTimings = [reminderSettings.r24h_sms, reminderSettings.r2h_sms, reminderSettings.r1h_sms].filter(Boolean).length;
-          const emailTimings = [reminderSettings.r24h_email, reminderSettings.r2h_email, reminderSettings.r1h_email].filter(Boolean).length;
-          const appts = Math.round(clientCount * 1.5); // avg 1.5 appts/client/month
-          const smsCost = smsTimings > 0 ? (appts * smsTimings * SMS_COST) + PHONE_COST : 0;
-          const emailFree = appts * emailTimings;
-          const totalCost = smsCost;
-
-          return (
-            <div className={styles.costEstimator}>
-              <h3 className={styles.costEstTitle}>💰 Estimated Monthly Cost</h3>
-              <p className={styles.costEstSub}>Based on {clientCount} client{clientCount !== 1 ? "s" : ""} × ~{appts} appointments/month</p>
-              <div className={styles.costGrid}>
-                <div className={styles.costItem}>
-                  <span className={styles.costLabel}>📱 SMS ({smsTimings} reminder{smsTimings !== 1 ? "s" : ""}/appt)</span>
-                  <span className={styles.costValue}>{smsTimings > 0 ? `~$${smsCost.toFixed(2)}` : "—"}</span>
-                </div>
-                <div className={styles.costItem}>
-                  <span className={styles.costLabel}>📧 Email ({emailTimings} reminder{emailTimings !== 1 ? "s" : ""}/appt)</span>
-                  <span className={styles.costValue} style={{ color: "var(--color-success)" }}>{emailTimings > 0 ? `${emailFree} msgs — Free` : "—"}</span>
-                </div>
-                <div className={`${styles.costItem} ${styles.costTotal}`}>
-                  <span className={styles.costLabel}>Total estimated</span>
-                  <span className={styles.costValue}>{totalCost > 0 ? `~$${totalCost.toFixed(2)}/mo` : "Free"}</span>
-                </div>
-              </div>
-              <p className={styles.costFootnote}>
-                SMS: $0.0079/msg + $1.15/mo phone number (Twilio). Email: Free up to 3,000/mo (Resend).
-              </p>
+        {/* Unified Reminder Grid */}
+        {(reminderSettings.enabled || staffReminderSettings.enabled) && (
+          <div
+            className={styles.reminderGridUnified}
+            style={{
+              ['--reminder-cols' as string]:
+                reminderSettings.enabled && staffReminderSettings.enabled
+                  ? '1fr repeat(4, 80px)'
+                  : '1fr repeat(2, 90px)',
+            }}
+          >
+            {/* Super header row */}
+            <div className={styles.reminderSuperHeader}>
+              <span></span>
+              {reminderSettings.enabled && <span className={styles.superHeaderGroup}>👤 Client</span>}
+              {staffReminderSettings.enabled && <span className={styles.superHeaderGroup}>💇 Staff</span>}
             </div>
-          );
-        })()}
+            {/* Sub-header row */}
+            <div className={styles.reminderSubHeader}>
+              <span>Timing</span>
+              {reminderSettings.enabled && <><span>📱 SMS</span><span>📧 Email</span></>}
+              {staffReminderSettings.enabled && <><span>📱 SMS</span><span>📧 Email</span></>}
+            </div>
+            {/* 24-Hour Row */}
+            <div className={styles.reminderUnifiedRow}>
+              <span className={styles.reminderTimingLabel}>🕐 24 hours before</span>
+              {reminderSettings.enabled && (
+                <>
+                  <label className={styles.protectionToggle}>
+                    <input type="checkbox" checked={reminderSettings.r24h_sms} onChange={(e) => setReminderSettings({ ...reminderSettings, r24h_sms: e.target.checked })} />
+                    <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
+                  </label>
+                  <label className={styles.protectionToggle}>
+                    <input type="checkbox" checked={reminderSettings.r24h_email} onChange={(e) => setReminderSettings({ ...reminderSettings, r24h_email: e.target.checked })} />
+                    <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
+                  </label>
+                </>
+              )}
+              {staffReminderSettings.enabled && (
+                <>
+                  <label className={styles.protectionToggle}>
+                    <input type="checkbox" checked={staffReminderSettings.r24h_sms} onChange={(e) => setStaffReminderSettings({ ...staffReminderSettings, r24h_sms: e.target.checked })} />
+                    <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
+                  </label>
+                  <label className={styles.protectionToggle}>
+                    <input type="checkbox" checked={staffReminderSettings.r24h_email} onChange={(e) => setStaffReminderSettings({ ...staffReminderSettings, r24h_email: e.target.checked })} />
+                    <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
+                  </label>
+                </>
+              )}
+            </div>
+            {/* 2-Hour Row */}
+            <div className={styles.reminderUnifiedRow}>
+              <span className={styles.reminderTimingLabel}>⏳ 2 hours before</span>
+              {reminderSettings.enabled && (
+                <>
+                  <label className={styles.protectionToggle}>
+                    <input type="checkbox" checked={reminderSettings.r2h_sms} onChange={(e) => setReminderSettings({ ...reminderSettings, r2h_sms: e.target.checked })} />
+                    <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
+                  </label>
+                  <label className={styles.protectionToggle}>
+                    <input type="checkbox" checked={reminderSettings.r2h_email} onChange={(e) => setReminderSettings({ ...reminderSettings, r2h_email: e.target.checked })} />
+                    <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
+                  </label>
+                </>
+              )}
+              {staffReminderSettings.enabled && (
+                <>
+                  <label className={styles.protectionToggle}>
+                    <input type="checkbox" checked={staffReminderSettings.r2h_sms} onChange={(e) => setStaffReminderSettings({ ...staffReminderSettings, r2h_sms: e.target.checked })} />
+                    <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
+                  </label>
+                  <label className={styles.protectionToggle}>
+                    <input type="checkbox" checked={staffReminderSettings.r2h_email} onChange={(e) => setStaffReminderSettings({ ...staffReminderSettings, r2h_email: e.target.checked })} />
+                    <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
+                  </label>
+                </>
+              )}
+            </div>
+            {/* 1-Hour Row */}
+            <div className={styles.reminderUnifiedRow}>
+              <span className={styles.reminderTimingLabel}>⏰ 1 hour before</span>
+              {reminderSettings.enabled && (
+                <>
+                  <label className={styles.protectionToggle}>
+                    <input type="checkbox" checked={reminderSettings.r1h_sms} onChange={(e) => setReminderSettings({ ...reminderSettings, r1h_sms: e.target.checked })} />
+                    <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
+                  </label>
+                  <label className={styles.protectionToggle}>
+                    <input type="checkbox" checked={reminderSettings.r1h_email} onChange={(e) => setReminderSettings({ ...reminderSettings, r1h_email: e.target.checked })} />
+                    <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
+                  </label>
+                </>
+              )}
+              {staffReminderSettings.enabled && (
+                <>
+                  <label className={styles.protectionToggle}>
+                    <input type="checkbox" checked={staffReminderSettings.r1h_sms} onChange={(e) => setStaffReminderSettings({ ...staffReminderSettings, r1h_sms: e.target.checked })} />
+                    <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
+                  </label>
+                  <label className={styles.protectionToggle}>
+                    <input type="checkbox" checked={staffReminderSettings.r1h_email} onChange={(e) => setStaffReminderSettings({ ...staffReminderSettings, r1h_email: e.target.checked })} />
+                    <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
+                  </label>
+                </>
+              )}
+            </div>
+          </div>
+        )}
 
-        {reminderSettings.enabled && (
+        {/* Message Templates */}
+        {(reminderSettings.enabled || staffReminderSettings.enabled) && (
           <div className={styles.reminderTemplates}>
             <h3 style={{ marginTop: "var(--space-5)", marginBottom: "var(--space-3)", fontSize: "var(--text-base)" }}>Message Templates</h3>
-            <small style={{ color: "var(--text-tertiary)", display: "block", marginBottom: "var(--space-3)" }}>
-              Merge tags: {'{client_name}'}, {'{service}'}, {'{staff}'}, {'{business_name}'}, {'{date}'}, {'{time}'}
-            </small>
 
-            {(reminderSettings.r24h_sms || reminderSettings.r2h_sms || reminderSettings.r1h_sms) && (
-              <div className={styles.formGroup}>
-                <label className="label">SMS Template</label>
-                <textarea
-                  className="input"
-                  rows={3}
-                  value={reminderTemplates.sms}
-                  onChange={(e) => setReminderTemplates({ ...reminderTemplates, sms: e.target.value })}
-                />
-                <small style={{ color: "var(--text-tertiary)" }}>Max ~160 chars recommended for single SMS</small>
+            {/* Client Templates */}
+            {reminderSettings.enabled && (
+              <div className={styles.templateGroup}>
+                <div className={styles.templateGroupLabel}>👤 Client Templates</div>
+                <small style={{ color: "var(--text-tertiary)", display: "block", marginBottom: "var(--space-3)" }}>
+                  Merge tags: {'{client_name}'}, {'{service}'}, {'{staff}'}, {'{business_name}'}, {'{date}'}, {'{time}'}
+                </small>
+
+                {(reminderSettings.r24h_sms || reminderSettings.r2h_sms || reminderSettings.r1h_sms) && (
+                  <div className={styles.formGroup}>
+                    <label className="label">SMS Template</label>
+                    <textarea
+                      className="input"
+                      rows={3}
+                      value={reminderTemplates.sms}
+                      onChange={(e) => setReminderTemplates({ ...reminderTemplates, sms: e.target.value })}
+                    />
+                    <small style={{ color: "var(--text-tertiary)" }}>Max ~160 chars recommended for single SMS</small>
+                  </div>
+                )}
+
+                {(reminderSettings.r24h_email || reminderSettings.r2h_email || reminderSettings.r1h_email) && (
+                  <>
+                    <div className={styles.formGroup}>
+                      <label className="label">Email Subject</label>
+                      <input
+                        className="input"
+                        value={reminderTemplates.email_subject}
+                        onChange={(e) => setReminderTemplates({ ...reminderTemplates, email_subject: e.target.value })}
+                      />
+                    </div>
+                    <div className={styles.formGroup}>
+                      <label className="label">Email Body</label>
+                      <textarea
+                        className="input"
+                        rows={5}
+                        value={reminderTemplates.email}
+                        onChange={(e) => setReminderTemplates({ ...reminderTemplates, email: e.target.value })}
+                      />
+                    </div>
+                  </>
+                )}
               </div>
             )}
 
-            {(reminderSettings.r24h_email || reminderSettings.r2h_email || reminderSettings.r1h_email) && (
-              <>
-                <div className={styles.formGroup}>
-                  <label className="label">Email Subject</label>
-                  <input
-                    className="input"
-                    value={reminderTemplates.email_subject}
-                    onChange={(e) => setReminderTemplates({ ...reminderTemplates, email_subject: e.target.value })}
-                  />
-                </div>
-                <div className={styles.formGroup}>
-                  <label className="label">Email Body</label>
-                  <textarea
-                    className="input"
-                    rows={6}
-                    value={reminderTemplates.email}
-                    onChange={(e) => setReminderTemplates({ ...reminderTemplates, email: e.target.value })}
-                  />
-                </div>
-              </>
+            {/* Staff Templates */}
+            {staffReminderSettings.enabled && (
+              <div className={styles.templateGroup}>
+                <div className={styles.templateGroupLabel}>💇 Staff Templates</div>
+                <small style={{ color: "var(--text-tertiary)", display: "block", marginBottom: "var(--space-3)" }}>
+                  Merge tags: {'{staff_name}'}, {'{client_name}'}, {'{service}'}, {'{business_name}'}, {'{date}'}, {'{time}'}
+                </small>
+
+                {(staffReminderSettings.r24h_sms || staffReminderSettings.r2h_sms || staffReminderSettings.r1h_sms) && (
+                  <div className={styles.formGroup}>
+                    <label className="label">SMS Template</label>
+                    <textarea
+                      className="input"
+                      rows={3}
+                      value={staffReminderTemplates.sms}
+                      onChange={(e) => setStaffReminderTemplates({ ...staffReminderTemplates, sms: e.target.value })}
+                    />
+                    <small style={{ color: "var(--text-tertiary)" }}>Max ~160 chars recommended for single SMS</small>
+                  </div>
+                )}
+
+                {(staffReminderSettings.r24h_email || staffReminderSettings.r2h_email || staffReminderSettings.r1h_email) && (
+                  <>
+                    <div className={styles.formGroup}>
+                      <label className="label">Email Subject</label>
+                      <input
+                        className="input"
+                        value={staffReminderTemplates.email_subject}
+                        onChange={(e) => setStaffReminderTemplates({ ...staffReminderTemplates, email_subject: e.target.value })}
+                      />
+                    </div>
+                    <div className={styles.formGroup}>
+                      <label className="label">Email Body</label>
+                      <textarea
+                        className="input"
+                        rows={5}
+                        value={staffReminderTemplates.email}
+                        onChange={(e) => setStaffReminderTemplates({ ...staffReminderTemplates, email: e.target.value })}
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
             )}
           </div>
         )}

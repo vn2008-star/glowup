@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData } from "@/lib/api";
+import { GlowUpLogo } from "@/components/GlowUpLogo";
 import styles from "./checkout.module.css";
 import { useRouter } from "next/navigation";
 import type { Appointment, Service, AppointmentCharge, Staff } from "@/lib/types";
@@ -407,25 +408,6 @@ export default function CheckoutPage() {
       {/* ── Welcome Screen (no staff unlocked) ── */}
       {!unlockedStaffId && !loading ? (
         <div className={styles.welcomeScreen}>
-          {/* Gear icon for owner escape — owner only */}
-          <button
-            className={styles.dashboardLink}
-            title="Back to Dashboard"
-            onClick={() => {
-              const owner = staffMembers.find((s) => s.role === "owner");
-              if (owner?.pin) {
-                setDashboardExit(true);
-                setPinModalStaffId("dashboard-exit");
-                setPinInput("");
-                setPinError(false);
-              } else {
-                router.push("/dashboard");
-              }
-            }}
-          >
-            ⚙️
-          </button>
-
           {/* Salon branding */}
           <div className={styles.welcomeBrand}>
             {tenant?.logo_url ? (
@@ -474,6 +456,31 @@ export default function CheckoutPage() {
           </div>
 
           <p className={styles.welcomeHint}>Tap your name to sign in</p>
+
+          <div className={styles.poweredBy}>
+            <span className={styles.poweredByText}>powered by</span>
+            <GlowUpLogo size={28} />
+            <span className={styles.poweredByBrand}>GlowUp</span>
+          </div>
+
+          {/* Gear icon for owner escape — below branding */}
+          <button
+            className={styles.dashboardLink}
+            title="Back to Dashboard"
+            onClick={() => {
+              const owner = staffMembers.find((s) => s.role === "owner");
+              if (owner?.pin) {
+                setDashboardExit(true);
+                setPinModalStaffId("dashboard-exit");
+                setPinInput("");
+                setPinError(false);
+              } else {
+                router.push("/dashboard");
+              }
+            }}
+          >
+            ⚙️
+          </button>
         </div>
       ) : (
         <>

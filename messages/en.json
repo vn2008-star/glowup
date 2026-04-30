@@ -119,6 +119,7 @@
   },
   "dashboard": {
     "overview": "Overview",
+    "quickStart": "Quick Start",
     "calendar": "Calendar",
     "clients": "Clients",
     "services": "Services",

@@ -119,6 +119,7 @@
   },
   "dashboard": {
     "overview": "概览",
+    "quickStart": "快速开始",
     "calendar": "日历",
     "clients": "客户",
     "services": "服务",

@@ -119,6 +119,7 @@
   },
   "dashboard": {
     "overview": "개요",
+    "quickStart": "빠른 시작",
     "calendar": "캘린더",
     "clients": "고객",
     "services": "서비스",

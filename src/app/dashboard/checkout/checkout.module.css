@@ -50,13 +50,43 @@
 }
 .welcomeTitle {
   font-family: 'Playfair Display', serif;
-  font-size: 2.5rem;
+  font-size: 2.8rem;
   font-weight: 700;
-  background: linear-gradient(135deg, #D4A0D4, #E8B4CB);
+  background: linear-gradient(
+    90deg,
+    #D4A0D4 0%,
+    #E8B4CB 25%,
+    #fff 45%,
+    #fff 55%,
+    #E8B4CB 75%,
+    #D4A0D4 100%
+  );
+  background-size: 250% 100%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
   margin-bottom: var(--space-2);
+  animation:
+    titleShimmer 4s ease-in-out infinite,
+    titleGlow 3s ease-in-out infinite;
+  letter-spacing: 0.02em;
+  position: relative;
+}
+@keyframes titleShimmer {
+  0% { background-position: 100% 50%; }
+  50% { background-position: 0% 50%; }
+  100% { background-position: 100% 50%; }
+}
+@keyframes titleGlow {
+  0%, 100% {
+    filter: drop-shadow(0 0 8px rgba(212, 160, 212, 0.3))
+            drop-shadow(0 0 20px rgba(232, 180, 203, 0.15));
+  }
+  50% {
+    filter: drop-shadow(0 0 16px rgba(212, 160, 212, 0.6))
+            drop-shadow(0 0 40px rgba(232, 180, 203, 0.35))
+            drop-shadow(0 0 60px rgba(200, 160, 220, 0.2));
+  }
 }
 .welcomeSubtitle {
   font-size: var(--text-sm);
@@ -137,6 +167,38 @@
   opacity: 0.6;
   letter-spacing: 0.02em;
 }
+.poweredBy {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: var(--space-8);
+  padding: var(--space-3) var(--space-6);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--surface-secondary) 80%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border-primary) 60%, transparent);
+  opacity: 0.8;
+  transition: all 0.3s;
+  box-shadow: 0 4px 24px rgba(201, 160, 220, 0.1);
+}
+.poweredBy:hover {
+  opacity: 1;
+  box-shadow: 0 6px 32px rgba(201, 160, 220, 0.2);
+}
+.poweredByText {
+  font-size: 14px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+.poweredByBrand {
+  font-size: 20px;
+  font-weight: 800;
+  background: linear-gradient(135deg, #c9a0dc, #f0a3b5);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: 0.02em;
+}
 
 /* ── Header ── */
 .pageHeader {
@@ -149,10 +211,13 @@
 }
 .dashboardLink {
   font-size: 18px;
-  opacity: 0.3;
+  opacity: 0.25;
   text-decoration: none;
   transition: opacity 0.2s;
-  margin-right: var(--space-2);
+  margin-top: var(--space-4);
+  background: none;
+  border: none;
+  cursor: pointer;
 }
 .dashboardLink:hover {
   opacity: 0.8;
