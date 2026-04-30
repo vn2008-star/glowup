@@ -322,6 +322,14 @@ export default function CampaignsPage() {
   async function handleSendBlast() {
     if (selectedSlots.size === 0) return;
     setFillSending(true);
+
+    // Build personalized message with slot info
+    const slotsText = getSelectedSlotsText();
+    const personalizedMessage = fillMessage
+      .replace("{slots}", slotsText)
+      .replace("{discount}", fillDiscount ? `${fillDiscount} — ` : "");
+
+    // 1. Save campaign record
     const recipientCount = getAudienceCount(fillAudience);
     const payload = {
       name: `Fill My Openings — ${new Date().toLocaleDateString()}`,
@@ -329,14 +337,43 @@ export default function CampaignsPage() {
       template: {
         message: fillMessage,
         discount: fillDiscount,
-        slots: getSelectedSlotsText(),
+        slots: slotsText,
         audience: fillAudience,
       },
-      status: "completed",
-      metrics: { sent: recipientCount, opened: 0, booked: 0, revenue: 0 },
+      status: "sending",
+      metrics: { sent: 0, opened: 0, booked: 0, revenue: 0 },
     };
-    const { data } = await queryData<Campaign>("campaigns.add", payload);
-    if (data) setCampaigns(prev => [data, ...prev]);
+    const { data: campaign } = await queryData<Campaign>("campaigns.add", payload);
+    if (campaign) setCampaigns(prev => [campaign, ...prev]);
+
+    // 2. Actually send via SMS/Email
+    try {
+      const res = await fetch("/api/send-campaign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          campaign_id: campaign?.id,
+          message: personalizedMessage,
+          audience: fillAudience,
+          tenant_id: tenant?.id,
+          channel: "sms", // default to SMS for fill-openings
+        }),
+      });
+      const result = await res.json();
+
+      // Update local campaign with real metrics
+      if (campaign) {
+        const updated: Campaign = {
+          ...campaign,
+          status: "completed" as Campaign["status"],
+          metrics: { sent: result.sent || recipientCount, opened: 0, booked: 0, revenue: 0 },
+        };
+        setCampaigns(prev => prev.map(c => c.id === campaign.id ? updated : c));
+      }
+    } catch (err) {
+      console.error("Blast send failed:", err);
+    }
+
     setFillSending(false);
     setFillSent(true);
   }
