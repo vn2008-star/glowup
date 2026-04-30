@@ -12,7 +12,14 @@ export async function POST(request: Request) {
   ])
 
   const { action, payload } = body
-  const { data: { user } } = await supabase.auth.getUser()
+
+  let user
+  try {
+    const { data } = await supabase.auth.getUser()
+    user = data?.user
+  } catch {
+    return NextResponse.json({ error: 'Auth service unavailable' }, { status: 503 })
+  }
 
   if (!user) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
@@ -159,7 +166,7 @@ export async function POST(request: Request) {
       case 'appointments.list': {
         let query = svc
           .from('appointments')
-          .select('*, client:clients(*), staff_member:staff(*), service:services(*)')
+          .select('*, client:clients(*), staff_member:staff!staff_id(*), service:services(*)')
           .eq('tenant_id', tenantId)
           .order('start_time', { ascending: true })
 
@@ -188,7 +195,7 @@ export async function POST(request: Request) {
         const { data, error } = await svc
           .from('appointments')
           .insert({ ...payload, tenant_id: tenantId })
-          .select('*, client:clients(*), staff_member:staff(*), service:services(*)')
+          .select('*, client:clients(*), staff_member:staff!staff_id(*), service:services(*)')
           .single()
         return NextResponse.json({ data, error: error?.message })
       }
@@ -200,7 +207,7 @@ export async function POST(request: Request) {
           .update(fields)
           .eq('id', id)
           .eq('tenant_id', tenantId)
-          .select('*, client:clients(*), staff_member:staff(*), service:services(*)')
+          .select('*, client:clients(*), staff_member:staff!staff_id(*), service:services(*)')
           .single()
         return NextResponse.json({ data, error: error?.message })
       }
@@ -254,6 +261,32 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: !error, error: error?.message })
       }
 
+      case 'staff.verify-pin': {
+        const { staff_id, pin } = payload
+        const { data, error } = await svc
+          .from('staff')
+          .select('id, pin')
+          .eq('id', staff_id)
+          .eq('tenant_id', tenantId)
+          .single()
+        if (error) return NextResponse.json({ data: { valid: false }, error: error.message })
+        // If no PIN set, allow access
+        if (!data.pin) return NextResponse.json({ data: { valid: true, no_pin: true } })
+        return NextResponse.json({ data: { valid: data.pin === pin } })
+      }
+
+      case 'staff.set-pin': {
+        const { id, pin } = payload
+        const { data, error } = await svc
+          .from('staff')
+          .update({ pin: pin || null })
+          .eq('id', id)
+          .eq('tenant_id', tenantId)
+          .select()
+          .single()
+        return NextResponse.json({ data, error: error?.message })
+      }
+
       // ─── CAMPAIGNS ───
       case 'campaigns.list': {
         const { data, error } = await svc
@@ -298,7 +331,7 @@ export async function POST(request: Request) {
       case 'service_history.list': {
         let query = svc
           .from('service_history')
-          .select('*, staff_member:staff(id, name), service:services(id, name, category)')
+          .select('*, staff_member:staff!staff_id(id, name), service:services(id, name, category)')
           .eq('tenant_id', tenantId)
           .order('date', { ascending: false })
 
@@ -314,7 +347,7 @@ export async function POST(request: Request) {
         const { data, error } = await svc
           .from('service_history')
           .insert({ ...payload, tenant_id: tenantId })
-          .select('*, staff_member:staff(id, name), service:services(id, name, category)')
+          .select('*, staff_member:staff!staff_id(id, name), service:services(id, name, category)')
           .single()
         return NextResponse.json({ data, error: error?.message })
       }
@@ -326,7 +359,7 @@ export async function POST(request: Request) {
           .update(fields)
           .eq('id', id)
           .eq('tenant_id', tenantId)
-          .select('*, staff_member:staff(id, name), service:services(id, name, category)')
+          .select('*, staff_member:staff!staff_id(id, name), service:services(id, name, category)')
           .single()
         return NextResponse.json({ data, error: error?.message })
       }
@@ -535,7 +568,7 @@ export async function POST(request: Request) {
           unreadConvosRes,
         ] = await Promise.all([
           svc.from('appointments')
-            .select('*, client:clients(*), service:services(*), staff_member:staff(*)')
+            .select('*, client:clients(*), service:services(*), staff_member:staff!staff_id(*)')
             .eq('tenant_id', tenantId)
             .gte('start_time', `${todayStr}T00:00:00`)
             .lte('start_time', `${todayStr}T23:59:59`)
@@ -702,7 +735,7 @@ export async function POST(request: Request) {
       case 'waitlist.list': {
         const { data, error } = await svc
           .from('waitlist')
-          .select('*, client:clients(id, first_name, last_name, phone, email), service:services(id, name, price), staff_member:staff(id, name)')
+          .select('*, client:clients(id, first_name, last_name, phone, email), service:services(id, name, price), staff_member:staff!staff_id(id, name)')
           .eq('tenant_id', tenantId)
           .order('created_at', { ascending: false })
         return NextResponse.json({ data, error: error?.message })
@@ -825,7 +858,7 @@ export async function POST(request: Request) {
         const { client_id } = payload
         const { data, error } = await svc
           .from('service_history')
-          .select('*, staff_member:staff(id, name), service:services(id, name, category)')
+          .select('*, staff_member:staff!staff_id(id, name), service:services(id, name, category)')
           .eq('tenant_id', tenantId)
           .eq('client_id', client_id)
           .order('date', { ascending: false })
@@ -858,12 +891,43 @@ export async function POST(request: Request) {
       case 'gallery.list': {
         const { data, error } = await svc
           .from('service_history')
-          .select('*, staff_member:staff(id, name), service:services(id, name, category), client:clients(id, first_name, last_name)')
+          .select('*, staff_member:staff!staff_id(id, name), service:services(id, name, category), client:clients(id, first_name, last_name)')
           .eq('tenant_id', tenantId)
           .or('before_photo_urls.neq.{},after_photo_urls.neq.{}')
           .order('date', { ascending: false })
           .limit(payload?.limit || 50)
         return NextResponse.json({ data, error: error?.message })
+      }
+
+      case 'gallery.create': {
+        const { data, error } = await svc
+          .from('service_history')
+          .insert({
+            tenant_id: tenantId,
+            client_id: payload.client_id || null,
+            staff_id: payload.staff_id || null,
+            service_id: payload.service_id || null,
+            appointment_id: payload.appointment_id || null,
+            date: payload.date || new Date().toISOString().split('T')[0],
+            notes: payload.notes || null,
+            formula: payload.formula || null,
+            before_photo_urls: payload.before_photo_urls || [],
+            after_photo_urls: payload.after_photo_urls || [],
+            satisfaction: payload.satisfaction || null,
+            total_paid: payload.total_paid || 0,
+          })
+          .select('*')
+          .single()
+        return NextResponse.json({ data, error: error?.message })
+      }
+
+      case 'gallery.delete': {
+        const { error } = await svc
+          .from('service_history')
+          .delete()
+          .eq('id', payload.id)
+          .eq('tenant_id', tenantId)
+        return NextResponse.json({ success: !error, error: error?.message })
       }
 
       // ─── ADVANCED REPORTS ───
@@ -1088,7 +1152,7 @@ export async function POST(request: Request) {
           })
           .eq('id', id)
           .eq('tenant_id', tenantId)
-          .select('*, client:clients(*), staff_member:staff(*), service:services(*)')
+          .select('*, client:clients(*), staff_member:staff!staff_id(*), service:services(*)')
           .single()
         return NextResponse.json({ data, error: error?.message })
       }
@@ -1102,7 +1166,7 @@ export async function POST(request: Request) {
         // Get all completed/checked-out appointments for the day
         const { data: apts } = await svc
           .from('appointments')
-          .select('*, client:clients(*), staff_member:staff(*), service:services(*)')
+          .select('*, client:clients(*), staff_member:staff!staff_id(*), service:services(*)')
           .eq('tenant_id', tenantId)
           .gte('start_time', dayStart)
           .lte('start_time', dayEnd)
@@ -1138,10 +1202,21 @@ export async function POST(request: Request) {
             services_total: 0, tips_total: 0, upsell_total: 0,
             cash_total: 0, card_total: 0,
             appointments: 0, commission_earned: 0,
+            details: [],  // per-appointment detail rows
           }
         }
 
-        // Process appointments
+        // Build a map of charges grouped by appointment_id
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const chargesByApt: Record<string, any[]> = {}
+        for (const ch of charges) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const chAny = ch as any
+          if (!chargesByApt[chAny.appointment_id]) chargesByApt[chAny.appointment_id] = []
+          chargesByApt[chAny.appointment_id].push(chAny)
+        }
+
+        // Process appointments — include base service price
         for (const apt of (apts || [])) {
           const sid = apt.staff_id || 'unassigned'
           if (!staffMap[sid]) {
@@ -1151,13 +1226,49 @@ export async function POST(request: Request) {
               services_total: 0, tips_total: 0, upsell_total: 0,
               cash_total: 0, card_total: 0,
               appointments: 0, commission_earned: 0,
+              details: [],
             }
           }
           const entry = staffMap[sid]
           entry.appointments++
           entry.tips_total += Number(apt.tip_amount || 0)
 
-          // Determine payment method split
+          // Add base service price to services_total
+          const servicePrice = Number(apt.service?.price || apt.total_price || 0)
+          entry.services_total += servicePrice
+
+          // Commission on base service: use per-service rate if set, else staff default
+          const baseServiceRate = apt.service?.commission_rate
+          const baseEffectiveRate = baseServiceRate != null ? baseServiceRate : entry.commission_rate
+          entry.commission_earned += servicePrice * (baseEffectiveRate / 100)
+
+          // Build add-ons list for this appointment from charges
+          const aptCharges = chargesByApt[apt.id] || []
+          const addOns = aptCharges
+            .filter((c: any) => c.is_upsell)
+            .map((c: any) => ({
+              name: c.service?.name || c.description || 'Add-on',
+              amount: Number(c.amount || 0),
+            }))
+
+          // Client name
+          const clientName = apt.client
+            ? `${apt.client.first_name}${apt.client.last_name ? ' ' + apt.client.last_name : ''}`
+            : (apt.notes || 'Walk-in')
+
+          // Add detail row
+          entry.details.push({
+            appointment_id: apt.id,
+            client_name: clientName,
+            service_name: apt.service?.name || 'Service',
+            service_price: servicePrice,
+            add_ons: addOns,
+            tip: Number(apt.tip_amount || 0),
+            payment_method: apt.payment_method || '',
+            time: apt.start_time,
+          })
+
+          // Determine payment method split (full appointment total incl. tip)
           const aptTotal = Number(apt.total_price || 0)
           if (apt.payment_method === 'cash') entry.cash_total += aptTotal + Number(apt.tip_amount || 0)
           else if (apt.payment_method === 'card') entry.card_total += aptTotal + Number(apt.tip_amount || 0)
@@ -1167,7 +1278,7 @@ export async function POST(request: Request) {
           }
         }
 
-        // Process charges for commission calculation
+        // Process charges — only add upsell charges (base service already counted above)
         for (const ch of charges) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const chAny = ch as any
@@ -1178,13 +1289,13 @@ export async function POST(request: Request) {
 
           if (chAny.is_upsell) {
             entry.upsell_total += amount
-          }
-          entry.services_total += amount
+            entry.services_total += amount
 
-          // Per-service commission rate: use service rate if set, else staff default
-          const serviceRate = chAny.service?.commission_rate
-          const effectiveRate = serviceRate != null ? serviceRate : entry.commission_rate
-          entry.commission_earned += amount * (effectiveRate / 100)
+            // Per-service commission rate on upsell
+            const serviceRate = chAny.service?.commission_rate
+            const effectiveRate = serviceRate != null ? serviceRate : entry.commission_rate
+            entry.commission_earned += amount * (effectiveRate / 100)
+          }
         }
 
         // Tips go 100% to staff
@@ -1301,7 +1412,7 @@ export async function POST(request: Request) {
             status: 'confirmed',
             notes: clientId ? null : 'Walk-in',
           })
-          .select('*, client:clients(*), staff_member:staff(*), service:services(*)')
+          .select('*, client:clients(*), staff_member:staff!staff_id(*), service:services(*)')
           .single()
 
         if (aptErr) {

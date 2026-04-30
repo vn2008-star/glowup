@@ -131,7 +131,8 @@
     "inbox": "Bandeja",
     "reports": "Reportes",
     "settings": "Configuración",
-    "checkout": "Cobro"
+    "checkout": "Cobro",
+    "frontDesk": "Recepción"
   },
   "calendarPage": {
     "title": "Calendario", "today": "Hoy", "day": "Día", "week": "Semana", "month": "Mes",
@@ -247,7 +248,7 @@
     "free": "Gratis", "perMonth": "/mes", "basedOn": "Basado en"
   },
   "checkoutPage": {
-    "title": "Cobro & Cierre Diario",
+    "title": "Recepción",
     "allStaff": "Todo el equipo",
     "todaysAppointments": "Citas de hoy",
     "total": "Total",
@@ -269,6 +270,7 @@
     "processing": "Procesando...",
     "completeCheckout": "Completar Cobro",
     "checkedOut": "Cobrado",
+    "editCheckout": "Editar cobro",
     "dailyTally": "Cierre Diario — Reparto de Ingresos",
     "totalRevenue": "Ingresos Totales",
     "totalTips": "Total Propinas",
@@ -289,6 +291,10 @@
     "clientPhone": "Teléfono (opcional)",
     "createWalkIn": "Crear visita sin cita",
     "clientBirthday": "Cumpleaños (opcional)",
-    "birthdaySurprise": "¡Te enviaremos una sorpresa especial en tu cumpleaños!"
+    "birthdaySurprise": "¡Te enviaremos una sorpresa especial en tu cumpleaños!",
+    "enterPin": "Ingresa tu PIN",
+    "wrongPin": "PIN incorrecto — intenta de nuevo",
+    "lock": "Cerrar sesión",
+    "client": "Cliente"
   }
 }

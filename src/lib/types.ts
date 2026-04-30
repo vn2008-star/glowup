@@ -18,6 +18,9 @@ export interface Tenant {
   subscription_status: 'trialing' | 'active' | 'past_due' | 'canceled' | null
   trial_ends_at: string | null
   current_period_end: string | null
+  is_active: boolean
+  deleted_at: string | null
+  deletion_scheduled_at: string | null
   created_at: string
   updated_at: string
 }
@@ -35,6 +38,7 @@ export interface Staff {
   schedule: Record<string, unknown>
   commission_rate: number
   is_active: boolean
+  pin: string | null
   created_at: string
   updated_at: string
 }

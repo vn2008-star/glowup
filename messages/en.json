@@ -131,7 +131,8 @@
     "inbox": "Inbox",
     "reports": "Reports",
     "settings": "Settings",
-    "checkout": "Checkout"
+    "checkout": "Checkout",
+    "frontDesk": "Front Desk"
   },
   "calendarPage": {
     "title": "Calendar",
@@ -413,7 +414,7 @@
     "basedOn": "Based on"
   },
   "checkoutPage": {
-    "title": "Checkout & Daily Tally",
+    "title": "Front Desk",
     "allStaff": "All Staff",
     "todaysAppointments": "Today's Appointments",
     "total": "Total",
@@ -424,8 +425,8 @@
     "selectAppointment": "Select an appointment to start checkout",
     "checkoutTitle": "Checkout",
     "services": "Services & Charges",
-    "upsell": "UPSELL",
-    "addService": "Add service (upsell)",
+    "upsell": "ADD-ON",
+    "addService": "Add service (add-on)",
     "add": "Add",
     "subtotal": "Subtotal",
     "tip": "Tip",
@@ -435,14 +436,15 @@
     "processing": "Processing...",
     "completeCheckout": "Complete Checkout",
     "checkedOut": "Checked Out",
-    "dailyTally": "Daily Tally — Revenue Split",
+    "editCheckout": "Edit Checkout",
+    "dailyTally": "Daily — Revenue Split",
     "totalRevenue": "Total Revenue",
     "totalTips": "Total Tips",
-    "upsellRevenue": "Upsell Revenue",
+    "upsellRevenue": "Add-on Revenue",
     "appointments": "Appointments",
     "commissionPayout": "Commission Payout",
     "staffMember": "Staff Member",
-    "upsells": "Upsells",
+    "upsells": "Add-ons",
     "tips": "Tips",
     "commission": "Commission",
     "payout": "Payout",
@@ -455,6 +457,10 @@
     "clientPhone": "Phone (optional)",
     "createWalkIn": "Create Walk-in",
     "clientBirthday": "Birthday (optional)",
-    "birthdaySurprise": "We'll surprise you with a special treat on your birthday!"
+    "birthdaySurprise": "We'll surprise you with a special treat on your birthday!",
+    "enterPin": "Enter your PIN",
+    "wrongPin": "Incorrect PIN — try again",
+    "lock": "Sign Out",
+    "client": "Client"
   }
 }

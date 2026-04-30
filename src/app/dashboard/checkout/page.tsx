@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData } from "@/lib/api";
 import styles from "./checkout.module.css";
+import { useRouter } from "next/navigation";
 import type { Appointment, Service, AppointmentCharge, Staff } from "@/lib/types";
 
 type FullAppointment = Appointment & {
@@ -32,6 +33,9 @@ export default function CheckoutPage() {
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "card" | "mixed" | "">("");
   const [upsellServiceId, setUpsellServiceId] = useState("");
   const [checkingOut, setCheckingOut] = useState(false);
+  const [editingCheckout, setEditingCheckout] = useState(false);
+  const [beforePhoto, setBeforePhoto] = useState<string | null>(null);
+  const [afterPhoto, setAfterPhoto] = useState<string | null>(null);
 
   // Daily tally
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -39,6 +43,15 @@ export default function CheckoutPage() {
 
   // Staff selector (shared tablet mode)
   const [activeStaffId, setActiveStaffId] = useState("all");
+
+  // PIN gate state
+  const [pinModalStaffId, setPinModalStaffId] = useState<string | null>(null);
+  const [pinInput, setPinInput] = useState("");
+  const [pinError, setPinError] = useState(false);
+  const [unlockedStaffId, setUnlockedStaffId] = useState<string | null>(null);
+  const [pinVerifying, setPinVerifying] = useState(false);
+  const [dashboardExit, setDashboardExit] = useState(false);
+  const router = useRouter();
 
   // Walk-in modal
   const [showWalkIn, setShowWalkIn] = useState(false);
@@ -135,6 +148,30 @@ export default function CheckoutPage() {
 
   const activeStaff = staffMembers.filter((s) => s.is_active);
 
+  // Filtered tally: staff sees only their own, owner sees all
+  const filteredTally = useMemo(() => {
+    if (!tally) return null;
+    if (activeStaffId === "all") return tally;
+
+    // Filter to the selected staff member only
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const staffRow = tally.staff.find((s: any) => s.id === activeStaffId);
+    const filtered = staffRow ? [staffRow] : [];
+
+    // Recalculate totals from filtered staff
+    const totals = {
+      services: filtered.reduce((sum: number, s: { services_total: number }) => sum + s.services_total, 0),
+      upsells: filtered.reduce((sum: number, s: { upsell_total: number }) => sum + s.upsell_total, 0),
+      tips: filtered.reduce((sum: number, s: { tips_total: number }) => sum + s.tips_total, 0),
+      appointments: filtered.reduce((sum: number, s: { appointments: number }) => sum + s.appointments, 0),
+      commission: filtered.reduce((sum: number, s: { commission_earned: number }) => sum + s.commission_earned, 0),
+      cash: staffRow ? (tally.totals.cash * (staffRow.services_total / (tally.totals.services || 1))) : 0,
+      card: staffRow ? (tally.totals.card * (staffRow.services_total / (tally.totals.services || 1))) : 0,
+    };
+
+    return { staff: filtered, totals };
+  }, [tally, activeStaffId]);
+
   // ── Walk-in ──
   async function handleCreateWalkIn() {
     if (!walkInStaff || !walkInService) return;
@@ -225,6 +262,22 @@ export default function CheckoutPage() {
       );
       setSelectedApt({ ...selectedApt, ...data });
       fetchTally();
+
+      // Save before/after photos to gallery if any were uploaded
+      if (beforePhoto || afterPhoto) {
+        await queryData("gallery.create", {
+          appointment_id: selectedApt.id,
+          client_id: selectedApt.client_id,
+          staff_id: selectedApt.staff_id,
+          service_id: selectedApt.service_id,
+          date: selectedApt.start_time?.split("T")[0] || selectedDate,
+          before_photo_urls: beforePhoto ? [beforePhoto] : [],
+          after_photo_urls: afterPhoto ? [afterPhoto] : [],
+          total_paid: chargeTotal + tip,
+        });
+        setBeforePhoto(null);
+        setAfterPhoto(null);
+      }
     }
     setCheckingOut(false);
   }
@@ -232,13 +285,218 @@ export default function CheckoutPage() {
   const chargesTotal = charges.reduce((sum, c) => sum + Number(c.amount), 0);
   const tip = Number(tipAmount) || 0;
   const grandTotal = chargesTotal + tip;
-  const isCheckedOut = selectedApt?.status === "completed" && selectedApt?.checked_out_at;
+  const isCheckedOut = selectedApt?.status === "completed" && selectedApt?.checked_out_at && !editingCheckout;
+
+  // Reset editing state when selecting a different appointment
+  function handleSelectApt(apt: FullAppointment) {
+    setSelectedApt(apt);
+    setEditingCheckout(false);
+    setBeforePhoto(null);
+    setAfterPhoto(null);
+  }
+
+  // Reopen a checked-out appointment for editing
+  function handleReopenCheckout() {
+    if (!selectedApt) return;
+    setEditingCheckout(true);
+    setTipAmount(String(selectedApt.tip_amount || ""));
+    setPaymentMethod((selectedApt.payment_method as "cash" | "card" | "mixed") || "");
+  }
+
+  // ── PIN Gate Logic ──
+  function handleStaffTap(staffId: string) {
+    // If already unlocked for this staff, just switch
+    if (unlockedStaffId === staffId) {
+      setActiveStaffId(staffId);
+      setSelectedApt(null);
+      setEditingCheckout(false);
+      return;
+    }
+
+    // Find the staff member to check if they have a PIN
+    if (staffId === "all") {
+      // Owner view — find the owner staff member
+      const owner = staffMembers.find((s) => s.role === "owner" || s.role === "manager");
+      if (owner?.pin) {
+        setPinModalStaffId("all");
+        setPinInput("");
+        setPinError(false);
+        return;
+      }
+      // No owner PIN set — allow access
+      setActiveStaffId("all");
+      setUnlockedStaffId("all");
+      setSelectedApt(null);
+      setEditingCheckout(false);
+      return;
+    }
+
+    const staff = staffMembers.find((s) => s.id === staffId);
+    if (staff?.pin) {
+      // PIN required — show keypad
+      setPinModalStaffId(staffId);
+      setPinInput("");
+      setPinError(false);
+    } else {
+      // No PIN set — allow access
+      setActiveStaffId(staffId);
+      setUnlockedStaffId(staffId);
+      setSelectedApt(null);
+      setEditingCheckout(false);
+    }
+  }
+
+  async function handlePinSubmit(pinValue?: string) {
+    const pin = pinValue || pinInput;
+    if (!pinModalStaffId || pin.length !== 4) return;
+    setPinVerifying(true);
+
+    // For dashboard exit, verify against owner only; for "all" view, owner or manager
+    const staffIdToVerify = pinModalStaffId === "dashboard-exit"
+      ? (staffMembers.find((s) => s.role === "owner")?.id || "")
+      : pinModalStaffId === "all"
+      ? (staffMembers.find((s) => s.role === "owner" || s.role === "manager")?.id || "")
+      : pinModalStaffId;
+
+    const { data } = await queryData<{ valid: boolean }>("staff.verify-pin", {
+      staff_id: staffIdToVerify,
+      pin,
+    });
+
+    setPinVerifying(false);
+
+    if (data?.valid) {
+      if (dashboardExit) {
+        // Owner verified — navigate to dashboard
+        setDashboardExit(false);
+        setPinModalStaffId(null);
+        setPinInput("");
+        router.push("/dashboard");
+        return;
+      }
+      setActiveStaffId(pinModalStaffId);
+      setUnlockedStaffId(pinModalStaffId);
+      setSelectedApt(null);
+      setEditingCheckout(false);
+      setPinModalStaffId(null);
+      setPinInput("");
+    } else {
+      setPinError(true);
+      setPinInput("");
+      setTimeout(() => setPinError(false), 600);
+    }
+  }
+
+  function handleLock() {
+    setActiveStaffId("all");
+    setUnlockedStaffId(null);
+    setSelectedApt(null);
+    setEditingCheckout(false);
+  }
+
+  // Get the name for the PIN modal
+  const pinModalStaffName = pinModalStaffId === "all"
+    ? t("allStaff")
+    : pinModalStaffId === "dashboard-exit"
+    ? "Dashboard"
+    : staffMembers.find((s) => s.id === pinModalStaffId)?.name || "";
 
   // ── Render ──
   return (
     <div className={styles.page}>
+      {/* ── Welcome Screen (no staff unlocked) ── */}
+      {!unlockedStaffId && !loading ? (
+        <div className={styles.welcomeScreen}>
+          {/* Gear icon for owner escape — owner only */}
+          <button
+            className={styles.dashboardLink}
+            title="Back to Dashboard"
+            onClick={() => {
+              const owner = staffMembers.find((s) => s.role === "owner");
+              if (owner?.pin) {
+                setDashboardExit(true);
+                setPinModalStaffId("dashboard-exit");
+                setPinInput("");
+                setPinError(false);
+              } else {
+                router.push("/dashboard");
+              }
+            }}
+          >
+            ⚙️
+          </button>
+
+          {/* Salon branding */}
+          <div className={styles.welcomeBrand}>
+            {tenant?.logo_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={tenant.logo_url} alt={tenant?.name || "Salon"} className={styles.welcomeLogo} />
+            ) : (
+              <div className={styles.welcomeLogoFallback}>✦</div>
+            )}
+            <h1 className={styles.welcomeTitle}>{tenant?.name || "Welcome"}</h1>
+            <p className={styles.welcomeSubtitle}>{formatDate(selectedDate)}</p>
+          </div>
+
+          {/* Staff cards — sorted: owner → manager → technician */}
+          <div className={styles.welcomeStaffGrid}>
+            {[...activeStaff].sort((a, b) => {
+              const order = { owner: 0, manager: 1, technician: 2 } as Record<string, number>;
+              return (order[a.role] ?? 9) - (order[b.role] ?? 9);
+            }).map((s, i) => {
+              const colors = [
+                "linear-gradient(135deg, #D4A0D4, #E8B4CB)",
+                "linear-gradient(135deg, #B8C9E8, #C4A8D8)",
+                "linear-gradient(135deg, #F0C4B8, #E8A0B4)",
+                "linear-gradient(135deg, #C4D8C0, #A8C8B8)",
+                "linear-gradient(135deg, #E8C4D8, #D4B0C8)",
+                "linear-gradient(135deg, #C8B8E0, #B4A0D0)",
+              ];
+              const count = appointments.filter((a) => a.staff_id === s.id && !a.checked_out_at).length;
+              return (
+                <button
+                  key={s.id}
+                  className={styles.welcomeCard}
+                  onClick={() => handleStaffTap(s.id)}
+                >
+                  <div className={styles.welcomeCardAvatar} style={{ background: colors[i % colors.length] }}>
+                    {s.photo_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={s.photo_url} alt={s.name} className={styles.welcomeCardImg} />
+                    ) : (
+                      <span className={styles.welcomeCardInitials}>{getInitials(s.name)}</span>
+                    )}
+                  </div>
+                  <span className={styles.welcomeCardName}>{s.name}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <p className={styles.welcomeHint}>Tap your name to sign in</p>
+        </div>
+      ) : (
+        <>
       {/* ── Header ── */}
       <div className={styles.pageHeader}>
+        <button
+          className={styles.dashboardLink}
+          title="Back to Dashboard"
+          onClick={() => {
+            const owner = staffMembers.find((s) => s.role === "owner");
+            if (!owner) return; // Only owners can access dashboard
+            if (owner.pin) {
+              setDashboardExit(true);
+              setPinModalStaffId("dashboard-exit");
+              setPinInput("");
+              setPinError(false);
+            } else {
+              router.push("/dashboard");
+            }
+          }}
+        >
+          ⚙️
+        </button>
         <h1>{t("title")}</h1>
         <div className={styles.headerActions}>
           <div className={styles.dateNav}>
@@ -251,15 +509,18 @@ export default function CheckoutPage() {
 
       {/* ── Staff Avatar Bar ── */}
       <div className={styles.staffBar}>
-        <button
-          className={`${styles.staffAvatar} ${activeStaffId === "all" ? styles.staffAvatarActive : ""}`}
-          onClick={() => setActiveStaffId("all")}
-        >
-          <div className={styles.avatarCircle} style={{ background: "var(--color-primary)" }}>
-            ✦
-          </div>
-          <span className={styles.avatarName}>{t("allStaff")}</span>
-        </button>
+        {/* Only show All Staff to unlocked owner/manager */}
+        {unlockedStaffId && (staffMembers.find((s) => s.id === unlockedStaffId)?.role === "owner" || staffMembers.find((s) => s.id === unlockedStaffId)?.role === "manager" || unlockedStaffId === "all") && (
+          <button
+            className={`${styles.staffAvatar} ${activeStaffId === "all" ? styles.staffAvatarActive : ""}`}
+            onClick={() => { setActiveStaffId("all"); setSelectedApt(null); }}
+          >
+            <div className={styles.avatarCircle} style={{ background: "var(--color-primary)" }}>
+              ✦
+            </div>
+            <span className={styles.avatarName}>{t("allStaff")}</span>
+          </button>
+        )}
         {activeStaff.map((s, i) => {
           const colors = [
             "linear-gradient(135deg, #8B5CF6, #EC4899)",
@@ -273,7 +534,7 @@ export default function CheckoutPage() {
             <button
               key={s.id}
               className={`${styles.staffAvatar} ${activeStaffId === s.id ? styles.staffAvatarActive : ""}`}
-              onClick={() => setActiveStaffId(s.id)}
+              onClick={() => handleStaffTap(s.id)}
             >
               <div className={styles.avatarCircle} style={{ background: colors[i % colors.length] }}>
                 {s.photo_url ? (
@@ -292,6 +553,11 @@ export default function CheckoutPage() {
             </button>
           );
         })}
+        {unlockedStaffId && (
+          <button className={styles.lockBtn} onClick={handleLock} title={t("lock")}>
+            🔒 {t("lock")}
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -301,8 +567,8 @@ export default function CheckoutPage() {
       ) : (
         <>
           {/* ── Main Layout ── */}
-          <div className={styles.mainLayout}>
-            {/* ── Left: Appointment List ── */}
+          <div className={`${styles.mainLayout} ${!selectedApt ? styles.mainLayoutFull : ""}`}>
+            {/* ── Left: Calendar Day View ── */}
             <div className={styles.aptList}>
               <div className={styles.aptListHeader}>
                 <span>{t("todaysAppointments")}</span>
@@ -322,53 +588,242 @@ export default function CheckoutPage() {
                       + {t("walkInBtn")}
                     </button>
                   </div>
-                ) : (
-                  filteredApts.map((apt) => (
-                    <div
-                      key={apt.id}
-                      className={`${styles.aptItem} ${selectedApt?.id === apt.id ? styles.aptItemActive : ""} ${apt.checked_out_at ? styles.aptItemCheckedOut : ""}`}
-                      onClick={() => setSelectedApt(apt)}
-                    >
-                      <div
-                        className={`${styles.aptDot} ${
-                          apt.status === "completed" ? styles.aptDotCompleted :
-                          apt.status === "confirmed" ? styles.aptDotConfirmed :
-                          apt.status === "cancelled" ? styles.aptDotCancelled :
-                          styles.aptDotPending
-                        }`}
-                      />
-                      <div className={styles.aptInfo}>
-                        <div className={styles.aptTime}>{formatTime(apt.start_time)} – {formatTime(apt.end_time)}</div>
-                        <div className={styles.aptClient}>
-                          {apt.client ? `${apt.client.first_name} ${apt.client.last_name || ""}`.trim() : t("walkIn")}
-                        </div>
-                        <div className={styles.aptService}>
-                          {apt.service?.name || "Service"} • {apt.staff_member?.name || "Unassigned"}
+                ) : (() => {
+                  // Calendar time grid constants
+                  const CAL_SLOT_H = 60; // px per hour
+                  const CAL_START = 9; // 9 AM
+                  const CAL_END = 19; // 7 PM
+                  const HOURS = Array.from({ length: CAL_END - CAL_START }, (_, i) => i + CAL_START);
+
+                  const fmtHour = (h: number) => {
+                    const ampm = h >= 12 ? "PM" : "AM";
+                    const h12 = h > 12 ? h - 12 : h === 0 ? 12 : h;
+                    return `${h12} ${ampm}`;
+                  };
+
+                  const getPos = (time: string) => {
+                    const d = new Date(time);
+                    const hDec = d.getHours() + d.getMinutes() / 60;
+                    return (hDec - CAL_START) * CAL_SLOT_H;
+                  };
+
+                  const getH = (start: string, end: string) => {
+                    const s = new Date(start);
+                    const e = new Date(end);
+                    const hrs = (e.getTime() - s.getTime()) / (1000 * 60 * 60);
+                    return Math.max(hrs * CAL_SLOT_H, 28);
+                  };
+
+                  const aptColor = (status: string) => {
+                    switch (status) {
+                      case "completed": return "var(--color-success)";
+                      case "cancelled": return "#ef4444";
+                      default: return "var(--color-primary)";
+                    }
+                  };
+
+                  // Current time marker
+                  const now = new Date();
+                  const nowHDec = now.getHours() + now.getMinutes() / 60;
+                  const isToday = selectedDate === now.toISOString().split("T")[0];
+
+                  const staffColors = [
+                    "linear-gradient(135deg, #8B5CF6, #EC4899)",
+                    "linear-gradient(135deg, #06B6D4, #3B82F6)",
+                    "linear-gradient(135deg, #F59E0B, #EF4444)",
+                    "linear-gradient(135deg, #10B981, #059669)",
+                    "linear-gradient(135deg, #F472B6, #FB923C)",
+                    "linear-gradient(135deg, #6366F1, #8B5CF6)",
+                  ];
+
+                  // Determine columns: multi-staff for "all", single for individual
+                  const isAllStaff = activeStaffId === "all";
+                  const columns = isAllStaff
+                    ? activeStaff.map((s, i) => ({ staff: s, color: staffColors[i % staffColors.length] }))
+                    : [{ staff: activeStaff.find(s => s.id === activeStaffId) || activeStaff[0], color: staffColors[0] }];
+
+                  // Helper: get open slots for a staff's appointments
+                  const getOpenSlots = (staffApts: FullAppointment[]) => {
+                    const sorted = [...staffApts].sort(
+                      (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+                    );
+                    const slots: { start: number; end: number }[] = [];
+                    let cur = CAL_START;
+                    for (const apt of sorted) {
+                      const aStart = new Date(apt.start_time).getHours() + new Date(apt.start_time).getMinutes() / 60;
+                      const aEnd = new Date(apt.end_time).getHours() + new Date(apt.end_time).getMinutes() / 60;
+                      if (aStart > cur) slots.push({ start: cur, end: aStart });
+                      cur = Math.max(cur, aEnd);
+                    }
+                    if (cur < CAL_END) slots.push({ start: cur, end: CAL_END });
+                    return slots;
+                  };
+
+                  return isAllStaff ? (
+                    /* ═══ All Staff: Multi-Column Grid ═══ */
+                    <div className={styles.calMulti}>
+                      {/* Time labels column */}
+                      <div className={styles.calTimeCol}>
+                        <div className={styles.calTimeHeader} />
+                        <div className={styles.calTimeBody}>
+                          {HOURS.map((h) => (
+                            <div key={h} className={styles.calTimeSlot}>
+                              <span className={styles.calSlotLabel}>{fmtHour(h)}</span>
+                            </div>
+                          ))}
                         </div>
                       </div>
-                      <div>
-                        {apt.checked_out_at ? (
-                          <span className={`${styles.aptStatus} ${styles.statusCompleted}`}>✓ {t("done")}</span>
-                        ) : apt.status === "confirmed" ? (
-                          <span className={`${styles.aptStatus} ${styles.statusConfirmed}`}>{t("confirmed")}</span>
-                        ) : (
-                          <span className={`${styles.aptStatus} ${styles.statusPending}`}>{apt.status}</span>
-                        )}
-                      </div>
+
+                      {/* Staff columns */}
+                      {columns.map(({ staff, color }, colIdx) => {
+                        if (!staff) return null;
+                        const staffApts = filteredApts.filter(a => a.staff_id === staff.id);
+                        const openSlots = getOpenSlots(staffApts);
+                        return (
+                          <div key={staff.id} className={styles.calStaffCol}>
+                            {/* Column header */}
+                            <div className={styles.calColHeader}>
+                              <div className={styles.calColAvatar} style={{ background: color }}>
+                                {staff.photo_url ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={staff.photo_url} alt={staff.name} className={styles.avatarImg} />
+                                ) : (
+                                  getInitials(staff.name)
+                                )}
+                              </div>
+                              <span className={styles.calColName}>{staff.name}</span>
+                              <span className={styles.calColCount}>{staffApts.length}</span>
+                            </div>
+                            {/* Column body */}
+                            <div className={styles.calColBody}>
+                              {/* Hour gridlines */}
+                              {HOURS.map((h) => (
+                                <div key={h} className={styles.calColLine} style={{ top: `${(h - CAL_START) * CAL_SLOT_H}px` }} />
+                              ))}
+                              {/* Open slots */}
+                              {openSlots.map((slot, i) => (
+                                <div
+                                  key={`open-${colIdx}-${i}`}
+                                  className={styles.calOpen}
+                                  style={{
+                                    top: `${(slot.start - CAL_START) * CAL_SLOT_H}px`,
+                                    height: `${(slot.end - slot.start) * CAL_SLOT_H}px`,
+                                    left: 4, right: 4,
+                                  }}
+                                  onClick={() => setShowWalkIn(true)}
+                                />
+                              ))}
+                              {/* Appointment blocks */}
+                              {staffApts.map((apt) => {
+                                const clientName = apt.client
+                                  ? `${apt.client.first_name} ${apt.client.last_name || ""}`.trim()
+                                  : t("walkIn");
+                                return (
+                                  <div
+                                    key={apt.id}
+                                    className={`${styles.calApt} ${selectedApt?.id === apt.id ? styles.calAptActive : ""} ${apt.checked_out_at ? styles.calAptDone : ""}`}
+                                    style={{
+                                      top: `${getPos(apt.start_time)}px`,
+                                      height: `${getH(apt.start_time, apt.end_time)}px`,
+                                      borderLeftColor: aptColor(apt.status),
+                                      left: 4, right: 4,
+                                    }}
+                                    onClick={() => handleSelectApt(apt)}
+                                  >
+                                    <span className={styles.calAptClient}>{clientName}</span>
+                                    <span className={styles.calAptService}>{apt.service?.name || "Service"}</span>
+                                    <span className={styles.calAptTime}>
+                                      {formatTime(apt.start_time)} – {formatTime(apt.end_time)}
+                                    </span>
+                                    {apt.checked_out_at && <span className={styles.calAptBadge}>✓</span>}
+                                  </div>
+                                );
+                              })}
+                              {/* Now marker */}
+                              {isToday && nowHDec >= CAL_START && nowHDec <= CAL_END && (
+                                <div className={styles.calNow} style={{ top: `${(nowHDec - CAL_START) * CAL_SLOT_H}px` }}>
+                                  <span className={styles.calNowDot} />
+                                  <span className={styles.calNowLine} />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                  ))
-                )}
+                  ) : (
+                    /* ═══ Single Staff: Original Single Column ═══ */
+                    <div className={styles.calGrid}>
+                      {/* Hour lines */}
+                      {HOURS.map((h) => (
+                        <div key={h} className={styles.calSlot}>
+                          <span className={styles.calSlotLabel}>{fmtHour(h)}</span>
+                          <div className={styles.calSlotLine} />
+                        </div>
+                      ))}
+
+                      {/* Open slots */}
+                      {(() => {
+                        const openSlots = getOpenSlots(filteredApts);
+                        return openSlots.map((slot, i) => (
+                          <div
+                            key={`open-${i}`}
+                            className={styles.calOpen}
+                            style={{
+                              top: `${(slot.start - CAL_START) * CAL_SLOT_H}px`,
+                              height: `${(slot.end - slot.start) * CAL_SLOT_H}px`,
+                            }}
+                            onClick={() => setShowWalkIn(true)}
+                            title={`Open: ${fmtHour(slot.start)} – ${fmtHour(slot.end)}`}
+                          >
+                            <span className={styles.calOpenLabel}>+ Fill Opening</span>
+                          </div>
+                        ));
+                      })()}
+
+                      {/* Appointment blocks */}
+                      {filteredApts.map((apt) => {
+                        const clientName = apt.client
+                          ? `${apt.client.first_name} ${apt.client.last_name || ""}`.trim()
+                          : t("walkIn");
+                        return (
+                          <div
+                            key={apt.id}
+                            className={`${styles.calApt} ${selectedApt?.id === apt.id ? styles.calAptActive : ""} ${apt.checked_out_at ? styles.calAptDone : ""}`}
+                            style={{
+                              top: `${getPos(apt.start_time)}px`,
+                              height: `${getH(apt.start_time, apt.end_time)}px`,
+                              borderLeftColor: aptColor(apt.status),
+                            }}
+                            onClick={() => handleSelectApt(apt)}
+                          >
+                            <span className={styles.calAptClient}>{clientName}</span>
+                            <span className={styles.calAptService}>{apt.service?.name || "Service"}</span>
+                            <span className={styles.calAptTime}>
+                              {formatTime(apt.start_time)} – {formatTime(apt.end_time)}
+                            </span>
+                            {apt.checked_out_at && <span className={styles.calAptBadge}>✓</span>}
+                          </div>
+                        );
+                      })}
+
+                      {/* Now marker */}
+                      {isToday && nowHDec >= CAL_START && nowHDec <= CAL_END && (
+                        <div className={styles.calNow} style={{ top: `${(nowHDec - CAL_START) * CAL_SLOT_H}px` }}>
+                          <span className={styles.calNowDot} />
+                          <span className={styles.calNowLine} />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 
-            {/* ── Right: Checkout Panel ── */}
+            {/* ── Right: Checkout Panel (only when appointment selected) ── */}
+            {selectedApt && (
             <div className={styles.checkoutPanel}>
-              {!selectedApt ? (
-                <div className={styles.checkoutEmpty}>
-                  <span>💳</span>
-                  <p>{t("selectAppointment")}</p>
-                </div>
-              ) : (
+              {(() => { return (
                 <>
                   {/* Header */}
                   <div className={styles.checkoutHeader}>
@@ -449,6 +904,12 @@ export default function CheckoutPage() {
                         ✓ {t("checkedOut")} — {selectedApt.payment_method?.toUpperCase()} — ${Number(selectedApt.total_price || 0).toFixed(2)}
                         {Number(selectedApt.tip_amount) > 0 && ` + $${Number(selectedApt.tip_amount).toFixed(2)} tip`}
                       </div>
+                      <button
+                        className={styles.editCheckoutBtn}
+                        onClick={handleReopenCheckout}
+                      >
+                        ✏️ {t("editCheckout")}
+                      </button>
                     </div>
                   ) : (
                     <div className={styles.paymentSection}>
@@ -500,49 +961,79 @@ export default function CheckoutPage() {
                       </button>
                     </div>
                   )}
+                  {/* ── Before & After Photos ── */}
+                  {!isCheckedOut && (
+                    <div className={styles.photoSection}>
+                      <div className={styles.photoSectionTitle}>📸 Before & After</div>
+                      <div className={styles.photoUploads}>
+                        <label className={styles.photoSlot}>
+                          <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            if (file.size > 2 * 1024 * 1024) { alert("Max 2 MB"); return; }
+                            const r = new FileReader();
+                            r.onload = () => setBeforePhoto(r.result as string);
+                            r.readAsDataURL(file);
+                          }} />
+                          {beforePhoto ? (
+                            <div className={styles.photoThumb}>
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={beforePhoto} alt="Before" />
+                              <button className={styles.photoRemove} onClick={(e) => { e.preventDefault(); setBeforePhoto(null); }}>✕</button>
+                            </div>
+                          ) : (
+                            <div className={styles.photoPlaceholder}>
+                              <span>＋</span>
+                              <small>Before</small>
+                            </div>
+                          )}
+                        </label>
+                        <label className={styles.photoSlot}>
+                          <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            if (file.size > 2 * 1024 * 1024) { alert("Max 2 MB"); return; }
+                            const r = new FileReader();
+                            r.onload = () => setAfterPhoto(r.result as string);
+                            r.readAsDataURL(file);
+                          }} />
+                          {afterPhoto ? (
+                            <div className={styles.photoThumb}>
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={afterPhoto} alt="After" />
+                              <button className={styles.photoRemove} onClick={(e) => { e.preventDefault(); setAfterPhoto(null); }}>✕</button>
+                            </div>
+                          ) : (
+                            <div className={styles.photoPlaceholder}>
+                              <span>＋</span>
+                              <small>After</small>
+                            </div>
+                          )}
+                        </label>
+                      </div>
+                    </div>
+                  )}
                 </>
-              )}
+              ) })()}
             </div>
+            )}
           </div>
 
           {/* ── Daily Tally ── */}
-          {tally && (
+          {filteredTally && (
             <div className={styles.tallySection}>
               <div className={styles.tallyHeader}>
-                <h2>📊 {t("dailyTally")}</h2>
+                <h2>📊 {t("dailyTally")}{activeStaffId !== "all" ? ` — ${filteredTally.staff[0]?.name || ""}` : ""}</h2>
                 <span style={{ fontSize: "var(--text-sm)", color: "var(--text-tertiary)" }}>
                   {formatDate(selectedDate)}
                 </span>
-              </div>
-
-              <div className={styles.tallyKPIs}>
-                <div className={styles.tallyKPI}>
-                  <div className="kpiLabel">{t("totalRevenue")}</div>
-                  <div className="kpiValue kpiValueAccent">${tally.totals.services.toFixed(2)}</div>
-                </div>
-                <div className={styles.tallyKPI}>
-                  <div className="kpiLabel">{t("totalTips")}</div>
-                  <div className="kpiValue kpiValueSuccess">${tally.totals.tips.toFixed(2)}</div>
-                </div>
-                <div className={styles.tallyKPI}>
-                  <div className="kpiLabel">{t("upsellRevenue")}</div>
-                  <div className="kpiValue">${tally.totals.upsells.toFixed(2)}</div>
-                </div>
-                <div className={styles.tallyKPI}>
-                  <div className="kpiLabel">{t("appointments")}</div>
-                  <div className="kpiValue">{tally.totals.appointments}</div>
-                </div>
-                <div className={styles.tallyKPI}>
-                  <div className="kpiLabel">{t("commissionPayout")}</div>
-                  <div className="kpiValue kpiValueSuccess">${tally.totals.commission.toFixed(2)}</div>
-                </div>
               </div>
 
               <table className={styles.tallyTable}>
                 <thead>
                   <tr>
                     <th>{t("staffMember")}</th>
-                    <th>{t("appointments")}</th>
+                    <th>{t("client")}</th>
                     <th>{t("services")}</th>
                     <th>{t("upsells")}</th>
                     <th>{t("tips")}</th>
@@ -552,46 +1043,80 @@ export default function CheckoutPage() {
                 </thead>
                 <tbody>
                   {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                  {tally.staff.map((s: any) => (
-                    <tr key={s.id}>
-                      <td><strong>{s.name}</strong></td>
-                      <td>{s.appointments}</td>
-                      <td>${s.services_total.toFixed(2)}</td>
-                      <td>${s.upsell_total.toFixed(2)}</td>
-                      <td>${s.tips_total.toFixed(2)}</td>
-                      <td>{s.commission_rate}%</td>
-                      <td className={styles.commissionCell}>${s.commission_earned.toFixed(2)}</td>
-                    </tr>
+                  {filteredTally.staff.map((s: any) => (
+                    <Fragment key={s.id}>
+                      {/* Staff summary row */}
+                      <tr key={s.id} className={styles.tallyStaffRow}>
+                        <td rowSpan={s.details?.length > 0 ? 1 : 1}>
+                          <strong>{s.name}</strong>
+                          <span className={styles.tallySubtext}>{s.appointments} appt{s.appointments !== 1 ? 's' : ''}</span>
+                        </td>
+                        <td colSpan={4} className={styles.tallyStaffSummary}>
+                          Total: ${s.services_total.toFixed(2)} services · ${s.upsell_total.toFixed(2)} add-ons · ${s.tips_total.toFixed(2)} tips
+                        </td>
+                        <td>{s.commission_rate}%</td>
+                        <td className={styles.commissionCell}>${s.commission_earned.toFixed(2)}</td>
+                      </tr>
+                      {/* Detail rows per appointment */}
+                      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                      {(s.details || []).map((d: any) => (
+                        <tr key={d.appointment_id} className={styles.tallyDetailRow}>
+                          <td></td>
+                          <td>{d.client_name}</td>
+                          <td>{d.service_name} <span className={styles.tallyPrice}>${d.service_price.toFixed(2)}</span></td>
+                          <td>
+                            {d.add_ons.length > 0
+                              ? d.add_ons.map((a: any, i: number) => (
+                                  <span key={i} className={styles.tallyAddOn}>
+                                    {a.name} <span className={styles.tallyPrice}>${a.amount.toFixed(2)}</span>
+                                    {i < d.add_ons.length - 1 ? ', ' : ''}
+                                  </span>
+                                ))
+                              : <span className={styles.tallyMuted}>—</span>
+                            }
+                          </td>
+                          <td>{d.tip > 0 ? `$${d.tip.toFixed(2)}` : <span className={styles.tallyMuted}>—</span>}</td>
+                          <td></td>
+                          <td></td>
+                        </tr>
+                      ))}
+                    </Fragment>
                   ))}
-                  <tr className={styles.tallyTotalRow}>
-                    <td>{t("total")}</td>
-                    <td>{tally.totals.appointments}</td>
-                    <td>${tally.totals.services.toFixed(2)}</td>
-                    <td>${tally.totals.upsells.toFixed(2)}</td>
-                    <td>${tally.totals.tips.toFixed(2)}</td>
-                    <td>—</td>
-                    <td className={styles.commissionCell}>${tally.totals.commission.toFixed(2)}</td>
-                  </tr>
+                  {activeStaffId === "all" && (
+                    <tr className={styles.tallyTotalRow}>
+                      <td>{t("total")}</td>
+                      <td>{filteredTally.totals.appointments} appts</td>
+                      <td>${filteredTally.totals.services.toFixed(2)}</td>
+                      <td>${filteredTally.totals.upsells.toFixed(2)}</td>
+                      <td>${filteredTally.totals.tips.toFixed(2)}</td>
+                      <td>—</td>
+                      <td className={styles.commissionCell}>${filteredTally.totals.commission.toFixed(2)}</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
 
               <div className={styles.paymentSplit}>
                 <div className={styles.splitBadge}>
                   <span className={styles.splitIcon}>💵</span>
-                  {t("cash")}: ${tally.totals.cash.toFixed(2)}
+                  {t("cash")}: ${filteredTally.totals.cash.toFixed(2)}
                 </div>
                 <div className={styles.splitBadge}>
                   <span className={styles.splitIcon}>💳</span>
-                  {t("card")}: ${tally.totals.card.toFixed(2)}
+                  {t("card")}: ${filteredTally.totals.card.toFixed(2)}
                 </div>
-                <div className={styles.splitBadge}>
-                  <span className={styles.splitIcon}>🏪</span>
-                  {t("ownerRevenue")}: ${(tally.totals.services - tally.totals.commission + tally.totals.tips).toFixed(2)}
-                </div>
+                {activeStaffId === "all" && (
+                  <div className={styles.splitBadge}>
+                    <span className={styles.splitIcon}>🏪</span>
+                    {t("ownerRevenue")}: ${(filteredTally.totals.services - filteredTally.totals.commission + filteredTally.totals.tips).toFixed(2)}
+                  </div>
+                )}
               </div>
             </div>
           )}
         </>
+      )}
+      </>
       )}
 
       {/* ── Walk-in Modal ── */}
@@ -603,21 +1128,21 @@ export default function CheckoutPage() {
               <button className={styles.modalClose} onClick={() => setShowWalkIn(false)}>✕</button>
             </div>
             <div className={styles.modalBody}>
-              {/* Staff */}
-              <label className={styles.formLabel}>{t("selectStaff")} *</label>
-              <select className={styles.formSelect} value={walkInStaff} onChange={(e) => setWalkInStaff(e.target.value)}>
-                <option value="">{t("selectStaff")}...</option>
-                {activeStaff.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </select>
-
               {/* Service */}
               <label className={styles.formLabel}>{t("selectService")} *</label>
               <select className={styles.formSelect} value={walkInService} onChange={(e) => setWalkInService(e.target.value)}>
                 <option value="">{t("selectService")}...</option>
                 {services.map((s) => (
                   <option key={s.id} value={s.id}>{s.name} — ${s.price}</option>
+                ))}
+              </select>
+
+              {/* Staff */}
+              <label className={styles.formLabel}>{t("selectStaff")} *</label>
+              <select className={styles.formSelect} value={walkInStaff} onChange={(e) => setWalkInStaff(e.target.value)}>
+                <option value="">{t("selectStaff")}...</option>
+                {activeStaff.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
                 ))}
               </select>
 
@@ -660,6 +1185,63 @@ export default function CheckoutPage() {
                 {creatingWalkIn ? t("processing") : `🚶 ${t("createWalkIn")}`}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── PIN Keypad Modal ── */}
+      {pinModalStaffId && (
+        <div className={styles.pinOverlay} onClick={() => setPinModalStaffId(null)}>
+          <div className={`${styles.pinModal} ${pinError ? styles.pinShake : ""}`} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.pinHeader}>
+              <span className={styles.pinLockIcon}>🔒</span>
+              <h3>{pinModalStaffName}</h3>
+              <p>{t("enterPin")}</p>
+            </div>
+            <div className={styles.pinDots}>
+              {[0, 1, 2, 3].map((i) => (
+                <div key={i} className={`${styles.pinDot} ${pinInput.length > i ? styles.pinDotFilled : ""}`} />
+              ))}
+            </div>
+            {pinError && <p className={styles.pinErrorText}>{t("wrongPin")}</p>}
+            <div className={styles.pinKeypad}>
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
+                <button
+                  key={n}
+                  className={styles.pinKey}
+                  onClick={() => {
+                    const next = pinInput + String(n);
+                    setPinInput(next);
+                    if (next.length === 4) {
+                      setTimeout(() => handlePinSubmit(next), 150);
+                    }
+                  }}
+                  disabled={pinInput.length >= 4}
+                >
+                  {n}
+                </button>
+              ))}
+              <button className={`${styles.pinKey} ${styles.pinKeyMuted}`} onClick={() => setPinModalStaffId(null)}>
+                ✕
+              </button>
+              <button
+                className={styles.pinKey}
+                onClick={() => {
+                  const next = pinInput + "0";
+                  setPinInput(next);
+                  if (next.length === 4) {
+                    setTimeout(() => handlePinSubmit(next), 150);
+                  }
+                }}
+                disabled={pinInput.length >= 4}
+              >
+                0
+              </button>
+              <button className={`${styles.pinKey} ${styles.pinKeyMuted}`} onClick={() => setPinInput(pinInput.slice(0, -1))}>
+                ⌫
+              </button>
+            </div>
+            {pinVerifying && <p className={styles.pinVerifying}>{t("processing")}</p>}
           </div>
         </div>
       )}

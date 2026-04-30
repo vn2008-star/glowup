@@ -206,6 +206,31 @@
   border-radius: var(--radius-md);
   background: var(--bg-surface);
 }
+/* ── Recent Clients ── */
+.recentCard {
+  padding: var(--space-6);
+}
+.recentCard h2 {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  margin-bottom: var(--space-4);
+}
+.recentList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.recentRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-3);
+  border-radius: var(--radius-md);
+  transition: background var(--transition-fast);
+}
+.recentRow:hover {
+  background: var(--bg-surface);
+}
 .clientAvatar {
   width: 36px;
   height: 36px;
@@ -215,9 +240,28 @@
   background: var(--gradient-primary);
   color: var(--text-inverse);
   font-weight: 700;
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   border-radius: var(--radius-full);
   flex-shrink: 0;
+}
+.clientInfo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.clientName {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.clientMeta {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
 }
 .atRiskInfo {
   flex: 1;
@@ -233,6 +277,28 @@
 .atRiskDetail {
   font-size: var(--text-xs);
   color: var(--text-tertiary);
+}
+.atRiskCard {
+  padding: var(--space-6);
+}
+.scheduleHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-4);
+}
+.scheduleHeader h2 {
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+.viewAll {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-primary);
+  text-decoration: none;
+}
+.viewAll:hover {
+  text-decoration: underline;
 }
 
 /* ── Empty States ── */

@@ -31,6 +31,8 @@ export default function SettingsPage() {
   const [linkCopied, setLinkCopied] = useState(false);
   const [clientCount, setClientCount] = useState(0);
 
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+
   // Form state
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -67,6 +69,7 @@ export default function SettingsPage() {
     setEmail(tenant.email || "");
     setWebsite(tenant.website || "");
     setAddress(tenant.address || "");
+    setLogoUrl(tenant.logo_url || null);
 
     // Load business hours from tenant settings JSON
     if (tenant.settings && typeof tenant.settings === "object") {
@@ -125,6 +128,7 @@ export default function SettingsPage() {
         email: email || null,
         website: website || null,
         address: address || null,
+        logo_url: logoUrl,
         settings,
       }),
     });
@@ -159,6 +163,50 @@ export default function SettingsPage() {
       {/* Business Profile */}
       <div className={`card ${styles.section}`}>
         <h2>Business Profile</h2>
+
+        {/* Logo Upload */}
+        <div className={styles.logoUploadRow}>
+          <label className={styles.logoUpload}>
+            <input
+              type="file"
+              accept="image/*"
+              style={{ display: "none" }}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                if (file.size > 2 * 1024 * 1024) {
+                  alert("Image must be under 2 MB");
+                  return;
+                }
+                const reader = new FileReader();
+                reader.onload = () => setLogoUrl(reader.result as string);
+                reader.readAsDataURL(file);
+              }}
+            />
+            {logoUrl ? (
+              <div className={styles.logoPreview}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={logoUrl} alt="Business logo" />
+                <div className={styles.logoOverlay}>Change</div>
+              </div>
+            ) : (
+              <div className={styles.logoPlaceholder}>
+                <span>＋</span>
+                <small>Upload Logo</small>
+              </div>
+            )}
+          </label>
+          {logoUrl && (
+            <button
+              className={styles.logoRemoveBtn}
+              onClick={() => setLogoUrl(null)}
+              type="button"
+            >
+              Remove
+            </button>
+          )}
+        </div>
+
         <div className={styles.formGrid}>
           <div className={styles.formGroup}>
             <label className="label">Business Name</label>
@@ -626,6 +674,95 @@ export default function SettingsPage() {
               </div>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* ── Danger Zone ── */}
+      <div className={`card ${styles.section} ${styles.dangerZone}`}>
+        <h2>⚠️ Danger Zone</h2>
+
+        {/* Suspend / Reactivate */}
+        <div className={styles.dangerItem}>
+          <div className={styles.dangerInfo}>
+            <h3>Disable Account</h3>
+            <p>Suspend your account temporarily. Staff won&apos;t be able to log in and your booking page will be hidden. All data is preserved.</p>
+          </div>
+          <button
+            className={`btn ${tenant?.is_active === false ? 'btn-primary' : 'btn-secondary'} ${styles.dangerBtn}`}
+            onClick={async () => {
+              const action = tenant?.is_active === false ? 'enable' : 'disable';
+              if (action === 'disable' && !confirm('Are you sure you want to suspend your account? Staff will be logged out and bookings will be paused.')) return;
+              const res = await fetch('/api/account-management', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action }),
+              });
+              if (res.ok) {
+                await refetch();
+                alert(action === 'disable' ? 'Account suspended.' : 'Account reactivated!');
+              } else {
+                const d = await res.json();
+                alert(d.error || 'Failed');
+              }
+            }}
+          >
+            {tenant?.is_active === false ? '✓ Reactivate Account' : 'Disable Account'}
+          </button>
+        </div>
+
+        {/* Deletion scheduled banner */}
+        {tenant?.deletion_scheduled_at && (
+          <div className={styles.deletionBanner}>
+            <div>
+              <strong>🗑️ Account scheduled for deletion</strong>
+              <p>Your account and all data will be permanently deleted on <strong>{new Date(tenant.deletion_scheduled_at as string).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</strong>.</p>
+            </div>
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={async () => {
+                const res = await fetch('/api/account-management', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ action: 'cancel-delete' }),
+                });
+                if (res.ok) {
+                  await refetch();
+                  alert('Deletion cancelled! Your account has been reactivated.');
+                }
+              }}
+            >
+              Cancel Deletion
+            </button>
+          </div>
+        )}
+
+        {/* Delete Account */}
+        <div className={styles.dangerItem}>
+          <div className={styles.dangerInfo}>
+            <h3>Delete Account</h3>
+            <p>Permanently delete your business account and all associated data (clients, appointments, staff, services). This action has a 30-day grace period before data is permanently removed.</p>
+          </div>
+          <button
+            className={`btn ${styles.deleteBtn}`}
+            onClick={async () => {
+              const confirmName = prompt(`To confirm, please type your business name: "${tenant?.name}"`);
+              if (!confirmName) return;
+              const res = await fetch('/api/account-management', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'delete', confirm_name: confirmName }),
+              });
+              const d = await res.json();
+              if (res.ok) {
+                await refetch();
+                alert(`Account scheduled for deletion on ${new Date(d.deletion_date).toLocaleDateString()}. You have 30 days to cancel.`);
+              } else {
+                alert(d.error || 'Deletion failed');
+              }
+            }}
+          >
+            Delete Account
+          </button>
         </div>
       </div>
 

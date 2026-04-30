@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 // Dashboard layout v2 - updated nav items
 
 import styles from "./dashboard.module.css";
@@ -57,14 +57,14 @@ const GiftIcon = () => (
 const CameraIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></svg>
 );
-const CheckoutIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" /><line x1="3" y1="6" x2="21" y2="6" /><path d="M16 10a4 4 0 0 1-8 0" /></svg>
+const FrontDeskIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="13" width="20" height="5" rx="1" /><path d="M12 3v10" /><path d="M8 7h8" /><circle cx="6" cy="21" r="1" /><circle cx="18" cy="21" r="1" /></svg>
 );
 
 const navKeys = [
   { href: "/dashboard", icon: <HomeIcon />, key: "overview" },
   { href: "/dashboard/calendar", icon: <CalendarIcon />, key: "calendar" },
-  { href: "/dashboard/checkout", icon: <CheckoutIcon />, key: "checkout" },
+  { href: "/dashboard/checkout", icon: <FrontDeskIcon />, key: "frontDesk" },
   { href: "/dashboard/clients", icon: <UsersIcon />, key: "clients" },
   { href: "/dashboard/services", icon: <ScissorsIcon />, key: "services" },
   { href: "/dashboard/packages", icon: <GiftIcon />, key: "packages" },
@@ -92,13 +92,26 @@ function ThemeToggle() {
   );
 }
 
+const ADMIN_EMAILS = ['vn2008@gmail.com'];
+
 function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { tenant, currentStaff, loading } = useTenant();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const t = useTranslations('dashboard');
   const tc = useTranslations('common');
+
+  // Check if the current user is a platform admin
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user?.email && ADMIN_EMAILS.includes(user.email.toLowerCase())) {
+        setIsAdmin(true);
+      }
+    });
+  }, []);
 
   async function handleLogout() {
     clearTenantCache();
@@ -114,6 +127,21 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
 
   // Close mobile menu on route change
   const handleNavClick = () => setMobileMenuOpen(false);
+
+  const isFrontDesk = pathname === '/dashboard/checkout';
+
+  // Front Desk mode: full-screen, no sidebar, no top bar
+  if (isFrontDesk) {
+    return (
+      <div className={styles.layout}>
+        <div className={styles.content} style={{ marginLeft: 0 }}>
+          <main className={styles.mainContent}>
+            {children}
+          </main>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.layout}>
@@ -160,6 +188,12 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
           <div className={styles.footerActions}>
             <LanguageSwitcher variant="sidebar" />
             <ThemeToggle />
+            {isAdmin && (
+              <Link href="/admin" className={styles.logoutButton} title="Platform Admin" style={{ textDecoration: 'none' }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
+                <span>Admin</span>
+              </Link>
+            )}
             <button onClick={handleLogout} className={styles.logoutButton} title={tc('signOut')}>
               <LogoutIcon /> <span>{tc('signOut')}</span>
             </button>

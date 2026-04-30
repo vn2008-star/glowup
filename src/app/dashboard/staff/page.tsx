@@ -31,7 +31,7 @@ export default function StaffPage() {
   const [formData, setFormData] = useState({
     name: "", email: "", phone: "", role: "technician" as string,
     professional_title: PROFESSIONAL_TYPES[0].title,
-    specialties: [] as string[], commission_rate: 0, is_active: true, photo_url: "",
+    specialties: [] as string[], commission_rate: 0, is_active: true, photo_url: "", pin: "",
   });
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
 
@@ -66,7 +66,7 @@ export default function StaffPage() {
     setFormData({
       name: "", email: "", phone: "", role: "technician",
       professional_title: PROFESSIONAL_TYPES[0].title,
-      specialties: [], commission_rate: 0, is_active: true, photo_url: "",
+      specialties: [], commission_rate: 0, is_active: true, photo_url: "", pin: "",
     });
     setPhotoPreview(null);
     setShowModal(true);
@@ -84,6 +84,7 @@ export default function StaffPage() {
       commission_rate: s.commission_rate,
       is_active: s.is_active,
       photo_url: s.photo_url || "",
+      pin: s.pin || "",
     });
     setPhotoPreview(s.photo_url || null);
     setShowModal(true);
@@ -146,6 +147,7 @@ export default function StaffPage() {
       specialties: allSpecialties,
       commission_rate: formData.commission_rate,
       is_active: formData.is_active,
+      pin: formData.pin || null,
     };
 
     // Only include photo_url if present (column may not exist yet)
@@ -475,6 +477,25 @@ export default function StaffPage() {
                   <div className={styles.formGroup}>
                     <label className="label">Commission Rate (%)</label>
                     <input className="input" type="number" value={formData.commission_rate} onChange={(e) => setFormData({ ...formData, commission_rate: Number(e.target.value) })} />
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label className="label">🔒 Tablet PIN</label>
+                    <input
+                      className="input"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={4}
+                      value={formData.pin}
+                      placeholder="4-digit PIN"
+                      onChange={(e) => {
+                        const v = e.target.value.replace(/\D/g, "").slice(0, 4);
+                        setFormData({ ...formData, pin: v });
+                      }}
+                    />
+                    <span style={{ fontSize: "12px", color: "var(--text-tertiary)", marginTop: "4px" }}>
+                      {formData.pin ? `PIN: ${formData.pin}` : "No PIN set — staff can access without PIN"}
+                    </span>
                   </div>
                   {editingStaff && (
                     <div className={styles.formGroup}>

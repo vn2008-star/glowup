@@ -131,7 +131,8 @@
     "inbox": "Hộp thư",
     "reports": "Báo cáo",
     "settings": "Cài đặt",
-    "checkout": "Thanh toán"
+    "checkout": "Thanh toán",
+    "frontDesk": "Quầy Tiếp Tân"
   },
   "calendarPage": {
     "title": "Lịch hẹn",
@@ -413,7 +414,7 @@
     "basedOn": "Dựa trên"
   },
   "checkoutPage": {
-    "title": "Thanh toán & Tổng kết ngày",
+    "title": "Quầy Tiếp Tân",
     "allStaff": "Tất cả nhân viên",
     "todaysAppointments": "Lịch hẹn hôm nay",
     "total": "Tổng",
@@ -435,14 +436,15 @@
     "processing": "Đang xử lý...",
     "completeCheckout": "Hoàn tất thanh toán",
     "checkedOut": "Đã thanh toán",
+    "editCheckout": "Sửa thanh toán",
     "dailyTally": "Tổng kết ngày — Chia doanh thu",
     "totalRevenue": "Tổng doanh thu",
     "totalTips": "Tổng tiền bo",
-    "upsellRevenue": "Doanh thu upsell",
+    "upsellRevenue": "Doanh thu dịch vụ thêm",
     "appointments": "Lịch hẹn",
     "commissionPayout": "Hoa hồng",
     "staffMember": "Nhân viên",
-    "upsells": "Upsell",
+    "upsells": "Dịch vụ thêm",
     "tips": "Tiền bo",
     "commission": "Hoa hồng",
     "payout": "Chi trả",
@@ -455,6 +457,10 @@
     "clientPhone": "Số điện thoại (tùy chọn)",
     "createWalkIn": "Tạo khách vãng lai",
     "clientBirthday": "Sinh nhật (tùy chọn)",
-    "birthdaySurprise": "Chúng tôi sẽ gửi ưu đãi đặc biệt vào ngày sinh nhật của bạn!"
+    "birthdaySurprise": "Chúng tôi sẽ gửi ưu đãi đặc biệt vào ngày sinh nhật của bạn!",
+    "enterPin": "Nhập mã PIN",
+    "wrongPin": "Sai mã PIN — thử lại",
+    "lock": "Đăng xuất",
+    "client": "Khách hàng"
   }
 }

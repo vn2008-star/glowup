@@ -131,7 +131,8 @@
     "inbox": "받은편지함",
     "reports": "리포트",
     "settings": "설정",
-    "checkout": "결제"
+    "checkout": "결제",
+    "frontDesk": "프론트 데스크"
   },
   "calendarPage": {
     "title": "캘린더", "today": "오늘", "day": "일", "week": "주", "month": "월",
@@ -245,7 +246,7 @@
     "free": "무료", "perMonth": "/월", "basedOn": "기준"
   },
   "checkoutPage": {
-    "title": "결제 & 일일 정산",
+    "title": "프론트 데스크",
     "allStaff": "전체 직원",
     "todaysAppointments": "오늘의 예약",
     "total": "총계",
@@ -267,14 +268,15 @@
     "processing": "처리 중...",
     "completeCheckout": "결제 완료",
     "checkedOut": "결제 완료",
+    "editCheckout": "결제 수정",
     "dailyTally": "일일 정산 — 수익 분배",
     "totalRevenue": "총 매출",
     "totalTips": "총 팁",
-    "upsellRevenue": "추가 매출",
+    "upsellRevenue": "추가 서비스 매출",
     "appointments": "예약",
     "commissionPayout": "커미션 지급",
     "staffMember": "직원",
-    "upsells": "추가 판매",
+    "upsells": "추가 서비스",
     "tips": "팁",
     "commission": "커미션",
     "payout": "지급액",
@@ -287,6 +289,10 @@
     "clientPhone": "전화번호 (선택)",
     "createWalkIn": "워크인 생성",
     "clientBirthday": "생일 (선택)",
-    "birthdaySurprise": "생일에 특별한 서프라이즈를 보내드려요!"
+    "birthdaySurprise": "생일에 특별한 서프라이즈를 보내드려요!",
+    "enterPin": "PIN을 입력하세요",
+    "wrongPin": "잘못된 PIN — 다시 시도하세요",
+    "lock": "로그아웃",
+    "client": "고객"
   }
 }

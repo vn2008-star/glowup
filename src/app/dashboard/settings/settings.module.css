@@ -10,6 +10,92 @@
 .formGroup { display: flex; flex-direction: column; }
 .fullWidth { grid-column: 1 / -1; }
 
+/* Logo Upload */
+.logoUploadRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+.logoUpload {
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.logoPreview {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  overflow: hidden;
+  position: relative;
+  border: 3px solid var(--border-primary);
+  transition: all 0.2s;
+}
+.logoPreview:hover {
+  border-color: var(--color-primary);
+}
+.logoPreview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.logoOverlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.logoPreview:hover .logoOverlay {
+  opacity: 1;
+}
+.logoPlaceholder {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  border: 2px dashed var(--border-primary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  color: var(--text-tertiary);
+  transition: all 0.2s;
+}
+.logoPlaceholder:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+.logoPlaceholder span {
+  font-size: 22px;
+  line-height: 1;
+}
+.logoPlaceholder small {
+  font-size: 10px;
+  font-weight: 600;
+}
+.logoRemoveBtn {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  cursor: pointer;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-md);
+  transition: all 0.15s;
+}
+.logoRemoveBtn:hover {
+  color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+}
+
 .hoursList { display: flex; flex-direction: column; gap: var(--space-3); }
 .hoursRow { display: flex; align-items: center; gap: var(--space-4); padding: var(--space-2) 0; }
 .dayName { width: 100px; font-size: var(--text-sm); font-weight: 600; color: var(--text-primary); }
@@ -222,10 +308,80 @@
   line-height: var(--leading-relaxed);
 }
 
+/* ── Danger Zone ── */
+.dangerZone {
+  border: 1px solid rgba(239, 68, 68, 0.3) !important;
+}
+.dangerZone h2 {
+  color: #ef4444 !important;
+  border-bottom-color: rgba(239, 68, 68, 0.2) !important;
+}
+.dangerItem {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.dangerItem:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.dangerInfo h3 {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: var(--space-1);
+}
+.dangerInfo p {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  line-height: var(--leading-relaxed);
+  max-width: 480px;
+}
+.dangerBtn {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.deleteBtn {
+  flex-shrink: 0;
+  white-space: nowrap;
+  background: #ef4444 !important;
+  border-color: #ef4444 !important;
+  color: white !important;
+}
+.deleteBtn:hover {
+  background: #dc2626 !important;
+  border-color: #dc2626 !important;
+}
+.deletionBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: var(--radius-lg);
+  margin: var(--space-3) 0;
+}
+.deletionBanner strong {
+  font-size: var(--text-sm);
+  color: #ef4444;
+}
+.deletionBanner p {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  margin-top: var(--space-1);
+  line-height: var(--leading-relaxed);
+}
+
 @media (max-width: 768px) {
   .formGrid { grid-template-columns: 1fr; }
   .upgradePlans { flex-direction: column; }
   .aiStatusRow { flex-direction: column; align-items: flex-start; }
   .reminderGridHeader,
   .reminderGridRow { grid-template-columns: 1fr 80px 80px; }
+  .dangerItem { flex-direction: column; }
 }

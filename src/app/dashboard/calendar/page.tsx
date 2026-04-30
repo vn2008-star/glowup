@@ -240,7 +240,7 @@ export default function CalendarPage() {
     const service = services.find(s => s.id === formData.service_id);
     const start = new Date(formData.start_time);
     const end = new Date(start.getTime() + (service?.duration_minutes || 60) * 60 * 1000);
-    const { data } = await queryData<FullAppointment>("appointments.add", {
+    const { data, error } = await queryData<FullAppointment>("appointments.add", {
       client_id: formData.client_id || null,
       service_id: formData.service_id,
       staff_id: formData.staff_id || null,
@@ -250,6 +250,10 @@ export default function CalendarPage() {
       total_price: service?.price || 0,
       notes: formData.notes || null,
     });
+    if (error) {
+      alert(`Failed to book appointment: ${error}`);
+      return;
+    }
     if (data) {
       setAppointments(prev => [...prev, data]);
       setShowModal(false);
