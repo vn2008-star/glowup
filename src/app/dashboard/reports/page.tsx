@@ -248,7 +248,7 @@ export default function ReportsPage() {
                   <div className={styles.retLabel}>At Risk</div>
                 </div>
                 <div className={styles.retCard}>
-                  <div className={styles.retValue} style={{ color: 'var(--color-error)' }}>{retention.summary.lost}</div>
+                  <div className={styles.retValue} style={{ color: 'var(--color-danger)' }}>{retention.summary.lost}</div>
                   <div className={styles.retLabel}>Lost (90+ days)</div>
                 </div>
                 <div className={styles.retCard}>
@@ -277,7 +277,7 @@ export default function ReportsPage() {
                     </span>
                     <span className={styles.retName}>{c.first_name} {c.last_name || ''}</span>
                     <span className={styles.retVisits}>{c.visit_count} visits</span>
-                    <span className={styles.retDays} style={{ color: c.daysSinceLastVisit > 90 ? 'var(--color-error)' : c.daysSinceLastVisit > 45 ? '#d97706' : 'var(--text-secondary)' }}>
+                    <span className={styles.retDays} style={{ color: c.daysSinceLastVisit > 90 ? 'var(--color-danger)' : c.daysSinceLastVisit > 45 ? '#d97706' : 'var(--text-secondary)' }}>
                       {c.daysSinceLastVisit > 900 ? 'No visits' : `${c.daysSinceLastVisit}d ago`}
                     </span>
                   </div>

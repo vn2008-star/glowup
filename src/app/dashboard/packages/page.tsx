@@ -207,7 +207,7 @@ export default function PackagesPage() {
                     </div>
                     <div className={styles.pkgActions}>
                       <button className="btn btn-sm btn-outline" onClick={() => openEditPkg(pkg)}>Edit</button>
-                      <button className="btn btn-sm btn-outline" onClick={() => handleDeletePkg(pkg.id)} style={{ color: '#ff4d6a', borderColor: '#ff4d6a' }}>Delete</button>
+                      <button className="btn btn-sm btn-danger" onClick={() => handleDeletePkg(pkg.id)}>Delete</button>
                     </div>
                   </div>
                 ))}
@@ -301,7 +301,7 @@ export default function PackagesPage() {
                       ))}
                     </select>
                     <input type="number" value={ps.quantity} onChange={e => updatePkgService(i, 'quantity', parseInt(e.target.value) || 1)} style={{ width: '60px', padding: '8px', borderRadius: '8px', border: '1px solid var(--border-default)', background: 'var(--bg-surface)', color: 'var(--text-primary)' }} min={1} />
-                    <button onClick={() => removePkgService(i)} style={{ background: 'none', border: 'none', color: 'var(--color-error)', cursor: 'pointer', fontSize: '1.2rem' }}>×</button>
+                    <button onClick={() => removePkgService(i)} style={{ background: 'none', border: 'none', color: 'var(--color-danger)', cursor: 'pointer', fontSize: '1.2rem' }}>×</button>
                   </div>
                 ))}
                 <button className="btn btn-sm btn-outline" onClick={addServiceToPkg} style={{ marginTop: '4px' }}>+ Add Service</button>
