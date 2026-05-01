@@ -1516,6 +1516,70 @@ export async function POST(request: Request) {
         return NextResponse.json({ data: newApt })
       }
 
+      /* ═══ Feedback ═══ */
+      case 'feedback.create': {
+        // Get staff_id from current user
+        const { data: staffRow } = await svc
+          .from('staff')
+          .select('id')
+          .eq('tenant_id', tenantId)
+          .eq('user_id', user.id)
+          .single()
+
+        const { data: fb, error: fbErr } = await svc
+          .from('feedback')
+          .insert({
+            tenant_id: tenantId,
+            staff_id: staffRow?.id || null,
+            page: payload.page,
+            type: payload.type || 'feedback',
+            message: payload.message,
+            rating: payload.rating || null,
+          })
+          .select()
+          .single()
+
+        if (fbErr) return NextResponse.json({ error: fbErr.message }, { status: 500 })
+        return NextResponse.json({ data: fb })
+      }
+
+      case 'feedback.list': {
+        let query = svc
+          .from('feedback')
+          .select('*, staff:staff(name)')
+          .eq('tenant_id', tenantId)
+          .order('created_at', { ascending: false })
+
+        if (payload?.status) query = query.eq('status', payload.status)
+        if (payload?.type) query = query.eq('type', payload.type)
+        if (payload?.limit) query = query.limit(payload.limit)
+        else query = query.limit(50)
+
+        const { data: fbList, error: fbListErr } = await query
+        if (fbListErr) return NextResponse.json({ error: fbListErr.message }, { status: 500 })
+        return NextResponse.json({ data: fbList })
+      }
+
+      case 'feedback.update': {
+        const { id, ...updates } = payload
+        if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
+
+        if (updates.status === 'reviewed' || updates.status === 'planned' || updates.status === 'done' || updates.status === 'dismissed') {
+          updates.reviewed_at = new Date().toISOString()
+        }
+
+        const { data: fbUp, error: fbUpErr } = await svc
+          .from('feedback')
+          .update(updates)
+          .eq('id', id)
+          .eq('tenant_id', tenantId)
+          .select()
+          .single()
+
+        if (fbUpErr) return NextResponse.json({ error: fbUpErr.message }, { status: 500 })
+        return NextResponse.json({ data: fbUp })
+      }
+
       default:
         return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 })
     }

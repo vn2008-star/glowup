@@ -9,6 +9,7 @@ import { useTenant, TenantProvider, clearTenantCache } from "@/lib/tenant-contex
 import { createClient } from "@/lib/supabase/client";
 import { GlowUpLogo } from "@/components/GlowUpLogo";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { FeedbackWidget } from "@/components/FeedbackWidget";
 import { useTheme } from "@/lib/theme-context";
 import { useTranslations } from "next-intl";
 
@@ -144,6 +145,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
             {children}
           </main>
         </div>
+        <FeedbackWidget />
       </div>
     );
   }
@@ -228,6 +230,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       </div>
+      <FeedbackWidget />
     </div>
   );
 }
