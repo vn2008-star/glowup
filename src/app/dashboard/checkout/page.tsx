@@ -967,7 +967,7 @@ export default function CheckoutPage() {
                             {w.client ? `${w.client.first_name} ${w.client.last_name || ''}`.trim() : 'Guest'}
                           </div>
                           <div className={styles.queueService}>
-                            {w.service?.name || 'Service'} · {w.staff_id ? 'Requested you' : 'Any Staff'}
+                            {w.service?.name || 'Service'} · {w.staff_id === unlockedStaffId ? 'Requested you' : 'Any Staff'}
                           </div>
                         </div>
                         <button
