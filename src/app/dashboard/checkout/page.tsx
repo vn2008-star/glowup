@@ -958,7 +958,7 @@ export default function CheckoutPage() {
                 return (
                   <div className={styles.waitlistClaimSection}>
                     <div className={styles.waitlistClaimHeader}>
-                      <span>🚶 Walk-in Queue ({claimable.length})</span>
+                      <span>🚶 Walk-in Waitlist ({claimable.length})</span>
                     </div>
                     {claimable.map((w: { id: string; staff_id: string | null; client: { first_name: string; last_name?: string } | null; service: { name: string } | null }) => (
                       <div key={w.id} className={styles.waitlistClaimItem}>
