@@ -1015,7 +1015,7 @@ export default function CheckoutPage() {
                     const s = new Date(start);
                     const e = new Date(end);
                     const hrs = (e.getTime() - s.getTime()) / (1000 * 60 * 60);
-                    return Math.max(hrs * CAL_SLOT_H, 28);
+                    return Math.max(hrs * CAL_SLOT_H, 40);
                   };
 
                   const aptColor = (status: string) => {
