@@ -170,8 +170,6 @@ export async function POST(request: Request) {
         first_name: firstName,
         last_name: lastName,
         phone: client_phone?.trim() || null,
-        source: 'walk-in',
-        status: 'new',
       })
       .select('id')
       .single()
