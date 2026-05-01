@@ -733,11 +733,14 @@ export async function POST(request: Request) {
 
       // ─── WAITLIST ───
       case 'waitlist.list': {
+        const todayStr = new Date().toISOString().split('T')[0]
         const { data, error } = await svc
           .from('waitlist')
           .select('*, client:clients(id, first_name, last_name, phone, email), service:services(id, name, price), staff_member:staff!staff_id(id, name)')
           .eq('tenant_id', tenantId)
-          .order('created_at', { ascending: false })
+          .eq('status', 'waiting')
+          .gte('created_at', `${todayStr}T00:00:00`)
+          .order('created_at', { ascending: true })
         return NextResponse.json({ data, error: error?.message })
       }
 

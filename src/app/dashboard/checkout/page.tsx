@@ -168,16 +168,23 @@ export default function CheckoutPage() {
   async function handleClaimWalkin(waitlistId: string) {
     if (!unlockedStaffId || !tenant) return;
     setClaimingId(waitlistId);
+
+    // Optimistic: remove from waitlist immediately so UI feels instant
+    setStaffWaitlist((prev) => prev.filter((w) => w.id !== waitlistId));
+
     try {
       const { data } = await queryData("waitlist.claim", {
         waitlist_id: waitlistId,
         staff_id: unlockedStaffId,
       });
       if (data) {
-        // Refresh everything — the new appointment will appear on the calendar
+        // Refresh appointments + waitlist to sync with server
         await Promise.all([fetchData(), fetchStaffWaitlist(), fetchWaitlist()]);
       }
-    } catch { /* silent */ }
+    } catch {
+      // Revert optimistic update on failure
+      fetchStaffWaitlist();
+    }
     setClaimingId(null);
   }
 
