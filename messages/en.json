@@ -468,7 +468,7 @@
     "waitlistName": "Your Name",
     "waitlistPhone": "Phone (optional)",
     "waitlistService": "Service (optional)",
-    "currentQueue": "Current Queue",
+    "currentQueue": "Current Waitlist",
     "positionInLine": "Position",
     "estimatedWait": "~{min} min wait",
     "noOneWaiting": "No one waiting — you'd be first!",
