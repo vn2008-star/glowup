@@ -1460,7 +1460,7 @@ export async function POST(request: Request) {
 
       // ─── Waitlist: Staff claims a walk-in client ───
       case 'waitlist.claim': {
-        const { waitlist_id, staff_id: claimStaffId } = body
+        const { waitlist_id, staff_id: claimStaffId } = payload
 
         if (!waitlist_id || !claimStaffId) {
           return NextResponse.json({ error: 'Missing waitlist_id or staff_id' }, { status: 400 })
