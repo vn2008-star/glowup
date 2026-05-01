@@ -994,7 +994,7 @@ export default function CheckoutPage() {
                   </div>
                 ) : (() => {
                   // Calendar time grid constants
-                  const CAL_SLOT_H = 60; // px per hour
+                  const CAL_SLOT_H = 80; // px per hour
                   const CAL_START = 9; // 9 AM
                   const CAL_END = 19; // 7 PM
                   const HOURS = Array.from({ length: CAL_END - CAL_START }, (_, i) => i + CAL_START);

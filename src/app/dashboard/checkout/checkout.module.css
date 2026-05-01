@@ -763,7 +763,7 @@
   position: relative;
 }
 .calTimeSlot {
-  height: 60px;
+  height: 80px;
   display: flex;
   align-items: flex-start;
   justify-content: flex-end;
@@ -821,7 +821,7 @@
 }
 .calColBody {
   position: relative;
-  min-height: 600px;
+  min-height: 800px;
 }
 .calColLine {
   position: absolute;
@@ -834,11 +834,11 @@
 /* Single-column layout (individual staff) */
 .calGrid {
   position: relative;
-  min-height: 600px;
+  min-height: 800px;
   padding-left: 0;
 }
 .calSlot {
-  height: 60px;
+  height: 80px;
   display: flex;
   align-items: flex-start;
   position: relative;
