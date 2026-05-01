@@ -1746,3 +1746,57 @@
   white-space: nowrap;
   letter-spacing: 0.3px;
 }
+
+/* ── Staff View: Waitlist Claim Section ── */
+.waitlistClaimSection {
+  background: color-mix(in srgb, var(--color-warning) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-warning) 25%, transparent);
+  border-radius: var(--radius-lg);
+  margin: 0 var(--space-3) var(--space-2);
+  overflow: hidden;
+}
+.waitlistClaimHeader {
+  padding: var(--space-2) var(--space-3);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-warning);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-warning) 15%, transparent);
+}
+.waitlistClaimItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-warning) 10%, transparent);
+  transition: background 0.15s;
+}
+.waitlistClaimItem:last-child {
+  border-bottom: none;
+}
+.waitlistClaimItem:hover {
+  background: color-mix(in srgb, var(--color-warning) 8%, transparent);
+}
+.claimBtn {
+  padding: var(--space-1) var(--space-3);
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+  background: linear-gradient(135deg, #F59E0B, #EF4444);
+  color: white;
+  flex-shrink: 0;
+}
+.claimBtn:hover {
+  opacity: 0.9;
+  transform: scale(1.03);
+}
+.claimBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}

@@ -64,10 +64,13 @@ export default function CheckoutPage() {
   const [creatingWalkIn, setCreatingWalkIn] = useState(false);
 
   // Welcome screen panels
-  const [waitlistQueue, setWaitlistQueue] = useState<{ id: string; position: number; client_name: string; service_name: string; estimated_wait_minutes: number }[]>([]);
+  const [waitlistQueue, setWaitlistQueue] = useState<{ id: string; position: number; client_name: string; service_name: string; staff_name: string; staff_id: string | null; estimated_wait_minutes: number }[]>([]);
+  const [staffWaits, setStaffWaits] = useState<{ id: string; name: string; role: string; estimated_wait_minutes: number }[]>([]);
+  const [anyStaffWait, setAnyStaffWait] = useState(0);
   const [wlName, setWlName] = useState("");
   const [wlPhone, setWlPhone] = useState("");
   const [wlService, setWlService] = useState("");
+  const [wlStaff, setWlStaff] = useState(""); // "" = Any Staff
   const [wlSubmitting, setWlSubmitting] = useState(false);
   const [wlSuccess, setWlSuccess] = useState(false);
   const [ciQuery, setCiQuery] = useState("");
@@ -122,6 +125,8 @@ export default function CheckoutPage() {
       const res = await fetch(`/api/public-waitlist?slug=${tenant.slug}`);
       const json = await res.json();
       if (json.queue) setWaitlistQueue(json.queue);
+      if (json.staffWaits) setStaffWaits(json.staffWaits);
+      if (json.anyStaffWait !== undefined) setAnyStaffWait(json.anyStaffWait);
     } catch { /* silent */ }
   }, [tenant?.slug]);
 
@@ -144,12 +149,14 @@ export default function CheckoutPage() {
           client_name: wlName.trim(),
           client_phone: wlPhone.trim() || null,
           service_id: wlService || null,
+          staff_id: wlStaff || null, // null = "Any Staff"
         }),
       });
       if (res.ok) {
         setWlName("");
         setWlPhone("");
         setWlService("");
+        setWlStaff("");
         setWlSuccess(true);
         setTimeout(() => setWlSuccess(false), 4000);
         fetchWaitlist();
@@ -192,6 +199,43 @@ export default function CheckoutPage() {
       }
     } catch { /* silent */ }
     setCiChecking(null);
+  }
+
+  // ── Staff View: Waitlist entries to claim ──
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [staffWaitlist, setStaffWaitlist] = useState<any[]>([]);
+  const [claimingId, setClaimingId] = useState<string | null>(null);
+
+  const fetchStaffWaitlist = useCallback(async () => {
+    if (!tenant || !unlockedStaffId) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data } = await queryData<any[]>("waitlist.list", {});
+    setStaffWaitlist(data || []);
+  }, [tenant, unlockedStaffId]);
+
+  useEffect(() => {
+    if (unlockedStaffId) {
+      fetchStaffWaitlist();
+      const iv = setInterval(fetchStaffWaitlist, 15000);
+      return () => clearInterval(iv);
+    }
+  }, [unlockedStaffId, fetchStaffWaitlist]);
+
+  async function handleClaimWalkin(waitlistId: string) {
+    if (!unlockedStaffId) return;
+    setClaimingId(waitlistId);
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await queryData<any>("waitlist.claim", {
+        waitlist_id: waitlistId,
+        staff_id: unlockedStaffId,
+      });
+      // Refresh both lists
+      fetchData();
+      fetchStaffWaitlist();
+      fetchWaitlist();
+    } catch { /* silent */ }
+    setClaimingId(null);
   }
 
   // Fetch charges when appointment is selected
@@ -611,6 +655,23 @@ export default function CheckoutPage() {
                 </select>
               </div>
 
+              {/* Staff Selector with wait times */}
+              <div className={styles.panelField}>
+                <label className={styles.panelLabel}>{t("selectStaff")}</label>
+                <select
+                  className={styles.panelSelect}
+                  value={wlStaff}
+                  onChange={(e) => setWlStaff(e.target.value)}
+                >
+                  <option value="">✨ Any Staff — ~{anyStaffWait} min wait</option>
+                  {staffWaits.map((sw) => (
+                    <option key={sw.id} value={sw.id}>
+                      {sw.name} — ~{sw.estimated_wait_minutes} min wait
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <button
                 className={`${styles.panelSubmitBtn} ${styles.waitlistSubmitBtn}`}
                 onClick={handleJoinWaitlist}
@@ -630,7 +691,7 @@ export default function CheckoutPage() {
                       <div className={styles.queuePosition}>{entry.position}</div>
                       <div className={styles.queueInfo}>
                         <div className={styles.queueName}>{entry.client_name}</div>
-                        <div className={styles.queueService}>{entry.service_name}</div>
+                        <div className={styles.queueService}>{entry.service_name} · {entry.staff_name}</div>
                       </div>
                       <div className={styles.queueWait}>~{entry.estimated_wait_minutes} min</div>
                     </li>
@@ -831,6 +892,42 @@ export default function CheckoutPage() {
                   </button>
                 </div>
               </div>
+
+              {/* ── Waitlist: Claimable Walk-ins ── */}
+              {(() => {
+                // Show entries for this staff, or unclaimed (Any Staff) entries
+                const claimable = staffWaitlist.filter((w: { staff_id: string | null }) =>
+                  w.staff_id === unlockedStaffId || !w.staff_id
+                );
+                if (claimable.length === 0) return null;
+                return (
+                  <div className={styles.waitlistClaimSection}>
+                    <div className={styles.waitlistClaimHeader}>
+                      <span>🚶 Walk-in Queue ({claimable.length})</span>
+                    </div>
+                    {claimable.map((w: { id: string; staff_id: string | null; client: { first_name: string; last_name?: string } | null; service: { name: string } | null }) => (
+                      <div key={w.id} className={styles.waitlistClaimItem}>
+                        <div className={styles.queueInfo}>
+                          <div className={styles.queueName}>
+                            {w.client ? `${w.client.first_name} ${w.client.last_name || ''}`.trim() : 'Guest'}
+                          </div>
+                          <div className={styles.queueService}>
+                            {w.service?.name || 'Service'} · {w.staff_id ? 'Requested you' : 'Any Staff'}
+                          </div>
+                        </div>
+                        <button
+                          className={styles.claimBtn}
+                          onClick={() => handleClaimWalkin(w.id)}
+                          disabled={claimingId === w.id}
+                        >
+                          {claimingId === w.id ? '...' : '✋ Accept'}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+
               <div className={styles.aptListBody}>
                 {filteredApts.length === 0 ? (
                   <div className={styles.emptyState}>

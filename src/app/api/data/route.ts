@@ -1443,6 +1443,79 @@ export async function POST(request: Request) {
         return NextResponse.json({ data: updatedApt })
       }
 
+      // ─── Waitlist: List entries for staff view ───
+      case 'waitlist.list': {
+        const today = new Date().toISOString().split('T')[0]
+        const { data: entries, error: wlErr } = await svc
+          .from('waitlist')
+          .select('id, client_id, service_id, staff_id, status, notes, created_at, client:clients(first_name, last_name), service:services(name, duration_minutes, price)')
+          .eq('tenant_id', tenantId)
+          .eq('status', 'waiting')
+          .gte('created_at', `${today}T00:00:00`)
+          .order('created_at', { ascending: true })
+
+        if (wlErr) return NextResponse.json({ error: wlErr.message }, { status: 500 })
+        return NextResponse.json({ data: entries })
+      }
+
+      // ─── Waitlist: Staff claims a walk-in client ───
+      case 'waitlist.claim': {
+        const { waitlist_id, staff_id: claimStaffId } = body
+
+        if (!waitlist_id || !claimStaffId) {
+          return NextResponse.json({ error: 'Missing waitlist_id or staff_id' }, { status: 400 })
+        }
+
+        // Get the waitlist entry with client + service
+        const { data: wlEntry, error: wlGetErr } = await svc
+          .from('waitlist')
+          .select('id, client_id, service_id, service:services(name, duration_minutes, price)')
+          .eq('id', waitlist_id)
+          .eq('tenant_id', tenantId)
+          .eq('status', 'waiting')
+          .single()
+
+        if (wlGetErr || !wlEntry) {
+          return NextResponse.json({ error: 'Waitlist entry not found or already claimed' }, { status: 404 })
+        }
+
+        // Mark waitlist entry as seated (claimed)
+        await svc
+          .from('waitlist')
+          .update({ status: 'seated', staff_id: claimStaffId })
+          .eq('id', waitlist_id)
+          .eq('tenant_id', tenantId)
+
+        // Auto-create a walk-in appointment for this client
+        const now = new Date()
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const svcData = wlEntry.service as any
+        const durationMin = svcData?.duration_minutes || 30
+        const endTime = new Date(now.getTime() + durationMin * 60000)
+
+        const { data: newApt, error: aptCreateErr } = await svc
+          .from('appointments')
+          .insert({
+            tenant_id: tenantId,
+            client_id: wlEntry.client_id,
+            staff_id: claimStaffId,
+            service_id: wlEntry.service_id,
+            start_time: now.toISOString(),
+            end_time: endTime.toISOString(),
+            status: 'confirmed',
+            notes: 'Walk-in (claimed from waitlist)',
+            checked_in_at: now.toISOString(),
+          })
+          .select('*, client:clients(*), staff_member:staff!staff_id(*), service:services(*)')
+          .single()
+
+        if (aptCreateErr) {
+          return NextResponse.json({ error: aptCreateErr.message }, { status: 500 })
+        }
+
+        return NextResponse.json({ data: newApt })
+      }
+
       default:
         return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 })
     }
