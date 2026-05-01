@@ -1421,6 +1421,28 @@ export async function POST(request: Request) {
         return NextResponse.json({ data: newApt })
       }
 
+      // ─── Client Check-In ───
+      case 'appointments.checkin': {
+        const { appointment_id } = body
+
+        if (!appointment_id) {
+          return NextResponse.json({ error: 'Missing appointment_id' }, { status: 400 })
+        }
+
+        const { data: updatedApt, error: checkinErr } = await svc
+          .from('appointments')
+          .update({ checked_in_at: new Date().toISOString() })
+          .eq('id', appointment_id)
+          .eq('tenant_id', tenantId)
+          .select('id, checked_in_at')
+          .single()
+
+        if (checkinErr) {
+          return NextResponse.json({ error: checkinErr.message }, { status: 500 })
+        }
+        return NextResponse.json({ data: updatedApt })
+      }
+
       default:
         return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 })
     }

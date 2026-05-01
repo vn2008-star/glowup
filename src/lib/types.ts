@@ -96,6 +96,7 @@ export interface Appointment {
   tip_amount: number
   checked_out_at: string | null
   checked_out_by: string | null
+  checked_in_at: string | null
   created_at: string
   updated_at: string
   // Joined fields

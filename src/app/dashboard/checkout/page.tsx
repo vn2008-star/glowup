@@ -63,6 +63,18 @@ export default function CheckoutPage() {
   const [walkInBirthday, setWalkInBirthday] = useState("");
   const [creatingWalkIn, setCreatingWalkIn] = useState(false);
 
+  // Welcome screen panels
+  const [waitlistQueue, setWaitlistQueue] = useState<{ id: string; position: number; client_name: string; service_name: string; estimated_wait_minutes: number }[]>([]);
+  const [wlName, setWlName] = useState("");
+  const [wlPhone, setWlPhone] = useState("");
+  const [wlService, setWlService] = useState("");
+  const [wlSubmitting, setWlSubmitting] = useState(false);
+  const [wlSuccess, setWlSuccess] = useState(false);
+  const [ciQuery, setCiQuery] = useState("");
+  const [ciResults, setCiResults] = useState<{ id: string; start_time: string; client_name: string; service_name: string; staff_name: string; checked_in_at: string | null }[]>([]);
+  const [ciSearching, setCiSearching] = useState(false);
+  const [ciChecking, setCiChecking] = useState<string | null>(null);
+
   // ── Data fetching ──
   const fetchData = useCallback(async () => {
     if (!tenant) return;
@@ -102,6 +114,85 @@ export default function CheckoutPage() {
   useEffect(() => {
     fetchTally();
   }, [fetchTally]);
+
+  // ── Waitlist queue fetching ──
+  const fetchWaitlist = useCallback(async () => {
+    if (!tenant?.slug) return;
+    try {
+      const res = await fetch(`/api/public-waitlist?slug=${tenant.slug}`);
+      const json = await res.json();
+      if (json.queue) setWaitlistQueue(json.queue);
+    } catch { /* silent */ }
+  }, [tenant?.slug]);
+
+  useEffect(() => {
+    fetchWaitlist();
+    // Refresh every 30 seconds
+    const iv = setInterval(fetchWaitlist, 30000);
+    return () => clearInterval(iv);
+  }, [fetchWaitlist]);
+
+  async function handleJoinWaitlist() {
+    if (!wlName.trim() || !tenant?.slug) return;
+    setWlSubmitting(true);
+    try {
+      const res = await fetch('/api/public-waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          slug: tenant.slug,
+          client_name: wlName.trim(),
+          client_phone: wlPhone.trim() || null,
+          service_id: wlService || null,
+        }),
+      });
+      if (res.ok) {
+        setWlName("");
+        setWlPhone("");
+        setWlService("");
+        setWlSuccess(true);
+        setTimeout(() => setWlSuccess(false), 4000);
+        fetchWaitlist();
+      }
+    } catch { /* silent */ }
+    setWlSubmitting(false);
+  }
+
+  async function handleCheckInSearch(query: string) {
+    setCiQuery(query);
+    if (!query.trim() || query.trim().length < 2 || !tenant?.slug) {
+      setCiResults([]);
+      return;
+    }
+    setCiSearching(true);
+    try {
+      const res = await fetch(`/api/public-checkin?slug=${tenant.slug}&q=${encodeURIComponent(query.trim())}`);
+      const json = await res.json();
+      setCiResults(json.appointments || []);
+    } catch { /* silent */ }
+    setCiSearching(false);
+  }
+
+  async function handleCheckIn(appointmentId: string) {
+    if (!tenant?.slug) return;
+    setCiChecking(appointmentId);
+    try {
+      const res = await fetch('/api/public-checkin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug: tenant.slug, appointment_id: appointmentId }),
+      });
+      if (res.ok) {
+        // Update local results to show checked-in
+        setCiResults(prev => prev.map(a =>
+          a.id === appointmentId ? { ...a, checked_in_at: new Date().toISOString() } : a
+        ));
+        // Refresh main appointments list so staff sees the badge
+        fetchData();
+      }
+    } catch { /* silent */ }
+    setCiChecking(null);
+  }
 
   // Fetch charges when appointment is selected
   useEffect(() => {
@@ -469,6 +560,148 @@ export default function CheckoutPage() {
 
           <p className={styles.welcomeHint}>Tap your name to sign in</p>
 
+          {/* ── Walk-in Waitlist + Client Check-in Panels ── */}
+          <div className={styles.welcomePanels}>
+            {/* Walk-in Waitlist Panel */}
+            <div className={styles.welcomePanel}>
+              <div className={styles.panelHeader}>
+                <div className={`${styles.panelIcon} ${styles.panelIconWaitlist}`}>🚶</div>
+                <h3>{t("waitlistTitle")}</h3>
+              </div>
+
+              {wlSuccess && (
+                <div className={styles.waitlistSuccess}>
+                  <span>✅ {t("waitlistJoined")}</span>
+                </div>
+              )}
+
+              <div className={styles.panelField}>
+                <label className={styles.panelLabel}>{t("waitlistName")} *</label>
+                <input
+                  type="text"
+                  className={styles.panelInput}
+                  value={wlName}
+                  onChange={(e) => setWlName(e.target.value)}
+                  placeholder="Jane Smith"
+                />
+              </div>
+
+              <div className={styles.panelField}>
+                <label className={styles.panelLabel}>{t("waitlistPhone")}</label>
+                <input
+                  type="tel"
+                  className={styles.panelInput}
+                  value={wlPhone}
+                  onChange={(e) => setWlPhone(e.target.value)}
+                  placeholder="(555) 123-4567"
+                />
+              </div>
+
+              <div className={styles.panelField}>
+                <label className={styles.panelLabel}>{t("waitlistService")}</label>
+                <select
+                  className={styles.panelSelect}
+                  value={wlService}
+                  onChange={(e) => setWlService(e.target.value)}
+                >
+                  <option value="">— {t("selectService")} —</option>
+                  {services.map((s) => (
+                    <option key={s.id} value={s.id}>{s.name} — ${s.price}</option>
+                  ))}
+                </select>
+              </div>
+
+              <button
+                className={`${styles.panelSubmitBtn} ${styles.waitlistSubmitBtn}`}
+                onClick={handleJoinWaitlist}
+                disabled={!wlName.trim() || wlSubmitting}
+              >
+                {wlSubmitting ? t("processing") : `🚶 ${t("joinWaitlist")}`}
+              </button>
+
+              {/* Current Queue */}
+              <div className={styles.queueDivider}>{t("currentQueue")} ({waitlistQueue.length})</div>
+              {waitlistQueue.length === 0 ? (
+                <p className={styles.queueEmpty}>{t("noOneWaiting")}</p>
+              ) : (
+                <ul className={styles.queueList}>
+                  {waitlistQueue.map((entry) => (
+                    <li key={entry.id} className={styles.queueItem}>
+                      <div className={styles.queuePosition}>{entry.position}</div>
+                      <div className={styles.queueInfo}>
+                        <div className={styles.queueName}>{entry.client_name}</div>
+                        <div className={styles.queueService}>{entry.service_name}</div>
+                      </div>
+                      <div className={styles.queueWait}>~{entry.estimated_wait_minutes} min</div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            {/* Client Check-in Panel */}
+            <div className={styles.welcomePanel}>
+              <div className={styles.panelHeader}>
+                <div className={`${styles.panelIcon} ${styles.panelIconCheckin}`}>✓</div>
+                <h3>{t("checkinTitle")}</h3>
+              </div>
+
+              <div className={styles.panelField}>
+                <label className={styles.panelLabel}>{t("checkinSearch")}</label>
+                <input
+                  type="text"
+                  className={styles.panelInput}
+                  value={ciQuery}
+                  onChange={(e) => handleCheckInSearch(e.target.value)}
+                  placeholder="Sarah Chen or (555) 123-4567"
+                />
+              </div>
+
+              <div className={styles.checkinResults}>
+                {ciQuery.trim().length < 2 ? (
+                  <p className={styles.checkinEmpty}>{t("searchToCheckin")}</p>
+                ) : ciSearching ? (
+                  <p className={styles.checkinEmpty}>{t("processing")}</p>
+                ) : ciResults.length === 0 ? (
+                  <p className={styles.checkinEmpty}>{t("noMatchingAppts")}</p>
+                ) : (
+                  ciResults.map((apt) => {
+                    const d = new Date(apt.start_time);
+                    const hours = d.getHours();
+                    const mins = String(d.getMinutes()).padStart(2, "0");
+                    const ampm = hours >= 12 ? "PM" : "AM";
+                    const h12 = hours % 12 || 12;
+                    const alreadyCheckedIn = !!apt.checked_in_at;
+
+                    return (
+                      <div key={apt.id} className={`${styles.checkinItem} ${alreadyCheckedIn ? styles.checkinItemChecked : ""}`}>
+                        <div className={styles.checkinTime}>
+                          <div className={styles.checkinTimeHour}>{h12}:{mins}</div>
+                          <div className={styles.checkinTimePeriod}>{ampm}</div>
+                        </div>
+                        <div className={styles.checkinInfo}>
+                          <div className={styles.checkinClient}>{apt.client_name}</div>
+                          <div className={styles.checkinService}>{apt.service_name} · {t("withStaff")} {apt.staff_name}</div>
+                        </div>
+                        {alreadyCheckedIn ? (
+                          <span className={styles.checkinDone}>{t("checkedInStatus")}</span>
+                        ) : (
+                          <button
+                            className={styles.checkinAction}
+                            onClick={() => handleCheckIn(apt.id)}
+                            disabled={ciChecking === apt.id}
+                          >
+                            {ciChecking === apt.id ? "..." : t("checkinBtn")}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+
           <div className={styles.poweredBy}>
             <span className={styles.poweredByText}>powered by</span>
             <GlowUpLogo size={28} />
@@ -754,6 +987,7 @@ export default function CheckoutPage() {
                                     <span className={styles.calAptTime}>
                                       {formatTime(apt.start_time)} – {formatTime(apt.end_time)}
                                     </span>
+                                    {apt.checked_in_at && !apt.checked_out_at && <span className={styles.checkedInBadge}>ARRIVED</span>}
                                     {apt.checked_out_at && <span className={styles.calAptBadge}>✓</span>}
                                   </div>
                                 );
@@ -821,6 +1055,7 @@ export default function CheckoutPage() {
                             <span className={styles.calAptTime}>
                               {formatTime(apt.start_time)} – {formatTime(apt.end_time)}
                             </span>
+                            {apt.checked_in_at && !apt.checked_out_at && <span className={styles.checkedInBadge}>ARRIVED</span>}
                             {apt.checked_out_at && <span className={styles.calAptBadge}>✓</span>}
                           </div>
                         );

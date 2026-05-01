@@ -462,6 +462,23 @@
     "enterPin": "Enter your PIN",
     "wrongPin": "Incorrect PIN — try again",
     "lock": "Sign Out",
-    "client": "Client"
+    "client": "Client",
+    "waitlistTitle": "Walk-in Waitlist",
+    "joinWaitlist": "Join Waitlist",
+    "waitlistName": "Your Name",
+    "waitlistPhone": "Phone (optional)",
+    "waitlistService": "Service (optional)",
+    "currentQueue": "Current Queue",
+    "positionInLine": "Position",
+    "estimatedWait": "~{min} min wait",
+    "noOneWaiting": "No one waiting — you'd be first!",
+    "waitlistJoined": "You're on the list!",
+    "checkinTitle": "Check In",
+    "checkinSearch": "Name or phone number",
+    "checkinBtn": "✓ Check In",
+    "checkedInStatus": "Checked In ✓",
+    "noMatchingAppts": "No matching appointments found",
+    "searchToCheckin": "Enter your name or phone to find your appointment",
+    "withStaff": "with"
   }
 }
