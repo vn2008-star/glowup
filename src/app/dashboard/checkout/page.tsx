@@ -150,7 +150,10 @@ export default function CheckoutPage() {
     return a.staff_id === activeStaffId;
   });
 
-  const activeStaff = staffMembers.filter((s) => s.is_active);
+  const activeStaff = staffMembers.filter((s) => s.is_active).sort((a, b) => {
+    const order: Record<string, number> = { owner: 0, manager: 1, technician: 2 };
+    return (order[a.role] ?? 9) - (order[b.role] ?? 9);
+  });
 
   // Filtered tally: staff sees only their own, owner/manager sees all
   const filteredTally = useMemo(() => {
