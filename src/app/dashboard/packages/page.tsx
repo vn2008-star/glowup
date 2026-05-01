@@ -104,15 +104,23 @@ export default function PackagesPage() {
   };
 
   const handleCreateGC = async () => {
-    await mutateData("giftcards.create", {
-      initial_amount: parseFloat(gcAmount) || 0,
-      balance: parseFloat(gcAmount) || 0,
-      recipient_name: gcRecipient || null,
-      recipient_email: gcEmail || null,
-      message: gcMessage || null,
-      purchaser_name: gcPurchaser || null,
-    });
-    setShowGCModal(false); resetGCForm(); fetchData();
+    try {
+      const res = await mutateData("giftcards.create", {
+        initial_amount: parseFloat(gcAmount) || 0,
+        balance: parseFloat(gcAmount) || 0,
+        recipient_name: gcRecipient || null,
+        recipient_email: gcEmail || null,
+        message: gcMessage || null,
+        purchaser_name: gcPurchaser || null,
+      });
+      if (res.error) {
+        alert(`Failed to create gift card: ${res.error}`);
+        return;
+      }
+      setShowGCModal(false); resetGCForm(); fetchData();
+    } catch (err) {
+      alert(`Failed to create gift card: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
   };
 
   const addServiceToPkg = () => setPkgServices([...pkgServices, { service_id: "", quantity: 1 }]);
