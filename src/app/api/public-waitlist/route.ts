@@ -125,7 +125,7 @@ export async function GET(request: Request) {
 // POST: Add a new walk-in to the waitlist
 export async function POST(request: Request) {
   const body = await request.json()
-  const { slug, client_name, client_phone, service_id, staff_id } = body
+  const { slug, client_name, client_phone, client_email, client_birthday, service_id, staff_id } = body
 
   if (!slug || !client_name?.trim()) {
     return NextResponse.json({ error: 'Missing required fields (slug, client_name)' }, { status: 400 })
@@ -149,7 +149,7 @@ export async function POST(request: Request) {
 
   let clientId: string | null = null
 
-  // Try to find by phone
+  // Try to find by phone first
   if (client_phone?.trim()) {
     const { data: existing } = await svc
       .from('clients')
@@ -161,6 +161,28 @@ export async function POST(request: Request) {
     if (existing) clientId = existing.id
   }
 
+  // Try to find by email if not found by phone
+  if (!clientId && client_email?.trim()) {
+    const { data: existing } = await svc
+      .from('clients')
+      .select('id')
+      .eq('tenant_id', tenant.id)
+      .eq('email', client_email.trim())
+      .maybeSingle()
+
+    if (existing) clientId = existing.id
+  }
+
+  // Update existing client with any new info (email, birthday)
+  if (clientId) {
+    const updates: Record<string, string> = {}
+    if (client_email?.trim()) updates.email = client_email.trim()
+    if (client_birthday) updates.birthday = client_birthday
+    if (Object.keys(updates).length > 0) {
+      await svc.from('clients').update(updates).eq('id', clientId)
+    }
+  }
+
   // Create new client if not found
   if (!clientId) {
     const { data: newClient } = await svc
@@ -170,6 +192,8 @@ export async function POST(request: Request) {
         first_name: firstName,
         last_name: lastName,
         phone: client_phone?.trim() || null,
+        email: client_email?.trim() || null,
+        birthday: client_birthday || null,
       })
       .select('id')
       .single()

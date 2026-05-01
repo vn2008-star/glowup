@@ -69,6 +69,8 @@ export default function CheckoutPage() {
   const [anyStaffWait, setAnyStaffWait] = useState(0);
   const [wlName, setWlName] = useState("");
   const [wlPhone, setWlPhone] = useState("");
+  const [wlEmail, setWlEmail] = useState("");
+  const [wlBirthday, setWlBirthday] = useState("");
   const [wlService, setWlService] = useState("");
   const [wlStaff, setWlStaff] = useState(""); // "" = Any Staff
   const [wlSubmitting, setWlSubmitting] = useState(false);
@@ -149,6 +151,8 @@ export default function CheckoutPage() {
           slug: tenant.slug,
           client_name: wlName.trim(),
           client_phone: wlPhone.trim() || null,
+          client_email: wlEmail.trim() || null,
+          client_birthday: wlBirthday || null,
           service_id: wlService || null,
           staff_id: wlStaff || null, // null = "Any Staff"
         }),
@@ -156,6 +160,8 @@ export default function CheckoutPage() {
       if (res.ok) {
         setWlName("");
         setWlPhone("");
+        setWlEmail("");
+        setWlBirthday("");
         setWlService("");
         setWlStaff("");
         setWlShowForm(false);
@@ -678,6 +684,28 @@ export default function CheckoutPage() {
                         onChange={(e) => setWlPhone(e.target.value)}
                         placeholder="(555) 123-4567"
                       />
+                    </div>
+
+                    <div className={styles.panelField}>
+                      <label className={styles.panelLabel}>Email (optional)</label>
+                      <input
+                        type="email"
+                        className={styles.panelInput}
+                        value={wlEmail}
+                        onChange={(e) => setWlEmail(e.target.value)}
+                        placeholder="jane@email.com"
+                      />
+                    </div>
+
+                    <div className={styles.panelField}>
+                      <label className={styles.panelLabel}>🎂 Birthday (optional)</label>
+                      <input
+                        type="date"
+                        className={styles.panelInput}
+                        value={wlBirthday}
+                        onChange={(e) => setWlBirthday(e.target.value)}
+                      />
+                      <span className={styles.birthdayHint}>We&apos;ll send you a special birthday surprise! 🎁</span>
                     </div>
 
                     <div className={styles.panelField}>
