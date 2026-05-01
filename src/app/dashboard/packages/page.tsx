@@ -207,7 +207,7 @@ export default function PackagesPage() {
                     </div>
                     <div className={styles.pkgActions}>
                       <button className="btn btn-sm btn-outline" onClick={() => openEditPkg(pkg)}>Edit</button>
-                      <button className="btn btn-sm btn-outline" onClick={() => handleDeletePkg(pkg.id)} style={{ color: 'var(--color-error)' }}>Delete</button>
+                      <button className="btn btn-sm btn-outline" onClick={() => handleDeletePkg(pkg.id)} style={{ color: '#ff4d6a', borderColor: '#ff4d6a' }}>Delete</button>
                     </div>
                   </div>
                 ))}
