@@ -81,6 +81,11 @@ export default function CheckoutPage() {
   const [ciSearching, setCiSearching] = useState(false);
   const [ciChecking, setCiChecking] = useState<string | null>(null);
 
+  // Staff-facing waitlist (for Accept flow)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [staffWaitlist, setStaffWaitlist] = useState<any[]>([]);
+  const [claimingId, setClaimingId] = useState<string | null>(null);
+
   // ── Data fetching ──
   const fetchData = useCallback(async () => {
     if (!tenant) return;
@@ -139,6 +144,42 @@ export default function CheckoutPage() {
     const iv = setInterval(fetchWaitlist, 30000);
     return () => clearInterval(iv);
   }, [fetchWaitlist]);
+
+  // ── Staff-facing waitlist fetch (raw entries for Accept flow) ──
+  const fetchStaffWaitlist = useCallback(async () => {
+    if (!tenant) return;
+    try {
+      const { data } = await queryData<
+        { id: string; staff_id: string | null; service_id: string | null; client_id: string | null; client: { first_name: string; last_name?: string } | null; service: { name: string } | null }[]
+      >("waitlist.list", {});
+      setStaffWaitlist(data || []);
+    } catch { /* silent */ }
+  }, [tenant]);
+
+  useEffect(() => {
+    if (unlockedStaffId) {
+      fetchStaffWaitlist();
+      const iv = setInterval(fetchStaffWaitlist, 15000);
+      return () => clearInterval(iv);
+    }
+  }, [unlockedStaffId, fetchStaffWaitlist]);
+
+  // ── Accept walk-in handler ──
+  async function handleClaimWalkin(waitlistId: string) {
+    if (!unlockedStaffId || !tenant) return;
+    setClaimingId(waitlistId);
+    try {
+      const { data } = await queryData("waitlist.claim", {
+        waitlist_id: waitlistId,
+        staff_id: unlockedStaffId,
+      });
+      if (data) {
+        // Refresh everything — the new appointment will appear on the calendar
+        await Promise.all([fetchData(), fetchStaffWaitlist(), fetchWaitlist()]);
+      }
+    } catch { /* silent */ }
+    setClaimingId(null);
+  }
 
   async function handleJoinWaitlist() {
     if (!wlName.trim() || !tenant?.slug) return;
@@ -207,43 +248,6 @@ export default function CheckoutPage() {
       }
     } catch { /* silent */ }
     setCiChecking(null);
-  }
-
-  // ── Staff View: Waitlist entries to claim ──
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [staffWaitlist, setStaffWaitlist] = useState<any[]>([]);
-  const [claimingId, setClaimingId] = useState<string | null>(null);
-
-  const fetchStaffWaitlist = useCallback(async () => {
-    if (!tenant || !unlockedStaffId) return;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data } = await queryData<any[]>("waitlist.list", {});
-    setStaffWaitlist(data || []);
-  }, [tenant, unlockedStaffId]);
-
-  useEffect(() => {
-    if (unlockedStaffId) {
-      fetchStaffWaitlist();
-      const iv = setInterval(fetchStaffWaitlist, 15000);
-      return () => clearInterval(iv);
-    }
-  }, [unlockedStaffId, fetchStaffWaitlist]);
-
-  async function handleClaimWalkin(waitlistId: string) {
-    if (!unlockedStaffId) return;
-    setClaimingId(waitlistId);
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await queryData<any>("waitlist.claim", {
-        waitlist_id: waitlistId,
-        staff_id: unlockedStaffId,
-      });
-      // Refresh both lists
-      fetchData();
-      fetchStaffWaitlist();
-      fetchWaitlist();
-    } catch { /* silent */ }
-    setClaimingId(null);
   }
 
   // Fetch charges when appointment is selected
