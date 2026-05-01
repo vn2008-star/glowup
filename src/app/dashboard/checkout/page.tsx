@@ -73,6 +73,7 @@ export default function CheckoutPage() {
   const [wlStaff, setWlStaff] = useState(""); // "" = Any Staff
   const [wlSubmitting, setWlSubmitting] = useState(false);
   const [wlSuccess, setWlSuccess] = useState(false);
+  const [wlShowForm, setWlShowForm] = useState(false);
   const [ciQuery, setCiQuery] = useState("");
   const [ciResults, setCiResults] = useState<{ id: string; start_time: string; client_name: string; service_name: string; staff_name: string; checked_in_at: string | null }[]>([]);
   const [ciSearching, setCiSearching] = useState(false);
@@ -157,6 +158,7 @@ export default function CheckoutPage() {
         setWlPhone("");
         setWlService("");
         setWlStaff("");
+        setWlShowForm(false);
         setWlSuccess(true);
         setTimeout(() => setWlSuccess(false), 4000);
         fetchWaitlist();
@@ -619,68 +621,7 @@ export default function CheckoutPage() {
                 </div>
               )}
 
-              <div className={styles.panelField}>
-                <label className={styles.panelLabel}>{t("waitlistName")} *</label>
-                <input
-                  type="text"
-                  className={styles.panelInput}
-                  value={wlName}
-                  onChange={(e) => setWlName(e.target.value)}
-                  placeholder="Jane Smith"
-                />
-              </div>
-
-              <div className={styles.panelField}>
-                <label className={styles.panelLabel}>{t("waitlistPhone")}</label>
-                <input
-                  type="tel"
-                  className={styles.panelInput}
-                  value={wlPhone}
-                  onChange={(e) => setWlPhone(e.target.value)}
-                  placeholder="(555) 123-4567"
-                />
-              </div>
-
-              <div className={styles.panelField}>
-                <label className={styles.panelLabel}>{t("waitlistService")}</label>
-                <select
-                  className={styles.panelSelect}
-                  value={wlService}
-                  onChange={(e) => setWlService(e.target.value)}
-                >
-                  <option value="">— {t("selectService")} —</option>
-                  {services.map((s) => (
-                    <option key={s.id} value={s.id}>{s.name} — ${s.price}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Staff Selector with wait times */}
-              <div className={styles.panelField}>
-                <label className={styles.panelLabel}>{t("selectStaff")}</label>
-                <select
-                  className={styles.panelSelect}
-                  value={wlStaff}
-                  onChange={(e) => setWlStaff(e.target.value)}
-                >
-                  <option value="">✨ Any Staff — ~{anyStaffWait} min wait</option>
-                  {staffWaits.map((sw) => (
-                    <option key={sw.id} value={sw.id}>
-                      {sw.name} — ~{sw.estimated_wait_minutes} min wait
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <button
-                className={`${styles.panelSubmitBtn} ${styles.waitlistSubmitBtn}`}
-                onClick={handleJoinWaitlist}
-                disabled={!wlName.trim() || wlSubmitting}
-              >
-                {wlSubmitting ? t("processing") : `🚶 ${t("joinWaitlist")}`}
-              </button>
-
-              {/* Current Queue */}
+              {/* Current Queue — shown first */}
               <div className={styles.queueDivider}>{t("currentQueue")} ({waitlistQueue.length})</div>
               {waitlistQueue.length === 0 ? (
                 <p className={styles.queueEmpty}>{t("noOneWaiting")}</p>
@@ -697,6 +638,88 @@ export default function CheckoutPage() {
                     </li>
                   ))}
                 </ul>
+              )}
+
+              {/* Join Waitlist Button */}
+              <button
+                className={`${styles.panelSubmitBtn} ${styles.waitlistSubmitBtn}`}
+                onClick={() => setWlShowForm(true)}
+              >
+                🚶 {t("joinWaitlist")}
+              </button>
+
+              {/* Join Waitlist Modal */}
+              {wlShowForm && (
+                <div className={styles.wlModalOverlay} onClick={() => setWlShowForm(false)}>
+                  <div className={styles.wlModal} onClick={(e) => e.stopPropagation()}>
+                    <div className={styles.wlModalHeader}>
+                      <h3>🚶 {t("joinWaitlist")}</h3>
+                      <button className={styles.wlModalClose} onClick={() => setWlShowForm(false)}>✕</button>
+                    </div>
+
+                    <div className={styles.panelField}>
+                      <label className={styles.panelLabel}>{t("waitlistName")} *</label>
+                      <input
+                        type="text"
+                        className={styles.panelInput}
+                        value={wlName}
+                        onChange={(e) => setWlName(e.target.value)}
+                        placeholder="Jane Smith"
+                        autoFocus
+                      />
+                    </div>
+
+                    <div className={styles.panelField}>
+                      <label className={styles.panelLabel}>{t("waitlistPhone")}</label>
+                      <input
+                        type="tel"
+                        className={styles.panelInput}
+                        value={wlPhone}
+                        onChange={(e) => setWlPhone(e.target.value)}
+                        placeholder="(555) 123-4567"
+                      />
+                    </div>
+
+                    <div className={styles.panelField}>
+                      <label className={styles.panelLabel}>{t("waitlistService")}</label>
+                      <select
+                        className={styles.panelSelect}
+                        value={wlService}
+                        onChange={(e) => setWlService(e.target.value)}
+                      >
+                        <option value="">— {t("selectService")} —</option>
+                        {services.map((s) => (
+                          <option key={s.id} value={s.id}>{s.name} — ${s.price}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Staff Selector with wait times */}
+                    <div className={styles.panelField}>
+                      <label className={styles.panelLabel}>{t("selectStaff")}</label>
+                      <select
+                        className={styles.panelSelect}
+                        value={wlStaff}
+                        onChange={(e) => setWlStaff(e.target.value)}
+                      >
+                        <option value="">✨ Any Staff — ~{anyStaffWait} min wait</option>
+                        {staffWaits.map((sw) => (
+                          <option key={sw.id} value={sw.id}>
+                            {sw.name} — ~{sw.estimated_wait_minutes} min wait
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <button
+                      className={`${styles.panelSubmitBtn} ${styles.waitlistSubmitBtn}`}
+                      onClick={handleJoinWaitlist}
+                      disabled={!wlName.trim() || wlSubmitting}
+                    >
+                      {wlSubmitting ? t("processing") : `🚶 ${t("joinWaitlist")}`}
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
 
