@@ -128,7 +128,7 @@ export default function BookingClient({ slug }: { slug: string }) {
 
   // Submit booking
   async function handleSubmit() {
-    if (!selectedService || !selectedDate || !selectedTime || !clientName) return
+    if (!selectedService || !selectedDate || !selectedTime || !clientName || !clientPhone.trim()) return
     setSubmitting(true)
 
     try {
@@ -418,11 +418,11 @@ export default function BookingClient({ slug }: { slug: string }) {
                 </div>
                 <div className={styles.formRow}>
                   <div className={styles.formGroup}>
-                    <label>Phone</label>
-                    <input type="tel" value={clientPhone} onChange={e => setClientPhone(e.target.value)} placeholder="(415) 555-1234" />
+                    <label>Phone *</label>
+                    <input type="tel" value={clientPhone} onChange={e => setClientPhone(e.target.value)} placeholder="(415) 555-1234" required />
                   </div>
                   <div className={styles.formGroup}>
-                    <label>Email</label>
+                    <label>Email <span className={styles.optionalLabel}>(optional)</span></label>
                     <input type="email" value={clientEmail} onChange={e => setClientEmail(e.target.value)} placeholder="jane@email.com" />
                   </div>
                 </div>
@@ -439,7 +439,7 @@ export default function BookingClient({ slug }: { slug: string }) {
 
               <div className={styles.stepActions}>
                 <button className={styles.backBtn} onClick={() => setStep(2)}>← Back</button>
-                <button className={styles.nextBtn} onClick={() => { if (clientName.trim()) setStep(4) }} disabled={!clientName.trim()}>
+                <button className={styles.nextBtn} onClick={() => { if (clientName.trim() && clientPhone.trim()) setStep(4) }} disabled={!clientName.trim() || !clientPhone.trim()}>
                   Review Booking →
                 </button>
               </div>

@@ -37,7 +37,7 @@ export default function StaffPage() {
 
   // Schedule editor state
   const [showScheduleModal, setShowScheduleModal] = useState(false);
-  const [scheduleData, setScheduleData] = useState<Record<string, { open: string; close: string; off: boolean }>>({});
+  const [scheduleData, setScheduleData] = useState<Record<string, { open: string; close: string; off: boolean; useSlots?: boolean; slots?: { start: string; end: string }[] }>>({}); 
 
   const [agreementStaff, setAgreementStaff] = useState<Staff | null>(null);
 
@@ -92,13 +92,70 @@ export default function StaffPage() {
 
   function openSchedule(s: Staff) {
     setSelectedStaff(s);
-    const sched = (s.schedule || {}) as Record<string, { open: string; close: string; off: boolean }>;
-    const filled: Record<string, { open: string; close: string; off: boolean }> = {};
+    const sched = (s.schedule || {}) as Record<string, { open: string; close: string; off: boolean; useSlots?: boolean; slots?: { start: string; end: string }[] }>;
+    const filled: Record<string, { open: string; close: string; off: boolean; useSlots?: boolean; slots?: { start: string; end: string }[] }> = {};
     DAYS.forEach((d) => {
-      filled[d] = sched[d] || { open: "09:00", close: "18:00", off: d === "Sunday" };
+      const existing = sched[d];
+      filled[d] = existing
+        ? { open: existing.open || "09:00", close: existing.close || "18:00", off: !!existing.off, useSlots: !!existing.useSlots, slots: existing.slots || [] }
+        : { open: "09:00", close: "18:00", off: d === "Sunday", useSlots: false, slots: [] };
     });
     setScheduleData(filled);
     setShowScheduleModal(true);
+  }
+
+  function addSlot(day: string) {
+    setScheduleData((prev) => {
+      const dayData = prev[day];
+      const slots = dayData.slots || [];
+      // Default new slot: start after last slot's end, or day open time
+      const lastEnd = slots.length > 0 ? slots[slots.length - 1].end : dayData.open;
+      const [h, m] = lastEnd.split(':').map(Number);
+      const endMinutes = Math.min(h * 60 + m + 90, 23 * 60 + 30); // +1.5h
+      const endH = String(Math.floor(endMinutes / 60)).padStart(2, '0');
+      const endM = String(endMinutes % 60).padStart(2, '0');
+      return {
+        ...prev,
+        [day]: { ...dayData, slots: [...slots, { start: lastEnd, end: `${endH}:${endM}` }] },
+      };
+    });
+  }
+
+  function updateSlot(day: string, index: number, field: 'start' | 'end', value: string) {
+    setScheduleData((prev) => {
+      const dayData = prev[day];
+      const slots = [...(dayData.slots || [])];
+      slots[index] = { ...slots[index], [field]: value };
+      return { ...prev, [day]: { ...dayData, slots } };
+    });
+  }
+
+  function removeSlot(day: string, index: number) {
+    setScheduleData((prev) => {
+      const dayData = prev[day];
+      const slots = (dayData.slots || []).filter((_, i) => i !== index);
+      return { ...prev, [day]: { ...dayData, slots } };
+    });
+  }
+
+  function toggleSlotMode(day: string) {
+    setScheduleData((prev) => {
+      const dayData = prev[day];
+      return { ...prev, [day]: { ...dayData, useSlots: !dayData.useSlots } };
+    });
+  }
+
+  function copySlots(fromDay: string) {
+    setScheduleData((prev) => {
+      const source = prev[fromDay];
+      const updated = { ...prev };
+      DAYS.forEach((d) => {
+        if (d !== fromDay && !prev[d].off) {
+          updated[d] = { ...prev[d], useSlots: source.useSlots, slots: source.slots ? [...source.slots.map(s => ({ ...s }))] : [] };
+        }
+      });
+      return updated;
+    });
   }
 
   function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -396,12 +453,28 @@ export default function StaffPage() {
                 <h3>Weekly Schedule</h3>
                 <div className={styles.scheduleGrid}>
                   {DAYS.map((day) => {
-                    const sched = (selectedStaff.schedule as Record<string, { open: string; close: string; off: boolean }>)?.[day];
+                    const sched = (selectedStaff.schedule as Record<string, { open: string; close: string; off: boolean; useSlots?: boolean; slots?: { start: string; end: string }[] }>)?.[day];
+                    const formatSlotTime = (t: string) => {
+                      const [h, m] = t.split(':').map(Number);
+                      const ampm = h >= 12 ? 'PM' : 'AM';
+                      const h12 = h % 12 || 12;
+                      return m === 0 ? `${h12} ${ampm}` : `${h12}:${String(m).padStart(2,'0')} ${ampm}`;
+                    };
                     return (
                       <div key={day} className={styles.scheduleRow}>
                         <span className={styles.schedDay}>{day.slice(0, 3)}</span>
                         <span className={styles.schedTime}>
-                          {sched?.off ? <span style={{ color: "var(--text-tertiary)" }}>Off</span> : `${sched?.open || "9:00"} – ${sched?.close || "18:00"}`}
+                          {sched?.off ? (
+                            <span style={{ color: "var(--text-tertiary)" }}>Off</span>
+                          ) : sched?.useSlots && sched.slots && sched.slots.length > 0 ? (
+                            <span className={styles.slotBadges}>
+                              {sched.slots.map((sl, i) => (
+                                <span key={i} className={styles.slotBadge}>{formatSlotTime(sl.start)}–{formatSlotTime(sl.end)}</span>
+                              ))}
+                            </span>
+                          ) : (
+                            `${sched?.open || "9:00"} – ${sched?.close || "18:00"}`
+                          )}
                         </span>
                       </div>
                     );
@@ -572,35 +645,126 @@ export default function StaffPage() {
       {/* ── Schedule Editor Modal ── */}
       {showScheduleModal && selectedStaff && (
         <div className={styles.modalOverlay} onClick={() => { setShowScheduleModal(false); setSelectedStaff(null); }}>
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()} style={{ padding: "var(--space-8)" }}>
-            <h2 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              Schedule — {selectedStaff.name}
-              <button type="button" style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--text-secondary)', lineHeight: 1 }} onClick={() => { setShowScheduleModal(false); setSelectedStaff(null); }}>×</button>
-            </h2>
-            <form onSubmit={handleSaveSchedule}>
-              <div className={styles.scheduleEditor}>
-                {DAYS.map((day) => (
-                  <div key={day} className={styles.schedEditRow}>
-                    <span className={styles.schedEditDay}>{day}</span>
-                    <input className="input" type="time" value={scheduleData[day]?.open || ""} disabled={scheduleData[day]?.off}
-                      onChange={(e) => setScheduleData((prev) => ({ ...prev, [day]: { ...prev[day], open: e.target.value } }))}
-                      style={{ width: 120 }}
-                    />
-                    <span style={{ color: "var(--text-tertiary)" }}>to</span>
-                    <input className="input" type="time" value={scheduleData[day]?.close || ""} disabled={scheduleData[day]?.off}
-                      onChange={(e) => setScheduleData((prev) => ({ ...prev, [day]: { ...prev[day], close: e.target.value } }))}
-                      style={{ width: 120 }}
-                    />
-                    <label className={styles.checkLabel}>
-                      <input type="checkbox" checked={scheduleData[day]?.off || false}
-                        onChange={() => setScheduleData((prev) => ({ ...prev, [day]: { ...prev[day], off: !prev[day].off } }))}
-                      />
-                      Off
-                    </label>
+          <div className={`${styles.modal} ${styles.modalWide}`} onClick={(e) => e.stopPropagation()} style={{ padding: 0 }}>
+            <div style={{ padding: 'var(--space-6) var(--space-8) 0' }}>
+              <h2 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                Schedule — {selectedStaff.name}
+                <button type="button" style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--text-secondary)', lineHeight: 1 }} onClick={() => { setShowScheduleModal(false); setSelectedStaff(null); }}>×</button>
+              </h2>
+            </div>
+            <form onSubmit={handleSaveSchedule} className={styles.modalForm}>
+              <div className={styles.modalBody}>
+                <div className={styles.scheduleEditor}>
+                  {DAYS.map((day) => {
+                    const dayData = scheduleData[day];
+                    const isOff = dayData?.off;
+                    const useSlots = dayData?.useSlots;
+                    const slots = dayData?.slots || [];
+
+                    return (
+                      <div key={day} className={styles.schedDayBlock}>
+                        {/* Day header row */}
+                        <div className={styles.schedEditRow}>
+                          <span className={styles.schedEditDay}>{day}</span>
+                          <div className={styles.schedDayControls}>
+                            {!isOff && (
+                              <>
+                                <input className="input" type="time" value={dayData?.open || ""}
+                                  onChange={(e) => setScheduleData((prev) => ({ ...prev, [day]: { ...prev[day], open: e.target.value } }))}
+                                  style={{ width: 120 }}
+                                />
+                                <span style={{ color: "var(--text-tertiary)", fontSize: 'var(--text-sm)' }}>to</span>
+                                <input className="input" type="time" value={dayData?.close || ""}
+                                  onChange={(e) => setScheduleData((prev) => ({ ...prev, [day]: { ...prev[day], close: e.target.value } }))}
+                                  style={{ width: 120 }}
+                                />
+                              </>
+                            )}
+                            <label className={styles.checkLabel}>
+                              <input type="checkbox" checked={isOff || false}
+                                onChange={() => setScheduleData((prev) => ({ ...prev, [day]: { ...prev[day], off: !prev[day].off } }))}
+                              />
+                              Off
+                            </label>
+                          </div>
+                        </div>
+
+                        {/* Slot mode toggle */}
+                        {!isOff && (
+                          <div className={styles.slotToggleRow}>
+                            <button
+                              type="button"
+                              className={`${styles.slotModeBtn} ${!useSlots ? styles.slotModeBtnActive : ''}`}
+                              onClick={() => { if (useSlots) toggleSlotMode(day); }}
+                            >
+                              Continuous
+                            </button>
+                            <button
+                              type="button"
+                              className={`${styles.slotModeBtn} ${useSlots ? styles.slotModeBtnActive : ''}`}
+                              onClick={() => { if (!useSlots) toggleSlotMode(day); }}
+                            >
+                              🕐 Custom Slots
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Appointment Slots */}
+                        {!isOff && useSlots && (
+                          <div className={styles.slotsContainer}>
+                            {slots.length === 0 && (
+                              <p className={styles.slotsEmpty}>No slots yet — add your first appointment block</p>
+                            )}
+                            {slots.map((slot, i) => (
+                              <div key={i} className={styles.slotRow}>
+                                <span className={styles.slotNum}>{i + 1}</span>
+                                <input className="input" type="time" value={slot.start}
+                                  onChange={(e) => updateSlot(day, i, 'start', e.target.value)}
+                                  style={{ width: 110 }}
+                                />
+                                <span style={{ color: "var(--text-tertiary)", fontSize: 'var(--text-sm)' }}>→</span>
+                                <input className="input" type="time" value={slot.end}
+                                  onChange={(e) => updateSlot(day, i, 'end', e.target.value)}
+                                  style={{ width: 110 }}
+                                />
+                                <span className={styles.slotDuration}>
+                                  {(() => {
+                                    const [sh, sm] = slot.start.split(':').map(Number);
+                                    const [eh, em] = slot.end.split(':').map(Number);
+                                    const mins = (eh * 60 + em) - (sh * 60 + sm);
+                                    if (mins <= 0) return '';
+                                    const h = Math.floor(mins / 60);
+                                    const m = mins % 60;
+                                    return h > 0 ? `${h}h${m > 0 ? ` ${m}m` : ''}` : `${m}m`;
+                                  })()}
+                                </span>
+                                <button type="button" className={styles.slotRemoveBtn} onClick={() => removeSlot(day, i)} title="Remove slot">✕</button>
+                              </div>
+                            ))}
+                            <button type="button" className={styles.addSlotBtn} onClick={() => addSlot(day)}>
+                              + Add Slot
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Copy to all days */}
+                <div className={styles.copySection}>
+                  <span className={styles.copyLabel}>Copy schedule from:</span>
+                  <div className={styles.copyBtns}>
+                    {DAYS.filter(d => !scheduleData[d]?.off).map((d) => (
+                      <button key={d} type="button" className={styles.copyBtn} onClick={() => copySlots(d)} title={`Copy ${d}'s schedule to all other working days`}>
+                        {d.slice(0, 3)} → All
+                      </button>
+                    ))}
                   </div>
-                ))}
+                </div>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-6)', paddingTop: 'var(--space-4)', borderTop: '1px solid var(--border-subtle)' }}>
+
+              <div className={styles.modalFooter}>
                 <button type="button" className="btn btn-secondary" onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); setShowScheduleModal(false); setSelectedStaff(null); }}>Cancel</button>
                 <button type="submit" className="btn btn-primary">Save Schedule</button>
               </div>

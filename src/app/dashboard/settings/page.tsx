@@ -75,6 +75,8 @@ export default function SettingsPage() {
     email: "Hi {staff_name},\n\nYou have an upcoming appointment:\n\n👤 Client: {client_name}\n📋 Service: {service}\n📅 Date: {date}\n🕐 Time: {time}\n📍 At: {business_name}\n\nPlease make sure you're prepared and on time.\n\n— {business_name}",
   });
 
+  const [paymentQr, setPaymentQr] = useState({ venmo_qr: "", zelle_qr: "" });
+
   // Load current settings from tenant
   const loadSettings = useCallback(() => {
     if (!tenant) return;
@@ -94,6 +96,7 @@ export default function SettingsPage() {
       if (s.staff_reminders) setStaffReminderSettings({ ...staffReminderSettings, ...(s.staff_reminders as Record<string, boolean>) });
       if (s.reminder_templates) setReminderTemplates({ ...reminderTemplates, ...(s.reminder_templates as Record<string, string>) });
       if (s.staff_reminder_templates) setStaffReminderTemplates({ ...staffReminderTemplates, ...(s.staff_reminder_templates as Record<string, string>) });
+      if (s.payment_qr) setPaymentQr({ venmo_qr: "", zelle_qr: "", ...(s.payment_qr as Record<string, string>) });
     }
 
     setLoading(false);
@@ -135,6 +138,7 @@ export default function SettingsPage() {
       staff_reminders: staffReminderSettings,
       reminder_templates: reminderTemplates,
       staff_reminder_templates: staffReminderTemplates,
+      payment_qr: paymentQr,
     };
 
     const res = await fetch("/api/save-settings", {
@@ -340,6 +344,105 @@ export default function SettingsPage() {
               <option value="15">15 minutes</option>
               <option value="30">30 minutes</option>
             </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Payment Methods */}
+      <div className={`card ${styles.section}`}>
+        <h2>💰 Payment Methods</h2>
+        <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginBottom: "var(--space-4)" }}>
+          Upload your Venmo and Zelle QR codes. Staff can show these to clients during checkout.
+        </p>
+        <div className={styles.formGrid}>
+          {/* Venmo */}
+          <div className={styles.formGroup}>
+            <label className="label" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+              <span style={{ color: '#008CFF', fontWeight: 800, fontSize: '1.1rem' }}>Ⓥ</span> Venmo QR Code
+            </label>
+            <div className={styles.qrUploadBox}>
+              <label className={styles.qrUploadLabel}>
+                <input
+                  type="file"
+                  accept="image/*"
+                  style={{ display: "none" }}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (file.size > 2 * 1024 * 1024) { alert("Max 2 MB"); return; }
+                    const reader = new FileReader();
+                    reader.onload = () => setPaymentQr(prev => ({ ...prev, venmo_qr: reader.result as string }));
+                    reader.readAsDataURL(file);
+                  }}
+                />
+                {paymentQr.venmo_qr ? (
+                  <div className={styles.qrPreviewWrap}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={paymentQr.venmo_qr} alt="Venmo QR" className={styles.qrPreviewImg} />
+                    <div className={styles.qrPreviewOverlay}>Change</div>
+                  </div>
+                ) : (
+                  <div className={styles.qrUploadPlaceholder}>
+                    <span style={{ fontSize: '1.5rem' }}>📷</span>
+                    <span>Upload QR Code</span>
+                  </div>
+                )}
+              </label>
+              {paymentQr.venmo_qr && (
+                <button
+                  type="button"
+                  className={styles.qrRemoveBtn}
+                  onClick={() => setPaymentQr(prev => ({ ...prev, venmo_qr: "" }))}
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Zelle */}
+          <div className={styles.formGroup}>
+            <label className="label" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+              <span style={{ color: '#6D1ED4', fontWeight: 800, fontSize: '1.1rem' }}>Ⓩ</span> Zelle QR Code
+            </label>
+            <div className={styles.qrUploadBox}>
+              <label className={styles.qrUploadLabel}>
+                <input
+                  type="file"
+                  accept="image/*"
+                  style={{ display: "none" }}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (file.size > 2 * 1024 * 1024) { alert("Max 2 MB"); return; }
+                    const reader = new FileReader();
+                    reader.onload = () => setPaymentQr(prev => ({ ...prev, zelle_qr: reader.result as string }));
+                    reader.readAsDataURL(file);
+                  }}
+                />
+                {paymentQr.zelle_qr ? (
+                  <div className={styles.qrPreviewWrap}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={paymentQr.zelle_qr} alt="Zelle QR" className={styles.qrPreviewImg} />
+                    <div className={styles.qrPreviewOverlay}>Change</div>
+                  </div>
+                ) : (
+                  <div className={styles.qrUploadPlaceholder}>
+                    <span style={{ fontSize: '1.5rem' }}>📷</span>
+                    <span>Upload QR Code</span>
+                  </div>
+                )}
+              </label>
+              {paymentQr.zelle_qr && (
+                <button
+                  type="button"
+                  className={styles.qrRemoveBtn}
+                  onClick={() => setPaymentQr(prev => ({ ...prev, zelle_qr: "" }))}
+                >
+                  Remove
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>

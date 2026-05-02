@@ -92,7 +92,7 @@ export interface Appointment {
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'no_show'
   total_price: number | null
   notes: string | null
-  payment_method: 'cash' | 'card' | 'mixed' | 'other' | null
+  payment_method: 'cash' | 'card' | 'mixed' | 'venmo' | 'zelle' | 'gift_card' | 'other' | null
   tip_amount: number
   checked_out_at: string | null
   checked_out_by: string | null

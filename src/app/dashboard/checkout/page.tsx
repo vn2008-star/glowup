@@ -31,7 +31,8 @@ export default function CheckoutPage() {
   const [selectedApt, setSelectedApt] = useState<FullAppointment | null>(null);
   const [charges, setCharges] = useState<AppointmentCharge[]>([]);
   const [tipAmount, setTipAmount] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "card" | "mixed" | "">("");
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "card" | "mixed" | "venmo" | "zelle" | "gift_card" | "">("")
+  const [showQrModal, setShowQrModal] = useState<"venmo" | "zelle" | null>(null);;
   const [upsellServiceId, setUpsellServiceId] = useState("");
   const [checkingOut, setCheckingOut] = useState(false);
   const [editingCheckout, setEditingCheckout] = useState(false);
@@ -270,7 +271,7 @@ export default function CheckoutPage() {
       setCharges(data || []);
     })();
     setTipAmount(String(selectedApt.tip_amount || ""));
-    setPaymentMethod((selectedApt.payment_method as "cash" | "card" | "mixed") || "");
+    setPaymentMethod((selectedApt.payment_method as "cash" | "card" | "mixed" | "venmo" | "zelle" | "gift_card") || "");
   }, [selectedApt]);
 
   // ── Helpers ──
@@ -375,6 +376,22 @@ export default function CheckoutPage() {
     const svc = services.find((s) => s.id === upsellServiceId);
     if (!svc) return;
 
+    // If no charges exist yet, add the original service as the base charge first
+    let currentCharges = [...charges];
+    if (currentCharges.length === 0 && selectedApt.service) {
+      const { data: baseCharge } = await queryData<AppointmentCharge>("charges.add", {
+        appointment_id: selectedApt.id,
+        staff_id: selectedApt.staff_id,
+        service_id: selectedApt.service.id,
+        description: selectedApt.service.name,
+        amount: selectedApt.service.price,
+        is_upsell: false,
+      });
+      if (baseCharge) {
+        currentCharges = [baseCharge];
+      }
+    }
+
     const { data } = await queryData<AppointmentCharge>("charges.add", {
       appointment_id: selectedApt.id,
       staff_id: selectedApt.staff_id,
@@ -385,7 +402,7 @@ export default function CheckoutPage() {
     });
 
     if (data) {
-      setCharges((prev) => [...prev, data]);
+      setCharges([...currentCharges, data]);
       setUpsellServiceId("");
     }
   }
@@ -467,7 +484,7 @@ export default function CheckoutPage() {
     if (!selectedApt) return;
     setEditingCheckout(true);
     setTipAmount(String(selectedApt.tip_amount || ""));
-    setPaymentMethod((selectedApt.payment_method as "cash" | "card" | "mixed") || "");
+    setPaymentMethod((selectedApt.payment_method as "cash" | "card" | "mixed" | "venmo" | "zelle" | "gift_card") || "");
   }
 
   // ── PIN Gate Logic ──
@@ -577,8 +594,10 @@ export default function CheckoutPage() {
           {/* Salon branding */}
           <div className={styles.welcomeBrand}>
             {tenant?.logo_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={tenant.logo_url} alt={tenant?.name || "Salon"} className={styles.welcomeLogo} />
+              <div className={styles.welcomeLogoWrap}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={tenant.logo_url} alt={tenant?.name || "Salon"} className={styles.welcomeLogo} />
+              </div>
             ) : (
               <div className={styles.welcomeLogoFallback}>✦</div>
             )}
@@ -694,6 +713,7 @@ export default function CheckoutPage() {
                         value={wlPhone}
                         onChange={(e) => setWlPhone(e.target.value)}
                         placeholder="(555) 123-4567"
+                        required
                       />
                     </div>
 
@@ -753,7 +773,7 @@ export default function CheckoutPage() {
                     <button
                       className={`${styles.panelSubmitBtn} ${styles.waitlistSubmitBtn}`}
                       onClick={handleJoinWaitlist}
-                      disabled={!wlName.trim() || wlSubmitting}
+                      disabled={!wlName.trim() || !wlPhone.trim() || wlSubmitting}
                     >
                       {wlSubmitting ? t("processing") : `🚶 ${t("joinWaitlist")}`}
                     </button>
@@ -1000,10 +1020,25 @@ export default function CheckoutPage() {
                     </button>
                   </div>
                 ) : (() => {
-                  // Calendar time grid constants
+                  // Calendar time grid constants — dynamic based on appointments
                   const CAL_SLOT_H = 80; // px per hour
-                  const CAL_START = 9; // 9 AM
-                  const CAL_END = 19; // 7 PM
+                  const DEFAULT_START = 9;
+                  const DEFAULT_END = 19;
+
+                  // Find earliest and latest appointments to expand grid if needed
+                  let earliestHour = DEFAULT_START;
+                  let latestHour = DEFAULT_END;
+                  filteredApts.forEach(a => {
+                    const s = new Date(a.start_time);
+                    const e = new Date(a.end_time);
+                    const sH = s.getHours() + s.getMinutes() / 60;
+                    const eH = e.getHours() + e.getMinutes() / 60;
+                    if (sH < earliestHour) earliestHour = sH;
+                    if (eH > latestHour) latestHour = eH;
+                  });
+
+                  const CAL_START = Math.min(DEFAULT_START, Math.floor(earliestHour));
+                  const CAL_END = Math.max(DEFAULT_END, Math.ceil(latestHour));
                   const HOURS = Array.from({ length: CAL_END - CAL_START }, (_, i) => i + CAL_START);
 
                   const fmtHour = (h: number) => {
@@ -1351,18 +1386,33 @@ export default function CheckoutPage() {
                       </div>
 
                       <div className={styles.paymentMethods}>
-                        {(["cash", "card", "mixed"] as const).map((m) => (
-                          <button
-                            key={m}
-                            className={`${styles.paymentBtn} ${paymentMethod === m ? styles.paymentBtnActive : ""}`}
-                            onClick={() => setPaymentMethod(m)}
-                          >
-                            <span className={styles.paymentIcon}>
-                              {m === "cash" ? "💵" : m === "card" ? "💳" : "🔄"}
-                            </span>
-                            {t(m)}
-                          </button>
-                        ))}
+                        {(["cash", "card", "venmo", "zelle", "gift_card", "mixed"] as const).map((m) => {
+                          const icons: Record<string, string> = { cash: "💵", card: "💳", mixed: "🔄", venmo: "Ⓥ", zelle: "Ⓩ", gift_card: "🎁" };
+                          const labels: Record<string, string> = { cash: t("cash"), card: t("card"), mixed: t("mixed"), venmo: "Venmo", zelle: "Zelle", gift_card: "Gift Card" };
+                          const colors: Record<string, string> = { venmo: "#008CFF", zelle: "#6D1ED4", gift_card: "#D4A017" };
+                          return (
+                            <button
+                              key={m}
+                              className={`${styles.paymentBtn} ${paymentMethod === m ? styles.paymentBtnActive : ""}`}
+                              onClick={() => {
+                                setPaymentMethod(m);
+                                if (m === "venmo" || m === "zelle") {
+                                  const tenantSettings = (tenant?.settings || {}) as Record<string, unknown>;
+                                  const paymentSettings = (tenantSettings.payment_qr || {}) as Record<string, string>;
+                                  if (paymentSettings[`${m}_qr`]) {
+                                    setShowQrModal(m);
+                                  }
+                                }
+                              }}
+                              style={paymentMethod === m && colors[m] ? { borderColor: colors[m], background: `${colors[m]}18` } : {}}
+                            >
+                              <span className={styles.paymentIcon} style={colors[m] ? { fontSize: "1.25rem", fontWeight: 800, color: colors[m] } : {}}>
+                                {icons[m]}
+                              </span>
+                              {labels[m]}
+                            </button>
+                          );
+                        })}
                       </div>
 
                       <button
@@ -1658,6 +1708,41 @@ export default function CheckoutPage() {
           </div>
         </div>
       )}
+
+      {/* ── Venmo / Zelle QR Code Modal ── */}
+      {showQrModal && (() => {
+        const tenantSettings = (tenant?.settings || {}) as Record<string, unknown>;
+        const paymentSettings = (tenantSettings.payment_qr || {}) as Record<string, string>;
+        const qrImage = paymentSettings[`${showQrModal}_qr`];
+        const brandColor = showQrModal === "venmo" ? "#008CFF" : "#6D1ED4";
+        const brandName = showQrModal === "venmo" ? "Venmo" : "Zelle";
+
+        return (
+          <div className={styles.qrOverlay} onClick={() => setShowQrModal(null)}>
+            <div className={styles.qrModal} onClick={(e) => e.stopPropagation()}>
+              <button className={styles.qrClose} onClick={() => setShowQrModal(null)}>×</button>
+              <div className={styles.qrBrand} style={{ color: brandColor }}>
+                <span className={styles.qrBrandIcon}>{showQrModal === "venmo" ? "Ⓥ" : "Ⓩ"}</span>
+                {brandName}
+              </div>
+              <p className={styles.qrInstruction}>Show this QR code to the client</p>
+              {qrImage ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={qrImage} alt={`${brandName} QR Code`} className={styles.qrImage} />
+              ) : (
+                <div className={styles.qrPlaceholder}>
+                  <p>No QR code uploaded</p>
+                  <small>Go to Settings → Payment Methods to upload</small>
+                </div>
+              )}
+              <button className={styles.qrDoneBtn} style={{ background: brandColor }} onClick={() => setShowQrModal(null)}>
+                Done
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+
     </div>
   );
 }

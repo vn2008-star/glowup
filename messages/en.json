@@ -466,7 +466,7 @@
     "waitlistTitle": "Walk-in Waitlist",
     "joinWaitlist": "Join Waitlist",
     "waitlistName": "Your Name",
-    "waitlistPhone": "Phone (optional)",
+    "waitlistPhone": "Phone *",
     "waitlistService": "Service (optional)",
     "currentQueue": "Current Waitlist",
     "positionInLine": "Position",

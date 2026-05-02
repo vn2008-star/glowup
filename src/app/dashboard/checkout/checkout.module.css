@@ -21,14 +21,24 @@
 .welcomeBrand {
   margin-bottom: var(--space-8);
 }
-.welcomeLogo {
-  width: 100px;
-  height: 100px;
+.welcomeLogoWrap {
+  width: 220px;
+  height: 220px;
   border-radius: 50%;
-  object-fit: cover;
-  margin-bottom: var(--space-4);
-  box-shadow: 0 8px 32px rgba(212, 160, 212, 0.3);
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(212, 160, 212, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto var(--space-4);
   animation: welcomeFloat 3s ease-in-out infinite;
+}
+.welcomeLogo {
+  width: 140px;
+  height: 140px;
+  object-fit: contain;
+  display: block;
 }
 .welcomeLogoFallback {
   width: 100px;
@@ -126,8 +136,8 @@
   transform: translateY(-2px) scale(0.98);
 }
 .welcomeCardAvatar {
-  width: 80px;
-  height: 80px;
+  width: 100px;
+  height: 100px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -1879,4 +1889,106 @@
   margin-top: 4px;
   font-style: italic;
   letter-spacing: 0.02em;
+}
+
+/* ── Venmo / Zelle QR Modal ── */
+.qrOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.2s ease;
+}
+.qrModal {
+  background: var(--surface-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-2xl);
+  padding: var(--space-8);
+  width: 360px;
+  max-width: 90vw;
+  text-align: center;
+  animation: slideUp 0.3s ease;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+  position: relative;
+}
+.qrClose {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 1.5rem;
+  cursor: pointer;
+  line-height: 1;
+  transition: color 0.15s;
+}
+.qrClose:hover {
+  color: var(--text-primary);
+}
+.qrBrand {
+  font-size: 1.75rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+.qrBrandIcon {
+  font-size: 2rem;
+}
+.qrInstruction {
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+  margin-bottom: var(--space-5);
+}
+.qrImage {
+  width: 240px;
+  height: 240px;
+  object-fit: contain;
+  border-radius: var(--radius-lg);
+  border: 2px solid var(--border-primary);
+  margin-bottom: var(--space-5);
+  background: white;
+  padding: var(--space-2);
+}
+.qrPlaceholder {
+  width: 240px;
+  height: 180px;
+  margin: 0 auto var(--space-5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--border-primary);
+  border-radius: var(--radius-lg);
+  color: var(--text-tertiary);
+}
+.qrPlaceholder p {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  margin-bottom: var(--space-1);
+}
+.qrPlaceholder small {
+  font-size: var(--text-xs);
+  opacity: 0.7;
+}
+.qrDoneBtn {
+  width: 100%;
+  padding: var(--space-3);
+  border: none;
+  border-radius: var(--radius-lg);
+  color: white;
+  font-size: var(--text-base);
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.qrDoneBtn:hover {
+  opacity: 0.9;
 }
