@@ -307,7 +307,8 @@ export default function CheckoutPage() {
 
   const activeStaff = staffMembers.filter((s) => s.is_active).sort((a, b) => {
     const order: Record<string, number> = { owner: 0, manager: 1, technician: 2 };
-    return (order[a.role] ?? 9) - (order[b.role] ?? 9);
+    const rd = (order[a.role] ?? 9) - (order[b.role] ?? 9);
+    return rd !== 0 ? rd : a.name.localeCompare(b.name);
   });
 
   // Filtered tally: staff sees only their own, owner/manager sees all

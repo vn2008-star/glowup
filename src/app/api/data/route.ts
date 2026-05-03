@@ -227,8 +227,14 @@ export async function POST(request: Request) {
           .from('staff')
           .select('*')
           .eq('tenant_id', tenantId)
-          .order('name')
-        return NextResponse.json({ data, error: error?.message })
+        const rolePriority: Record<string, number> = { owner: 0, manager: 1, technician: 2 }
+        const sorted = (data || []).sort((a: { role: string; name: string }, b: { role: string; name: string }) => {
+          const ra = rolePriority[a.role] ?? 3
+          const rb = rolePriority[b.role] ?? 3
+          if (ra !== rb) return ra - rb
+          return a.name.localeCompare(b.name)
+        })
+        return NextResponse.json({ data: sorted, error: error?.message })
       }
 
       case 'staff.add': {

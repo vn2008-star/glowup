@@ -38,9 +38,10 @@ export async function GET(request: Request) {
   // Get active staff
   const { data: staff } = await svc
     .from('staff')
-    .select('id, name, specialties, schedule')
+    .select('id, name, role, specialties, schedule')
     .eq('tenant_id', tenant.id)
     .eq('is_active', true)
+    .order('name')
 
   // Get existing appointments for availability checking (next 30 days)
   const now = new Date()
