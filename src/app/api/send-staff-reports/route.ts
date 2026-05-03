@@ -52,7 +52,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Only owners and managers can send revenue reports' }, { status: 403 })
   }
 
-  return sendReports(svc, staffRecord.tenant_id, period || 'biweekly', offset || 0, staffIds)
+  const data = await sendReports(svc, staffRecord.tenant_id, period || 'biweekly', offset || 0, staffIds)
+  return NextResponse.json({ data })
 }
 
 // Cron-triggered auto-send
@@ -91,7 +92,7 @@ export async function GET(request: Request) {
     if (reportPeriod === 'biweekly' && day !== 1 && day !== 16) continue
 
     const result = await sendReports(svc, tenant.id, reportPeriod, -1)
-    results.push({ tenant: tenant.name, ...result.data })
+    results.push({ tenant: tenant.name, ...result })
   }
 
   return NextResponse.json({ message: 'Staff reports processed', results })
@@ -281,8 +282,7 @@ async function sendReports(
     }
   }
 
-  const responseData = { sent, errors, period: periodLabel, dry_run: !hasResend }
-  return NextResponse.json({ data: responseData })
+  return { sent, errors, period: periodLabel, dry_run: !hasResend }
 }
 
 // ─── Professional HTML Email Template with Itemized Lines ───

@@ -506,7 +506,7 @@ export default function StaffPage() {
                 <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => openEdit(selectedStaff)}>✏️ Edit Profile</button>
                 <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => openSchedule(selectedStaff)}>📅 Edit Schedule</button>
                 <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setAgreementStaff(selectedStaff)}>{(selectedStaff as any).agreement_signed_at ? '✅ View Agreement' : '📝 Sign Agreement'}</button>
-                <button className="btn btn-ghost" style={{ color: "var(--color-danger)" }} onClick={() => handleDelete(selectedStaff.id)}>🗑️</button>
+                <button className="btn btn-ghost" style={{ color: "var(--color-danger)" }} onClick={() => setDeleteConfirmId(selectedStaff.id)}>🗑️</button>
               </div>
             </div>
           </div>
