@@ -34,30 +34,19 @@ const ESSENTIAL_STEPS: Step[] = [
   {
     id: "profile",
     number: 1,
-    title: "Business Profile",
-    description: "Add your salon name, logo, contact info, and address so clients can find and trust you.",
+    title: "Business Profile & Hours",
+    description: "Add your salon name, logo, contact info, address, and set your weekly open/close times.",
     href: "/dashboard/settings",
     checkComplete: (ctx) => {
       if (!ctx.tenant) return false;
       const t = ctx.tenant;
-      return !!(t.name && (t.phone || t.email) && t.address);
-    },
-  },
-  {
-    id: "hours",
-    number: 2,
-    title: "Business Hours",
-    description: "Set your weekly open/close times so clients can only book during your availability.",
-    href: "/dashboard/settings",
-    checkComplete: (ctx) => {
-      if (!ctx.tenant) return false;
-      const settings = ctx.tenant.settings as Record<string, unknown> | null;
-      return !!(settings && settings.business_hours);
+      const settings = t.settings as Record<string, unknown> | null;
+      return !!(t.name && (t.phone || t.email) && t.address && settings?.business_hours);
     },
   },
   {
     id: "staff",
-    number: 3,
+    number: 2,
     title: "Add Staff Members",
     description: "Add your stylists and technicians with their roles, specialties, and contact info.",
     href: "/dashboard/staff",
@@ -65,7 +54,7 @@ const ESSENTIAL_STEPS: Step[] = [
   },
   {
     id: "services",
-    number: 4,
+    number: 3,
     title: "Create Services",
     description: "Add your service menu — cuts, colors, treatments, etc. — with pricing and duration.",
     href: "/dashboard/services",
@@ -73,7 +62,7 @@ const ESSENTIAL_STEPS: Step[] = [
   },
   {
     id: "clients",
-    number: 5,
+    number: 4,
     title: "Import or Add Clients",
     description: "Add your existing clients manually or import via CSV to get started right away.",
     href: "/dashboard/clients",
@@ -81,7 +70,7 @@ const ESSENTIAL_STEPS: Step[] = [
   },
   {
     id: "booking",
-    number: 6,
+    number: 5,
     title: "Share Your Booking Link",
     description: "Copy your unique booking URL and add it to your Instagram bio, website, and Google profile.",
     href: "/dashboard/settings",
@@ -92,7 +81,7 @@ const ESSENTIAL_STEPS: Step[] = [
   },
   {
     id: "reminders",
-    number: 7,
+    number: 6,
     title: "Set Up Reminders",
     description: "Enable SMS and email reminders for both clients and staff to reduce no-shows.",
     href: "/dashboard/settings",
@@ -105,7 +94,7 @@ const ESSENTIAL_STEPS: Step[] = [
   },
   {
     id: "frontdesk",
-    number: 8,
+    number: 7,
     title: "Try the Front Desk",
     description: "Open the full-screen POS mode to check in walk-ins, process payments, and manage your day.",
     href: "/dashboard/checkout",
@@ -142,6 +131,12 @@ const ADVANCED_FEATURES: AdvancedFeature[] = [
     icon: "📊",
     title: "Reports & Analytics",
     description: "Track revenue, busiest times, top services, and staff performance at a glance.",
+    href: "/dashboard/reports",
+  },
+  {
+    icon: "💰",
+    title: "Staff Revenue Reports",
+    description: "Auto-generate biweekly or monthly itemized revenue statements and email them directly to each staff member.",
     href: "/dashboard/reports",
   },
   {
