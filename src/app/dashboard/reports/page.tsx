@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData } from "@/lib/api";
@@ -40,7 +40,21 @@ interface PeakHoursData {
   days: string[]; hours: number[]; maxCount: number;
 }
 
-const TABS = ["Overview", "Staff Performance", "Client Retention", "Revenue Forecast", "Peak Hours"] as const;
+interface StaffRevenueEntry {
+  id: string; name: string; email: string | null; role: string;
+  photoUrl: string | null; commissionRate: number;
+  appointments: number; revenue: number; tips: number;
+  uniqueClients: number; avgTicket: number; commissionEarned: number;
+}
+
+interface StaffRevenueData {
+  staffRevenue: StaffRevenueEntry[];
+  totals: { appointments: number; revenue: number; tips: number; commission: number };
+  periodType: string;
+  period: { start: string; end: string; label: string };
+}
+
+const TABS = ["Overview", "Staff Performance", "Staff Revenue", "Client Retention", "Revenue Forecast", "Peak Hours"] as const;
 
 export default function ReportsPage() {
   const { tenant } = useTenant();
@@ -55,6 +69,12 @@ export default function ReportsPage() {
   const [forecast, setForecast] = useState<ForecastData | null>(null);
   const [peakHours, setPeakHours] = useState<PeakHoursData | null>(null);
   const [retFilter, setRetFilter] = useState<string>("all");
+
+  // Staff Revenue tab state
+  const [staffRevData, setStaffRevData] = useState<StaffRevenueData | null>(null);
+  const [revPeriodType, setRevPeriodType] = useState<'biweekly' | 'monthly'>('biweekly');
+  const [revOffset, setRevOffset] = useState(0);
+  const [sendingEmail, setSendingEmail] = useState<string | null>(null);
 
   const fetchTabData = useCallback(async () => {
     if (!tenant) return;
@@ -86,9 +106,14 @@ export default function ReportsPage() {
           setPeakHours(data);
           break;
         }
+        case "Staff Revenue": {
+          const { data } = await queryData<StaffRevenueData>("reports.staff-revenue", { period: revPeriodType, offset: revOffset });
+          setStaffRevData(data);
+          break;
+        }
       }
     } finally { setLoading(false); }
-  }, [tenant, activeTab]);
+  }, [tenant, activeTab, revPeriodType, revOffset]);
 
   useEffect(() => { fetchTabData(); }, [fetchTabData]);
 
@@ -368,7 +393,7 @@ export default function ReportsPage() {
 
                 {/* Data rows */}
                 {peakHours.days.map(day => (
-                  <>
+                  <React.Fragment key={day}>
                     <div key={`label-${day}`} className={styles.heatmapDayLabel}>{day.slice(0, 3)}</div>
                     {peakHours.hours.map(hour => {
                       const count = peakHours.grid[day]?.[hour] || 0;
@@ -388,7 +413,7 @@ export default function ReportsPage() {
                         </div>
                       );
                     })}
-                  </>
+                  </React.Fragment>
                 ))}
               </div>
 
@@ -402,6 +427,165 @@ export default function ReportsPage() {
                 <span>High</span>
               </div>
             </div>
+          )}
+
+          {/* ═══ STAFF REVENUE TAB ═══ */}
+          {activeTab === "Staff Revenue" && (
+            <>
+              {/* Period Controls */}
+              <div className={styles.revControls}>
+                <div className={styles.revPeriodToggle}>
+                  <button className={`${styles.revToggleBtn} ${revPeriodType === 'biweekly' ? styles.revToggleActive : ''}`}
+                    onClick={() => { setRevPeriodType('biweekly'); setRevOffset(0); }}>Biweekly</button>
+                  <button className={`${styles.revToggleBtn} ${revPeriodType === 'monthly' ? styles.revToggleActive : ''}`}
+                    onClick={() => { setRevPeriodType('monthly'); setRevOffset(0); }}>Monthly</button>
+                </div>
+                <div className={styles.revPeriodNav}>
+                  <button className={styles.revNavBtn} onClick={() => setRevOffset(o => o - 1)}>← Previous</button>
+                  <span className={styles.revPeriodLabel}>{staffRevData?.period?.label || '...'}</span>
+                  <button className={styles.revNavBtn} onClick={() => setRevOffset(o => Math.min(o + 1, 0))} disabled={revOffset >= 0}>Next →</button>
+                </div>
+                <button className={`btn btn-primary ${styles.revEmailAllBtn}`}
+                  disabled={sendingEmail === 'all' || !staffRevData?.staffRevenue?.length}
+                  onClick={async () => {
+                    setSendingEmail('all');
+                    try {
+                      const res = await fetch('/api/send-staff-reports', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ period: revPeriodType, offset: revOffset }),
+                      });
+                      const result = await res.json();
+                      alert(`Reports sent! ${result.data?.sent || 0} emails delivered.${result.data?.dry_run ? ' (Dry run — set RESEND_API_KEY for live sending)' : ''}`);
+                    } catch { alert('Failed to send reports.'); }
+                    setSendingEmail(null);
+                  }}>
+                  {sendingEmail === 'all' ? '⏳ Sending...' : '📧 Email All Staff'}
+                </button>
+              </div>
+
+              {/* Summary KPIs */}
+              {staffRevData && (
+                <div className={styles.kpiGrid}>
+                  <div className={`card ${styles.kpiCard}`}>
+                    <span className={styles.kpiLabel}>Total Revenue</span>
+                    <span className={styles.kpiValue}>{fmt(staffRevData.totals.revenue)}</span>
+                    <span className={styles.kpiChange}>{staffRevData.period.label}</span>
+                  </div>
+                  <div className={`card ${styles.kpiCard}`}>
+                    <span className={styles.kpiLabel}>Total Commission</span>
+                    <span className={styles.kpiValue} style={{ color: 'var(--color-success)' }}>{fmt(staffRevData.totals.commission)}</span>
+                    <span className={styles.kpiChange}>all staff combined</span>
+                  </div>
+                  <div className={`card ${styles.kpiCard}`}>
+                    <span className={styles.kpiLabel}>Total Tips</span>
+                    <span className={styles.kpiValue} style={{ color: '#e8b4cb' }}>{fmt(staffRevData.totals.tips)}</span>
+                    <span className={styles.kpiChange}>{staffRevData.totals.appointments} appointments</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Revenue Table */}
+              {staffRevData && staffRevData.staffRevenue.length > 0 ? (
+                <div className={`card ${styles.revTableCard}`}>
+                  <table className={styles.revTable}>
+                    <thead>
+                      <tr>
+                        <th>Staff</th>
+                        <th>Appts</th>
+                        <th>Revenue</th>
+                        <th>Rate</th>
+                        <th>Commission</th>
+                        <th>Tips</th>
+                        <th>Avg Ticket</th>
+                        <th>Clients</th>
+                        <th>Total Earned</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {staffRevData.staffRevenue.map((s) => (
+                        <tr key={s.id}>
+                          <td>
+                            <div className={styles.revStaffCell}>
+                              <div className={styles.revAvatar}>{s.name.charAt(0)}</div>
+                              <div>
+                                <div className={styles.revName}>{s.name}</div>
+                                <div className={styles.revRole}>{s.role}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td>{s.appointments}</td>
+                          <td className={styles.revMoney}>{fmt(s.revenue)}</td>
+                          <td>{s.commissionRate}%</td>
+                          <td className={styles.revMoney} style={{ color: 'var(--color-success)' }}>{fmt(s.commissionEarned)}</td>
+                          <td className={styles.revMoney} style={{ color: '#e8b4cb' }}>{fmt(s.tips)}</td>
+                          <td>{fmt(s.avgTicket)}</td>
+                          <td>{s.uniqueClients}</td>
+                          <td className={styles.revMoney} style={{ fontWeight: 700, color: 'var(--color-primary)' }}>{fmt(s.commissionEarned + s.tips)}</td>
+                          <td style={{ whiteSpace: 'nowrap' }}>
+                            <button className={`btn btn-ghost btn-sm ${styles.revEmailBtn}`}
+                              title="Preview statement"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                try {
+                                  const res = await fetch('/api/staff-statement/preview', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ staffId: s.id, period: revPeriodType, offset: revOffset }),
+                                  });
+                                  const result = await res.json();
+                                  if (result.data?.url) window.open(result.data.url, '_blank');
+                                } catch { alert('Failed to generate preview.'); }
+                              }}>
+                              👁️
+                            </button>
+                            <button className={`btn btn-ghost btn-sm ${styles.revEmailBtn}`}
+                              disabled={!s.email || sendingEmail === s.id}
+                              title={s.email ? `Send to ${s.email}` : 'No email on file'}
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                setSendingEmail(s.id);
+                                try {
+                                  const res = await fetch('/api/send-staff-reports', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ period: revPeriodType, offset: revOffset, staffIds: [s.id] }),
+                                  });
+                                  const result = await res.json();
+                                  alert(`Report sent to ${s.name}!${result.data?.dry_run ? ' (Dry run)' : ''}`);
+                                } catch { alert('Failed to send.'); }
+                                setSendingEmail(null);
+                              }}>
+                              {sendingEmail === s.id ? '⏳' : '📧'}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className={styles.revTotalsRow}>
+                        <td><strong>TOTALS</strong></td>
+                        <td><strong>{staffRevData.totals.appointments}</strong></td>
+                        <td className={styles.revMoney}><strong>{fmt(staffRevData.totals.revenue)}</strong></td>
+                        <td></td>
+                        <td className={styles.revMoney} style={{ color: 'var(--color-success)' }}><strong>{fmt(staffRevData.totals.commission)}</strong></td>
+                        <td className={styles.revMoney} style={{ color: '#e8b4cb' }}><strong>{fmt(staffRevData.totals.tips)}</strong></td>
+                        <td></td>
+                        <td></td>
+                        <td className={styles.revMoney} style={{ color: 'var(--color-primary)' }}><strong>{fmt(staffRevData.totals.commission + staffRevData.totals.tips)}</strong></td>
+                        <td></td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              ) : staffRevData ? (
+                <div className="card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                  <h3 style={{ marginBottom: 'var(--space-2)' }}>No Revenue Data</h3>
+                  <p>No completed appointments found for this period.</p>
+                </div>
+              ) : null}
+            </>
           )}
         </>
       )}

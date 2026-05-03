@@ -40,6 +40,7 @@ export default function StaffPage() {
   const [scheduleData, setScheduleData] = useState<Record<string, { open: string; close: string; off: boolean; useSlots?: boolean; slots?: { start: string; end: string }[] }>>({}); 
 
   const [agreementStaff, setAgreementStaff] = useState<Staff | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const fetchStaff = useCallback(async () => {
     if (!tenant) return;
@@ -251,9 +252,19 @@ export default function StaffPage() {
     setPhotoPreview(null);
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm("Delete this staff member? This cannot be undone.")) return;
-    await queryData("staff.delete", { id });
+  async function handleDeleteConfirmed() {
+    if (!deleteConfirmId) return;
+    const id = deleteConfirmId;
+    setDeleteConfirmId(null);
+    const { error } = await queryData("staff.delete", { id });
+    if (error) {
+      if (error.includes("foreign key") || error.includes("violates") || error.includes("referenced")) {
+        alert("Cannot delete this staff member because they have existing appointments. Deactivate them instead.");
+      } else {
+        alert(`Error deleting staff: ${error}`);
+      }
+      return;
+    }
     setStaffMembers((prev) => prev.filter((s) => s.id !== id));
     if (selectedStaff?.id === id) setSelectedStaff(null);
   }
@@ -363,7 +374,7 @@ export default function StaffPage() {
                   <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); openEdit(s); }}>✏️ Edit</button>
                   <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); openSchedule(s); }}>📅 Schedule</button>
                   <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); setAgreementStaff(s); }}>{(s as any).agreement_signed_at ? '✅' : '📝'} Agreement</button>
-                  <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); handleDelete(s.id); }} style={{ color: "var(--color-danger)" }}>🗑️</button>
+                  <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(s.id); }} style={{ color: "var(--color-danger)" }}>🗑️</button>
                 </div>
               </div>
             );
@@ -780,6 +791,36 @@ export default function StaffPage() {
           onClose={() => setAgreementStaff(null)}
           onSigned={() => { setAgreementStaff(null); fetchStaff(); }}
         />
+      )}
+
+      {/* ── Delete Confirmation Modal ── */}
+      {deleteConfirmId && (
+        <div className={styles.profileOverlay} onMouseDown={(e) => { if (e.target === e.currentTarget) setDeleteConfirmId(null); }}>
+          <div style={{
+            background: 'var(--surface-primary)',
+            border: '1px solid var(--border-primary)',
+            borderRadius: 'var(--radius-xl)',
+            padding: 'var(--space-8)',
+            maxWidth: 400,
+            width: '90%',
+            textAlign: 'center',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+          }}>
+            <div style={{ fontSize: '2.5rem', marginBottom: 'var(--space-4)' }}>⚠️</div>
+            <h3 style={{ color: 'var(--text-primary)', marginBottom: 'var(--space-2)', fontSize: '1.1rem' }}>Delete Staff Member?</h3>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: 'var(--space-6)', fontSize: '0.9rem' }}>
+              This action cannot be undone. The staff member will be permanently removed.
+            </p>
+            <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'center' }}>
+              <button className="btn btn-ghost" onClick={() => setDeleteConfirmId(null)}>Cancel</button>
+              <button className="btn" onClick={handleDeleteConfirmed} style={{
+                background: 'var(--color-danger, #ef4444)',
+                color: 'white',
+                border: 'none',
+              }}>Delete</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

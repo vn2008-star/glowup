@@ -984,6 +984,121 @@ export async function POST(request: Request) {
         return NextResponse.json({ data: { staffPerformance, period: { start: monthStart, end: monthEnd } } })
       }
 
+      case 'reports.staff-revenue': {
+        // payload: { period: 'biweekly' | 'monthly', offset?: number }
+        // offset: 0 = current period, -1 = previous, etc.
+        const periodType = payload?.period || 'biweekly'
+        const offset = payload?.offset || 0
+        const now = new Date()
+
+        let periodStart: Date, periodEnd: Date, periodLabel: string
+
+        if (periodType === 'monthly') {
+          const month = now.getMonth() + offset
+          periodStart = new Date(now.getFullYear(), month, 1)
+          periodEnd = new Date(now.getFullYear(), month + 1, 0, 23, 59, 59)
+          periodLabel = periodStart.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+        } else {
+          // Biweekly: periods start on 1st and 16th of each month
+          const currentDay = now.getDate()
+          const isFirstHalf = currentDay <= 15
+          const baseMonth = now.getMonth()
+          const baseYear = now.getFullYear()
+
+          // Calculate biweekly offset
+          let halfIndex = isFirstHalf ? 0 : 1
+          halfIndex += offset
+
+          // Convert halfIndex back to actual period
+          const monthOffset = Math.floor(halfIndex / 2) + (halfIndex < 0 && halfIndex % 2 !== 0 ? -1 : 0)
+          const half = ((halfIndex % 2) + 2) % 2 // normalize to 0 or 1
+
+          const targetMonth = baseMonth + monthOffset
+          const targetDate = new Date(baseYear, targetMonth, 1)
+
+          if (half === 0) {
+            periodStart = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1)
+            periodEnd = new Date(targetDate.getFullYear(), targetDate.getMonth(), 15, 23, 59, 59)
+          } else {
+            periodStart = new Date(targetDate.getFullYear(), targetDate.getMonth(), 16)
+            periodEnd = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0, 23, 59, 59)
+          }
+
+          const monthName = periodStart.toLocaleDateString('en-US', { month: 'short' })
+          periodLabel = `${monthName} ${periodStart.getDate()}–${periodEnd.getDate()}, ${periodStart.getFullYear()}`
+        }
+
+        const [aptsRes, staffRes] = await Promise.all([
+          svc.from('appointments').select('*').eq('tenant_id', tenantId)
+            .gte('start_time', periodStart.toISOString())
+            .lte('start_time', periodEnd.toISOString())
+            .eq('status', 'completed'),
+          svc.from('staff').select('id, name, email, role, commission_rate, is_active, specialties, photo_url')
+            .eq('tenant_id', tenantId)
+        ])
+
+        const apts = aptsRes.data || []
+        const staffList = staffRes.data || []
+
+        interface RevEntry {
+          id: string; name: string; email: string | null; role: string;
+          commissionRate: number; photoUrl: string | null;
+          appointments: number; revenue: number; tips: number;
+          clients: Set<string>;
+        }
+        const revMap: Record<string, RevEntry> = {}
+
+        for (const s of staffList) {
+          revMap[s.id] = {
+            id: s.id, name: s.name, email: s.email || null, role: s.role,
+            commissionRate: s.commission_rate || 0, photoUrl: s.photo_url || null,
+            appointments: 0, revenue: 0, tips: 0,
+            clients: new Set()
+          }
+        }
+
+        for (const a of apts) {
+          if (!a.staff_id || !revMap[a.staff_id]) continue
+          const r = revMap[a.staff_id]
+          r.appointments++
+          r.revenue += a.total_price || 0
+          r.tips += a.tip_amount || 0
+          if (a.client_id) r.clients.add(a.client_id)
+        }
+
+        const staffRevenue = Object.values(revMap)
+          .filter(r => r.appointments > 0 || staffList.find(s => s.id === r.id)?.is_active)
+          .map(r => ({
+            id: r.id, name: r.name, email: r.email, role: r.role,
+            photoUrl: r.photoUrl, commissionRate: r.commissionRate,
+            appointments: r.appointments, revenue: r.revenue, tips: r.tips,
+            uniqueClients: r.clients.size,
+            avgTicket: r.appointments > 0 ? Math.round(r.revenue / r.appointments) : 0,
+            commissionEarned: Math.round(r.revenue * (r.commissionRate / 100)),
+          }))
+          .sort((a, b) => {
+            const rolePriority: Record<string, number> = { owner: 0, manager: 1, technician: 2 };
+            const ra = rolePriority[a.role] ?? 3;
+            const rb = rolePriority[b.role] ?? 3;
+            if (ra !== rb) return ra - rb;
+            return a.name.localeCompare(b.name);
+          })
+
+        const totals = {
+          appointments: staffRevenue.reduce((s, r) => s + r.appointments, 0),
+          revenue: staffRevenue.reduce((s, r) => s + r.revenue, 0),
+          tips: staffRevenue.reduce((s, r) => s + r.tips, 0),
+          commission: staffRevenue.reduce((s, r) => s + r.commissionEarned, 0),
+        }
+
+        return NextResponse.json({
+          data: {
+            staffRevenue, totals, periodType,
+            period: { start: periodStart.toISOString(), end: periodEnd.toISOString(), label: periodLabel }
+          }
+        })
+      }
+
       case 'reports.retention': {
         const { data: clients } = await svc
           .from('clients')

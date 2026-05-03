@@ -111,6 +111,12 @@
   justify-content: center;
   gap: var(--space-5);
   max-width: 800px;
+  padding: var(--space-2) var(--space-3);
+}
+/* Compact contacts-style grid for 8+ staff — no scroll needed */
+.welcomeStaffGridCompact {
+  gap: var(--space-3) var(--space-4);
+  max-width: 900px;
 }
 .welcomeCard {
   display: flex;
@@ -124,6 +130,33 @@
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   min-width: 140px;
+}
+/* Compact card for 8+ staff — bare avatar icon style */
+.welcomeStaffGridCompact .welcomeCard {
+  padding: var(--space-2);
+  min-width: auto;
+  width: 80px;
+  gap: var(--space-1);
+  background: none;
+  border: none;
+  box-shadow: none;
+}
+.welcomeStaffGridCompact .welcomeCard:hover {
+  background: rgba(212, 160, 212, 0.08);
+  border: none;
+  box-shadow: none;
+}
+.welcomeStaffGridCompact .welcomeCardAvatar {
+  width: 52px;
+  height: 52px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+.welcomeStaffGridCompact .welcomeCardName {
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 76px;
 }
 .welcomeCard:hover {
   transform: translateY(-4px);

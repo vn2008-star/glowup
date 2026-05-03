@@ -606,7 +606,7 @@ export default function CheckoutPage() {
           </div>
 
           {/* Staff cards — sorted: owner → manager → technician */}
-          <div className={styles.welcomeStaffGrid}>
+          <div className={`${styles.welcomeStaffGrid}${activeStaff.length >= 16 ? ` ${styles.welcomeStaffGridCompact}` : ""}`}>
             {[...activeStaff].sort((a, b) => {
               const order = { owner: 0, manager: 1, technician: 2 } as Record<string, number>;
               return (order[a.role] ?? 9) - (order[b.role] ?? 9);

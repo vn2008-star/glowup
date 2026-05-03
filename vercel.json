@@ -7,6 +7,10 @@
     {
       "path": "/api/run-automations",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/send-staff-reports",
+      "schedule": "0 7 1,16 * *"
     }
   ]
 }
