@@ -78,7 +78,7 @@ export default function AdminPage() {
   const [rewardToast, setRewardToast] = useState('');
 
   // Outreach state
-  const [outreachTab, setOutreachTab] = useState<'upload' | 'history'>('upload');
+  const [outreachTab, setOutreachTab] = useState<'upload' | 'history' | 'followups'>('upload');
   const [csvLeads, setCsvLeads] = useState<OutreachLead[]>([]);
   const [senderName, setSenderName] = useState('');
   const [senderEmail, setSenderEmail] = useState('');
@@ -87,6 +87,18 @@ export default function AdminPage() {
   const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
   const [campaignsLoading, setCampaignsLoading] = useState(false);
   const [csvError, setCsvError] = useState('');
+  const [selectedTemplate, setSelectedTemplate] = useState('feature_showcase');
+  const [followUpCandidates, setFollowUpCandidates] = useState<CampaignRow[]>([]);
+  const [followUpLoading, setFollowUpLoading] = useState(false);
+  const [followUpSending, setFollowUpSending] = useState(false);
+  const [followUpResults, setFollowUpResults] = useState<{ summary: { total: number; sent: number; skipped: number; failed: number } } | null>(null);
+
+  const templateOptions = [
+    { id: 'feature_showcase', name: '🚀 Feature Showcase', desc: 'Highlights top features & stats — best for first cold outreach' },
+    { id: 'success_story', name: '⭐ Success Story', desc: 'Social proof with salon success metrics — best for warm leads' },
+    { id: 'limited_offer', name: '🔥 Limited-Time Offer', desc: 'Urgency-driven exclusive deal — best for conversion push' },
+    { id: 'follow_up', name: '💬 Friendly Follow-Up', desc: 'Gentle reminder for previously contacted salons' },
+  ];
 
   const fetchTenants = useCallback(async () => {
     const res = await fetch("/api/admin/tenants");
@@ -238,6 +250,7 @@ export default function AdminPage() {
           leads: csvLeads,
           senderName: senderName.trim() || undefined,
           senderEmail: senderEmail.trim() || undefined,
+          templateId: selectedTemplate,
         }),
       });
 
@@ -363,14 +376,29 @@ export default function AdminPage() {
 
       {/* ─── Bulk Outreach Section ─── */}
       <div className={styles.settingsCard}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
           <h3>📧 Bulk Salon Outreach</h3>
-          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
             <button
               className={`${styles.filterBtn} ${outreachTab === 'upload' ? styles.filterActive : ''}`}
               onClick={() => setOutreachTab('upload')}
             >
               Upload & Send
+            </button>
+            <button
+              className={`${styles.filterBtn} ${outreachTab === 'followups' ? styles.filterActive : ''}`}
+              onClick={async () => {
+                setOutreachTab('followups');
+                setFollowUpLoading(true);
+                const res = await fetch('/api/admin/outreach?action=follow-up-candidates');
+                if (res.ok) {
+                  const d = await res.json();
+                  setFollowUpCandidates(d.candidates || []);
+                }
+                setFollowUpLoading(false);
+              }}
+            >
+              🔄 Auto Follow-Ups
             </button>
             <button
               className={`${styles.filterBtn} ${outreachTab === 'history' ? styles.filterActive : ''}`}
@@ -417,6 +445,30 @@ export default function AdminPage() {
                   placeholder="e.g. james@glowup.com"
                   style={{ width: '100%', padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-default)', background: 'var(--bg-surface)', color: 'var(--text-primary)', fontSize: '13px' }}
                 />
+              </div>
+            </div>
+
+            {/* Template Selector */}
+            <div style={{ marginBottom: 'var(--space-4)' }}>
+              <label style={{ fontSize: '12px', fontWeight: 600, display: 'block', marginBottom: '8px', color: 'var(--text-secondary)' }}>Email Template</label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 'var(--space-2)' }}>
+                {templateOptions.map((t) => (
+                  <div
+                    key={t.id}
+                    onClick={() => setSelectedTemplate(t.id)}
+                    style={{
+                      padding: 'var(--space-3)',
+                      borderRadius: 'var(--radius-md)',
+                      border: selectedTemplate === t.id ? '2px solid var(--color-primary)' : '1px solid var(--border-default)',
+                      background: selectedTemplate === t.id ? 'rgba(195, 126, 218, 0.08)' : 'var(--bg-surface)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '4px' }}>{t.name}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', lineHeight: 1.4 }}>{t.desc}</div>
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -582,6 +634,106 @@ export default function AdminPage() {
               </div>
             )}
           </div>
+        ) : outreachTab === 'followups' ? (
+          /* Auto Follow-Ups Tab */
+          <div>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: 'var(--space-4)', lineHeight: 1.6 }}>
+              Salons that were emailed <strong>7+ days ago</strong> with no signup will receive an automatic follow-up. Each salon gets up to <strong>2 follow-ups</strong> using escalating templates: 1st → Success Story, 2nd → Friendly Follow-Up.
+            </p>
+
+            {followUpLoading ? (
+              <div style={{ textAlign: 'center', padding: 'var(--space-8)', color: 'var(--text-tertiary)' }}>Scanning for candidates...</div>
+            ) : followUpResults ? (
+              <div>
+                <div style={{ display: 'flex', gap: 'var(--space-4)', marginBottom: 'var(--space-4)', flexWrap: 'wrap' }}>
+                  <div className={styles.statCard} style={{ flex: '1 1 100px', padding: 'var(--space-3)' }}>
+                    <span style={{ fontSize: '20px', fontWeight: 800 }}>{followUpResults.summary.total}</span>
+                    <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>Total</span>
+                  </div>
+                  <div className={styles.statCard} style={{ flex: '1 1 100px', padding: 'var(--space-3)' }}>
+                    <span style={{ fontSize: '20px', fontWeight: 800, color: 'var(--color-success)' }}>{followUpResults.summary.sent}</span>
+                    <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>Sent ✉️</span>
+                  </div>
+                  <div className={styles.statCard} style={{ flex: '1 1 100px', padding: 'var(--space-3)' }}>
+                    <span style={{ fontSize: '20px', fontWeight: 800, color: '#ef4444' }}>{followUpResults.summary.failed}</span>
+                    <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>Failed ❌</span>
+                  </div>
+                </div>
+                <button className={styles.enableBtn} onClick={() => setFollowUpResults(null)}>Done</button>
+              </div>
+            ) : followUpCandidates.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: 'var(--space-6)' }}>
+                <div style={{ fontSize: '32px', marginBottom: '8px' }}>✅</div>
+                <p style={{ fontSize: '14px', color: 'var(--text-secondary)', fontWeight: 600 }}>No follow-ups needed right now</p>
+                <p style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>All sent campaigns are either less than 7 days old, already signed up, or have reached the follow-up limit.</p>
+              </div>
+            ) : (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
+                  <span style={{ fontSize: '13px', fontWeight: 600 }}>{followUpCandidates.length} salons ready for follow-up</span>
+                  <button
+                    className={styles.enableBtn}
+                    style={{ padding: '8px 24px', fontSize: '13px' }}
+                    disabled={followUpSending}
+                    onClick={async () => {
+                      if (!confirm(`Send follow-up emails to ${followUpCandidates.length} salons?`)) return;
+                      setFollowUpSending(true);
+                      try {
+                        const res = await fetch('/api/admin/outreach', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            action: 'send-follow-ups',
+                            senderName: senderName.trim() || undefined,
+                            campaignIds: followUpCandidates.map(c => c.id),
+                          }),
+                        });
+                        if (res.ok) {
+                          const data = await res.json();
+                          setFollowUpResults(data);
+                          setFollowUpCandidates([]);
+                        }
+                      } catch (err) {
+                        console.error(err);
+                      }
+                      setFollowUpSending(false);
+                    }}
+                  >
+                    {followUpSending ? 'Sending follow-ups...' : `🔄 Send ${followUpCandidates.length} Follow-Ups`}
+                  </button>
+                </div>
+                <div className={styles.tableWrap} style={{ maxHeight: '350px', overflow: 'auto' }}>
+                  <table className={styles.table}>
+                    <thead>
+                      <tr>
+                        <th>Salon</th>
+                        <th>Owner</th>
+                        <th>Email</th>
+                        <th>Original Sent</th>
+                        <th>Follow-Ups</th>
+                        <th>Next Template</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {followUpCandidates.map((c) => {
+                        const nextTemplate = (c as any).follow_up_count === 0 ? '⭐ Success Story' : '💬 Follow-Up';
+                        return (
+                          <tr key={c.id}>
+                            <td><strong>{c.salon_name}</strong></td>
+                            <td>{c.owner_name}</td>
+                            <td style={{ fontSize: '12px' }}>{c.owner_email}</td>
+                            <td className={styles.dateCell}>{c.sent_at ? new Date(c.sent_at).toLocaleDateString() : '—'}</td>
+                            <td style={{ textAlign: 'center' }}>{(c as any).follow_up_count || 0}/2</td>
+                            <td style={{ fontSize: '12px' }}>{nextTemplate}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
         ) : (
           /* Campaign History Tab */
           <div>
@@ -602,8 +754,9 @@ export default function AdminPage() {
                         <th>Owner</th>
                         <th>Email</th>
                         <th>City</th>
+                        <th>Template</th>
                         <th>Status</th>
-                        <th>Code</th>
+                        <th>Follow-Ups</th>
                         <th>Sent</th>
                       </tr>
                     </thead>
@@ -614,6 +767,18 @@ export default function AdminPage() {
                           <td>{c.owner_name}</td>
                           <td style={{ fontSize: '12px' }}>{c.owner_email}</td>
                           <td style={{ fontSize: '12px' }}>{c.city && c.state ? `${c.city}, ${c.state}` : c.city || c.state || '—'}</td>
+                          <td style={{ fontSize: '11px' }}>
+                            <span style={{
+                              padding: '2px 8px',
+                              borderRadius: 'var(--radius-full)',
+                              background: 'var(--bg-surface)',
+                              border: '1px solid var(--border-subtle)',
+                              fontWeight: 600,
+                            }}>
+                              {(c as any).template_id === 'success_story' ? '⭐' : (c as any).template_id === 'limited_offer' ? '🔥' : (c as any).template_id === 'follow_up' ? '💬' : '🚀'}
+                              {' '}{((c as any).template_id || 'feature_showcase').replace(/_/g, ' ')}
+                            </span>
+                          </td>
                           <td>
                             <span className={`${styles.statusBadge} ${
                               c.signed_up ? styles.statusActive
@@ -624,7 +789,7 @@ export default function AdminPage() {
                               {c.signed_up ? '🎉 Signed Up' : c.status === 'sent' ? '✉️ Sent' : c.status === 'skipped_active' ? '✅ Already Active' : '❌ ' + c.status}
                             </span>
                           </td>
-                          <td style={{ fontFamily: 'monospace', fontSize: '11px' }}>{c.referral_code || '—'}</td>
+                          <td style={{ textAlign: 'center', fontSize: '12px' }}>{(c as any).follow_up_count || 0}</td>
                           <td className={styles.dateCell}>{c.sent_at ? new Date(c.sent_at).toLocaleDateString() : '—'}</td>
                         </tr>
                       ))}

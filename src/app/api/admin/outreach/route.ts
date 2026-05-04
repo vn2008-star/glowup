@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { renderTemplate, TEMPLATES, TemplateId } from '@/lib/outreach-templates'
 
 // Verify the current user is a platform admin
 async function verifyAdmin() {
@@ -14,15 +15,44 @@ async function verifyAdmin() {
   return user
 }
 
-// GET — list past outreach campaigns
-export async function GET() {
-  const user = await verifyAdmin()
-  if (!user) return NextResponse.json({ error: 'Unauthorized', your_email: '' }, { status: 403 })
-
-  const svc = createServiceClient(
+function getSvc() {
+  return createServiceClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
+}
+
+// GET — list past outreach campaigns
+export async function GET(request: Request) {
+  const user = await verifyAdmin()
+  if (!user) return NextResponse.json({ error: 'Unauthorized', your_email: '' }, { status: 403 })
+
+  const url = new URL(request.url)
+  const action = url.searchParams.get('action')
+
+  const svc = getSvc()
+
+  // Return template list
+  if (action === 'templates') {
+    return NextResponse.json({ templates: Object.values(TEMPLATES) })
+  }
+
+  // Return follow-up candidates (sent 7+ days ago, no signup, not yet followed up to max)
+  if (action === 'follow-up-candidates') {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString()
+
+    const { data } = await svc
+      .from('outreach_campaigns')
+      .select('*')
+      .eq('status', 'sent')
+      .eq('signed_up', false)
+      .lt('sent_at', sevenDaysAgo)
+      .lt('follow_up_count', 2) // Max 2 follow-ups
+      .order('sent_at', { ascending: true })
+      .limit(200)
+
+    return NextResponse.json({ candidates: data || [] })
+  }
 
   const { data, error } = await svc
     .from('outreach_campaigns')
@@ -35,35 +65,47 @@ export async function GET() {
   return NextResponse.json({ campaigns: data || [] })
 }
 
-// POST — send bulk outreach emails
+// POST — send bulk outreach or follow-ups
 export async function POST(request: Request) {
   const user = await verifyAdmin()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
 
-  const { leads, senderName, senderEmail } = await request.json()
+  const body = await request.json()
+  const { action } = body
+
+  // Handle auto follow-ups
+  if (action === 'send-follow-ups') {
+    return handleFollowUps(body)
+  }
+
+  // Regular bulk send
+  return handleBulkSend(body)
+}
+
+async function handleBulkSend(body: {
+  leads: Array<{ salon_name: string; owner_name: string; owner_email: string; phone?: string; city?: string; state?: string }>;
+  senderName?: string;
+  senderEmail?: string;
+  templateId?: TemplateId;
+}) {
+  const { leads, senderName, senderEmail, templateId = 'feature_showcase' } = body
 
   if (!leads || !Array.isArray(leads) || leads.length === 0) {
     return NextResponse.json({ error: 'No leads provided' }, { status: 400 })
   }
 
-  const svc = createServiceClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
+  const svc = getSvc()
 
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
   const genCode = () => 'CR-' + Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
 
+  const template = TEMPLATES[templateId] || TEMPLATES.feature_showcase
+
   const results: Array<{
-    salon_name: string
-    owner_name: string
-    owner_email: string
-    status: string
-    code?: string
-    error?: string
+    salon_name: string; owner_name: string; owner_email: string;
+    status: string; code?: string; error?: string;
   }> = []
 
-  // Rate-limit: process in batches of 10 with 1s delay
   const BATCH_SIZE = 10
   const BATCH_DELAY = 1000
 
@@ -89,16 +131,10 @@ export async function POST(request: Request) {
         .single()
 
       if (existingOwner) {
-        // Record as skipped
         await svc.from('outreach_campaigns').insert({
-          salon_name: salon_name.trim(),
-          owner_name: owner_name.trim(),
-          owner_email: email,
-          phone: phone?.trim() || null,
-          city: city?.trim() || null,
-          state: state?.trim() || null,
-          status: 'skipped_active',
-          referral_code: null,
+          salon_name: salon_name.trim(), owner_name: owner_name.trim(), owner_email: email,
+          phone: phone?.trim() || null, city: city?.trim() || null, state: state?.trim() || null,
+          status: 'skipped_active', referral_code: null, template_id: templateId,
         })
         results.push({ salon_name, owner_name, owner_email: email, status: 'skipped_active' })
         continue
@@ -120,7 +156,6 @@ export async function POST(request: Request) {
       // 3. Generate referral code
       const code = genCode()
 
-      // Insert into client_referral_codes (reusing existing table for signup tracking)
       await svc.from('client_referral_codes').insert({
         code,
         referrer_name: senderName || 'GlowUp Team',
@@ -130,8 +165,9 @@ export async function POST(request: Request) {
         referred_owner_email: email,
       })
 
-      // 4. Send email
+      // 4. Send email using template
       const signupLink = `${process.env.NEXT_PUBLIC_APP_URL || 'https://glowup-jade.vercel.app'}/auth/signup?cref=${code}`
+      const htmlContent = renderTemplate(templateId, salon_name, owner_name, signupLink, senderName)
 
       let emailSent = false
       try {
@@ -146,73 +182,13 @@ export async function POST(request: Request) {
           await resend.emails.send({
             from: fromLine,
             to: [email],
-            subject: `✨ ${salon_name} — free salon management that pays for itself`,
-            html: `
-              <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px; background: #1a1a2e; color: #e0e0e0; border-radius: 16px;">
-                <div style="text-align: center; margin-bottom: 24px;">
-                  <h1 style="font-size: 28px; margin: 0; background: linear-gradient(135deg, #e8a87c, #d4a0e8); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">✨ GlowUp</h1>
-                </div>
-
-                <div style="margin-bottom: 24px;">
-                  <p style="font-size: 16px; line-height: 1.6; color: #ffffff; margin: 0 0 16px;">
-                    Hi ${owner_name.trim()},
-                  </p>
-                  <p style="font-size: 14px; line-height: 1.7; color: #c0c0c0; margin: 0 0 16px;">
-                    I wanted to reach out because I think <strong style="color: #ffffff;">${salon_name.trim()}</strong> would be a great fit for GlowUp — the all-in-one platform that helps beauty businesses grow on autopilot.
-                  </p>
-                  <p style="font-size: 14px; line-height: 1.7; color: #c0c0c0; margin: 0 0 16px;">
-                    Salons using GlowUp see on average:
-                  </p>
-                </div>
-
-                <div style="display: flex; gap: 12px; margin-bottom: 24px;">
-                  <div style="flex: 1; background: #2a2a3e; border-radius: 12px; padding: 16px; text-align: center;">
-                    <div style="font-size: 24px; font-weight: 800; color: #e8a87c;">60%</div>
-                    <div style="font-size: 11px; color: #999; margin-top: 4px;">Less no-shows</div>
-                  </div>
-                  <div style="flex: 1; background: #2a2a3e; border-radius: 12px; padding: 16px; text-align: center;">
-                    <div style="font-size: 24px; font-weight: 800; color: #d4a0e8;">3.2×</div>
-                    <div style="font-size: 11px; color: #999; margin-top: 4px;">More repeat visits</div>
-                  </div>
-                  <div style="flex: 1; background: #2a2a3e; border-radius: 12px; padding: 16px; text-align: center;">
-                    <div style="font-size: 24px; font-weight: 800; color: #22c55e;">45%</div>
-                    <div style="font-size: 11px; color: #999; margin-top: 4px;">Revenue increase</div>
-                  </div>
-                </div>
-
-                <div style="background: #2a2a3e; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
-                  <p style="font-size: 13px; color: #b0b0b0; margin: 0 0 8px;"><strong style="color: #d4a0e8;">What you get:</strong></p>
-                  <ul style="font-size: 13px; color: #c0c0c0; line-height: 1.8; margin: 0; padding-left: 18px;">
-                    <li>Smart booking with photo-based CRM</li>
-                    <li>Automated reminders that cut no-shows</li>
-                    <li>"Fill My Openings" — blast last-minute availability</li>
-                    <li>Client loyalty & retention automation</li>
-                    <li>Staff performance reports</li>
-                  </ul>
-                </div>
-
-                <div style="text-align: center; margin-bottom: 24px;">
-                  <a href="${signupLink}" style="display: inline-block; padding: 14px 36px; background: linear-gradient(135deg, #c37eda, #e8a87c); color: #fff; text-decoration: none; border-radius: 10px; font-weight: 700; font-size: 15px;">
-                    Start Your Free Trial →
-                  </a>
-                  <p style="font-size: 12px; color: #888; margin: 12px 0 0;">No credit card required. Setup takes 2 minutes.</p>
-                </div>
-
-                <div style="text-align: center; border-top: 1px solid #333; padding-top: 16px;">
-                  <p style="color: #666; font-size: 11px; margin: 0;">
-                    ${senderName ? `— ${senderName}, GlowUp Team` : '— The GlowUp Team'}
-                  </p>
-                  <p style="color: #555; font-size: 10px; margin: 8px 0 0;">
-                    Reply to this email if you have any questions. We'd love to help ${salon_name.trim()} grow!
-                  </p>
-                </div>
-              </div>
-            `,
+            subject: template.subjectFn(salon_name.trim()),
+            html: htmlContent,
           })
           emailSent = true
         } else {
-          console.log(`[DRY RUN] Outreach email to ${email} for ${salon_name}`)
-          emailSent = true // Count as sent in dry run
+          console.log(`[DRY RUN] Outreach email to ${email} for ${salon_name} (template: ${templateId})`)
+          emailSent = true
         }
       } catch (emailErr) {
         console.error(`Failed to send outreach email to ${email}:`, emailErr)
@@ -220,27 +196,16 @@ export async function POST(request: Request) {
 
       // 5. Record in outreach_campaigns
       await svc.from('outreach_campaigns').insert({
-        salon_name: salon_name.trim(),
-        owner_name: owner_name.trim(),
-        owner_email: email,
-        phone: phone?.trim() || null,
-        city: city?.trim() || null,
-        state: state?.trim() || null,
-        referral_code: code,
+        salon_name: salon_name.trim(), owner_name: owner_name.trim(), owner_email: email,
+        phone: phone?.trim() || null, city: city?.trim() || null, state: state?.trim() || null,
+        referral_code: code, template_id: templateId, follow_up_count: 0,
         status: emailSent ? 'sent' : 'failed',
         sent_at: emailSent ? new Date().toISOString() : null,
       })
 
-      results.push({
-        salon_name,
-        owner_name,
-        owner_email: email,
-        status: emailSent ? 'sent' : 'failed',
-        code,
-      })
+      results.push({ salon_name, owner_name, owner_email: email, status: emailSent ? 'sent' : 'failed', code })
     }
 
-    // Batch delay for rate limiting
     if (i + BATCH_SIZE < leads.length) {
       await new Promise(resolve => setTimeout(resolve, BATCH_DELAY))
     }
@@ -250,8 +215,116 @@ export async function POST(request: Request) {
   const skipped = results.filter(r => r.status.startsWith('skipped')).length
   const failed = results.filter(r => r.status === 'failed').length
 
+  return NextResponse.json({ summary: { total: results.length, sent, skipped, failed }, results })
+}
+
+async function handleFollowUps(body: { senderName?: string; campaignIds?: string[] }) {
+  const { senderName, campaignIds } = body
+  const svc = getSvc()
+
+  // Get candidates — either specific IDs or auto-detect
+  let candidates
+  if (campaignIds && campaignIds.length > 0) {
+    const { data } = await svc
+      .from('outreach_campaigns')
+      .select('*')
+      .in('id', campaignIds)
+      .eq('signed_up', false)
+    candidates = data || []
+  } else {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString()
+    const { data } = await svc
+      .from('outreach_campaigns')
+      .select('*')
+      .eq('status', 'sent')
+      .eq('signed_up', false)
+      .lt('sent_at', sevenDaysAgo)
+      .lt('follow_up_count', 2)
+      .order('sent_at', { ascending: true })
+      .limit(50)
+    candidates = data || []
+  }
+
+  if (candidates.length === 0) {
+    return NextResponse.json({ summary: { total: 0, sent: 0, skipped: 0, failed: 0 }, results: [] })
+  }
+
+  // Follow-up sequence: 1st follow-up → success_story, 2nd → follow_up template
+  const templateSequence: TemplateId[] = ['success_story', 'follow_up']
+
+  const results: Array<{ salon_name: string; owner_email: string; status: string; template: string }> = []
+
+  const BATCH_SIZE = 10
+  const BATCH_DELAY = 1000
+
+  for (let i = 0; i < candidates.length; i += BATCH_SIZE) {
+    const batch = candidates.slice(i, i + BATCH_SIZE)
+
+    for (const campaign of batch) {
+      const followUpIdx = Math.min(campaign.follow_up_count || 0, templateSequence.length - 1)
+      const templateId = templateSequence[followUpIdx]
+      const template = TEMPLATES[templateId]
+
+      const signupLink = campaign.referral_code
+        ? `${process.env.NEXT_PUBLIC_APP_URL || 'https://glowup-jade.vercel.app'}/auth/signup?cref=${campaign.referral_code}`
+        : `${process.env.NEXT_PUBLIC_APP_URL || 'https://glowup-jade.vercel.app'}/auth/signup`
+
+      const htmlContent = renderTemplate(templateId, campaign.salon_name, campaign.owner_name, signupLink, senderName)
+
+      let emailSent = false
+      try {
+        if (process.env.RESEND_API_KEY) {
+          const { Resend } = await import('resend')
+          const resend = new Resend(process.env.RESEND_API_KEY)
+
+          await resend.emails.send({
+            from: senderName
+              ? `${senderName} via GlowUp <onboarding@resend.dev>`
+              : 'GlowUp Team <onboarding@resend.dev>',
+            to: [campaign.owner_email],
+            subject: template.subjectFn(campaign.salon_name),
+            html: htmlContent,
+          })
+          emailSent = true
+        } else {
+          console.log(`[DRY RUN] Follow-up to ${campaign.owner_email} (template: ${templateId})`)
+          emailSent = true
+        }
+      } catch (err) {
+        console.error(`Follow-up failed for ${campaign.owner_email}:`, err)
+      }
+
+      if (emailSent) {
+        // Update the campaign record
+        await svc.from('outreach_campaigns')
+          .update({
+            follow_up_count: (campaign.follow_up_count || 0) + 1,
+            last_follow_up_at: new Date().toISOString(),
+            last_template_id: templateId,
+          })
+          .eq('id', campaign.id)
+      }
+
+      results.push({
+        salon_name: campaign.salon_name,
+        owner_email: campaign.owner_email,
+        status: emailSent ? 'sent' : 'failed',
+        template: templateId,
+      })
+    }
+
+    if (i + BATCH_SIZE < candidates.length) {
+      await new Promise(resolve => setTimeout(resolve, BATCH_DELAY))
+    }
+  }
+
   return NextResponse.json({
-    summary: { total: results.length, sent, skipped, failed },
+    summary: {
+      total: results.length,
+      sent: results.filter(r => r.status === 'sent').length,
+      skipped: 0,
+      failed: results.filter(r => r.status === 'failed').length,
+    },
     results,
   })
 }
