@@ -41,11 +41,19 @@ export const TEMPLATES: Record<TemplateId, {
 };
 
 const baseStyles = `font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px; background: #1a1a2e; color: #e0e0e0; border-radius: 16px;`;
-const logoHtml = `<h1 style="font-size: 28px; margin: 0; background: linear-gradient(135deg, #e8a87c, #d4a0e8); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">✨ GlowUp</h1>`;
+
+// GlowUp SVG logo as inline data URI (works in all email clients)
+const logoSvgDataUri = `data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 48 48' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3ClinearGradient id='fg' x1='0' y1='0' x2='48' y2='48' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0%25' stop-color='%23c9a0dc'/%3E%3Cstop offset='100%25' stop-color='%23f0a3b5'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M38 24c0 7.732-6.268 14-14 14s-14-6.268-14-14S16.268 10 24 10c3.5 0 6.7 1.28 9.16 3.4' stroke='url(%23fg)' stroke-width='4' stroke-linecap='round' fill='none'/%3E%3Cpath d='M38 24H26' stroke='url(%23fg)' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M38 6l1.2 3.6L43 11l-3.8 1.4L38 16l-1.2-3.6L33 11l3.8-1.4z' fill='url(%23fg)'/%3E%3Ccircle cx='43' cy='6' r='1.5' fill='%23f0a3b5' opacity='0.6'/%3E%3C/svg%3E`;
+
+const logoHtml = `<div style="display: flex; align-items: center; gap: 10px;">
+  <img src="${logoSvgDataUri}" alt="GlowUp" width="40" height="40" style="display: block;" />
+  <h1 style="font-size: 28px; margin: 0; background: linear-gradient(135deg, #c9a0dc, #f0a3b5); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">GlowUp</h1>
+</div>`;
 const ctaButton = (link: string, text: string) => `<a href="${link}" style="display: inline-block; padding: 14px 36px; background: linear-gradient(135deg, #c37eda, #e8a87c); color: #fff; text-decoration: none; border-radius: 10px; font-weight: 700; font-size: 15px;">${text}</a>`;
 const footer = (senderName: string | undefined, salonName: string) => `
   <div style="text-align: center; border-top: 1px solid #333; padding-top: 16px;">
-    <p style="color: #666; font-size: 11px; margin: 0;">
+    <img src="${logoSvgDataUri}" alt="GlowUp" width="24" height="24" style="display: inline-block; vertical-align: middle; margin-right: 6px;" />
+    <p style="color: #666; font-size: 11px; margin: 0; display: inline;">
       ${senderName ? `— ${senderName}, GlowUp Team` : '— The GlowUp Team'}
     </p>
     <p style="color: #555; font-size: 10px; margin: 8px 0 0;">
