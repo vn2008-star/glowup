@@ -36,7 +36,7 @@ const ESSENTIAL_STEPS: Step[] = [
     number: 1,
     title: "Business Profile & Hours",
     description: "Add your salon name, logo, contact info, address, and set your weekly open/close times.",
-    href: "/dashboard/settings#profile",
+    href: "/dashboard/settings?section=profile",
     checkComplete: (ctx) => {
       if (!ctx.tenant) return false;
       const t = ctx.tenant;
@@ -65,7 +65,7 @@ const ESSENTIAL_STEPS: Step[] = [
     number: 4,
     title: "Share Your Booking Link",
     description: "Share your booking link so clients can book and enter their contact info automatically. Any remaining contacts can be imported or added manually in the next step.",
-    href: "/dashboard/settings#booking-link",
+    href: "/dashboard/settings?section=booking-link",
     checkComplete: (ctx) => {
       if (!ctx.tenant) return false;
       return !!ctx.tenant.slug;
@@ -84,7 +84,7 @@ const ESSENTIAL_STEPS: Step[] = [
     number: 6,
     title: "Set Up Reminders",
     description: "Enable SMS and email reminders for both clients and staff to reduce no-shows.",
-    href: "/dashboard/settings#reminders",
+    href: "/dashboard/settings?section=reminders",
     checkComplete: (ctx) => {
       if (!ctx.tenant) return false;
       const settings = ctx.tenant.settings as Record<string, unknown> | null;

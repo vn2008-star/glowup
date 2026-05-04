@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useTranslations } from "next-intl";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 import { useTenant } from "@/lib/tenant-context";
@@ -115,24 +116,28 @@ export default function SettingsPage() {
     });
   }, [tenant]);
 
-  // Scroll to hash section if navigated from Quick Start
+  // Scroll to section if navigated from Quick Start via ?section= param
+  const searchParams = useSearchParams();
+  const sectionParam = searchParams.get("section");
   useEffect(() => {
-    if (loading) return;
-    const hash = window.location.hash.replace("#", "");
-    if (!hash) return;
-    // small delay to let DOM paint
+    if (loading || !sectionParam) return;
     const timer = setTimeout(() => {
-      const el = document.getElementById(hash);
+      const el = document.getElementById(sectionParam);
       if (el) {
         el.scrollIntoView({ behavior: "smooth", block: "start" });
-        el.style.outline = "2px solid var(--color-accent, #D4A017)";
+        // Flash gold highlight so user sees the target section
+        el.style.outline = "2px solid #D4A017";
         el.style.outlineOffset = "4px";
-        el.style.borderRadius = "var(--radius-lg)";
-        setTimeout(() => { el.style.outline = "none"; }, 2200);
+        el.style.borderRadius = "12px";
+        el.style.transition = "outline-color 0.5s ease";
+        setTimeout(() => {
+          el.style.outlineColor = "transparent";
+          setTimeout(() => { el.style.outline = "none"; }, 600);
+        }, 2000);
       }
-    }, 300);
+    }, 400);
     return () => clearTimeout(timer);
-  }, [loading]);
+  }, [loading, sectionParam]);
 
   function updateHour(day: string, field: "open" | "close", value: string) {
     setHours((prev) => ({ ...prev, [day]: { ...prev[day], [field]: value } }));
