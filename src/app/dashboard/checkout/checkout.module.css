@@ -2025,3 +2025,250 @@
 .qrDoneBtn:hover {
   opacity: 0.9;
 }
+
+/* ══════════════════════════════════════════════
+   MOBILE RESPONSIVE — Phone & Small Tablet
+   ══════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .page {
+    padding: var(--space-3);
+  }
+
+  /* ── Welcome Screen ── */
+  .welcomeScreen {
+    min-height: 60vh;
+    padding: var(--space-4) var(--space-2);
+  }
+  .welcomeLogoWrap {
+    width: 120px;
+    height: 120px;
+  }
+  .welcomeLogo {
+    width: 80px;
+    height: 80px;
+  }
+  .welcomeLogoFallback {
+    width: 64px;
+    height: 64px;
+    font-size: 28px;
+  }
+  .welcomeTitle {
+    font-size: 1.6rem;
+  }
+  .welcomeStaffGrid {
+    gap: var(--space-3);
+    max-width: 100%;
+  }
+  .welcomeCard {
+    padding: var(--space-3) var(--space-4);
+    min-width: 100px;
+  }
+  .welcomeCardAvatar {
+    width: 56px;
+    height: 56px;
+  }
+  .welcomeCardName {
+    font-size: var(--text-xs);
+  }
+  .poweredBy {
+    padding: var(--space-2) var(--space-4);
+  }
+  .poweredByText { font-size: 12px; }
+  .poweredByBrand { font-size: 16px; }
+
+  /* ── Header ── */
+  .pageHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-2);
+  }
+  .pageHeader h1 {
+    font-size: var(--text-lg);
+  }
+  .headerActions {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .dateLabel {
+    font-size: var(--text-xs);
+    min-width: 120px;
+  }
+
+  /* ── Staff Bar ── */
+  .staffBar {
+    gap: var(--space-1);
+    padding: var(--space-2) 0;
+    margin-bottom: var(--space-2);
+  }
+  .staffAvatar {
+    padding: var(--space-1) var(--space-2);
+    min-width: 54px;
+  }
+  .avatarCircle {
+    width: 36px;
+    height: 36px;
+    font-size: 11px;
+  }
+  .avatarName {
+    font-size: 9px;
+    max-width: 48px;
+  }
+  .avatarBadge {
+    width: 14px;
+    height: 14px;
+    font-size: 8px;
+    top: 0;
+    right: 4px;
+  }
+
+  /* ── Main Layout ── */
+  .mainLayout {
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+  }
+
+  /* ── Appointment List ── */
+  .aptListBody {
+    max-height: 250px;
+  }
+  .aptItem {
+    padding: var(--space-2) var(--space-3);
+    gap: var(--space-2);
+  }
+  .aptClient {
+    font-size: var(--text-xs);
+  }
+  .aptService {
+    font-size: 10px;
+  }
+
+  /* ── Checkout Panel ── */
+  .checkoutHeader {
+    padding: var(--space-3) var(--space-4);
+  }
+  .checkoutHeader h2 {
+    font-size: var(--text-base);
+  }
+  .checkoutClientInfo {
+    padding: var(--space-3) var(--space-4);
+    gap: var(--space-2);
+  }
+  .clientAvatar {
+    width: 36px;
+    height: 36px;
+    font-size: 11px;
+  }
+  .chargesSection {
+    padding: var(--space-3) var(--space-4);
+  }
+  .chargeRow {
+    padding: var(--space-2);
+    gap: var(--space-1);
+  }
+  .chargeName {
+    font-size: var(--text-xs);
+  }
+  .chargeAmount {
+    font-size: var(--text-xs);
+    flex-shrink: 0;
+  }
+  .addUpsellRow {
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+  .addUpsellRow select {
+    width: 100%;
+    font-size: var(--text-xs);
+  }
+  .addUpsellBtn {
+    width: 100%;
+    text-align: center;
+  }
+
+  /* ── Payment ── */
+  .paymentSection {
+    padding: var(--space-3) var(--space-4);
+  }
+  .paymentMethods {
+    flex-wrap: wrap;
+    gap: var(--space-1);
+  }
+  .paymentBtn {
+    padding: var(--space-2);
+    font-size: var(--text-xs);
+    min-width: 0;
+  }
+  .paymentIcon {
+    font-size: var(--text-base);
+  }
+  .tipRow label { font-size: var(--text-xs); }
+  .tipInput { width: 80px; font-size: var(--text-xs); padding: var(--space-1); }
+  .checkoutBtn {
+    padding: var(--space-3);
+    font-size: var(--text-sm);
+  }
+
+  /* ── Calendar Day Grid ── */
+  .calMulti {
+    grid-template-columns: 36px repeat(auto-fit, minmax(0, 1fr));
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .calStaffHeader {
+    font-size: 9px;
+    padding: var(--space-1);
+  }
+
+  /* ── Revenue Table ── */
+  .dailyRevenue {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .dailyRevenue table {
+    font-size: 11px;
+    min-width: 600px;
+  }
+  .dailyRevenue th,
+  .dailyRevenue td {
+    padding: var(--space-1) var(--space-2);
+    white-space: nowrap;
+  }
+
+  /* ── Modals & Overlays ── */
+  .walkInModal,
+  .checkInModal,
+  .waitlistModal,
+  .signOutModal {
+    width: 95vw !important;
+    max-width: 95vw !important;
+    max-height: 85vh;
+    overflow-y: auto;
+  }
+
+  /* ── Sign Out button ── */
+  .signOutBtn {
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--text-xs);
+  }
+}
+
+/* Extra-small phones */
+@media (max-width: 380px) {
+  .page {
+    padding: var(--space-2);
+  }
+  .welcomeTitle {
+    font-size: 1.3rem;
+  }
+  .paymentMethods {
+    flex-direction: column;
+  }
+  .staffAvatar {
+    min-width: 46px;
+    padding: var(--space-1);
+  }
+  .avatarCircle {
+    width: 32px;
+    height: 32px;
+  }
+}
