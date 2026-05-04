@@ -64,7 +64,7 @@ const ESSENTIAL_STEPS: Step[] = [
     id: "booking",
     number: 4,
     title: "Share Your Booking Link",
-    description: "Copy your unique booking URL and add it to your Instagram bio, website, and Google profile.",
+    description: "Share your booking link so clients can book and enter their contact info automatically. Any remaining contacts can be imported or added manually in the next step.",
     href: "/dashboard/settings",
     checkComplete: (ctx) => {
       if (!ctx.tenant) return false;
