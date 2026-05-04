@@ -3,7 +3,7 @@ import { createClient as createServerClient } from '@supabase/supabase-js'
 
 export async function POST(request: Request) {
   const body = await request.json()
-  const { userId, email, businessName, ownerName } = body
+  const { userId, email, businessName, ownerName, referralCode } = body
 
   if (!userId || !email) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -41,6 +41,7 @@ export async function POST(request: Request) {
       slug,
       business_type: 'nail_salon',
       plan: 'free',
+      referred_by: referralCode || null,
     })
     .select('id')
     .single()
@@ -62,6 +63,71 @@ export async function POST(request: Request) {
 
   if (staffError) {
     return NextResponse.json({ error: staffError.message }, { status: 500 })
+  }
+
+  // ── Process referral code ──
+  if (referralCode) {
+    try {
+      // Look up the referral code
+      const { data: refCode } = await supabase
+        .from('referral_codes')
+        .select('id, tenant_id, uses')
+        .eq('code', referralCode.trim())
+        .single()
+
+      if (refCode) {
+        // Log the referral
+        await supabase.from('referral_log').insert({
+          referrer_tenant_id: refCode.tenant_id,
+          referred_tenant_id: tenant.id,
+          code: referralCode.trim(),
+          reward_applied: true,
+        })
+
+        // Increment uses on the referral code
+        await supabase
+          .from('referral_codes')
+          .update({ uses: (refCode.uses || 0) + 1 })
+          .eq('id', refCode.id)
+
+        // Extend the referrer's trial by 30 days
+        const { data: referrerTenant } = await supabase
+          .from('tenants')
+          .select('trial_ends_at, current_period_end')
+          .eq('id', refCode.tenant_id)
+          .single()
+
+        if (referrerTenant) {
+          const currentEnd = referrerTenant.current_period_end
+            ? new Date(referrerTenant.current_period_end)
+            : referrerTenant.trial_ends_at
+              ? new Date(referrerTenant.trial_ends_at)
+              : new Date()
+
+          // If the date is in the past, start from now
+          const baseDate = currentEnd > new Date() ? currentEnd : new Date()
+          baseDate.setDate(baseDate.getDate() + 30)
+
+          await supabase
+            .from('tenants')
+            .update({
+              trial_ends_at: baseDate.toISOString(),
+            })
+            .eq('id', refCode.tenant_id)
+        }
+
+        // Also extend the new tenant's trial by 30 days
+        const newTrialEnd = new Date()
+        newTrialEnd.setDate(newTrialEnd.getDate() + 60) // 30 default + 30 bonus
+        await supabase
+          .from('tenants')
+          .update({ trial_ends_at: newTrialEnd.toISOString() })
+          .eq('id', tenant.id)
+      }
+    } catch (refErr) {
+      // Don't fail the signup if referral processing fails
+      console.error('Referral processing error:', refErr)
+    }
   }
 
   return NextResponse.json({ success: true, tenantId: tenant.id })

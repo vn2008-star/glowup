@@ -1,16 +1,19 @@
 'use client'
 
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useState, Suspense } from 'react'
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 import styles from '../login/auth.module.css'
 
-export default function SignupPage() {
+function SignupForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
   const t = useTranslations('auth')
+
+  const refFromUrl = searchParams.get('ref') || ''
 
   const [formData, setFormData] = useState({
     businessName: '',
@@ -18,6 +21,7 @@ export default function SignupPage() {
     email: '',
     password: '',
     confirmPassword: '',
+    referralCode: refFromUrl,
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -72,6 +76,7 @@ export default function SignupPage() {
           email: formData.email,
           businessName: formData.businessName,
           ownerName: formData.ownerName,
+          referralCode: formData.referralCode.trim() || undefined,
         }),
       })
 
@@ -212,6 +217,19 @@ export default function SignupPage() {
             />
           </div>
 
+          <div className={styles.formGroup}>
+            <label htmlFor="referralCode">Referral Code <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: 400 }}>(optional)</span></label>
+            <input
+              id="referralCode"
+              name="referralCode"
+              type="text"
+              value={formData.referralCode}
+              onChange={handleChange}
+              placeholder="e.g. GLOWUP-LUXENAILS-ABC"
+              style={{ fontFamily: 'monospace' }}
+            />
+          </div>
+
           <button
             type="submit"
             className={styles.submitButton}
@@ -227,5 +245,13 @@ export default function SignupPage() {
         </p>
       </div>
     </div>
+  )
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', color: 'var(--text-tertiary)' }}>Loading...</div>}>
+      <SignupForm />
+    </Suspense>
   )
 }

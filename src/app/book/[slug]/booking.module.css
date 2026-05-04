@@ -521,13 +521,77 @@
   text-align: center;
   padding: 1rem 0;
 }
-.footer p {
-  font-size: 0.7rem;
-  color: #4a4a6a;
+.footerCta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  color: #6b6b8a;
+  text-decoration: none;
+  transition: all 0.25s ease;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  background: rgba(195, 126, 218, 0.04);
+  border: 1px solid transparent;
 }
-.footer strong {
+.footerCta:hover {
+  color: #c37eda;
+  border-color: rgba(195, 126, 218, 0.2);
+  background: rgba(195, 126, 218, 0.08);
+}
+.footerCta strong {
   color: #c37eda;
   font-weight: 700;
+}
+.footerCtaHighlight {
+  color: #e8a87c;
+  font-weight: 600;
+}
+
+/* ── Ambassador Nudge Card ── */
+.ambassadorCard {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  margin-top: 1.5rem;
+  background: linear-gradient(135deg, rgba(195, 126, 218, 0.06), rgba(232, 168, 124, 0.06));
+  border: 1px solid rgba(195, 126, 218, 0.15);
+  border-radius: 14px;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  text-align: left;
+}
+.ambassadorCard:hover {
+  border-color: rgba(195, 126, 218, 0.35);
+  background: linear-gradient(135deg, rgba(195, 126, 218, 0.1), rgba(232, 168, 124, 0.1));
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(195, 126, 218, 0.15);
+}
+.ambassadorIcon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+.ambassadorCard strong {
+  font-size: 0.82rem;
+  color: #f0f0f5;
+  display: block;
+  margin-bottom: 2px;
+}
+.ambassadorCard p {
+  font-size: 0.72rem;
+  color: #8b8b9e;
+  line-height: 1.4;
+  margin: 0;
+}
+.ambassadorArrow {
+  font-size: 1.25rem;
+  color: #c37eda;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+.ambassadorCard:hover .ambassadorArrow {
+  transform: translateX(4px);
 }
 
 /* ── Loading State ── */
@@ -706,4 +770,7 @@
   .timeGrid { grid-template-columns: repeat(3, 1fr); }
   .progressLabel { display: none; }
   .staffGrid { grid-template-columns: repeat(2, 1fr); }
+  .ambassadorCard { flex-direction: column; text-align: center; gap: 0.5rem; }
+  .ambassadorArrow { display: none; }
 }
+

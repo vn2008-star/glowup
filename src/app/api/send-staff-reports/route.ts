@@ -461,6 +461,11 @@ function generateReportEmail(data: {
       <p style="color:#666;font-size:12px;margin:0;">
         Powered by <span style="color:#c9a0dc;font-weight:600;">GlowUp</span> ✨
       </p>
+      <p style="margin:10px 0 0;">
+        <a href="https://glowup-jade.vercel.app/auth/signup" style="color:#e8b4cb;font-size:12px;text-decoration:none;font-weight:600;">
+          Own a salon? Get GlowUp free →
+        </a>
+      </p>
       <p style="color:#555;font-size:11px;margin:8px 0 0;">
         This is an automated report from ${data.businessName}. If you have questions, please contact your manager.
       </p>

@@ -260,6 +260,16 @@ export default function BookingClient({ slug }: { slug: string }) {
         <p className={styles.successNote}>
           {business.phone ? `Questions? Call ${business.phone}` : 'We look forward to seeing you!'}
         </p>
+
+        {/* Ambassador Nudge */}
+        <a href="/auth/signup" className={styles.ambassadorCard} target="_blank" rel="noopener noreferrer">
+          <span className={styles.ambassadorIcon}>✨</span>
+          <div>
+            <strong>Love easy online booking?</strong>
+            <p>Get GlowUp free for your salon — smart booking, automated reminders, and more.</p>
+          </div>
+          <span className={styles.ambassadorArrow}>→</span>
+        </a>
       </div>
     </div>
   )
@@ -500,7 +510,9 @@ export default function BookingClient({ slug }: { slug: string }) {
 
         {/* Footer */}
         <div className={styles.footer}>
-          <p>Powered by <strong>GlowUp</strong></p>
+          <a href="/auth/signup" target="_blank" rel="noopener noreferrer" className={styles.footerCta}>
+            Powered by <strong>GlowUp</strong> — <span className={styles.footerCtaHighlight}>Get it free for your salon →</span>
+          </a>
         </div>
       </div>
 
