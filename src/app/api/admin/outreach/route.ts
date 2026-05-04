@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { renderTemplate, TEMPLATES, TemplateId } from '@/lib/outreach-templates'
 
+const DAILY_LIMIT = 95 // Leave 5 buffer for follow-ups within Resend's 100/day free tier
+
 // Verify the current user is a platform admin
 async function verifyAdmin() {
   const supabase = await createClient()
@@ -22,6 +24,20 @@ function getSvc() {
   )
 }
 
+// Helper: count how many outreach emails we've sent today
+async function getSentTodayCount(svc: ReturnType<typeof getSvc>) {
+  const todayStart = new Date()
+  todayStart.setHours(0, 0, 0, 0)
+
+  const { count } = await svc
+    .from('outreach_campaigns')
+    .select('*', { count: 'exact', head: true })
+    .eq('status', 'sent')
+    .gte('sent_at', todayStart.toISOString())
+
+  return count || 0
+}
+
 // GET — list past outreach campaigns
 export async function GET(request: Request) {
   const user = await verifyAdmin()
@@ -35,6 +51,31 @@ export async function GET(request: Request) {
   // Return template list
   if (action === 'templates') {
     return NextResponse.json({ templates: Object.values(TEMPLATES) })
+  }
+
+  // Return queue stats
+  if (action === 'queue-stats') {
+    const { count: queuedCount } = await svc
+      .from('outreach_campaigns')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'queued')
+
+    const sentToday = await getSentTodayCount(svc)
+    const remaining = Math.max(0, DAILY_LIMIT - sentToday)
+
+    const { count: totalSent } = await svc
+      .from('outreach_campaigns')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'sent')
+
+    return NextResponse.json({
+      queued: queuedCount || 0,
+      sent_today: sentToday,
+      daily_limit: DAILY_LIMIT,
+      remaining_today: remaining,
+      total_sent: totalSent || 0,
+      estimated_days: queuedCount ? Math.ceil((queuedCount || 0) / DAILY_LIMIT) : 0,
+    })
   }
 
   // Return follow-up candidates (sent 7+ days ago, no signup, not yet followed up to max)
@@ -101,6 +142,10 @@ async function handleBulkSend(body: {
 
   const template = TEMPLATES[templateId] || TEMPLATES.feature_showcase
 
+  // Check how many we can send today
+  const sentToday = await getSentTodayCount(svc)
+  let remainingToday = Math.max(0, DAILY_LIMIT - sentToday)
+
   const results: Array<{
     salon_name: string; owner_name: string; owner_email: string;
     status: string; code?: string; error?: string;
@@ -140,12 +185,12 @@ async function handleBulkSend(body: {
         continue
       }
 
-      // 2. Check if already contacted
+      // 2. Check if already contacted or queued
       const { data: existingOutreach } = await svc
         .from('outreach_campaigns')
         .select('id')
         .eq('owner_email', email)
-        .in('status', ['sent', 'skipped_active'])
+        .in('status', ['sent', 'skipped_active', 'queued'])
         .single()
 
       if (existingOutreach) {
@@ -165,7 +210,22 @@ async function handleBulkSend(body: {
         referred_owner_email: email,
       })
 
-      // 4. Send email using template
+      // 4. Check daily limit — queue if exceeded
+      if (remainingToday <= 0) {
+        // Queue for later sending
+        await svc.from('outreach_campaigns').insert({
+          salon_name: salon_name.trim(), owner_name: owner_name.trim(), owner_email: email,
+          phone: phone?.trim() || null, city: city?.trim() || null, state: state?.trim() || null,
+          referral_code: code, template_id: templateId, follow_up_count: 0,
+          status: 'queued',
+          sender_name: senderName?.trim() || null,
+          sender_email: senderEmail?.trim() || null,
+        })
+        results.push({ salon_name, owner_name, owner_email: email, status: 'queued', code })
+        continue
+      }
+
+      // 5. Send email using template
       const signupLink = `${process.env.NEXT_PUBLIC_APP_URL || 'https://glowup-jade.vercel.app'}/auth/signup?cref=${code}`
       const htmlContent = renderTemplate(templateId, salon_name, owner_name, signupLink, senderName)
 
@@ -186,15 +246,17 @@ async function handleBulkSend(body: {
             html: htmlContent,
           })
           emailSent = true
+          remainingToday--
         } else {
           console.log(`[DRY RUN] Outreach email to ${email} for ${salon_name} (template: ${templateId})`)
           emailSent = true
+          remainingToday--
         }
       } catch (emailErr) {
         console.error(`Failed to send outreach email to ${email}:`, emailErr)
       }
 
-      // 5. Record in outreach_campaigns
+      // 6. Record in outreach_campaigns
       await svc.from('outreach_campaigns').insert({
         salon_name: salon_name.trim(), owner_name: owner_name.trim(), owner_email: email,
         phone: phone?.trim() || null, city: city?.trim() || null, state: state?.trim() || null,
@@ -212,10 +274,14 @@ async function handleBulkSend(body: {
   }
 
   const sent = results.filter(r => r.status === 'sent').length
+  const queued = results.filter(r => r.status === 'queued').length
   const skipped = results.filter(r => r.status.startsWith('skipped')).length
   const failed = results.filter(r => r.status === 'failed').length
 
-  return NextResponse.json({ summary: { total: results.length, sent, skipped, failed }, results })
+  return NextResponse.json({
+    summary: { total: results.length, sent, queued, skipped, failed },
+    results,
+  })
 }
 
 async function handleFollowUps(body: { senderName?: string; campaignIds?: string[] }) {
@@ -254,6 +320,10 @@ async function handleFollowUps(body: { senderName?: string; campaignIds?: string
 
   const results: Array<{ salon_name: string; owner_email: string; status: string; template: string }> = []
 
+  // Respect daily limit for follow-ups too
+  const sentToday = await getSentTodayCount(svc)
+  let remainingToday = Math.max(0, DAILY_LIMIT - sentToday)
+
   const BATCH_SIZE = 10
   const BATCH_DELAY = 1000
 
@@ -261,6 +331,16 @@ async function handleFollowUps(body: { senderName?: string; campaignIds?: string
     const batch = candidates.slice(i, i + BATCH_SIZE)
 
     for (const campaign of batch) {
+      if (remainingToday <= 0) {
+        results.push({
+          salon_name: campaign.salon_name,
+          owner_email: campaign.owner_email,
+          status: 'queued',
+          template: 'deferred',
+        })
+        continue
+      }
+
       const followUpIdx = Math.min(campaign.follow_up_count || 0, templateSequence.length - 1)
       const templateId = templateSequence[followUpIdx]
       const template = TEMPLATES[templateId]
@@ -286,9 +366,11 @@ async function handleFollowUps(body: { senderName?: string; campaignIds?: string
             html: htmlContent,
           })
           emailSent = true
+          remainingToday--
         } else {
           console.log(`[DRY RUN] Follow-up to ${campaign.owner_email} (template: ${templateId})`)
           emailSent = true
+          remainingToday--
         }
       } catch (err) {
         console.error(`Follow-up failed for ${campaign.owner_email}:`, err)

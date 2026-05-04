@@ -83,7 +83,7 @@ export default function AdminPage() {
   const [senderName, setSenderName] = useState('');
   const [senderEmail, setSenderEmail] = useState('');
   const [sending, setSending] = useState(false);
-  const [sendResults, setSendResults] = useState<{ summary: { total: number; sent: number; skipped: number; failed: number }; results: OutreachResult[] } | null>(null);
+  const [sendResults, setSendResults] = useState<{ summary: { total: number; sent: number; queued?: number; skipped: number; failed: number }; results: OutreachResult[] } | null>(null);
   const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
   const [campaignsLoading, setCampaignsLoading] = useState(false);
   const [csvError, setCsvError] = useState('');
@@ -92,6 +92,7 @@ export default function AdminPage() {
   const [followUpLoading, setFollowUpLoading] = useState(false);
   const [followUpSending, setFollowUpSending] = useState(false);
   const [followUpResults, setFollowUpResults] = useState<{ summary: { total: number; sent: number; skipped: number; failed: number } } | null>(null);
+  const [queueStats, setQueueStats] = useState<{ queued: number; sent_today: number; daily_limit: number; remaining_today: number; estimated_days: number } | null>(null);
 
   const templateOptions = [
     { id: 'feature_showcase', name: '🚀 Feature Showcase', desc: 'Highlights top features & stats — best for first cold outreach' },
@@ -536,7 +537,7 @@ export default function AdminPage() {
                       disabled={sending}
                       onClick={handleSendOutreach}
                     >
-                      {sending ? `Sending... (batch mode)` : `🚀 Send ${csvLeads.length} Emails`}
+                      {sending ? `Sending... (batch mode)` : csvLeads.length > 95 ? `🚀 Send 95 Now + Queue ${csvLeads.length - 95}` : `🚀 Send ${csvLeads.length} Emails`}
                     </button>
                   </div>
                 </div>
@@ -575,23 +576,43 @@ export default function AdminPage() {
             {sendResults && (
               <div>
                 <div style={{ display: 'flex', gap: 'var(--space-4)', marginBottom: 'var(--space-4)', flexWrap: 'wrap' }}>
-                  <div className={styles.statCard} style={{ flex: '1 1 100px', padding: 'var(--space-3)' }}>
+                  <div className={styles.statCard} style={{ flex: '1 1 80px', padding: 'var(--space-3)' }}>
                     <span style={{ fontSize: '20px', fontWeight: 800 }}>{sendResults.summary.total}</span>
                     <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>Total</span>
                   </div>
-                  <div className={styles.statCard} style={{ flex: '1 1 100px', padding: 'var(--space-3)' }}>
+                  <div className={styles.statCard} style={{ flex: '1 1 80px', padding: 'var(--space-3)' }}>
                     <span style={{ fontSize: '20px', fontWeight: 800, color: 'var(--color-success)' }}>{sendResults.summary.sent}</span>
                     <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>Sent ✉️</span>
                   </div>
-                  <div className={styles.statCard} style={{ flex: '1 1 100px', padding: 'var(--space-3)' }}>
+                  {(sendResults.summary.queued || 0) > 0 && (
+                    <div className={styles.statCard} style={{ flex: '1 1 80px', padding: 'var(--space-3)' }}>
+                      <span style={{ fontSize: '20px', fontWeight: 800, color: '#818cf8' }}>{sendResults.summary.queued}</span>
+                      <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>Queued ⏳</span>
+                    </div>
+                  )}
+                  <div className={styles.statCard} style={{ flex: '1 1 80px', padding: 'var(--space-3)' }}>
                     <span style={{ fontSize: '20px', fontWeight: 800, color: '#f59e0b' }}>{sendResults.summary.skipped}</span>
                     <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>Skipped ⏭️</span>
                   </div>
-                  <div className={styles.statCard} style={{ flex: '1 1 100px', padding: 'var(--space-3)' }}>
+                  <div className={styles.statCard} style={{ flex: '1 1 80px', padding: 'var(--space-3)' }}>
                     <span style={{ fontSize: '20px', fontWeight: 800, color: '#ef4444' }}>{sendResults.summary.failed}</span>
                     <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>Failed ❌</span>
                   </div>
                 </div>
+                {(sendResults.summary.queued || 0) > 0 && (
+                  <div style={{
+                    background: 'rgba(129, 140, 248, 0.1)',
+                    border: '1px solid rgba(129, 140, 248, 0.3)',
+                    borderRadius: 'var(--radius-md)',
+                    padding: 'var(--space-3)',
+                    marginBottom: 'var(--space-4)',
+                    fontSize: '13px',
+                    color: '#818cf8',
+                    lineHeight: 1.5,
+                  }}>
+                    ⏳ <strong>{sendResults.summary.queued} emails queued</strong> — they'll be sent automatically at <strong>95/day</strong> (est. {Math.ceil((sendResults.summary.queued || 0) / 95)} days). The queue runs daily at 10 AM via cron.
+                  </div>
+                )}
                 <div className={styles.tableWrap} style={{ maxHeight: '300px', overflow: 'auto' }}>
                   <table className={styles.table}>
                     <thead>
@@ -612,10 +633,11 @@ export default function AdminPage() {
                           <td>
                             <span className={`${styles.statusBadge} ${
                               r.status === 'sent' ? styles.statusActive
+                              : r.status === 'queued' ? styles.statusSuspended
                               : r.status === 'failed' ? styles.statusDeletion
                               : styles.statusSuspended
                             }`}>
-                              {r.status === 'sent' ? '✉️ Sent' : r.status === 'skipped_active' ? '✅ Already Active' : r.status === 'skipped_duplicate' ? '⏭️ Already Contacted' : r.status === 'skipped' ? `⚠️ ${r.error}` : '❌ Failed'}
+                              {r.status === 'sent' ? '✉️ Sent' : r.status === 'queued' ? '⏳ Queued' : r.status === 'skipped_active' ? '✅ Already Active' : r.status === 'skipped_duplicate' ? '⏭️ Already Contacted' : r.status === 'skipped' ? `⚠️ ${r.error}` : '❌ Failed'}
                             </span>
                           </td>
                           <td style={{ fontFamily: 'monospace', fontSize: '11px' }}>{r.code || '—'}</td>

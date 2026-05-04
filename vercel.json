@@ -9,6 +9,10 @@
       "schedule": "0 9 * * *"
     },
     {
+      "path": "/api/process-outreach-queue",
+      "schedule": "0 10 * * *"
+    },
+    {
       "path": "/api/send-staff-reports",
       "schedule": "0 7 1,16 * *"
     }
