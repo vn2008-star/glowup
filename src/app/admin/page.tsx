@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import styles from "./admin.module.css";
+import GrowthDashboard from "./GrowthDashboard";
 
 interface TenantRow {
   id: string;
@@ -318,6 +319,9 @@ export default function AdminPage() {
           <span className={styles.statLabel}>Pending Deletion</span>
         </div>
       </div>
+
+      {/* Growth Command Center */}
+      <GrowthDashboard />
 
       {/* Referral Settings */}
       <div className={styles.settingsCard}>
