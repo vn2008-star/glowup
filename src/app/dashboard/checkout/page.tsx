@@ -374,8 +374,32 @@ export default function CheckoutPage() {
   // ── Charge management ──
   async function addUpsellCharge() {
     if (!selectedApt || !upsellServiceId) return;
-    const svc = services.find((s) => s.id === upsellServiceId);
-    if (!svc) return;
+
+    // Check if this is an add-on selection (format: serviceId__addon__index)
+    const isAddon = upsellServiceId.includes('__addon__');
+    let description: string;
+    let amount: number;
+    let serviceId: string;
+
+    if (isAddon) {
+      const [svcId, , idxStr] = upsellServiceId.split('__addon__').length === 2
+        ? [upsellServiceId.split('__addon__')[0], 'addon', upsellServiceId.split('__addon__')[1]]
+        : [upsellServiceId, '', '0'];
+      serviceId = svcId;
+      const svc = services.find((s) => s.id === serviceId);
+      if (!svc || !svc.price_addons) return;
+      const addonIdx = parseInt(idxStr);
+      const addon = svc.price_addons[addonIdx];
+      if (!addon) return;
+      description = `${svc.name} — ${addon.label}`;
+      amount = addon.price;
+    } else {
+      serviceId = upsellServiceId;
+      const svc = services.find((s) => s.id === serviceId);
+      if (!svc) return;
+      description = svc.name;
+      amount = svc.price;
+    }
 
     // If no charges exist yet, add the original service as the base charge first
     let currentCharges = [...charges];
@@ -396,9 +420,9 @@ export default function CheckoutPage() {
     const { data } = await queryData<AppointmentCharge>("charges.add", {
       appointment_id: selectedApt.id,
       staff_id: selectedApt.staff_id,
-      service_id: svc.id,
-      description: svc.name,
-      amount: svc.price,
+      service_id: serviceId,
+      description,
+      amount,
       is_upsell: true,
     });
 
@@ -1332,7 +1356,14 @@ export default function CheckoutPage() {
                         <select value={upsellServiceId} onChange={(e) => setUpsellServiceId(e.target.value)}>
                           <option value="">+ {t("addService")}</option>
                           {services.map((s) => (
-                            <option key={s.id} value={s.id}>{s.name} — ${s.price}</option>
+                            <optgroup key={s.id} label={s.name}>
+                              <option value={s.id}>{s.name} — ${s.price}</option>
+                              {s.price_addons && s.price_addons.map((addon, i) => (
+                                <option key={`${s.id}__addon__${i}`} value={`${s.id}__addon__${i}`}>
+                                  ↳ +${addon.price} {addon.label}
+                                </option>
+                              ))}
+                            </optgroup>
                           ))}
                         </select>
                         <button
