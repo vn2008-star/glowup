@@ -121,6 +121,57 @@
   opacity: 0.5;
 }
 
+/* ── Reorder hint ── */
+.reorderHint {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  margin-bottom: var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* ── Drag & Drop ── */
+.dragHandle {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: var(--text-tertiary);
+  opacity: 0;
+  cursor: grab;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+  z-index: 2;
+  letter-spacing: -1px;
+}
+.serviceCard {
+  position: relative;
+}
+.serviceCard:hover .dragHandle {
+  opacity: 0.6;
+}
+.dragHandle:hover {
+  opacity: 1 !important;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+.serviceCard.dragging {
+  opacity: 0.4;
+  transform: scale(0.97);
+  box-shadow: none;
+}
+.serviceCard.dragOver {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-primary-200);
+  transform: translateY(-2px);
+}
+
 /* Service Image on Card */
 .serviceImage {
   width: 100%;

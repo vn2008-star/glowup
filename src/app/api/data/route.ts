@@ -162,6 +162,28 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: !error, error: error?.message })
       }
 
+      case 'services.reorder': {
+        // payload.items: Array<{ id: string; sort_order: number }>
+        const items = payload.items as { id: string; sort_order: number }[]
+        if (!Array.isArray(items)) {
+          return NextResponse.json({ error: 'items array required' }, { status: 400 })
+        }
+        for (const item of items) {
+          await svc
+            .from('services')
+            .update({ sort_order: item.sort_order })
+            .eq('id', item.id)
+            .eq('tenant_id', tenantId)
+        }
+        // Re-fetch full list in new order
+        const { data, error } = await svc
+          .from('services')
+          .select('*')
+          .eq('tenant_id', tenantId)
+          .order('sort_order', { ascending: true })
+        return NextResponse.json({ data, error: error?.message })
+      }
+
       // ─── APPOINTMENTS ───
       case 'appointments.list': {
         let query = svc
