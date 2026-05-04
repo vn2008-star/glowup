@@ -156,7 +156,10 @@
   color: var(--text-primary);
 }
 .stepDesc {
-  display: none;  /* hidden in compact mode */
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  line-height: var(--leading-relaxed);
+  margin-top: 2px;
 }
 
 /* Step Status */
