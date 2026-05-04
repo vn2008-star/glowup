@@ -62,8 +62,8 @@ export async function POST(req: NextRequest) {
 
         console.log(`✅ Subscription activated for tenant ${tenantId}`);
 
-        // ── Issue client referral rewards ──
-        // Find any pending client referral where this tenant was the referred salon
+        // ── Issue client referral rewards as Universal GlowUp Credits ──
+        // Credits are platform-level, redeemable at ANY GlowUp salon
         const { data: pendingReferrals } = await supabaseAdmin
           .from('referral_log')
           .select('id, client_referrer_name, client_referrer_email, client_reward_amount')
@@ -83,20 +83,24 @@ export async function POST(req: NextRequest) {
           for (const ref of pendingReferrals) {
             const amount = ref.client_reward_amount || 25;
 
-            // Create gift card at THIS salon (the one that just paid) for the referring client
-            const gcCode = 'GC-' + Array.from({ length: 6 }, () =>
+            // Create a Universal GlowUp Credit (GU- prefix, not tied to any salon)
+            const creditCode = 'GU-' + Array.from({ length: 6 }, () =>
               'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]
             ).join('');
 
-            await supabaseAdmin.from('gift_cards').insert({
-              tenant_id: tenantId,
-              code: gcCode,
-              initial_amount: amount,
+            const expiresAt = new Date();
+            expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+
+            await supabaseAdmin.from('glowup_credits').insert({
+              code: creditCode,
+              amount,
               balance: amount,
               status: 'active',
               recipient_name: ref.client_referrer_name || 'Referral Reward',
-              purchaser_name: 'GlowUp Rewards',
-              message: `Thank you for referring ${salonName} to GlowUp! Enjoy your $${amount} reward.`,
+              recipient_email: ref.client_referrer_email,
+              source: 'client_referral',
+              referral_log_id: ref.id,
+              expires_at: expiresAt.toISOString(),
             });
 
             // Mark referral as rewarded
@@ -105,7 +109,7 @@ export async function POST(req: NextRequest) {
               .update({ reward_applied: true, client_reward_status: 'rewarded' })
               .eq('id', ref.id);
 
-            // ── Email the client about their reward ──
+            // ── Email the client about their GlowUp Credit ──
             if (ref.client_referrer_email) {
               try {
                 if (process.env.RESEND_API_KEY) {
@@ -114,46 +118,48 @@ export async function POST(req: NextRequest) {
                   await resend.emails.send({
                     from: 'GlowUp <onboarding@resend.dev>',
                     to: [ref.client_referrer_email],
-                    subject: `🎁 You earned a $${amount} gift card at ${salonName}!`,
+                    subject: `\uD83C\uDF81 You earned a $${amount} GlowUp Credit!`,
                     html: `
                       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px; background: #1a1a2e; color: #e0e0e0; border-radius: 16px;">
                         <div style="text-align: center; margin-bottom: 24px;">
-                          <h1 style="font-size: 28px; margin: 0; background: linear-gradient(135deg, #e8a87c, #d4a0e8); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">✨ GlowUp</h1>
+                          <h1 style="font-size: 28px; margin: 0; background: linear-gradient(135deg, #e8a87c, #d4a0e8); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">\u2728 GlowUp</h1>
                         </div>
                         <div style="text-align: center; margin-bottom: 24px;">
-                          <div style="font-size: 48px; margin-bottom: 8px;">🎁</div>
+                          <div style="font-size: 48px; margin-bottom: 8px;">\uD83C\uDF81</div>
                           <h2 style="font-size: 22px; color: #ffffff; margin: 0 0 8px;">Congrats, ${ref.client_referrer_name || 'there'}!</h2>
-                          <p style="color: #b0b0b0; font-size: 15px; margin: 0;">Your referral paid off — literally!</p>
+                          <p style="color: #b0b0b0; font-size: 15px; margin: 0;">Your referral of <strong style="color: #fff;">${salonName}</strong> paid off!</p>
                         </div>
                         <div style="background: #2a2a3e; border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 24px;">
-                          <p style="color: #b0b0b0; font-size: 13px; margin: 0 0 8px;">Your gift card code</p>
-                          <div style="font-size: 28px; font-weight: 800; letter-spacing: 0.1em; color: #e8a87c; font-family: monospace;">${gcCode}</div>
+                          <p style="color: #b0b0b0; font-size: 13px; margin: 0 0 8px;">Your GlowUp Credit code</p>
+                          <div style="font-size: 28px; font-weight: 800; letter-spacing: 0.1em; color: #e8a87c; font-family: monospace;">${creditCode}</div>
                           <p style="color: #b0b0b0; font-size: 14px; margin: 12px 0 0;">
-                            Worth <strong style="color: #22c55e; font-size: 20px;">$${amount}</strong> at <strong style="color: #ffffff;">${salonName}</strong>
+                            Worth <strong style="color: #22c55e; font-size: 20px;">$${amount}</strong>
                           </p>
                         </div>
                         <div style="background: #2a2a3e; border-radius: 12px; padding: 16px; margin-bottom: 24px;">
                           <p style="color: #b0b0b0; font-size: 13px; margin: 0;">
-                            <strong style="color: #d4a0e8;">How to use:</strong> Simply mention this code at checkout when you visit <strong>${salonName}</strong>. The staff will apply your gift card balance to your service.
+                            <strong style="color: #d4a0e8;">How to use:</strong> Use this code at checkout at <strong>any salon on GlowUp</strong>. Just mention your GlowUp Credit code and the staff will apply it to your service.
                           </p>
                         </div>
+                        <div style="background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.2); border-radius: 12px; padding: 16px; margin-bottom: 24px; text-align: center;">
+                          <p style="color: #22c55e; font-size: 14px; font-weight: 600; margin: 0;">\uD83C\uDF1F Redeemable at any GlowUp salon \u2014 not just ${salonName}!</p>
+                        </div>
                         <div style="text-align: center; border-top: 1px solid #333; padding-top: 16px;">
-                          <p style="color: #666; font-size: 11px; margin: 0;">Thank you for helping ${salonName} discover GlowUp!</p>
+                          <p style="color: #666; font-size: 11px; margin: 0;">Valid for 1 year from issuance. Thank you for spreading the word about GlowUp!</p>
                         </div>
                       </div>
                     `,
                   });
-                  console.log(`📧 Reward email sent to ${ref.client_referrer_email} for gift card ${gcCode}`);
+                  console.log(`\uD83D\uDCE7 Reward email sent to ${ref.client_referrer_email} for GlowUp Credit ${creditCode}`);
                 } else {
-                  console.log(`[DRY RUN] Reward email to ${ref.client_referrer_email}: $${amount} gift card ${gcCode} at ${salonName}`);
+                  console.log(`[DRY RUN] Reward email to ${ref.client_referrer_email}: $${amount} GlowUp Credit ${creditCode}`);
                 }
               } catch (emailErr) {
                 console.error(`Failed to send reward email to ${ref.client_referrer_email}:`, emailErr);
-                // Don't fail the whole webhook if email fails
               }
             }
 
-            console.log(`🎁 Client referral reward: $${amount} gift card issued at tenant ${tenantId} for ${ref.client_referrer_email}`);
+            console.log(`\uD83C\uDF81 GlowUp Credit: $${amount} credit ${creditCode} issued for ${ref.client_referrer_email}`);
           }
         }
 

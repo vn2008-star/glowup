@@ -83,7 +83,7 @@ export default function ReferPage() {
           <h1 className={styles.title}>🎁 Refer a Salon & Earn</h1>
           <p className={styles.subtitle}>
             Know a salon that would love GlowUp? Refer them and earn a{" "}
-            <strong>$25 gift card</strong> at their salon when they sign up!
+            <strong>$25 GlowUp Credit</strong> redeemable at any GlowUp salon!
           </p>
         </div>
 
@@ -99,7 +99,7 @@ export default function ReferPage() {
           </div>
           <div className={styles.step}>
             <span className={styles.stepNum}>3</span>
-            <span>When they sign up & pay, you get a <strong>$25 gift card</strong></span>
+            <span>When they sign up & pay, you get a <strong>$25 GlowUp Credit</strong></span>
           </div>
         </div>
 
@@ -258,9 +258,10 @@ export default function ReferPage() {
             </div>
 
             <div className={styles.termsBox}>
-              <strong>Terms:</strong> Your $25 gift card will be issued at{" "}
-              <strong>{formData.salonName}</strong> once {result.salonOwnerName} signs up
+              <strong>Terms:</strong> Your $25 GlowUp Credit will be issued once{" "}
+              <strong>{result.salonOwnerName}</strong> signs up
               for GlowUp and pays for their first month after the free trial.
+              Redeemable at any salon on the GlowUp network. Valid for 1 year.
             </div>
           </div>
         )}

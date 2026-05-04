@@ -897,6 +897,101 @@ export async function POST(request: Request) {
         return NextResponse.json({ data, error: error?.message })
       }
 
+      // ─── GLOWUP CREDITS (Universal, cross-salon) ───
+      case 'credits.lookup': {
+        const { code: creditCode } = payload
+        const trimmedCode = creditCode?.toUpperCase().trim()
+        if (!trimmedCode) return NextResponse.json({ data: null, error: 'No code provided' })
+
+        const { data: credit, error: findErr } = await svc
+          .from('glowup_credits')
+          .select('*')
+          .eq('code', trimmedCode)
+          .single()
+
+        if (findErr || !credit) return NextResponse.json({ data: null, error: 'GlowUp Credit not found' })
+        if (credit.status !== 'active') return NextResponse.json({ data: null, error: `Credit is ${credit.status}` })
+
+        // Check expiry
+        if (credit.expires_at && new Date(credit.expires_at) < new Date()) {
+          // Auto-expire
+          await svc.from('glowup_credits').update({ status: 'expired' }).eq('id', credit.id)
+          return NextResponse.json({ data: null, error: 'This GlowUp Credit has expired' })
+        }
+
+        return NextResponse.json({ data: { ...credit, type: 'glowup_credit' } })
+      }
+
+      case 'credits.redeem': {
+        const { code: redeemCode, amount } = payload
+        const { data: credit, error: findErr } = await svc
+          .from('glowup_credits')
+          .select('*')
+          .eq('code', redeemCode)
+          .eq('status', 'active')
+          .single()
+
+        if (findErr || !credit) return NextResponse.json({ data: null, error: 'GlowUp Credit not found or inactive' })
+        if (credit.balance < amount) return NextResponse.json({ data: null, error: `Insufficient balance. Available: $${credit.balance}` })
+
+        // Check expiry
+        if (credit.expires_at && new Date(credit.expires_at) < new Date()) {
+          await svc.from('glowup_credits').update({ status: 'expired' }).eq('id', credit.id)
+          return NextResponse.json({ data: null, error: 'This GlowUp Credit has expired' })
+        }
+
+        const newBalance = credit.balance - amount
+        const newStatus = newBalance <= 0 ? 'redeemed' : 'active'
+
+        // Deduct from credit balance
+        const { data: updated, error: updateErr } = await svc
+          .from('glowup_credits')
+          .update({ balance: newBalance, status: newStatus })
+          .eq('id', credit.id)
+          .select()
+          .single()
+
+        if (updateErr) return NextResponse.json({ data: null, error: updateErr.message })
+
+        // Record the redemption for salon compensation tracking
+        let stripeCredit = null
+        try {
+          // Look up the salon's Stripe customer ID for auto-compensation
+          const { data: salonTenant } = await svc
+            .from('tenants')
+            .select('stripe_customer_id, name')
+            .eq('id', tenantId)
+            .single()
+
+          if (salonTenant?.stripe_customer_id && process.env.STRIPE_SECRET_KEY) {
+            // Create a Stripe invoice credit on the salon's account
+            // This will automatically reduce their next subscription invoice
+            const stripe = (await import('stripe')).default
+            const stripeClient = new stripe(process.env.STRIPE_SECRET_KEY)
+            const invoiceItem = await stripeClient.invoiceItems.create({
+              customer: salonTenant.stripe_customer_id,
+              amount: -Math.round(amount * 100), // negative = credit, in cents
+              currency: 'usd',
+              description: `GlowUp Credit redemption (${redeemCode}) — compensation for referral reward`,
+            })
+            stripeCredit = invoiceItem.id
+          }
+        } catch (stripeErr) {
+          console.error('Failed to create Stripe credit for salon compensation:', stripeErr)
+          // Don't fail the redemption if Stripe credit fails
+        }
+
+        await svc.from('credit_redemptions').insert({
+          credit_id: credit.id,
+          tenant_id: tenantId,
+          amount,
+          compensated: !!stripeCredit,
+          stripe_credit_id: stripeCredit,
+        })
+
+        return NextResponse.json({ data: updated })
+      }
+
       // ─── SERVICE HISTORY ───
       case 'service-history.list': {
         const { client_id } = payload

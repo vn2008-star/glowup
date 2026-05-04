@@ -446,19 +446,25 @@ export default function CheckoutPage() {
   }
 
   // ── Checkout ──
-  // Gift card lookup handler
+  // Gift card / GlowUp Credit lookup handler (auto-detects by prefix)
   async function handleGcLookup() {
     if (!gcCode.trim()) return;
     setGcLooking(true);
     setGcError("");
     setGcCard(null);
     setGcApplied(0);
-    const { data, error } = await queryData("giftcards.lookup", { code: gcCode.trim() });
+
+    // Auto-detect: GU- prefix = GlowUp Credit, GC- or anything else = salon gift card
+    const code = gcCode.trim().toUpperCase();
+    const isGlowUpCredit = code.startsWith('GU-');
+    const action = isGlowUpCredit ? 'credits.lookup' : 'giftcards.lookup';
+
+    const { data, error } = await queryData(action, { code });
     if (error || !data) {
-      setGcError(typeof error === 'string' ? error : 'Gift card not found or inactive');
+      setGcError(typeof error === 'string' ? error : (isGlowUpCredit ? 'GlowUp Credit not found or inactive' : 'Gift card not found or inactive'));
     } else {
       setGcCard(data);
-      // Auto-apply: min of gift card balance vs checkout total
+      // Auto-apply: min of balance vs checkout total
       const total = charges.length > 0 ? grandTotal : Number(selectedApt?.service?.price || 0) + (Number(tipAmount) || 0);
       setGcApplied(Math.min((data as { balance: number }).balance, total));
     }
@@ -493,14 +499,16 @@ export default function CheckoutPage() {
     const chargeTotal = currentCharges.reduce((sum, c) => sum + Number(c.amount), 0);
     const tip = Number(tipAmount) || 0;
 
-    // Redeem gift card balance if applied
+    // Redeem gift card or GlowUp Credit if applied
     if (paymentMethod === "gift_card" && gcCard && gcApplied > 0) {
-      const { error: redeemErr } = await queryData("giftcards.redeem", {
+      const isGlowUpCredit = gcCard.code?.startsWith('GU-') || gcCard.type === 'glowup_credit';
+      const redeemAction = isGlowUpCredit ? 'credits.redeem' : 'giftcards.redeem';
+      const { error: redeemErr } = await queryData(redeemAction, {
         code: gcCard.code,
         amount: gcApplied,
       });
       if (redeemErr) {
-        setGcError(typeof redeemErr === 'string' ? redeemErr : 'Failed to redeem gift card');
+        setGcError(typeof redeemErr === 'string' ? redeemErr : 'Failed to redeem');
         setCheckingOut(false);
         return;
       }
