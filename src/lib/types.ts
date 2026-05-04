@@ -73,6 +73,7 @@ export interface Service {
   description: string | null
   duration_minutes: number
   price: number
+  price_addons: { label: string; price: number }[] | null
   commission_rate: number | null
   image_url: string | null
   is_active: boolean

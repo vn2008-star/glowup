@@ -458,6 +458,84 @@
   color: #fff;
 }
 
+/* ── Price Add-Ons (form) ── */
+.addonsList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.addonRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.addonRow .input:first-child {
+  flex: 1;
+}
+.addonPriceWrap {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.addonPlus {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--text-tertiary);
+}
+.addonRemoveBtn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+.addonRemoveBtn:hover {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+  background: rgba(239, 68, 68, 0.08);
+}
+.addonAddBtn {
+  padding: var(--space-2) var(--space-3);
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-primary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-align: left;
+}
+.addonAddBtn:hover {
+  border-color: var(--color-primary);
+  background: var(--color-primary-200);
+}
+
+/* ── Price Add-On Pills (card) ── */
+.addonPills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.addonPill {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: rgba(195, 126, 218, 0.1);
+  color: var(--color-primary);
+  border: 1px solid rgba(195, 126, 218, 0.2);
+}
+
 /* ── Form ── */
 .formGrid {
   display: grid;

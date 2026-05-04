@@ -25,6 +25,7 @@ export default function ServicesPage() {
   const [bulkAdding, setBulkAdding] = useState(false);
   const [formData, setFormData] = useState({
     name: "", category: CATEGORY_OPTIONS[0], duration_minutes: 60, price: 0, description: "", is_active: true, image_url: "" as string,
+    price_addons: [] as { label: string; price: number }[],
   });
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -45,7 +46,7 @@ export default function ServicesPage() {
 
   const openNew = () => {
     setEditingService(null);
-    setFormData({ name: "", category: CATEGORY_OPTIONS[0], duration_minutes: 60, price: 0, description: "", is_active: true, image_url: "" });
+    setFormData({ name: "", category: CATEGORY_OPTIONS[0], duration_minutes: 60, price: 0, description: "", is_active: true, image_url: "", price_addons: [] });
     setShowModal(true);
   };
 
@@ -54,6 +55,7 @@ export default function ServicesPage() {
     setFormData({
       name: s.name, category: s.category, duration_minutes: s.duration_minutes,
       price: s.price, description: s.description || "", is_active: s.is_active, image_url: s.image_url || "",
+      price_addons: s.price_addons || [],
     });
     setShowModal(true);
   };
@@ -63,6 +65,7 @@ export default function ServicesPage() {
     setFormData({
       name: tpl.name, category: tpl.category, duration_minutes: tpl.duration_minutes,
       price: tpl.price, description: tpl.description, is_active: true, image_url: "",
+      price_addons: [],
     });
     setShowCatalog(false);
     setShowModal(true);
@@ -95,6 +98,7 @@ export default function ServicesPage() {
     const payload = {
       ...formData,
       image_url: formData.image_url || null,
+      price_addons: formData.price_addons.length > 0 ? formData.price_addons : null,
     };
 
     if (editingService) {
@@ -489,6 +493,58 @@ export default function ServicesPage() {
                   <label className="label">Description</label>
                   <textarea className="input" rows={3} value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} />
                 </div>
+
+                {/* Price Add-ons */}
+                <div className={`${styles.formGroup} ${styles.fullWidth}`}>
+                  <label className="label">Price Add-Ons <span style={{ fontWeight: 400, color: 'var(--text-tertiary)' }}>(optional surcharges)</span></label>
+                  <div className={styles.addonsList}>
+                    {formData.price_addons.map((addon, i) => (
+                      <div key={i} className={styles.addonRow}>
+                        <input
+                          className="input"
+                          placeholder="e.g., Dense hair surcharge"
+                          value={addon.label}
+                          onChange={(e) => {
+                            const updated = [...formData.price_addons];
+                            updated[i] = { ...updated[i], label: e.target.value };
+                            setFormData({ ...formData, price_addons: updated });
+                          }}
+                        />
+                        <div className={styles.addonPriceWrap}>
+                          <span className={styles.addonPlus}>+$</span>
+                          <input
+                            className="input"
+                            type="number"
+                            placeholder="0"
+                            value={addon.price}
+                            onChange={(e) => {
+                              const updated = [...formData.price_addons];
+                              updated[i] = { ...updated[i], price: Number(e.target.value) };
+                              setFormData({ ...formData, price_addons: updated });
+                            }}
+                            style={{ width: 80 }}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          className={styles.addonRemoveBtn}
+                          onClick={() => {
+                            const updated = formData.price_addons.filter((_, j) => j !== i);
+                            setFormData({ ...formData, price_addons: updated });
+                          }}
+                        >✕</button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      className={styles.addonAddBtn}
+                      onClick={() => setFormData({ ...formData, price_addons: [...formData.price_addons, { label: '', price: 0 }] })}
+                    >
+                      + Add surcharge tier
+                    </button>
+                  </div>
+                </div>
+
                 <div className={styles.formGroup}>
                   <label className={styles.toggleLabel}>
                     <input type="checkbox" checked={formData.is_active} onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })} />
@@ -655,8 +711,15 @@ function ServiceCard({ s, getCategoryColor, openEdit, handleDelete, isDragging, 
         </div>
         <h3 className={styles.serviceName}>{s.name}</h3>
         <p className={styles.serviceDesc}>{s.description}</p>
+        {s.price_addons && s.price_addons.length > 0 && (
+          <div className={styles.addonPills}>
+            {s.price_addons.map((a, i) => (
+              <span key={i} className={styles.addonPill}>+${a.price} {a.label}</span>
+            ))}
+          </div>
+        )}
         <div className={styles.serviceMeta}>
-          <span className={styles.servicePrice}>${s.price}</span>
+          <span className={styles.servicePrice}>${s.price}{s.price_addons && s.price_addons.length > 0 ? '+' : ''}</span>
           <span className={styles.serviceDuration}>{s.duration_minutes} min</span>
         </div>
       </div>
