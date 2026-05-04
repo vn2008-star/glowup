@@ -165,6 +165,19 @@ export async function POST(request: Request) {
           .from('client_referral_codes')
           .update({ uses: (crefCode.uses || 0) + 1 })
           .eq('id', crefCode.id)
+
+        // Auto-mark outreach campaign as signed up (close the loop!)
+        if (crefCode.referred_owner_email) {
+          await supabase
+            .from('outreach_campaigns')
+            .update({
+              signed_up: true,
+              signed_up_at: new Date().toISOString(),
+              signed_up_tenant_id: tenant.id,
+            })
+            .eq('referral_code', clientReferralCode.trim())
+            .eq('signed_up', false)
+        }
       }
     } catch (crefErr) {
       console.error('Client referral processing error:', crefErr)

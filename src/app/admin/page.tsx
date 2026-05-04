@@ -757,69 +757,138 @@ export default function AdminPage() {
             )}
           </div>
         ) : (
-          /* Campaign History Tab */
+          /* Campaign History Tab — Pipeline View */
           <div>
             {campaignsLoading ? (
               <div style={{ textAlign: 'center', padding: 'var(--space-8)', color: 'var(--text-tertiary)' }}>Loading campaigns...</div>
             ) : campaigns.length === 0 ? (
               <div style={{ textAlign: 'center', padding: 'var(--space-8)', color: 'var(--text-tertiary)' }}>No outreach campaigns yet</div>
-            ) : (
-              <div>
-                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: 'var(--space-3)' }}>
-                  {campaigns.length} total outreach emails • {campaigns.filter(c => c.status === 'sent').length} sent • {campaigns.filter(c => c.signed_up).length} signed up
-                </p>
-                <div className={styles.tableWrap} style={{ maxHeight: '400px', overflow: 'auto' }}>
-                  <table className={styles.table}>
-                    <thead>
-                      <tr>
-                        <th>Salon</th>
-                        <th>Owner</th>
-                        <th>Email</th>
-                        <th>City</th>
-                        <th>Template</th>
-                        <th>Status</th>
-                        <th>Follow-Ups</th>
-                        <th>Sent</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {campaigns.map((c) => (
-                        <tr key={c.id}>
-                          <td><strong>{c.salon_name}</strong></td>
-                          <td>{c.owner_name}</td>
-                          <td style={{ fontSize: '12px' }}>{c.owner_email}</td>
-                          <td style={{ fontSize: '12px' }}>{c.city && c.state ? `${c.city}, ${c.state}` : c.city || c.state || '—'}</td>
-                          <td style={{ fontSize: '11px' }}>
-                            <span style={{
-                              padding: '2px 8px',
-                              borderRadius: 'var(--radius-full)',
-                              background: 'var(--bg-surface)',
-                              border: '1px solid var(--border-subtle)',
-                              fontWeight: 600,
-                            }}>
-                              {(c as any).template_id === 'success_story' ? '⭐' : (c as any).template_id === 'limited_offer' ? '🔥' : (c as any).template_id === 'follow_up' ? '💬' : '🚀'}
-                              {' '}{((c as any).template_id || 'feature_showcase').replace(/_/g, ' ')}
-                            </span>
-                          </td>
-                          <td>
-                            <span className={`${styles.statusBadge} ${
-                              c.signed_up ? styles.statusActive
-                              : c.status === 'sent' ? styles.statusActive
-                              : c.status === 'skipped_active' ? styles.statusSuspended
-                              : styles.statusDeletion
-                            }`}>
-                              {c.signed_up ? '🎉 Signed Up' : c.status === 'sent' ? '✉️ Sent' : c.status === 'skipped_active' ? '✅ Already Active' : '❌ ' + c.status}
-                            </span>
-                          </td>
-                          <td style={{ textAlign: 'center', fontSize: '12px' }}>{(c as any).follow_up_count || 0}</td>
-                          <td className={styles.dateCell}>{c.sent_at ? new Date(c.sent_at).toLocaleDateString() : '—'}</td>
+            ) : (() => {
+              const signedUp = campaigns.filter(c => c.signed_up);
+              const needsFollowUp = campaigns.filter(c => c.status === 'sent' && !c.signed_up && (c as any).follow_up_count < 2 && c.sent_at && Date.now() - new Date(c.sent_at).getTime() > 7 * 86400000);
+              const waiting = campaigns.filter(c => c.status === 'sent' && !c.signed_up && (!c.sent_at || Date.now() - new Date(c.sent_at).getTime() <= 7 * 86400000));
+              const queued = campaigns.filter(c => c.status === 'queued');
+              const maxedOut = campaigns.filter(c => c.status === 'sent' && !c.signed_up && (c as any).follow_up_count >= 2);
+
+              type PipeFilter = 'all' | 'signed_up' | 'needs_followup' | 'waiting' | 'queued' | 'maxed';
+              const getFiltered = () => {
+                const pf = (window as any).__outreachPipeFilter as PipeFilter | undefined;
+                if (pf === 'signed_up') return signedUp;
+                if (pf === 'needs_followup') return needsFollowUp;
+                if (pf === 'waiting') return waiting;
+                if (pf === 'queued') return queued;
+                if (pf === 'maxed') return maxedOut;
+                return campaigns;
+              };
+              const filtered = getFiltered();
+
+              return (
+                <div>
+                  {/* Pipeline stat cards */}
+                  <div style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-4)', flexWrap: 'wrap' }}>
+                    {[
+                      { label: 'Signed Up 🎉', count: signedUp.length, color: '#22c55e', key: 'signed_up' },
+                      { label: 'Needs Follow-Up ⏰', count: needsFollowUp.length, color: '#f59e0b', key: 'needs_followup' },
+                      { label: 'Waiting ✉️', count: waiting.length, color: '#60a5fa', key: 'waiting' },
+                      { label: 'Queued ⏳', count: queued.length, color: '#818cf8', key: 'queued' },
+                      { label: 'Maxed Out 🚫', count: maxedOut.length, color: '#6b7280', key: 'maxed' },
+                      { label: 'Total', count: campaigns.length, color: '#a78bfa', key: 'all' },
+                    ].map(s => (
+                      <div
+                        key={s.key}
+                        className={styles.statCard}
+                        onClick={() => {
+                          (window as any).__outreachPipeFilter = (window as any).__outreachPipeFilter === s.key ? 'all' : s.key;
+                          // Trigger re-render by touching campaigns state
+                          setCampaigns([...campaigns]);
+                        }}
+                        style={{
+                          flex: '1 1 100px',
+                          padding: 'var(--space-3)',
+                          cursor: 'pointer',
+                          border: (window as any).__outreachPipeFilter === s.key ? `2px solid ${s.color}` : '1px solid var(--border-subtle)',
+                          transition: 'border 0.2s',
+                        }}
+                      >
+                        <span style={{ fontSize: '20px', fontWeight: 800, color: s.color }}>{s.count}</span>
+                        <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>{s.label}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Conversion rate */}
+                  {signedUp.length > 0 && (
+                    <div style={{
+                      background: 'rgba(34, 197, 94, 0.1)',
+                      border: '1px solid rgba(34, 197, 94, 0.3)',
+                      borderRadius: 'var(--radius-md)',
+                      padding: 'var(--space-3)',
+                      marginBottom: 'var(--space-4)',
+                      fontSize: '13px',
+                      color: '#22c55e',
+                    }}>
+                      🎯 <strong>Conversion rate: {((signedUp.length / campaigns.filter(c => c.status === 'sent').length) * 100).toFixed(1)}%</strong> — {signedUp.length} out of {campaigns.filter(c => c.status === 'sent').length} emailed salons signed up!
+                    </div>
+                  )}
+
+                  <p style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginBottom: 'var(--space-3)' }}>
+                    Click a stat card above to filter • Showing {filtered.length} of {campaigns.length}
+                  </p>
+
+                  <div className={styles.tableWrap} style={{ maxHeight: '400px', overflow: 'auto' }}>
+                    <table className={styles.table}>
+                      <thead>
+                        <tr>
+                          <th>Salon</th>
+                          <th>Owner</th>
+                          <th>Email</th>
+                          <th>City</th>
+                          <th>Template</th>
+                          <th>Status</th>
+                          <th>Follow-Ups</th>
+                          <th>Sent</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {filtered.map((c) => (
+                          <tr key={c.id}>
+                            <td><strong>{c.salon_name}</strong></td>
+                            <td>{c.owner_name}</td>
+                            <td style={{ fontSize: '12px' }}>{c.owner_email}</td>
+                            <td style={{ fontSize: '12px' }}>{c.city && c.state ? `${c.city}, ${c.state}` : c.city || c.state || '—'}</td>
+                            <td style={{ fontSize: '11px' }}>
+                              <span style={{
+                                padding: '2px 8px',
+                                borderRadius: 'var(--radius-full)',
+                                background: 'var(--bg-surface)',
+                                border: '1px solid var(--border-subtle)',
+                                fontWeight: 600,
+                              }}>
+                                {(c as any).template_id === 'success_story' ? '⭐' : (c as any).template_id === 'limited_offer' ? '🔥' : (c as any).template_id === 'follow_up' ? '💬' : '🚀'}
+                                {' '}{((c as any).template_id || 'feature_showcase').replace(/_/g, ' ')}
+                              </span>
+                            </td>
+                            <td>
+                              <span className={`${styles.statusBadge} ${
+                                c.signed_up ? styles.statusActive
+                                : c.status === 'sent' ? styles.statusActive
+                                : c.status === 'queued' ? styles.statusSuspended
+                                : c.status === 'skipped_active' ? styles.statusSuspended
+                                : styles.statusDeletion
+                              }`}>
+                                {c.signed_up ? '🎉 Signed Up' : c.status === 'sent' ? '✉️ Sent' : c.status === 'queued' ? '⏳ Queued' : c.status === 'skipped_active' ? '✅ Already Active' : '❌ ' + c.status}
+                              </span>
+                            </td>
+                            <td style={{ textAlign: 'center', fontSize: '12px' }}>{(c as any).follow_up_count || 0}</td>
+                            <td className={styles.dateCell}>{c.sent_at ? new Date(c.sent_at).toLocaleDateString() : '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
         )}
       </div>

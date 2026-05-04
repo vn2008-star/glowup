@@ -13,6 +13,10 @@ ALTER TABLE outreach_campaigns ADD COLUMN IF NOT EXISTS last_template_id TEXT;
 ALTER TABLE outreach_campaigns ADD COLUMN IF NOT EXISTS sender_name TEXT;
 ALTER TABLE outreach_campaigns ADD COLUMN IF NOT EXISTS sender_email TEXT;
 
+-- Signup tracking: when a salon converts from outreach
+ALTER TABLE outreach_campaigns ADD COLUMN IF NOT EXISTS signed_up_at TIMESTAMPTZ;
+ALTER TABLE outreach_campaigns ADD COLUMN IF NOT EXISTS signed_up_tenant_id UUID;
+
 -- Indexes for follow-up queries
 CREATE INDEX IF NOT EXISTS idx_outreach_follow_up
   ON outreach_campaigns(status, signed_up, sent_at, follow_up_count)
