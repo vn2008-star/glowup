@@ -209,6 +209,38 @@ export default function ServicesPage() {
     setDragOverId(null);
   }
 
+  /* ─── Category reorder ─── */
+  async function moveCategory(cat: string, direction: 'up' | 'down') {
+    const catIdx = categoriesInUse.indexOf(cat);
+    const swapIdx = direction === 'up' ? catIdx - 1 : catIdx + 1;
+    if (swapIdx < 0 || swapIdx >= categoriesInUse.length) return;
+
+    // Rebuild sort_order: put categories in new order, assign incrementing sort_order
+    const newOrder = [...categoriesInUse];
+    [newOrder[catIdx], newOrder[swapIdx]] = [newOrder[swapIdx], newOrder[catIdx]];
+
+    const items: { id: string; sort_order: number }[] = [];
+    let order = 0;
+    for (const c of newOrder) {
+      const catServices = services.filter(s => s.category === c);
+      for (const s of catServices) {
+        items.push({ id: s.id, sort_order: order++ });
+      }
+    }
+
+    // Optimistic update
+    setServices(prev => {
+      const updated = [...prev];
+      for (const item of items) {
+        const idx = updated.findIndex(s => s.id === item.id);
+        if (idx !== -1) updated[idx] = { ...updated[idx], sort_order: item.sort_order };
+      }
+      return updated.sort((a, b) => a.sort_order - b.sort_order);
+    });
+
+    await queryData("services.reorder", { items });
+  }
+
   /* ─── Derived state ─── */
   const activeServices = services.filter(s => s.is_active);
   const inactiveServices = services.filter(s => !s.is_active);
@@ -313,7 +345,7 @@ export default function ServicesPage() {
 
           {/* Category section headers when showing "All" */}
           {activeFilter === "all" ? (
-            categoriesInUse.map((cat) => {
+            categoriesInUse.map((cat, catIndex) => {
               const catServices = services.filter(s => s.category === cat);
               return (
                 <div key={cat} className={styles.categorySection}>
@@ -325,6 +357,22 @@ export default function ServicesPage() {
                       <h2>{cat}</h2>
                       <span className={styles.categorySectionCount}>{catServices.length} service{catServices.length !== 1 ? "s" : ""}</span>
                     </div>
+                    {categoriesInUse.length > 1 && (
+                      <div className={styles.categoryReorderBtns}>
+                        <button
+                          className={styles.categoryArrowBtn}
+                          disabled={catIndex === 0}
+                          onClick={() => moveCategory(cat, 'up')}
+                          title="Move category up"
+                        >▲</button>
+                        <button
+                          className={styles.categoryArrowBtn}
+                          disabled={catIndex === categoriesInUse.length - 1}
+                          onClick={() => moveCategory(cat, 'down')}
+                          title="Move category down"
+                        >▼</button>
+                      </div>
+                    )}
                   </div>
                   <div className={styles.serviceGrid}>
                     {catServices.map((s) => (

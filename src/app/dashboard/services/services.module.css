@@ -96,6 +96,34 @@
   color: var(--text-tertiary);
   font-weight: 500;
 }
+.categoryReorderBtns {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+}
+.categoryArrowBtn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: 10px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.categoryArrowBtn:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: var(--color-primary-200);
+}
+.categoryArrowBtn:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
 
 /* ── Service Grid ── */
 .serviceGrid {
