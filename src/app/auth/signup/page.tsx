@@ -14,6 +14,7 @@ function SignupForm() {
   const t = useTranslations('auth')
 
   const refFromUrl = searchParams.get('ref') || ''
+  const crefFromUrl = searchParams.get('cref') || ''
 
   const [formData, setFormData] = useState({
     businessName: '',
@@ -77,6 +78,7 @@ function SignupForm() {
           businessName: formData.businessName,
           ownerName: formData.ownerName,
           referralCode: formData.referralCode.trim() || undefined,
+          clientReferralCode: crefFromUrl.trim() || undefined,
         }),
       })
 

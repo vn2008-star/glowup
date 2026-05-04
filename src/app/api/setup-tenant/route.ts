@@ -3,7 +3,7 @@ import { createClient as createServerClient } from '@supabase/supabase-js'
 
 export async function POST(request: Request) {
   const body = await request.json()
-  const { userId, email, businessName, ownerName, referralCode } = body
+  const { userId, email, businessName, ownerName, referralCode, clientReferralCode } = body
 
   if (!userId || !email) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -127,6 +127,47 @@ export async function POST(request: Request) {
     } catch (refErr) {
       // Don't fail the signup if referral processing fails
       console.error('Referral processing error:', refErr)
+    }
+  }
+
+  // ── Process client referral code ──
+  if (clientReferralCode) {
+    try {
+      const { data: crefCode } = await supabase
+        .from('client_referral_codes')
+        .select('id, tenant_id, client_id, uses')
+        .eq('code', clientReferralCode.trim())
+        .single()
+
+      if (crefCode) {
+        // Get the platform reward amount
+        const { data: setting } = await supabase
+          .from('platform_settings')
+          .select('value')
+          .eq('key', 'client_referral_reward')
+          .single()
+
+        const rewardAmount = setting ? parseFloat(setting.value) : 25
+
+        // Log the referral as PENDING (gift card issued after first payment)
+        await supabase.from('referral_log').insert({
+          referrer_tenant_id: crefCode.tenant_id,
+          referred_tenant_id: tenant.id,
+          code: clientReferralCode.trim(),
+          reward_applied: false,
+          client_referrer_id: crefCode.client_id,
+          client_reward_amount: rewardAmount,
+          client_reward_status: 'pending',
+        })
+
+        // Increment uses
+        await supabase
+          .from('client_referral_codes')
+          .update({ uses: (crefCode.uses || 0) + 1 })
+          .eq('id', crefCode.id)
+      }
+    } catch (crefErr) {
+      console.error('Client referral processing error:', crefErr)
     }
   }
 

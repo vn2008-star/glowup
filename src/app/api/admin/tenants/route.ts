@@ -139,5 +139,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true })
   }
 
+  if (action === 'get-settings') {
+    const { data: settings } = await svc
+      .from('platform_settings')
+      .select('key, value')
+
+    const result: Record<string, string> = {}
+    settings?.forEach(s => { result[s.key] = s.value })
+    return NextResponse.json(result)
+  }
+
+  if (action === 'update-settings') {
+    const { key, value } = await request.clone().json()
+    if (!key || value === undefined) {
+      return NextResponse.json({ error: 'key and value required' }, { status: 400 })
+    }
+    const { error } = await svc
+      .from('platform_settings')
+      .upsert({ key, value: String(value), updated_at: new Date().toISOString() })
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ success: true })
+  }
+
   return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
 }

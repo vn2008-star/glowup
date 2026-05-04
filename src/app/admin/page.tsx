@@ -39,6 +39,9 @@ export default function AdminPage() {
   const [filter, setFilter] = useState<"all" | "active" | "suspended" | "deletion">("all");
   const [search, setSearch] = useState("");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [rewardAmount, setRewardAmount] = useState('25');
+  const [rewardSaving, setRewardSaving] = useState(false);
+  const [rewardToast, setRewardToast] = useState('');
 
   const fetchTenants = useCallback(async () => {
     const res = await fetch("/api/admin/tenants");
@@ -57,6 +60,17 @@ export default function AdminPage() {
     setTenants(data.tenants);
     setStats(data.stats);
     setLoading(false);
+
+    // Fetch referral reward setting
+    const settingsRes = await fetch('/api/admin/tenants', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'get-settings' }),
+    });
+    if (settingsRes.ok) {
+      const s = await settingsRes.json();
+      if (s.client_referral_reward) setRewardAmount(s.client_referral_reward);
+    }
   }, []);
 
   useEffect(() => {
@@ -152,6 +166,44 @@ export default function AdminPage() {
         <div className={styles.statCard}>
           <span className={`${styles.statValue} ${styles.statRed}`}>{stats.pendingDeletion}</span>
           <span className={styles.statLabel}>Pending Deletion</span>
+        </div>
+      </div>
+
+      {/* Referral Settings */}
+      <div className={styles.settingsCard}>
+        <h3>🎁 Client Referral Settings</h3>
+        <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: 'var(--space-3)' }}>
+          When a salon client refers GlowUp to a new salon, the client receives a gift card at their salon after the referred salon pays their first month.
+        </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+          <label style={{ fontSize: '14px', fontWeight: 600 }}>Reward Amount: $</label>
+          <input
+            type="number"
+            value={rewardAmount}
+            onChange={(e) => setRewardAmount(e.target.value)}
+            style={{ width: '80px', padding: 'var(--space-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-default)', background: 'var(--bg-surface)', color: 'var(--text-primary)', fontSize: '14px' }}
+            min="1"
+          />
+          <button
+            className={styles.enableBtn}
+            disabled={rewardSaving}
+            onClick={async () => {
+              setRewardSaving(true);
+              const res = await fetch('/api/admin/tenants', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'update-settings', key: 'client_referral_reward', value: rewardAmount }),
+              });
+              if (res.ok) {
+                setRewardToast('✅ Reward amount saved!');
+                setTimeout(() => setRewardToast(''), 3000);
+              }
+              setRewardSaving(false);
+            }}
+          >
+            {rewardSaving ? 'Saving...' : 'Save'}
+          </button>
+          {rewardToast && <span style={{ fontSize: '13px', color: 'var(--color-success)' }}>{rewardToast}</span>}
         </div>
       </div>
 

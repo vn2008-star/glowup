@@ -305,6 +305,19 @@
   color: var(--text-tertiary);
   padding: var(--space-8) !important;
 }
+.settingsCard {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  margin-bottom: var(--space-6);
+}
+.settingsCard h3 {
+  font-family: var(--font-heading);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  margin-bottom: var(--space-2);
+}
 
 /* ── Responsive ── */
 @media (max-width: 1024px) {
