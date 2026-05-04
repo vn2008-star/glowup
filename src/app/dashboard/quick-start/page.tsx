@@ -61,16 +61,8 @@ const ESSENTIAL_STEPS: Step[] = [
     checkComplete: (ctx) => ctx.serviceCount > 0,
   },
   {
-    id: "clients",
-    number: 4,
-    title: "Import or Add Clients",
-    description: "Add your existing clients manually or import via CSV to get started right away.",
-    href: "/dashboard/clients",
-    checkComplete: (ctx) => ctx.clientCount > 0,
-  },
-  {
     id: "booking",
-    number: 5,
+    number: 4,
     title: "Share Your Booking Link",
     description: "Copy your unique booking URL and add it to your Instagram bio, website, and Google profile.",
     href: "/dashboard/settings",
@@ -78,6 +70,14 @@ const ESSENTIAL_STEPS: Step[] = [
       if (!ctx.tenant) return false;
       return !!ctx.tenant.slug;
     },
+  },
+  {
+    id: "clients",
+    number: 5,
+    title: "Import or Add Clients",
+    description: "Add your existing clients manually or import via CSV to get started right away.",
+    href: "/dashboard/clients",
+    checkComplete: (ctx) => ctx.clientCount > 0,
   },
   {
     id: "reminders",
