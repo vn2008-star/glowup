@@ -17,14 +17,22 @@ export async function POST(request: Request) {
   // Check if this salon owner email is already on GlowUp
   const { data: existingOwner } = await svc
     .from('staff')
-    .select('id')
+    .select('id, tenant_id')
     .eq('role', 'owner')
     .ilike('email', ownerEmail.trim())
     .single()
 
   if (existingOwner) {
+    // Get the salon name to show the client
+    const { data: existingTenant } = await svc
+      .from('tenants')
+      .select('name')
+      .eq('id', existingOwner.tenant_id)
+      .single()
+
+    const existingSalonName = existingTenant?.name || 'This salon'
     return NextResponse.json(
-      { error: 'This salon owner is already on GlowUp!' },
+      { error: `Great news! ${existingSalonName} is already using GlowUp! 🎉 Ask them about their services — no referral needed.`, alreadyOnGlowUp: true },
       { status: 400 }
     )
   }

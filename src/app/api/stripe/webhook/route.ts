@@ -72,6 +72,14 @@ export async function POST(req: NextRequest) {
           .not('client_referrer_email', 'is', null);
 
         if (pendingReferrals && pendingReferrals.length > 0) {
+          // Get salon name for the email
+          const { data: tenant } = await supabaseAdmin
+            .from('tenants')
+            .select('name')
+            .eq('id', tenantId)
+            .single();
+          const salonName = tenant?.name || 'the salon';
+
           for (const ref of pendingReferrals) {
             const amount = ref.client_reward_amount || 25;
 
@@ -88,7 +96,7 @@ export async function POST(req: NextRequest) {
               status: 'active',
               recipient_name: ref.client_referrer_name || 'Referral Reward',
               purchaser_name: 'GlowUp Rewards',
-              message: `Thank you for referring this salon to GlowUp! Enjoy your $${amount} reward.`,
+              message: `Thank you for referring ${salonName} to GlowUp! Enjoy your $${amount} reward.`,
             });
 
             // Mark referral as rewarded
@@ -96,6 +104,54 @@ export async function POST(req: NextRequest) {
               .from('referral_log')
               .update({ reward_applied: true, client_reward_status: 'rewarded' })
               .eq('id', ref.id);
+
+            // ── Email the client about their reward ──
+            if (ref.client_referrer_email) {
+              try {
+                if (process.env.RESEND_API_KEY) {
+                  const { Resend } = await import('resend');
+                  const resend = new Resend(process.env.RESEND_API_KEY);
+                  await resend.emails.send({
+                    from: 'GlowUp <onboarding@resend.dev>',
+                    to: [ref.client_referrer_email],
+                    subject: `🎁 You earned a $${amount} gift card at ${salonName}!`,
+                    html: `
+                      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px; background: #1a1a2e; color: #e0e0e0; border-radius: 16px;">
+                        <div style="text-align: center; margin-bottom: 24px;">
+                          <h1 style="font-size: 28px; margin: 0; background: linear-gradient(135deg, #e8a87c, #d4a0e8); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">✨ GlowUp</h1>
+                        </div>
+                        <div style="text-align: center; margin-bottom: 24px;">
+                          <div style="font-size: 48px; margin-bottom: 8px;">🎁</div>
+                          <h2 style="font-size: 22px; color: #ffffff; margin: 0 0 8px;">Congrats, ${ref.client_referrer_name || 'there'}!</h2>
+                          <p style="color: #b0b0b0; font-size: 15px; margin: 0;">Your referral paid off — literally!</p>
+                        </div>
+                        <div style="background: #2a2a3e; border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 24px;">
+                          <p style="color: #b0b0b0; font-size: 13px; margin: 0 0 8px;">Your gift card code</p>
+                          <div style="font-size: 28px; font-weight: 800; letter-spacing: 0.1em; color: #e8a87c; font-family: monospace;">${gcCode}</div>
+                          <p style="color: #b0b0b0; font-size: 14px; margin: 12px 0 0;">
+                            Worth <strong style="color: #22c55e; font-size: 20px;">$${amount}</strong> at <strong style="color: #ffffff;">${salonName}</strong>
+                          </p>
+                        </div>
+                        <div style="background: #2a2a3e; border-radius: 12px; padding: 16px; margin-bottom: 24px;">
+                          <p style="color: #b0b0b0; font-size: 13px; margin: 0;">
+                            <strong style="color: #d4a0e8;">How to use:</strong> Simply mention this code at checkout when you visit <strong>${salonName}</strong>. The staff will apply your gift card balance to your service.
+                          </p>
+                        </div>
+                        <div style="text-align: center; border-top: 1px solid #333; padding-top: 16px;">
+                          <p style="color: #666; font-size: 11px; margin: 0;">Thank you for helping ${salonName} discover GlowUp!</p>
+                        </div>
+                      </div>
+                    `,
+                  });
+                  console.log(`📧 Reward email sent to ${ref.client_referrer_email} for gift card ${gcCode}`);
+                } else {
+                  console.log(`[DRY RUN] Reward email to ${ref.client_referrer_email}: $${amount} gift card ${gcCode} at ${salonName}`);
+                }
+              } catch (emailErr) {
+                console.error(`Failed to send reward email to ${ref.client_referrer_email}:`, emailErr);
+                // Don't fail the whole webhook if email fails
+              }
+            }
 
             console.log(`🎁 Client referral reward: $${amount} gift card issued at tenant ${tenantId} for ${ref.client_referrer_email}`);
           }

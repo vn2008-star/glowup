@@ -19,6 +19,7 @@ export default function ReferPage() {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [isGoodNews, setIsGoodNews] = useState(false);
   const [result, setResult] = useState<ReferralResult | null>(null);
   const [toast, setToast] = useState("");
 
@@ -30,6 +31,7 @@ export default function ReferPage() {
     e.preventDefault();
     setLoading(true);
     setError("");
+    setIsGoodNews(false);
 
     const res = await fetch("/api/client-referral", {
       method: "POST",
@@ -40,6 +42,7 @@ export default function ReferPage() {
     const data = await res.json();
     if (!res.ok || data.error) {
       setError(data.error || "Something went wrong");
+      setIsGoodNews(!!data.alreadyOnGlowUp);
     } else {
       setResult(data);
     }
@@ -175,7 +178,11 @@ export default function ReferPage() {
               </div>
             </div>
 
-            {error && <div className={styles.error}>{error}</div>}
+            {error && (
+              <div className={isGoodNews ? styles.goodNews : styles.error}>
+                {error}
+              </div>
+            )}
 
             <button type="submit" className={styles.submitBtn} disabled={loading}>
               {loading ? "Creating your referral..." : "Get My Referral Link"}
