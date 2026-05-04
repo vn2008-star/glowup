@@ -135,7 +135,7 @@ export async function POST(request: Request) {
     try {
       const { data: crefCode } = await supabase
         .from('client_referral_codes')
-        .select('id, tenant_id, client_id, uses')
+        .select('id, code, referrer_name, referrer_email, referred_owner_email, uses')
         .eq('code', clientReferralCode.trim())
         .single()
 
@@ -151,11 +151,11 @@ export async function POST(request: Request) {
 
         // Log the referral as PENDING (gift card issued after first payment)
         await supabase.from('referral_log').insert({
-          referrer_tenant_id: crefCode.tenant_id,
           referred_tenant_id: tenant.id,
           code: clientReferralCode.trim(),
           reward_applied: false,
-          client_referrer_id: crefCode.client_id,
+          client_referrer_name: crefCode.referrer_name,
+          client_referrer_email: crefCode.referrer_email,
           client_reward_amount: rewardAmount,
           client_reward_status: 'pending',
         })

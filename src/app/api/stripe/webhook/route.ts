@@ -66,36 +66,29 @@ export async function POST(req: NextRequest) {
         // Find any pending client referral where this tenant was the referred salon
         const { data: pendingReferrals } = await supabaseAdmin
           .from('referral_log')
-          .select('id, referrer_tenant_id, client_referrer_id, client_reward_amount')
+          .select('id, client_referrer_name, client_referrer_email, client_reward_amount')
           .eq('referred_tenant_id', tenantId)
           .eq('client_reward_status', 'pending')
-          .not('client_referrer_id', 'is', null);
+          .not('client_referrer_email', 'is', null);
 
         if (pendingReferrals && pendingReferrals.length > 0) {
           for (const ref of pendingReferrals) {
             const amount = ref.client_reward_amount || 25;
 
-            // Get client name for the gift card
-            const { data: client } = await supabaseAdmin
-              .from('clients')
-              .select('name')
-              .eq('id', ref.client_referrer_id)
-              .single();
-
-            // Create gift card at the referrer's salon
+            // Create gift card at THIS salon (the one that just paid) for the referring client
             const gcCode = 'GC-' + Array.from({ length: 6 }, () =>
               'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]
             ).join('');
 
             await supabaseAdmin.from('gift_cards').insert({
-              tenant_id: ref.referrer_tenant_id,
+              tenant_id: tenantId,
               code: gcCode,
               initial_amount: amount,
               balance: amount,
               status: 'active',
-              recipient_name: client?.name || 'Referral Reward',
+              recipient_name: ref.client_referrer_name || 'Referral Reward',
               purchaser_name: 'GlowUp Rewards',
-              message: `Thank you for referring a salon to GlowUp! Enjoy your $${amount} reward.`,
+              message: `Thank you for referring this salon to GlowUp! Enjoy your $${amount} reward.`,
             });
 
             // Mark referral as rewarded
@@ -104,7 +97,7 @@ export async function POST(req: NextRequest) {
               .update({ reward_applied: true, client_reward_status: 'rewarded' })
               .eq('id', ref.id);
 
-            console.log(`🎁 Client referral reward: $${amount} gift card issued for client ${ref.client_referrer_id}`);
+            console.log(`🎁 Client referral reward: $${amount} gift card issued at tenant ${tenantId} for ${ref.client_referrer_email}`);
           }
         }
 

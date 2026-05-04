@@ -270,34 +270,32 @@ export default function ReferralsPage() {
       </div>
 
       {/* Client Referral Program */}
-      {data?.tenant && (
-        <div className={styles.codeCard}>
-          <div className={styles.codeCardTitle}>👥 Client Referral Program</div>
-          <div className={styles.codeCardDesc}>
-            Your clients can earn a <strong>$25 gift card</strong> at your salon by referring
-            GlowUp to other salon owners. Share this link with your clients:
-          </div>
-          <div className={styles.linkDisplay}>
-            <div className={styles.linkValue}>
-              {typeof window !== "undefined" ? window.location.origin : ""}/refer/{data.tenant.slug}
-            </div>
-            <button
-              className={styles.copyBtn}
-              onClick={() =>
-                copyToClipboard(
-                  `${typeof window !== "undefined" ? window.location.origin : ""}/refer/${data.tenant!.slug}`,
-                  "Client referral link"
-                )
-              }
-            >
-              🔗 Copy Link
-            </button>
-          </div>
-          <p style={{ fontSize: "12px", color: "var(--text-tertiary)", marginTop: "var(--space-2)" }}>
-            Gift card is issued after the referred salon pays their first month.
-          </p>
+      <div className={styles.codeCard}>
+        <div className={styles.codeCardTitle}>👥 Client Referral Program</div>
+        <div className={styles.codeCardDesc}>
+          Anyone can earn a <strong>$25 gift card</strong> at your salon by referring
+          GlowUp to you or another salon owner. Share this link:
         </div>
-      )}
+        <div className={styles.linkDisplay}>
+          <div className={styles.linkValue}>
+            {typeof window !== "undefined" ? window.location.origin : ""}/refer
+          </div>
+          <button
+            className={styles.copyBtn}
+            onClick={() =>
+              copyToClipboard(
+                `${typeof window !== "undefined" ? window.location.origin : ""}/refer`,
+                "Client referral link"
+              )
+            }
+          >
+            🔗 Copy Link
+          </button>
+        </div>
+        <p style={{ fontSize: "12px", color: "var(--text-tertiary)", marginTop: "var(--space-2)" }}>
+          Gift card is issued after the referred salon pays their first month.
+        </p>
+      </div>
 
       {/* Toast */}
       {toast && <div className={styles.toast}>{toast}</div>}

@@ -3,10 +3,10 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 
 // Public endpoint — no auth required
 export async function POST(request: Request) {
-  const { slug, email } = await request.json()
+  const { clientName, clientEmail, salonName, ownerName, ownerEmail } = await request.json()
 
-  if (!slug || !email) {
-    return NextResponse.json({ error: 'Salon and email are required' }, { status: 400 })
+  if (!clientName || !clientEmail || !salonName || !ownerName || !ownerEmail) {
+    return NextResponse.json({ error: 'All fields are required' }, { status: 400 })
   }
 
   const svc = createServiceClient(
@@ -14,45 +14,35 @@ export async function POST(request: Request) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
-  // Find the tenant by slug
-  const { data: tenant } = await svc
-    .from('tenants')
-    .select('id, name')
-    .eq('slug', slug)
+  // Check if this salon owner email is already on GlowUp
+  const { data: existingOwner } = await svc
+    .from('staff')
+    .select('id')
+    .eq('role', 'owner')
+    .ilike('email', ownerEmail.trim())
     .single()
 
-  if (!tenant) {
-    return NextResponse.json({ error: 'Salon not found' }, { status: 404 })
-  }
-
-  // Find the client by email at this tenant
-  const { data: client } = await svc
-    .from('clients')
-    .select('id, name')
-    .eq('tenant_id', tenant.id)
-    .ilike('email', email.trim())
-    .single()
-
-  if (!client) {
+  if (existingOwner) {
     return NextResponse.json(
-      { error: 'No account found with this email at this salon. Please use the email your salon has on file for you.' },
-      { status: 404 }
+      { error: 'This salon owner is already on GlowUp!' },
+      { status: 400 }
     )
   }
 
-  // Check if client already has a referral code
+  // Check if this client already referred this owner email
   const { data: existing } = await svc
     .from('client_referral_codes')
     .select('id, code')
-    .eq('client_id', client.id)
-    .eq('tenant_id', tenant.id)
+    .eq('referrer_email', clientEmail.trim().toLowerCase())
+    .eq('referred_owner_email', ownerEmail.trim().toLowerCase())
     .single()
 
   if (existing) {
+    const link = `${process.env.NEXT_PUBLIC_APP_URL || 'https://glowup-jade.vercel.app'}/auth/signup?cref=${existing.code}`
     return NextResponse.json({
       code: existing.code,
-      clientName: client.name,
-      salonName: tenant.name,
+      referralLink: link,
+      salonOwnerName: ownerName,
     })
   }
 
@@ -63,32 +53,45 @@ export async function POST(request: Request) {
   const { error: insertErr } = await svc
     .from('client_referral_codes')
     .insert({
-      tenant_id: tenant.id,
-      client_id: client.id,
       code,
+      referrer_name: clientName.trim(),
+      referrer_email: clientEmail.trim().toLowerCase(),
+      referred_salon_name: salonName.trim(),
+      referred_owner_name: ownerName.trim(),
+      referred_owner_email: ownerEmail.trim().toLowerCase(),
     })
 
   if (insertErr) {
-    // If unique constraint fails, retry with different code
+    console.error('Client referral insert error:', insertErr)
+    // Retry with different code on unique constraint
     const code2 = 'CR-' + Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
     const { error: retry } = await svc
       .from('client_referral_codes')
-      .insert({ tenant_id: tenant.id, client_id: client.id, code: code2 })
+      .insert({
+        code: code2,
+        referrer_name: clientName.trim(),
+        referrer_email: clientEmail.trim().toLowerCase(),
+        referred_salon_name: salonName.trim(),
+        referred_owner_name: ownerName.trim(),
+        referred_owner_email: ownerEmail.trim().toLowerCase(),
+      })
 
     if (retry) {
       return NextResponse.json({ error: 'Failed to generate referral code' }, { status: 500 })
     }
 
+    const link2 = `${process.env.NEXT_PUBLIC_APP_URL || 'https://glowup-jade.vercel.app'}/auth/signup?cref=${code2}`
     return NextResponse.json({
       code: code2,
-      clientName: client.name,
-      salonName: tenant.name,
+      referralLink: link2,
+      salonOwnerName: ownerName,
     })
   }
 
+  const link = `${process.env.NEXT_PUBLIC_APP_URL || 'https://glowup-jade.vercel.app'}/auth/signup?cref=${code}`
   return NextResponse.json({
     code,
-    clientName: client.name,
-    salonName: tenant.name,
+    referralLink: link,
+    salonOwnerName: ownerName,
   })
 }
