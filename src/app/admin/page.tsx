@@ -451,7 +451,17 @@ export default function AdminPage() {
 
             {/* Template Selector */}
             <div style={{ marginBottom: 'var(--space-4)' }}>
-              <label style={{ fontSize: '12px', fontWeight: 600, display: 'block', marginBottom: '8px', color: 'var(--text-secondary)' }}>Email Template</label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>Email Template</label>
+                <a
+                  href="/admin/outreach-preview"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ fontSize: '11px', color: 'var(--color-primary)', textDecoration: 'none', fontWeight: 600 }}
+                >
+                  👁 Preview all templates ↗
+                </a>
+              </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 'var(--space-2)' }}>
                 {templateOptions.map((t) => (
                   <div
@@ -466,7 +476,18 @@ export default function AdminPage() {
                       transition: 'all 0.2s',
                     }}
                   >
-                    <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '4px' }}>{t.name}</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: 700 }}>{t.name}</span>
+                      <a
+                        href={`/admin/outreach-preview#${t.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ fontSize: '10px', color: 'var(--color-primary)', textDecoration: 'none', opacity: 0.7 }}
+                      >
+                        Preview ↗
+                      </a>
+                    </div>
                     <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', lineHeight: 1.4 }}>{t.desc}</div>
                   </div>
                 ))}
