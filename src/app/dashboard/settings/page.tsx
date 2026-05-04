@@ -115,6 +115,25 @@ export default function SettingsPage() {
     });
   }, [tenant]);
 
+  // Scroll to hash section if navigated from Quick Start
+  useEffect(() => {
+    if (loading) return;
+    const hash = window.location.hash.replace("#", "");
+    if (!hash) return;
+    // small delay to let DOM paint
+    const timer = setTimeout(() => {
+      const el = document.getElementById(hash);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+        el.style.outline = "2px solid var(--color-accent, #D4A017)";
+        el.style.outlineOffset = "4px";
+        el.style.borderRadius = "var(--radius-lg)";
+        setTimeout(() => { el.style.outline = "none"; }, 2200);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [loading]);
+
   function updateHour(day: string, field: "open" | "close", value: string) {
     setHours((prev) => ({ ...prev, [day]: { ...prev[day], [field]: value } }));
   }
@@ -184,7 +203,7 @@ export default function SettingsPage() {
       </div>
 
       {/* Business Profile */}
-      <div className={`card ${styles.section}`}>
+      <div id="profile" className={`card ${styles.section}`}>
         <h2>Business Profile</h2>
 
         {/* Logo Upload */}
@@ -255,7 +274,7 @@ export default function SettingsPage() {
       </div>
 
       {/* Business Hours */}
-      <div className={`card ${styles.section}`}>
+      <div id="hours" className={`card ${styles.section}`}>
         <h2>Business Hours</h2>
         <div className={styles.hoursList}>
           {DAYS.map((day) => (
@@ -294,7 +313,7 @@ export default function SettingsPage() {
       </div>
 
       {/* Booking Settings */}
-      <div className={`card ${styles.section}`}>
+      <div id="booking" className={`card ${styles.section}`}>
         <h2>Booking Settings</h2>
         <div className={styles.formGrid}>
           <div className={styles.formGroup}>
@@ -480,7 +499,7 @@ export default function SettingsPage() {
       </div>
 
       {/* Appointment Reminders */}
-      <div className={`card ${styles.section}`}>
+      <div id="reminders" className={`card ${styles.section}`}>
         <h2>🔔 Appointment Reminders</h2>
         <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginBottom: "var(--space-4)" }}>
           Automatically send reminders before appointments. Reduces no-shows by up to 60%.
@@ -718,7 +737,7 @@ export default function SettingsPage() {
 
       {/* Booking Link */}
       {tenant?.slug && (
-        <div className={`card ${styles.section}`}>
+        <div id="booking-link" className={`card ${styles.section}`}>
           <h2>🔗 Booking Link</h2>
           <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginBottom: "var(--space-4)" }}>
             Share this link with clients so they can book appointments online. Add it to your Instagram bio, website, or Google profile.
