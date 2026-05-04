@@ -95,17 +95,22 @@ export default function ServicesPage() {
     e.preventDefault();
     if (!formData.name || !formData.price) return;
 
+    // Filter out empty add-on rows
+    const validAddons = formData.price_addons.filter(a => a.label.trim() && a.price > 0);
+
     const payload = {
       ...formData,
       image_url: formData.image_url || null,
-      price_addons: formData.price_addons.length > 0 ? formData.price_addons : null,
+      price_addons: validAddons.length > 0 ? validAddons : null,
     };
 
     if (editingService) {
-      const { data } = await queryData<Service>("services.update", { id: editingService.id, ...payload });
+      const { data, error } = await queryData<Service>("services.update", { id: editingService.id, ...payload });
+      if (error) { console.error('Update error:', error); alert('Save failed: ' + error); return; }
       if (data) setServices(prev => prev.map(s => s.id === data.id ? data : s));
     } else {
-      const { data } = await queryData<Service>("services.add", payload);
+      const { data, error } = await queryData<Service>("services.add", payload);
+      if (error) { console.error('Add error:', error); alert('Save failed: ' + error); return; }
       if (data) setServices(prev => [...prev, data]);
     }
     setShowModal(false);
