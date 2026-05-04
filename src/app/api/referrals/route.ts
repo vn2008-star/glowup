@@ -1,13 +1,20 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
 
 export async function GET() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  // Use service role to bypass RLS for lookups
+  const db = createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
   // Get tenant
-  const { data: staff } = await supabase
+  const { data: staff } = await db
     .from('staff')
     .select('tenant_id')
     .eq('user_id', user.id)
@@ -17,21 +24,21 @@ export async function GET() {
   const tenantId = staff.tenant_id
 
   // Get referral code
-  const { data: code } = await supabase
+  const { data: code } = await db
     .from('referral_codes')
     .select('*')
     .eq('tenant_id', tenantId)
     .single()
 
   // Get referral history
-  const { data: history } = await supabase
+  const { data: history } = await db
     .from('referral_log')
     .select('*, referred_tenant:referred_tenant_id(name, created_at)')
     .eq('referrer_tenant_id', tenantId)
     .order('created_at', { ascending: false })
 
   // Get tenant info for generating code
-  const { data: tenant } = await supabase
+  const { data: tenant } = await db
     .from('tenants')
     .select('name, slug, trial_ends_at, current_period_end')
     .eq('id', tenantId)
@@ -53,10 +60,16 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  // Use service role to bypass RLS
+  const db = createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
   const { action } = await request.json()
 
   // Get tenant
-  const { data: staff } = await supabase
+  const { data: staff } = await db
     .from('staff')
     .select('tenant_id')
     .eq('user_id', user.id)
@@ -67,7 +80,7 @@ export async function POST(request: Request) {
 
   if (action === 'generate') {
     // Get tenant name for code
-    const { data: tenant } = await supabase
+    const { data: tenant } = await db
       .from('tenants')
       .select('name')
       .eq('id', tenantId)
@@ -81,7 +94,7 @@ export async function POST(request: Request) {
     const code = `GLOWUP-${baseName}-${suffix}`
 
     // Check if code already exists for this tenant
-    const { data: existing } = await supabase
+    const { data: existing } = await db
       .from('referral_codes')
       .select('id')
       .eq('tenant_id', tenantId)
@@ -89,7 +102,7 @@ export async function POST(request: Request) {
 
     if (existing) {
       // Regenerate
-      const { data: updated, error } = await supabase
+      const { data: updated, error } = await db
         .from('referral_codes')
         .update({ code })
         .eq('tenant_id', tenantId)
@@ -101,7 +114,7 @@ export async function POST(request: Request) {
     }
 
     // Create new
-    const { data: created, error } = await supabase
+    const { data: created, error } = await db
       .from('referral_codes')
       .insert({ tenant_id: tenantId, code })
       .select()
