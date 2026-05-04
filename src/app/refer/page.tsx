@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import styles from "./refer.module.css";
+import { GlowUpLogo } from "@/components/GlowUpLogo";
 
 interface ReferralResult {
   code: string;
@@ -69,15 +70,7 @@ export default function ReferPage() {
         {/* Header */}
         <div className={styles.header}>
           <div className={styles.logo}>
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="url(#sparkGradRef)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <defs>
-                <linearGradient id="sparkGradRef" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#e8a87c" />
-                  <stop offset="100%" stopColor="#d4a0e8" />
-                </linearGradient>
-              </defs>
-              <path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z" />
-            </svg>
+            <GlowUpLogo size={32} />
             <span className={styles.logoText}>GlowUp</span>
           </div>
           <h1 className={styles.title}>🎁 Refer a Salon & Earn</h1>
