@@ -488,11 +488,11 @@ export default function ServicesPage() {
                 </div>
                 <div className={styles.formGroup}>
                   <label className="label">Price ($)</label>
-                  <input className="input" type="number" value={formData.price} onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })} required />
+                  <input className="input" type="number" value={formData.price || ''} onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })} required />
                 </div>
                 <div className={styles.formGroup}>
                   <label className="label">Duration (minutes)</label>
-                  <input className="input" type="number" value={formData.duration_minutes} onChange={(e) => setFormData({ ...formData, duration_minutes: Number(e.target.value) })} />
+                  <input className="input" type="number" value={formData.duration_minutes || ''} onChange={(e) => setFormData({ ...formData, duration_minutes: Number(e.target.value) })} />
                 </div>
                 <div className={`${styles.formGroup} ${styles.fullWidth}`}>
                   <label className="label">Description</label>
