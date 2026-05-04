@@ -39,6 +39,14 @@ export default function CheckoutPage() {
   const [beforePhoto, setBeforePhoto] = useState<string | null>(null);
   const [afterPhoto, setAfterPhoto] = useState<string | null>(null);
 
+  // Gift card redemption
+  const [gcCode, setGcCode] = useState("");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [gcCard, setGcCard] = useState<any>(null);
+  const [gcError, setGcError] = useState("");
+  const [gcLooking, setGcLooking] = useState(false);
+  const [gcApplied, setGcApplied] = useState(0); // amount being applied from gift card
+
   // Daily tally
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [tally, setTally] = useState<any>(null);
@@ -438,6 +446,33 @@ export default function CheckoutPage() {
   }
 
   // ── Checkout ──
+  // Gift card lookup handler
+  async function handleGcLookup() {
+    if (!gcCode.trim()) return;
+    setGcLooking(true);
+    setGcError("");
+    setGcCard(null);
+    setGcApplied(0);
+    const { data, error } = await queryData("giftcards.lookup", { code: gcCode.trim() });
+    if (error || !data) {
+      setGcError(typeof error === 'string' ? error : 'Gift card not found or inactive');
+    } else {
+      setGcCard(data);
+      // Auto-apply: min of gift card balance vs checkout total
+      const total = charges.length > 0 ? grandTotal : Number(selectedApt?.service?.price || 0) + (Number(tipAmount) || 0);
+      setGcApplied(Math.min((data as { balance: number }).balance, total));
+    }
+    setGcLooking(false);
+  }
+
+  // Clear gift card state
+  function clearGiftCard() {
+    setGcCode("");
+    setGcCard(null);
+    setGcError("");
+    setGcApplied(0);
+  }
+
   async function handleCheckout() {
     if (!selectedApt || !paymentMethod) return;
     setCheckingOut(true);
@@ -457,6 +492,19 @@ export default function CheckoutPage() {
 
     const chargeTotal = currentCharges.reduce((sum, c) => sum + Number(c.amount), 0);
     const tip = Number(tipAmount) || 0;
+
+    // Redeem gift card balance if applied
+    if (paymentMethod === "gift_card" && gcCard && gcApplied > 0) {
+      const { error: redeemErr } = await queryData("giftcards.redeem", {
+        code: gcCard.code,
+        amount: gcApplied,
+      });
+      if (redeemErr) {
+        setGcError(typeof redeemErr === 'string' ? redeemErr : 'Failed to redeem gift card');
+        setCheckingOut(false);
+        return;
+      }
+    }
 
     const { data } = await queryData<FullAppointment>("appointments.checkout", {
       id: selectedApt.id,
@@ -487,6 +535,9 @@ export default function CheckoutPage() {
         setBeforePhoto(null);
         setAfterPhoto(null);
       }
+
+      // Reset gift card state after successful checkout
+      clearGiftCard();
     }
     setCheckingOut(false);
   }
@@ -502,6 +553,7 @@ export default function CheckoutPage() {
     setEditingCheckout(false);
     setBeforePhoto(null);
     setAfterPhoto(null);
+    clearGiftCard();
   }
 
   // Reopen a checked-out appointment for editing
@@ -1428,6 +1480,8 @@ export default function CheckoutPage() {
                               className={`${styles.paymentBtn} ${paymentMethod === m ? styles.paymentBtnActive : ""}`}
                               onClick={() => {
                                 setPaymentMethod(m);
+                                // Clear gift card state when switching away
+                                if (m !== "gift_card") clearGiftCard();
                                 if (m === "venmo" || m === "zelle") {
                                   const tenantSettings = (tenant?.settings || {}) as Record<string, unknown>;
                                   const paymentSettings = (tenantSettings.payment_qr || {}) as Record<string, string>;
@@ -1446,6 +1500,71 @@ export default function CheckoutPage() {
                           );
                         })}
                       </div>
+
+                      {/* ── Gift Card Redemption Panel ── */}
+                      {paymentMethod === "gift_card" && (
+                        <div className={styles.gcPanel}>
+                          {!gcCard ? (
+                            <>
+                              <label className={styles.gcLabel}>Enter Gift Card Code</label>
+                              <div className={styles.gcInputRow}>
+                                <input
+                                  type="text"
+                                  className={styles.gcInput}
+                                  value={gcCode}
+                                  onChange={(e) => setGcCode(e.target.value.toUpperCase())}
+                                  placeholder="e.g. ABCD1234EFGH"
+                                  maxLength={20}
+                                  onKeyDown={(e) => { if (e.key === 'Enter') handleGcLookup(); }}
+                                />
+                                <button
+                                  className={styles.gcLookupBtn}
+                                  onClick={handleGcLookup}
+                                  disabled={!gcCode.trim() || gcLooking}
+                                >
+                                  {gcLooking ? '...' : 'Apply'}
+                                </button>
+                              </div>
+                              {gcError && <p className={styles.gcError}>{gcError}</p>}
+                            </>
+                          ) : (
+                            <div className={styles.gcResult}>
+                              <div className={styles.gcResultHeader}>
+                                <span className={styles.gcResultIcon}>🎁</span>
+                                <div>
+                                  <strong className={styles.gcResultCode}>{gcCard.code}</strong>
+                                  {gcCard.recipient_name && (
+                                    <span className={styles.gcResultRecipient}>{gcCard.recipient_name}</span>
+                                  )}
+                                </div>
+                                <button className={styles.gcRemoveBtn} onClick={clearGiftCard}>✕</button>
+                              </div>
+                              <div className={styles.gcBalanceRow}>
+                                <span>Card Balance</span>
+                                <strong>${Number(gcCard.balance).toFixed(2)}</strong>
+                              </div>
+                              <div className={styles.gcBalanceRow}>
+                                <span>Applied to this checkout</span>
+                                <strong className={styles.gcAppliedAmount}>
+                                  −${gcApplied.toFixed(2)}
+                                </strong>
+                              </div>
+                              {gcCard.balance > gcApplied && (
+                                <div className={styles.gcBalanceRow}>
+                                  <span>Remaining on card</span>
+                                  <span>${(gcCard.balance - gcApplied).toFixed(2)}</span>
+                                </div>
+                              )}
+                              {gcApplied < (charges.length > 0 ? grandTotal : Number(selectedApt.service?.price || 0) + (Number(tipAmount) || 0)) && (
+                                <p className={styles.gcPartialNote}>
+                                  ⚠️ Gift card covers ${gcApplied.toFixed(2)} of the total. Collect remaining $
+                                  {((charges.length > 0 ? grandTotal : Number(selectedApt.service?.price || 0) + (Number(tipAmount) || 0)) - gcApplied).toFixed(2)} via another method.
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                       <button
                         className={styles.checkoutBtn}

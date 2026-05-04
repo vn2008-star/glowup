@@ -862,6 +862,19 @@ export async function POST(request: Request) {
         return NextResponse.json({ data, error: error?.message })
       }
 
+      case 'giftcards.lookup': {
+        const { code: lookupCode } = payload
+        const { data: card, error: findErr } = await svc
+          .from('gift_cards')
+          .select('*')
+          .eq('code', lookupCode.toUpperCase().trim())
+          .eq('tenant_id', tenantId)
+          .single()
+        if (findErr || !card) return NextResponse.json({ data: null, error: 'Gift card not found' })
+        if (card.status !== 'active') return NextResponse.json({ data: null, error: `Gift card is ${card.status}` })
+        return NextResponse.json({ data: card })
+      }
+
       case 'giftcards.redeem': {
         const { code: redeemCode, amount } = payload
         const { data: card, error: findErr } = await svc
