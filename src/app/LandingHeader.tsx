@@ -39,6 +39,7 @@ export function LandingHeader() {
         <nav className={styles.nav}>
           <a href="#features">{t('features')}</a>
           <a href="#pricing">{t('pricing')}</a>
+          <Link href="/refer" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>🎁 Refer & Earn</Link>
           <LanguageSwitcher variant="header" />
           <Link href="/auth/login">{t('signIn')}</Link>
           <Link href="/auth/signup" className="btn btn-sm btn-primary">{t('getStarted')}</Link>
@@ -63,6 +64,7 @@ export function LandingHeader() {
         <nav className={styles.mobileNav} onClick={() => setMenuOpen(false)}>
           <a href="#features">{t('features')}</a>
           <a href="#pricing">{t('pricing')}</a>
+          <Link href="/refer">🎁 Refer & Earn</Link>
           <LanguageSwitcher variant="header" />
           <Link href="/auth/login">{t('signIn')}</Link>
           <Link href="/auth/signup" className="btn btn-sm btn-primary" style={{ width: '100%', justifyContent: 'center' }}>{t('getStarted')}</Link>
