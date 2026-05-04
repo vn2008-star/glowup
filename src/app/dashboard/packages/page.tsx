@@ -35,6 +35,7 @@ export default function PackagesPage() {
   const [showPkgModal, setShowPkgModal] = useState(false);
   const [showGCModal, setShowGCModal] = useState(false);
   const [editPkg, setEditPkg] = useState<Package | null>(null);
+  const [gcFilter, setGcFilter] = useState<'active' | 'redeemed' | 'all'>('active');
 
   // Package form state
   const [pkgName, setPkgName] = useState("");
@@ -223,9 +224,21 @@ export default function PackagesPage() {
                 <p>Create digital gift cards with unique codes. Perfect for holidays, birthdays, and referral rewards.</p>
               </div>
             ) : (
+              <>
+              <div className={styles.gcFilterBar}>
+                {(['active', 'redeemed', 'all'] as const).map(f => {
+                  const count = f === 'all' ? giftCards.length : giftCards.filter(gc => gc.status === f).length;
+                  const labels = { active: '● Active', redeemed: '✓ Redeemed', all: 'All' };
+                  return (
+                    <button key={f} className={`${styles.gcFilterBtn} ${gcFilter === f ? styles.gcFilterActive : ''}`} onClick={() => setGcFilter(f)}>
+                      {labels[f]} ({count})
+                    </button>
+                  );
+                })}
+              </div>
               <div className={styles.gcGrid}>
-                {giftCards.map(gc => (
-                  <div key={gc.id} className={styles.gcCard}>
+                {giftCards.filter(gc => gcFilter === 'all' ? true : gc.status === gcFilter).map(gc => (
+                  <div key={gc.id} className={`${styles.gcCard} ${gc.status === 'redeemed' ? styles.gcCardRedeemed : ''}`}>
                     <div className={styles.gcCode}>{gc.code}</div>
                     <div className={styles.gcAmounts}>
                       <div className={styles.gcAmount}>
@@ -250,6 +263,7 @@ export default function PackagesPage() {
                   </div>
                 ))}
               </div>
+              </>
             )
           )}
         </>
