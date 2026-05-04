@@ -131,6 +131,7 @@
     "loyalty": "Lealtad",
     "inbox": "Bandeja",
     "reports": "Reportes",
+    "referrals": "Referidos",
     "settings": "Configuración",
     "checkout": "Cobro",
     "frontDesk": "Recepción"
@@ -296,6 +297,23 @@
     "enterPin": "Ingresa tu PIN",
     "wrongPin": "PIN incorrecto — intenta de nuevo",
     "lock": "Cerrar sesión",
-    "client": "Cliente"
+    "client": "Cliente",
+    "waitlistTitle": "Lista de Espera",
+    "joinWaitlist": "Unirse a la lista",
+    "waitlistName": "Tu nombre",
+    "waitlistPhone": "Teléfono *",
+    "waitlistService": "Servicio (opcional)",
+    "currentQueue": "Lista de espera actual",
+    "positionInLine": "Posición",
+    "estimatedWait": "~{min} min de espera",
+    "noOneWaiting": "Nadie esperando — ¡serías el primero!",
+    "waitlistJoined": "¡Estás en la lista!",
+    "checkinTitle": "Registro",
+    "checkinSearch": "Nombre o teléfono",
+    "checkinBtn": "✓ Registrar",
+    "checkedInStatus": "Registrado ✓",
+    "noMatchingAppts": "No se encontraron citas",
+    "searchToCheckin": "Ingresa tu nombre o teléfono para encontrar tu cita",
+    "withStaff": "con"
   }
 }

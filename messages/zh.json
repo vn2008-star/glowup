@@ -131,6 +131,7 @@
     "loyalty": "会员",
     "inbox": "收件箱",
     "reports": "报告",
+    "referrals": "推荐",
     "settings": "设置",
     "checkout": "结账",
     "frontDesk": "前台"
@@ -332,6 +333,23 @@
     "enterPin": "请输入PIN码",
     "wrongPin": "PIN码错误 — 请重试",
     "lock": "退出登录",
-    "client": "客户"
+    "client": "客户",
+    "waitlistTitle": "散客排队",
+    "joinWaitlist": "加入排队",
+    "waitlistName": "您的姓名",
+    "waitlistPhone": "电话 *",
+    "waitlistService": "服务（可选）",
+    "currentQueue": "当前排队",
+    "positionInLine": "位置",
+    "estimatedWait": "~{min} 分钟等待",
+    "noOneWaiting": "无人排队 — 您将是第一位！",
+    "waitlistJoined": "您已加入排队！",
+    "checkinTitle": "签到",
+    "checkinSearch": "姓名或电话号码",
+    "checkinBtn": "✓ 签到",
+    "checkedInStatus": "已签到 ✓",
+    "noMatchingAppts": "未找到匹配的预约",
+    "searchToCheckin": "输入姓名或电话查找预约",
+    "withStaff": "与"
   }
 }

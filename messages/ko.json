@@ -131,6 +131,7 @@
     "loyalty": "로열티",
     "inbox": "받은편지함",
     "reports": "리포트",
+    "referrals": "추천",
     "settings": "설정",
     "checkout": "결제",
     "frontDesk": "프론트 데스크"
@@ -294,6 +295,23 @@
     "enterPin": "PIN을 입력하세요",
     "wrongPin": "잘못된 PIN — 다시 시도하세요",
     "lock": "로그아웃",
-    "client": "고객"
+    "client": "고객",
+    "waitlistTitle": "워크인 대기자 목록",
+    "joinWaitlist": "대기자 목록 참여",
+    "waitlistName": "이름",
+    "waitlistPhone": "전화번호 *",
+    "waitlistService": "서비스 (선택)",
+    "currentQueue": "현재 대기자 목록",
+    "positionInLine": "순번",
+    "estimatedWait": "~{min}분 대기",
+    "noOneWaiting": "대기자가 없습니다 — 첫 번째로 오세요!",
+    "waitlistJoined": "대기자 목록에 등록되었습니다!",
+    "checkinTitle": "체크인",
+    "checkinSearch": "이름 또는 전화번호",
+    "checkinBtn": "✓ 체크인",
+    "checkedInStatus": "체크인 완료 ✓",
+    "noMatchingAppts": "일치하는 예약을 찾을 수 없습니다",
+    "searchToCheckin": "이름 또는 전화번호를 입력하여 예약을 찾으세요",
+    "withStaff": "담당"
   }
 }

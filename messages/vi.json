@@ -463,6 +463,23 @@
     "enterPin": "Nhập mã PIN",
     "wrongPin": "Sai mã PIN — thử lại",
     "lock": "Đăng xuất",
-    "client": "Khách hàng"
+    "client": "Khách hàng",
+    "waitlistTitle": "Danh sách chờ",
+    "joinWaitlist": "Tham gia danh sách chờ",
+    "waitlistName": "Tên của bạn",
+    "waitlistPhone": "Số điện thoại *",
+    "waitlistService": "Dịch vụ (tùy chọn)",
+    "currentQueue": "Danh sách chờ hiện tại",
+    "positionInLine": "Vị trí",
+    "estimatedWait": "~{min} phút chờ",
+    "noOneWaiting": "Không ai đang chờ — bạn sẽ là người đầu tiên!",
+    "waitlistJoined": "Bạn đã được thêm vào danh sách!",
+    "checkinTitle": "Đăng ký",
+    "checkinSearch": "Tên hoặc số điện thoại",
+    "checkinBtn": "✓ Đăng ký",
+    "checkedInStatus": "Đã đăng ký ✓",
+    "noMatchingAppts": "Không tìm thấy lịch hẹn phù hợp",
+    "searchToCheckin": "Nhập tên hoặc số điện thoại để tìm lịch hẹn",
+    "withStaff": "với"
   }
 }
