@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData } from "@/lib/api";
 import styles from "./settings.module.css";
+import { formatPhone } from "@/lib/utils";
 
 interface BusinessHours {
   [day: string]: { open: string; close: string; closed: boolean };
@@ -236,7 +237,7 @@ export default function SettingsPage() {
           </div>
           <div className={styles.formGroup}>
             <label className="label">Business Phone</label>
-            <input className="input" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(415) 555-0001" />
+            <input className="input" value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} placeholder="(415) 555-0001" />
           </div>
           <div className={styles.formGroup}>
             <label className="label">Email</label>

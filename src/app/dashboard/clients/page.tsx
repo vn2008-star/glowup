@@ -6,6 +6,7 @@ import { useTenant } from "@/lib/tenant-context";
 import { queryData } from "@/lib/api";
 import styles from "./clients.module.css";
 import type { Client, Service, Staff } from "@/lib/types";
+import { formatPhone } from "@/lib/utils";
 
 /* ── Masking helpers (mirrors API logic for "View as Technician" preview) ── */
 function maskPhone(phone: string | null): string | null {
@@ -457,7 +458,7 @@ export default function ClientsPage() {
                 </div>
                 <div className={styles.formGroup}>
                   <label className="label">Phone</label>
-                  <input className="input" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} />
+                  <input className="input" value={formData.phone} placeholder="(555) 123-4567" onChange={(e) => setFormData({ ...formData, phone: formatPhone(e.target.value) })} />
                 </div>
                 <div className={styles.formGroup}>
                   <label className="label">Email</label>
@@ -511,7 +512,7 @@ export default function ClientsPage() {
                 </div>
                 <div className={styles.formGroup}>
                   <label className="label">Phone</label>
-                  <input className="input" value={editData.phone} onChange={(e) => setEditData({ ...editData, phone: e.target.value })} />
+                  <input className="input" value={editData.phone} placeholder="(555) 123-4567" onChange={(e) => setEditData({ ...editData, phone: formatPhone(e.target.value) })} />
                 </div>
                 <div className={styles.formGroup}>
                   <label className="label">Email</label>

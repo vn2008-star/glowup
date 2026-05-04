@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import styles from './booking.module.css'
 import ChatWidget from './ChatWidget'
+import { formatPhone } from '@/lib/utils'
 
 /* ── Types ── */
 interface ServiceInfo { id: string; name: string; category: string; description: string | null; duration_minutes: number; price: number; sort_order: number; image_url: string | null }
@@ -419,7 +420,7 @@ export default function BookingClient({ slug }: { slug: string }) {
                 <div className={styles.formRow}>
                   <div className={styles.formGroup}>
                     <label>Phone *</label>
-                    <input type="tel" value={clientPhone} onChange={e => setClientPhone(e.target.value)} placeholder="(415) 555-1234" required />
+                    <input type="tel" value={clientPhone} onChange={e => setClientPhone(formatPhone(e.target.value))} placeholder="(415) 555-1234" required />
                   </div>
                   <div className={styles.formGroup}>
                     <label>Email <span className={styles.optionalLabel}>(optional)</span></label>
