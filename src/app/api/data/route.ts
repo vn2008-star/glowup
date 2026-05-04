@@ -853,7 +853,7 @@ export async function POST(request: Request) {
       }
 
       case 'giftcards.create': {
-        const code = Array.from({ length: 12 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('')
+        const code = 'GC-' + Array.from({ length: 6 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('')
         const { data, error } = await svc
           .from('gift_cards')
           .insert({ ...payload, code, tenant_id: tenantId })
