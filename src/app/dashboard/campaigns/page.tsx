@@ -39,6 +39,7 @@ interface HolidayInfo {
 }
 
 const HOLIDAYS: HolidayInfo[] = [
+  { name: "Lunar New Year", emoji: "🧧", month: 0, day: 29, template: "🧧 Lunar New Year Special! Start the Year of the Snake looking radiant. 20% off all services + lucky red gift cards available 🎊 Book now →", promoIdea: "Lucky red gift cards, new year glow-up packages, family bundles, festive nail art" },
   { name: "Valentine's Day", emoji: "💖", month: 1, day: 14, template: "💖 Valentine's Day Special! Look & feel amazing for your date. 15% off any service this week. Book now →", promoIdea: "Couples packages, date-night glam, gift cards, pampering bundles" },
   { name: "International Women's Day", emoji: "💜", month: 2, day: 8, template: "💜 Happy Women's Day, {name}! Celebrate YOU with a self-care session. 20% off this week only →", promoIdea: "Self-care packages, group bookings, squad deals, wellness bundles" },
   { name: "Mother's Day", emoji: "🌹", month: 4, day: 11, template: "🌹 Mother's Day Special! Give Mom the gift of pampering. Gift cards + 15% off spa & beauty packages →", promoIdea: "Gift cards, mother-daughter packages, spa bundles, relaxation treats" },
