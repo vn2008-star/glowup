@@ -675,12 +675,12 @@ export default function StaffPage() {
                               <>
                                 <input className="input" type="time" value={dayData?.open || ""}
                                   onChange={(e) => setScheduleData((prev) => ({ ...prev, [day]: { ...prev[day], open: e.target.value } }))}
-                                  style={{ width: 120 }}
+                                  style={{ width: 140 }}
                                 />
                                 <span style={{ color: "var(--text-tertiary)", fontSize: 'var(--text-sm)' }}>to</span>
                                 <input className="input" type="time" value={dayData?.close || ""}
                                   onChange={(e) => setScheduleData((prev) => ({ ...prev, [day]: { ...prev[day], close: e.target.value } }))}
-                                  style={{ width: 120 }}
+                                  style={{ width: 140 }}
                                 />
                               </>
                             )}
@@ -724,12 +724,12 @@ export default function StaffPage() {
                                 <span className={styles.slotNum}>{i + 1}</span>
                                 <input className="input" type="time" value={slot.start}
                                   onChange={(e) => updateSlot(day, i, 'start', e.target.value)}
-                                  style={{ width: 110 }}
+                                  style={{ width: 140 }}
                                 />
                                 <span style={{ color: "var(--text-tertiary)", fontSize: 'var(--text-sm)' }}>→</span>
                                 <input className="input" type="time" value={slot.end}
                                   onChange={(e) => updateSlot(day, i, 'end', e.target.value)}
-                                  style={{ width: 110 }}
+                                  style={{ width: 140 }}
                                 />
                                 <span className={styles.slotDuration}>
                                   {(() => {
