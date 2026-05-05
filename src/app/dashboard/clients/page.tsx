@@ -85,7 +85,8 @@ export default function ClientsPage() {
 
   async function handleAddClient(e: React.FormEvent) {
     e.preventDefault();
-    const { data } = await queryData<Client>("clients.add", { ...formData, status: "new" });
+    const cleanPayload = { ...formData, birthday: formData.birthday || null, status: "new" as const };
+    const { data } = await queryData<Client>("clients.add", cleanPayload);
     if (data) {
       setClients((prev) => [data, ...prev]);
       setShowAddModal(false);

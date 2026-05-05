@@ -93,9 +93,14 @@ export async function POST(request: Request) {
       }
 
       case 'clients.add': {
+        const cleanPayload = { ...payload, tenant_id: tenantId }
+        // Sanitize birthday: empty string → null (Postgres date column rejects '')
+        if (cleanPayload.birthday === '' || cleanPayload.birthday === undefined) {
+          cleanPayload.birthday = null
+        }
         const { data, error } = await svc
           .from('clients')
-          .insert({ ...payload, tenant_id: tenantId })
+          .insert(cleanPayload)
           .select()
           .single()
         return NextResponse.json({ data, error: error?.message })
