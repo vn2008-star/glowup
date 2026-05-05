@@ -6,18 +6,20 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 async function verifyAdmin() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
+  if (!user) return { user: null, email: null, reason: 'not_authenticated' } as const
 
   const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase())
-  if (!adminEmails.includes(user.email?.toLowerCase() || '')) return null
+  if (!adminEmails.includes(user.email?.toLowerCase() || '')) {
+    return { user: null, email: user.email, reason: 'not_in_admin_list' } as const
+  }
 
-  return user
+  return { user, email: user.email, reason: null } as const
 }
 
 // GET — list all tenants with stats
 export async function GET() {
-  const user = await verifyAdmin()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+  const auth = await verifyAdmin()
+  if (!auth.user) return NextResponse.json({ error: 'Unauthorized', your_email: auth.email || 'unknown', reason: auth.reason }, { status: 403 })
 
   const svc = createServiceClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -72,8 +74,8 @@ export async function GET() {
 
 // POST — admin actions on a tenant
 export async function POST(request: Request) {
-  const user = await verifyAdmin()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+  const auth = await verifyAdmin()
+  if (!auth.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
 
   const svc = createServiceClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
