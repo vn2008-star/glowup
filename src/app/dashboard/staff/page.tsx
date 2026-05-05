@@ -271,8 +271,8 @@ export default function StaffPage() {
       setSelectedStaff(data);
     }
     setShowScheduleModal(false);
+    setSelectedStaff(null);
   }
-
   /* Helper: extract professional title from stored specialties */
   function getStaffProfTitle(s: Staff): string | null {
     for (const pt of PROFESSIONAL_TYPES) {
