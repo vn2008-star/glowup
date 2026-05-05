@@ -1413,6 +1413,30 @@ export async function POST(request: Request) {
           .eq('tenant_id', tenantId)
           .select('*, client:clients(*), staff_member:staff!staff_id(*), service:services(*)')
           .single()
+
+        // Award loyalty points & update client stats ($5 = 1 point)
+        if (data && !error && data.client_id) {
+          const pointsEarned = Math.round((total_price || 0) / 5)
+          const { data: clientRow } = await svc
+            .from('clients')
+            .select('loyalty_points, visit_count, lifetime_spend')
+            .eq('id', data.client_id)
+            .single()
+
+          if (clientRow) {
+            await svc
+              .from('clients')
+              .update({
+                loyalty_points: (clientRow.loyalty_points || 0) + pointsEarned,
+                visit_count: (clientRow.visit_count || 0) + 1,
+                lifetime_spend: (clientRow.lifetime_spend || 0) + (total_price || 0),
+                last_visit: new Date().toISOString(),
+                status: 'active',
+              })
+              .eq('id', data.client_id)
+          }
+        }
+
         return NextResponse.json({ data, error: error?.message })
       }
 
