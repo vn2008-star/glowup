@@ -500,11 +500,11 @@ export default function CampaignsPage() {
         <button className={`${styles.tab} ${activeTab === "fill_openings" ? styles.activeTab : ""}`} onClick={() => setActiveTab("fill_openings")} style={activeTab !== "fill_openings" ? { color: "var(--color-primary)" } : {}}>
           ⚡ Fill My Openings
         </button>
-        <button className={`${styles.tab} ${activeTab === "campaigns" ? styles.activeTab : ""}`} onClick={() => setActiveTab("campaigns")}>
-          Campaigns ({campaigns.length})
-        </button>
         <button className={`${styles.tab} ${activeTab === "holidays" ? styles.activeTab : ""}`} onClick={() => setActiveTab("holidays")}>
           🎉 Holidays
+        </button>
+        <button className={`${styles.tab} ${activeTab === "campaigns" ? styles.activeTab : ""}`} onClick={() => setActiveTab("campaigns")}>
+          Campaigns ({campaigns.length})
         </button>
         <button className={`${styles.tab} ${activeTab === "automations" ? styles.activeTab : ""}`} onClick={() => setActiveTab("automations")}>
           Automations ({AUTOMATIONS_CONFIG.length})
