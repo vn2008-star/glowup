@@ -46,7 +46,7 @@ export default function ClientsPage() {
 
   // Edit profile state
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editData, setEditData] = useState({ first_name: "", last_name: "", phone: "", email: "", birthday: "", notes: "", photo_url: "" });
+  const [editData, setEditData] = useState({ first_name: "", last_name: "", phone: "", email: "", birthday: "", notes: "", photo_url: "", client_since: "" });
   const [editPhotoPreview, setEditPhotoPreview] = useState<string | null>(null);
 
   // Import clients state
@@ -230,6 +230,7 @@ export default function ClientsPage() {
       birthday: selectedClient.birthday || "",
       notes: selectedClient.notes || "",
       photo_url: selectedClient.photo_url || "",
+      client_since: selectedClient.created_at ? new Date(selectedClient.created_at).toISOString().split('T')[0] : "",
     });
     setEditPhotoPreview(selectedClient.photo_url || null);
     setShowEditModal(true);
@@ -238,10 +239,14 @@ export default function ClientsPage() {
   async function handleEditProfile(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedClient) return;
-    const cleanData = {
-      ...editData,
+    const { client_since, ...rest } = editData;
+    const cleanData: Record<string, unknown> = {
+      ...rest,
       birthday: editData.birthday || null,
     };
+    if (client_since) {
+      cleanData.created_at = new Date(client_since + 'T00:00:00').toISOString();
+    }
     const { data } = await queryData<Client>("clients.update", { id: selectedClient.id, ...cleanData });
     if (data) {
       setClients((prev) => prev.map((c) => c.id === data.id ? data : c));
@@ -522,6 +527,11 @@ export default function ClientsPage() {
                 <div className={styles.formGroup}>
                   <label className="label">Birthday</label>
                   <input className="input" type="date" value={editData.birthday} onChange={(e) => setEditData({ ...editData, birthday: e.target.value })} />
+                </div>
+                <div className={styles.formGroup}>
+                  <label className="label">Client Since</label>
+                  <input className="input" type="date" value={editData.client_since} onChange={(e) => setEditData({ ...editData, client_since: e.target.value })} />
+                  <small style={{ color: 'var(--text-tertiary)', marginTop: 4 }}>Override the original sign-up date (useful for imported clients)</small>
                 </div>
               </div>
               <div className={styles.formGroup}>
