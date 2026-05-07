@@ -468,6 +468,17 @@ export default function BookingPage() {
                   />
                   <span className={styles.clientPickerCount}>{selectedClientIds.size} selected</span>
                 </div>
+                {selectedClientIds.size > 0 && (
+                  <div className={styles.selectedChips}>
+                    {allClients.filter(c => selectedClientIds.has(c.id)).map(c => (
+                      <span key={c.id} className={styles.selectedChip}>
+                        {c.first_name} {c.last_name || ""}
+                        <button type="button" onClick={() => toggleClient(c.id)} className={styles.chipRemove}>×</button>
+                      </span>
+                    ))}
+                    <button type="button" className={styles.chipClearAll} onClick={() => setSelectedClientIds(new Set())}>Clear all</button>
+                  </div>
+                )}
                 <div className={styles.clientPickerList}>
                   {allClients
                     .filter(c => {

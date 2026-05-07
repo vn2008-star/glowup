@@ -394,6 +394,50 @@
   color: var(--text-tertiary);
 }
 
+/* Selected client chips */
+.selectedChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: var(--space-2);
+}
+.selectedChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  background: rgba(195, 126, 218, 0.15);
+  border: 1px solid var(--color-primary-200);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-primary);
+}
+.chipRemove {
+  background: none;
+  border: none;
+  color: var(--color-primary);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  opacity: 0.7;
+  transition: opacity var(--transition-fast);
+}
+.chipRemove:hover { opacity: 1; }
+.chipClearAll {
+  background: none;
+  border: none;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  text-decoration: underline;
+  padding: var(--space-1) var(--space-2);
+}
+.chipClearAll:hover { color: var(--text-secondary); }
+
 /* Preview */
 .fillPreview {
   border-radius: var(--radius-lg);
