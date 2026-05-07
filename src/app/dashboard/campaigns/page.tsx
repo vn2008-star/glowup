@@ -539,7 +539,7 @@ export default function CampaignsPage() {
                         <div className={styles.holidayStatus}>
                           <span className={`${styles.statusDot} ${existingCampaign.status === 'active' ? styles.statusActive : styles.statusPaused}`} />
                           <span className={styles.statusLabel}>
-                            {existingCampaign.status === 'active' ? 'Sending' : 'Paused'}
+                            {existingCampaign.status === 'active' ? 'Active' : 'Paused'}
                           </span>
                         </div>
                         {/* Action buttons */}
