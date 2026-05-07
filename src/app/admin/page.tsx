@@ -420,7 +420,7 @@ export default function AdminPage() {
               className={`${styles.filterBtn} ${outreachTab === 'upload' ? styles.filterActive : ''}`}
               onClick={() => setOutreachTab('upload')}
             >
-              Upload & Send
+              📨 Send
             </button>
             <button
               className={`${styles.filterBtn} ${outreachTab === 'followups' ? styles.filterActive : ''}`}
