@@ -787,9 +787,10 @@ export default function AdminPage() {
             {/* SMS Template Picker */}
             <div style={{ marginBottom: 'var(--space-4)' }}>
               <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px', display: 'block' }}>SMS Template</label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-2)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-2)' }}>
                 {[
                   { id: 'sms_intro', name: '👋 Introduction', desc: 'Quick intro — best for first contact' },
+                  { id: 'sms_success', name: '⭐ Success Story', desc: 'Social proof with real salon results' },
                   { id: 'sms_offer', name: '🔥 Free Trial', desc: 'Highlights the 60-day free trial' },
                   { id: 'sms_followup', name: '💬 Follow-Up', desc: 'Gentle nudge for non-responders' },
                 ].map(t => (

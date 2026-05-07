@@ -219,7 +219,7 @@ export function renderTemplate(
 }
 
 // ─── SMS Outreach Templates ───
-export type SmsTemplateId = 'sms_intro' | 'sms_offer' | 'sms_followup';
+export type SmsTemplateId = 'sms_intro' | 'sms_success' | 'sms_offer' | 'sms_followup';
 
 export const SMS_TEMPLATES: Record<SmsTemplateId, {
   id: SmsTemplateId;
@@ -232,6 +232,12 @@ export const SMS_TEMPLATES: Record<SmsTemplateId, {
     name: 'Introduction',
     description: 'Quick intro to GlowUp — best for first contact',
     icon: '👋',
+  },
+  sms_success: {
+    id: 'sms_success',
+    name: 'Success Story',
+    description: 'Social proof with real salon results',
+    icon: '⭐',
   },
   sms_offer: {
     id: 'sms_offer',
@@ -257,6 +263,8 @@ export function renderSmsTemplate(
   switch (templateId) {
     case 'sms_intro':
       return `Hi! Is ${salon} looking to automate bookings, cut no-shows by 60%, & grow clients? GlowUp is free for salons — try it: ${signupLink}`;
+    case 'sms_success':
+      return `⭐ Salons using GlowUp see 60% fewer no-shows & 3.2x more repeat clients. ${salon} could see the same results — free to try: ${signupLink}`;
     case 'sms_offer':
       return `🔥 ${salon} — Get 60 days FREE of GlowUp! Auto bookings, reminders, loyalty & more. No credit card needed. Sign up: ${signupLink}`;
     case 'sms_followup':
