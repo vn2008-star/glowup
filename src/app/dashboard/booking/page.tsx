@@ -327,18 +327,68 @@ export default function BookingPage() {
                 <p>No open slots in the next {fillDays} day{fillDays !== 1 ? "s" : ""}. Try expanding the date range.</p>
               </div>
             ) : (
-              <div className={styles.slotGrid}>
-                {allSlots.map(slot => (
-                  <div key={slot.id} className={`${styles.slotCard} ${selectedSlots.has(slot.id) ? styles.slotCardSelected : ""}`} onClick={() => toggleSlot(slot.id)}>
-                    <div className={styles.slotCheck}>{selectedSlots.has(slot.id) ? "✓" : ""}</div>
-                    <div className={styles.slotStaff}>{slot.staffName}</div>
-                    <div className={styles.slotDate}>{slot.date.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}</div>
-                    <div className={styles.slotTime}>
-                      {formatHour(slot.startHour)} – {formatHour(slot.endHour)}
-                      <span className={styles.slotDuration}>{slot.durationMin} min</span>
-                    </div>
-                  </div>
-                ))}
+              <div className={styles.staffGroups}>
+                {(() => {
+                  // Group slots by staff
+                  const grouped = new Map<string, OpenSlot[]>();
+                  allSlots.forEach(slot => {
+                    if (!grouped.has(slot.staffName)) grouped.set(slot.staffName, []);
+                    grouped.get(slot.staffName)!.push(slot);
+                  });
+                  return Array.from(grouped.entries()).map(([staffName, slots]) => {
+                    const staffSlotIds = slots.map(s => s.id);
+                    const allSelected = staffSlotIds.every(id => selectedSlots.has(id));
+                    const someSelected = staffSlotIds.some(id => selectedSlots.has(id));
+                    const selectedCount = staffSlotIds.filter(id => selectedSlots.has(id)).length;
+
+                    function toggleStaffSlots() {
+                      setSelectedSlots(prev => {
+                        const next = new Set(prev);
+                        if (allSelected) {
+                          staffSlotIds.forEach(id => next.delete(id));
+                        } else {
+                          staffSlotIds.forEach(id => next.add(id));
+                        }
+                        return next;
+                      });
+                    }
+
+                    return (
+                      <div key={staffName} className={styles.staffGroup}>
+                        <div className={styles.staffGroupHeader}>
+                          <div className={styles.staffGroupInfo}>
+                            <div className={styles.staffGroupAvatar}>{staffName[0]}</div>
+                            <div>
+                              <h4 className={styles.staffGroupName}>{staffName}</h4>
+                              <span className={styles.staffGroupCount}>
+                                {slots.length} opening{slots.length !== 1 ? "s" : ""}
+                                {someSelected && ` · ${selectedCount} selected`}
+                              </span>
+                            </div>
+                          </div>
+                          <button
+                            className={`${styles.slotSelectAll} ${allSelected ? styles.slotSelectAllActive : ""}`}
+                            onClick={toggleStaffSlots}
+                          >
+                            {allSelected ? "✓ All Selected" : `Select All (${slots.length})`}
+                          </button>
+                        </div>
+                        <div className={styles.slotGrid}>
+                          {slots.map(slot => (
+                            <div key={slot.id} className={`${styles.slotCard} ${selectedSlots.has(slot.id) ? styles.slotCardSelected : ""}`} onClick={() => toggleSlot(slot.id)}>
+                              <div className={styles.slotCheck}>{selectedSlots.has(slot.id) ? "✓" : ""}</div>
+                              <div className={styles.slotDate}>{slot.date.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}</div>
+                              <div className={styles.slotTime}>
+                                {formatHour(slot.startHour)} – {formatHour(slot.endHour)}
+                                <span className={styles.slotDuration}>{slot.durationMin} min</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
               </div>
             )}
             <div className={styles.fillNav}>

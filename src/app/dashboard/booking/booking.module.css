@@ -79,11 +79,65 @@
   min-width: 20px;
 }
 
+/* Staff-grouped sections */
+.staffGroups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+.staffGroup {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  overflow: hidden;
+}
+.staffGroupHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4) var(--space-5);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.staffGroupInfo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.staffGroupAvatar {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  background: var(--gradient-primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: var(--text-sm);
+  flex-shrink: 0;
+}
+.staffGroupName {
+  font-size: var(--text-base);
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.staffGroupCount {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+.slotSelectAllActive {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+}
+
 /* Slot selection grid */
 .slotGrid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: var(--space-3);
+  padding: var(--space-4);
 }
 .slotCard {
   padding: var(--space-4);
