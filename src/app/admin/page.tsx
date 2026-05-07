@@ -97,6 +97,8 @@ export default function AdminPage() {
   const [followUpSending, setFollowUpSending] = useState(false);
   const [followUpResults, setFollowUpResults] = useState<{ summary: { total: number; sent: number; skipped: number; failed: number } } | null>(null);
   const [queueStats, setQueueStats] = useState<{ queued: number; sent_today: number; daily_limit: number; remaining_today: number; estimated_days: number } | null>(null);
+  const [dbLeadsLoading, setDbLeadsLoading] = useState(false);
+  const [dbLeadsInfo, setDbLeadsInfo] = useState<{ total_in_db: number; already_contacted: number; ready_to_send: number } | null>(null);
 
   const templateOptions = [
     { id: 'feature_showcase', name: '🚀 Feature Showcase', desc: 'Highlights top features & stats — best for first cold outreach' },
@@ -528,44 +530,93 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* CSV Upload */}
-            <div
-              style={{
-                border: '2px dashed var(--border-default)',
-                borderRadius: 'var(--radius-lg)',
-                padding: 'var(--space-8)',
-                textAlign: 'center',
-                cursor: 'pointer',
-                marginBottom: 'var(--space-4)',
-                transition: 'border-color 0.2s',
-                background: 'var(--bg-surface)',
-              }}
-              onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--color-primary)'; }}
-              onDragLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-default)'; }}
-              onDrop={(e) => {
-                e.preventDefault();
-                e.currentTarget.style.borderColor = 'var(--border-default)';
-                const file = e.dataTransfer.files[0];
-                if (file) parseCsvFile(file);
-              }}
-              onClick={() => {
-                const input = document.createElement('input');
-                input.type = 'file';
-                input.accept = '.csv';
-                input.onchange = (e) => {
-                  const file = (e.target as HTMLInputElement).files?.[0];
+            {/* Load from Database OR CSV Upload */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
+              {/* Load from DB */}
+              <div
+                style={{
+                  border: '2px dashed var(--color-primary)',
+                  borderRadius: 'var(--radius-lg)',
+                  padding: 'var(--space-6)',
+                  textAlign: 'center',
+                  cursor: dbLeadsLoading ? 'wait' : 'pointer',
+                  transition: 'all 0.2s',
+                  background: 'rgba(195, 126, 218, 0.05)',
+                  opacity: dbLeadsLoading ? 0.7 : 1,
+                }}
+                onClick={async () => {
+                  if (dbLeadsLoading) return;
+                  setDbLeadsLoading(true);
+                  setCsvError('');
+                  setSendResults(null);
+                  try {
+                    const res = await fetch('/api/admin/outreach?action=load-leads');
+                    if (!res.ok) throw new Error('Failed to load leads');
+                    const d = await res.json();
+                    setDbLeadsInfo({ total_in_db: d.total_in_db, already_contacted: d.already_contacted, ready_to_send: d.ready_to_send });
+                    if (d.leads.length === 0) {
+                      setCsvError(`No new leads to send. ${d.total_in_db} leads in DB, ${d.already_contacted} already contacted.`);
+                    } else {
+                      setCsvLeads(d.leads);
+                    }
+                  } catch (err) {
+                    setCsvError('Failed to load leads from database: ' + (err instanceof Error ? err.message : ''));
+                  }
+                  setDbLeadsLoading(false);
+                }}
+              >
+                <div style={{ fontSize: '32px', marginBottom: '8px' }}>{dbLeadsLoading ? '⏳' : '🗄️'}</div>
+                <p style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-primary)', margin: '0 0 4px' }}>
+                  {dbLeadsLoading ? 'Loading leads...' : 'Load from Database'}
+                </p>
+                <p style={{ fontSize: '12px', color: 'var(--text-tertiary)', margin: 0 }}>
+                  Pull email-ready leads from InfoIQ
+                </p>
+                {dbLeadsInfo && (
+                  <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                    📊 {dbLeadsInfo.total_in_db} total · ✅ {dbLeadsInfo.ready_to_send} ready · 🔒 {dbLeadsInfo.already_contacted} contacted
+                  </div>
+                )}
+              </div>
+
+              {/* CSV Upload */}
+              <div
+                style={{
+                  border: '2px dashed var(--border-default)',
+                  borderRadius: 'var(--radius-lg)',
+                  padding: 'var(--space-6)',
+                  textAlign: 'center',
+                  cursor: 'pointer',
+                  transition: 'border-color 0.2s',
+                  background: 'var(--bg-surface)',
+                }}
+                onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--color-primary)'; }}
+                onDragLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-default)'; }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.currentTarget.style.borderColor = 'var(--border-default)';
+                  const file = e.dataTransfer.files[0];
                   if (file) parseCsvFile(file);
-                };
-                input.click();
-              }}
-            >
-              <div style={{ fontSize: '32px', marginBottom: '8px' }}>📁</div>
-              <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 4px' }}>
-                {csvLeads.length > 0 ? `${csvLeads.length} leads loaded` : 'Drop CSV file here or click to upload'}
-              </p>
-              <p style={{ fontSize: '12px', color: 'var(--text-tertiary)', margin: 0 }}>
-                CSV format: salon_name, owner_name, owner_email, phone, city, state
-              </p>
+                }}
+                onClick={() => {
+                  const input = document.createElement('input');
+                  input.type = 'file';
+                  input.accept = '.csv';
+                  input.onchange = (e) => {
+                    const file = (e.target as HTMLInputElement).files?.[0];
+                    if (file) parseCsvFile(file);
+                  };
+                  input.click();
+                }}
+              >
+                <div style={{ fontSize: '32px', marginBottom: '8px' }}>📁</div>
+                <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 4px' }}>
+                  {csvLeads.length > 0 ? `${csvLeads.length} leads loaded` : 'Upload CSV File'}
+                </p>
+                <p style={{ fontSize: '12px', color: 'var(--text-tertiary)', margin: 0 }}>
+                  CSV format: salon_name, owner_name, owner_email, phone, city, state
+                </p>
+              </div>
             </div>
 
             {csvError && (

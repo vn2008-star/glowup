@@ -53,6 +53,47 @@ export async function GET(request: Request) {
     return NextResponse.json({ templates: Object.values(TEMPLATES) })
   }
 
+  // Load email-ready leads from the InfoIQ `leads` table
+  if (action === 'load-leads') {
+    // Get all leads with emails
+    const { data: rawLeads, error: leadsErr } = await svc
+      .from('leads')
+      .select('business_name, email, phone, city, state, rating, review_count')
+      .not('email', 'is', null)
+      .order('created_at', { ascending: false })
+
+    if (leadsErr) return NextResponse.json({ error: leadsErr.message }, { status: 500 })
+
+    // Get already-contacted emails to exclude duplicates
+    const { data: contacted } = await svc
+      .from('outreach_campaigns')
+      .select('owner_email')
+      .in('status', ['sent', 'queued', 'skipped_active'])
+
+    const contactedEmails = new Set((contacted || []).map(c => c.owner_email?.toLowerCase()))
+
+    // Map leads to outreach format, filtering out already-contacted
+    const leads = (rawLeads || [])
+      .filter(l => l.email && !contactedEmails.has(l.email.toLowerCase()))
+      .map(l => ({
+        salon_name: l.business_name || 'Unknown Salon',
+        owner_name: l.business_name || 'Salon Owner',
+        owner_email: l.email,
+        phone: l.phone || undefined,
+        city: l.city || undefined,
+        state: l.state || undefined,
+        rating: l.rating,
+        review_count: l.review_count,
+      }))
+
+    return NextResponse.json({
+      leads,
+      total_in_db: rawLeads?.length || 0,
+      already_contacted: contactedEmails.size,
+      ready_to_send: leads.length,
+    })
+  }
+
   // Return queue stats
   if (action === 'queue-stats') {
     const { count: queuedCount } = await svc
