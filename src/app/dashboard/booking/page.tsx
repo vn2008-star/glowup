@@ -636,47 +636,6 @@ export default function BookingPage() {
         <h2>🤖 Booking Auto-Send</h2>
         <p>Automatically follow up to keep your schedule full</p>
         <div className={styles.automationList}>
-          {BOOKING_AUTOMATIONS.map((a) => {
-            const currentChannel = (automationStates[a.channelKey] as unknown as string) || "both";
-            return (
-            <div key={a.key} className={`card ${styles.automationCard}`}>
-              <div className={styles.automationInfo}>
-                <h3>{a.name}</h3>
-                <div className={styles.automationMeta}>
-                  <span className={styles.trigger}>⚡ {a.trigger}</span>
-                </div>
-                <div className={styles.channelPickerSmall}>
-                  <span className={styles.channelPickerLabel}>Send via:</span>
-                  {([["sms", "📱 SMS", "Send via text message"], ["email", "📧 Email", "Send via email"], ["both", "📱+📧 Both", "Send via SMS and email"]] as const).map(([ch, label, tip]) => (
-                    <button
-                      key={ch}
-                      type="button"
-                      title={tip}
-                      className={`${styles.channelBtnSm} ${currentChannel === ch ? styles.channelBtnSmActive : ""}`}
-                      onClick={async () => {
-                        setAutomationStates(prev => ({ ...prev, [a.channelKey]: ch }));
-                        await fetch("/api/save-settings", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ tenantId: tenant?.id, path: `automations.${a.channelKey}`, value: ch }),
-                        });
-                      }}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label className={styles.toggleLabel}>
-                  <input type="checkbox" checked={!!automationStates[a.key]} onChange={() => handleToggleAutomation(a.key)} />
-                  <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
-                </label>
-              </div>
-            </div>
-            );
-          })}
-
           {/* Fill My Openings Automation */}
           {(() => {
             const fmoChannel = (automationStates["auto_fill_openings_channel"] as unknown as string) || "both";
@@ -785,6 +744,47 @@ export default function BookingPage() {
               </div>
             );
           })()}
+
+          {BOOKING_AUTOMATIONS.map((a) => {
+            const currentChannel = (automationStates[a.channelKey] as unknown as string) || "both";
+            return (
+            <div key={a.key} className={`card ${styles.automationCard}`}>
+              <div className={styles.automationInfo}>
+                <h3>{a.name}</h3>
+                <div className={styles.automationMeta}>
+                  <span className={styles.trigger}>⚡ {a.trigger}</span>
+                </div>
+                <div className={styles.channelPickerSmall}>
+                  <span className={styles.channelPickerLabel}>Send via:</span>
+                  {([["sms", "📱 SMS", "Send via text message"], ["email", "📧 Email", "Send via email"], ["both", "📱+📧 Both", "Send via SMS and email"]] as const).map(([ch, label, tip]) => (
+                    <button
+                      key={ch}
+                      type="button"
+                      title={tip}
+                      className={`${styles.channelBtnSm} ${currentChannel === ch ? styles.channelBtnSmActive : ""}`}
+                      onClick={async () => {
+                        setAutomationStates(prev => ({ ...prev, [a.channelKey]: ch }));
+                        await fetch("/api/save-settings", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ tenantId: tenant?.id, path: `automations.${a.channelKey}`, value: ch }),
+                        });
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className={styles.toggleLabel}>
+                  <input type="checkbox" checked={!!automationStates[a.key]} onChange={() => handleToggleAutomation(a.key)} />
+                  <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
+                </label>
+              </div>
+            </div>
+            );
+          })}
         </div>
       </div>
     </div>
