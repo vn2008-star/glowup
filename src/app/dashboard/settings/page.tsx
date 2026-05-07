@@ -807,6 +807,37 @@ export default function SettingsPage() {
           <span>Enable masked communications for technicians</span>
         </label>
       </div>
+
+      {/* Review Request Auto-Send */}
+      <div id="review-request" className={`card ${styles.section}`}>
+        <h2>⭐ Review Request</h2>
+        <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginBottom: "var(--space-4)" }}>
+          Automatically ask clients for a Google or Yelp review after their appointment. Builds your online reputation on autopilot.
+        </p>
+        <label className={styles.protectionToggle}>
+          <input
+            type="checkbox"
+            checked={!!((tenant?.settings as Record<string, unknown>)?.automations as Record<string, boolean>)?.auto_review_request}
+            onChange={(e) => {
+              const settings = {
+                ...(typeof tenant?.settings === "object" && tenant.settings ? tenant.settings : {}),
+              } as Record<string, unknown>;
+              const existingAuto = (settings.automations || {}) as Record<string, boolean>;
+              settings.automations = { ...existingAuto, auto_review_request: e.target.checked };
+              fetch("/api/save-settings", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ settings }),
+              }).then(() => refetch());
+            }}
+          />
+          <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
+          <span>Send review request after completed appointments</span>
+        </label>
+        <div style={{ marginTop: "var(--space-3)", padding: "var(--space-3) var(--space-4)", background: "var(--bg-surface)", borderRadius: "var(--radius-md)", fontSize: "var(--text-sm)", color: "var(--text-tertiary)" }}>
+          ⚡ Trigger: 2 hours after appointment &nbsp;&nbsp; 📱 Channel: SMS
+        </div>
+      </div>
       {/* Billing & Subscription */}
       <div className={`card ${styles.section}`}>
         <h2>💳 Billing & Subscription</h2>
