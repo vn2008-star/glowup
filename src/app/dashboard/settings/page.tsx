@@ -834,8 +834,43 @@ export default function SettingsPage() {
           <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
           <span>Send review request after completed appointments</span>
         </label>
-        <div style={{ marginTop: "var(--space-3)", padding: "var(--space-3) var(--space-4)", background: "var(--bg-surface)", borderRadius: "var(--radius-md)", fontSize: "var(--text-sm)", color: "var(--text-tertiary)" }}>
-          ⚡ Trigger: 2 hours after appointment &nbsp;&nbsp; 📱 Channel: SMS
+        <div style={{ marginTop: "var(--space-3)", padding: "var(--space-3) var(--space-4)", background: "var(--bg-surface)", borderRadius: "var(--radius-md)", fontSize: "var(--text-sm)", color: "var(--text-tertiary)", display: "flex", alignItems: "center", gap: "var(--space-4)", flexWrap: "wrap" }}>
+          <span>⚡ Trigger: 2 hours after appointment</span>
+          <span style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+            Channel:
+            {([["sms", "📱 SMS"], ["email", "📧 Email"], ["both", "📱+📧 Both"]] as const).map(([ch, label]) => {
+              const currentChannel = ((tenant?.settings as Record<string, unknown>)?.automations as Record<string, string>)?.auto_review_channel || "sms";
+              return (
+                <button
+                  key={ch}
+                  type="button"
+                  onClick={() => {
+                    const s = { ...(typeof tenant?.settings === "object" && tenant.settings ? tenant.settings : {}) } as Record<string, unknown>;
+                    const a = (s.automations || {}) as Record<string, unknown>;
+                    s.automations = { ...a, auto_review_channel: ch };
+                    fetch("/api/save-settings", {
+                      method: "PUT",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ settings: s }),
+                    }).then(() => refetch());
+                  }}
+                  style={{
+                    padding: "2px 10px",
+                    borderRadius: "var(--radius-full)",
+                    border: currentChannel === ch ? "1.5px solid var(--color-primary)" : "1px solid var(--border-subtle)",
+                    background: currentChannel === ch ? "rgba(139,92,246,0.15)" : "transparent",
+                    color: currentChannel === ch ? "var(--color-primary)" : "var(--text-tertiary)",
+                    fontSize: "var(--text-xs)",
+                    fontWeight: currentChannel === ch ? 700 : 500,
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </span>
         </div>
       </div>
       {/* Billing & Subscription */}

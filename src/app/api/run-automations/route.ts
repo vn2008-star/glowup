@@ -337,7 +337,8 @@ export async function GET(request: Request) {
           const clientName = `${client.first_name || ''}`.trim() || 'there'
           const message = `Thanks for visiting ${businessName} today, ${clientName}! 🌟 We'd love to hear how it went — a quick review means the world to us ❤️`
 
-          await sendMessage({ client, message, businessName, twilioClient, resendClient, channel: 'sms' })
+          const reviewChannel = String(automations.auto_review_channel || 'sms') as 'sms' | 'email' | 'both'
+          await sendMessage({ client, message, businessName, twilioClient, resendClient, channel: reviewChannel })
           results.review++
 
           // Mark as requested
