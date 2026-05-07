@@ -629,6 +629,28 @@
   font-size: var(--text-sm);
   color: var(--text-secondary);
 }
+.channelPickerSmall {
+  display: flex;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+.channelBtnSm {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  line-height: 1;
+}
+.channelBtnSm:hover {
+  border-color: var(--color-primary-200);
+}
+.channelBtnSmActive {
+  border-color: var(--color-primary);
+  background: rgba(195, 126, 218, 0.12);
+}
 .toggleLabel {
   display: flex;
   cursor: pointer;
