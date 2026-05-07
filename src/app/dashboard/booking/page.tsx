@@ -784,6 +784,29 @@ export default function BookingPage() {
                     </button>
                   ))}
                 </div>
+
+                {/* Message Preview */}
+                <details style={{ marginTop: "var(--space-3)" }}>
+                  <summary style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)", cursor: "pointer", userSelect: "none" }}>
+                    💬 Preview message
+                  </summary>
+                  <div style={{
+                    marginTop: "var(--space-2)",
+                    padding: "var(--space-3)",
+                    background: "var(--bg-surface)",
+                    borderRadius: "var(--radius-md)",
+                    border: "1px solid var(--border-subtle)",
+                    fontSize: "var(--text-xs)",
+                    lineHeight: 1.7,
+                    color: "var(--text-primary)",
+                    whiteSpace: "pre-wrap",
+                  }}>
+                    {a.key === "auto_rebooking"
+                      ? `Hey Sarah! It's been 30 days since your last visit to ${tenant?.name || "Your Salon"}. Time for a refresh? Book now → ${typeof window !== "undefined" ? window.location.origin : ""}/book/${tenant?.slug || "your-salon"}`
+                      : `Hi Sarah, we missed you today at ${tenant?.name || "Your Salon"}! 😊 Life happens — we'd love to help you rebook. Book your next visit → ${typeof window !== "undefined" ? window.location.origin : ""}/book/${tenant?.slug || "your-salon"}`
+                    }
+                  </div>
+                </details>
               </div>
               <div>
                 <label className={styles.toggleLabel}>
