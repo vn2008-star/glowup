@@ -27,6 +27,13 @@ const TIER_COLORS: Record<string, string> = {
   Platinum: "#e5e4e2",
 };
 
+const LOYALTY_AUTOMATIONS = [
+  { key: "auto_birthday", name: "🎂 Birthday Auto-Send", trigger: "7 days before birthday", channel: "SMS + Email" },
+  { key: "auto_rebooking", name: "🔄 Rebooking Reminder", trigger: "Based on service cycle", channel: "SMS" },
+  { key: "auto_noshow", name: "⚠️ No-Show Follow-Up", trigger: "1 hour after missed appt", channel: "SMS" },
+  { key: "auto_loyalty", name: "🏆 Loyalty Milestone", trigger: "When reaching point threshold", channel: "SMS + Email" },
+];
+
 export default function LoyaltyPage() {
   const { tenant, refetch } = useTenant();
   const t = useTranslations("loyaltyPage");
@@ -36,6 +43,9 @@ export default function LoyaltyPage() {
   const [loading, setLoading] = useState(true);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editTiers, setEditTiers] = useState<{ name: string; minPoints: number; perks: string }[]>([]);
+
+  // Automation toggles
+  const [automationStates, setAutomationStates] = useState<Record<string, boolean>>({});
 
   const fetchLoyalty = useCallback(async () => {
     if (!tenant) return;
@@ -51,6 +61,16 @@ export default function LoyaltyPage() {
       setRecentActivity(data.recentActivity);
       setTotalPoints(data.totalPoints);
     }
+
+    // Load automation states from tenant settings
+    const settings = (tenant.settings || {}) as Record<string, unknown>;
+    const autoSettings = (settings.automations || {}) as Record<string, boolean>;
+    const states: Record<string, boolean> = {};
+    LOYALTY_AUTOMATIONS.forEach((a) => {
+      states[a.key] = autoSettings[a.key] ?? (a.key === "auto_birthday" || a.key === "auto_rebooking" || a.key === "auto_noshow");
+    });
+    setAutomationStates(states);
+
     setLoading(false);
   }, [tenant]);
 
@@ -79,6 +99,25 @@ export default function LoyaltyPage() {
 
   function removeTier(index: number) {
     setEditTiers((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  async function handleToggleAutomation(key: string) {
+    const newStates = { ...automationStates, [key]: !automationStates[key] };
+    setAutomationStates(newStates);
+
+    const settings = (tenant?.settings || {}) as Record<string, unknown>;
+    const existingAuto = (settings.automations || {}) as Record<string, boolean>;
+    const res = await fetch("/api/save-settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        settings: {
+          ...settings,
+          automations: { ...existingAuto, ...newStates },
+        },
+      }),
+    });
+    if (res.ok) refetch();
   }
 
   const totalClients = tiers.reduce((sum, t) => sum + t.clients, 0);
@@ -141,7 +180,7 @@ export default function LoyaltyPage() {
         ) : (
           <div className={styles.activityList}>
             {recentActivity.map((r) => {
-              const points = Math.round((r.total_price || 0) / 5); // $5 = 1 point
+              const points = Math.round((r.total_price || 0) / 5);
               const clientName = r.client ? `${r.client.first_name} ${r.client.last_name || ""}` : "Walk-in";
               return (
                 <div key={r.id} className={styles.activityRow}>
@@ -154,6 +193,31 @@ export default function LoyaltyPage() {
             })}
           </div>
         )}
+      </div>
+
+      {/* ── Auto-Send Settings ── */}
+      <div className={styles.autoSendSection}>
+        <h2>🤖 Auto-Send Settings</h2>
+        <p>Automate messages to keep clients engaged and coming back</p>
+        <div className={styles.automationList}>
+          {LOYALTY_AUTOMATIONS.map((a) => (
+            <div key={a.key} className={`card ${styles.automationCard}`}>
+              <div className={styles.automationInfo}>
+                <h3>{a.name}</h3>
+                <div className={styles.automationMeta}>
+                  <span className={styles.trigger}>⚡ {a.trigger}</span>
+                  <span className={styles.channel}>📱 {a.channel}</span>
+                </div>
+              </div>
+              <div>
+                <label className={styles.toggleLabel}>
+                  <input type="checkbox" checked={automationStates[a.key] || false} onChange={() => handleToggleAutomation(a.key)} />
+                  <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
+                </label>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Edit Tiers Modal */}
