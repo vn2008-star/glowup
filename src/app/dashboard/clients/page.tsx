@@ -29,6 +29,8 @@ export default function ClientsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<'name' | 'recent' | 'spent' | 'visits'>('name');
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('table');
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [formData, setFormData] = useState({ first_name: "", last_name: "", phone: "", email: "", birthday: "", notes: "", photo_url: "" });
@@ -77,11 +79,29 @@ export default function ClientsPage() {
 
   useEffect(() => { fetchClients(); }, [fetchClients]);
 
-  const filtered = clients.filter((c) => {
-    const matchesSearch = `${c.first_name} ${c.last_name || ""} ${c.email || ""} ${c.phone || ""}`.toLowerCase().includes(search.toLowerCase());
-    const matchesFilter = filter === "all" || c.status === filter;
-    return matchesSearch && matchesFilter;
-  });
+  const filtered = useMemo(() => {
+    const list = clients.filter((c) => {
+      const matchesSearch = `${c.first_name} ${c.last_name || ""} ${c.email || ""} ${c.phone || ""}`.toLowerCase().includes(search.toLowerCase());
+      const matchesFilter = filter === "all" || c.status === filter;
+      return matchesSearch && matchesFilter;
+    });
+    // Sort
+    list.sort((a, b) => {
+      switch (sortBy) {
+        case 'name':
+          return `${a.first_name} ${a.last_name || ''}`.localeCompare(`${b.first_name} ${b.last_name || ''}`);
+        case 'recent':
+          return (b.last_visit || '').localeCompare(a.last_visit || '');
+        case 'spent':
+          return (b.lifetime_spend || 0) - (a.lifetime_spend || 0);
+        case 'visits':
+          return (b.visit_count || 0) - (a.visit_count || 0);
+        default:
+          return 0;
+      }
+    });
+    return list;
+  }, [clients, search, filter, sortBy]);
 
   async function handleAddClient(e: React.FormEvent) {
     e.preventDefault();
@@ -388,6 +408,66 @@ export default function ClientsPage() {
         </div>
       </div>
 
+      {/* Sort + View Toggle */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-3)', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+          <span style={{ fontSize: '12px', color: 'var(--text-tertiary)', fontWeight: 600 }}>Sort:</span>
+          {([['name', 'A → Z'], ['recent', 'Recent'], ['spent', 'Top Spent'], ['visits', 'Most Visits']] as const).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setSortBy(key)}
+              style={{
+                padding: '4px 10px',
+                fontSize: '12px',
+                borderRadius: 'var(--radius-md)',
+                border: sortBy === key ? '1px solid var(--color-primary)' : '1px solid var(--border-default)',
+                background: sortBy === key ? 'rgba(195, 126, 218, 0.12)' : 'transparent',
+                color: sortBy === key ? 'var(--color-primary)' : 'var(--text-secondary)',
+                cursor: 'pointer',
+                fontWeight: sortBy === key ? 700 : 500,
+                transition: 'all 0.15s',
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--bg-elevated)', borderRadius: 'var(--radius-md)', padding: '2px' }}>
+          <button
+            onClick={() => setViewMode('table')}
+            title="Table view"
+            style={{
+              padding: '5px 10px',
+              fontSize: '13px',
+              borderRadius: 'var(--radius-sm)',
+              border: 'none',
+              background: viewMode === 'table' ? 'var(--color-primary)' : 'transparent',
+              color: viewMode === 'table' ? '#fff' : 'var(--text-tertiary)',
+              cursor: 'pointer',
+              transition: 'all 0.15s',
+            }}
+          >
+            ☰
+          </button>
+          <button
+            onClick={() => setViewMode('cards')}
+            title="Card view"
+            style={{
+              padding: '5px 10px',
+              fontSize: '13px',
+              borderRadius: 'var(--radius-sm)',
+              border: 'none',
+              background: viewMode === 'cards' ? 'var(--color-primary)' : 'transparent',
+              color: viewMode === 'cards' ? '#fff' : 'var(--text-tertiary)',
+              cursor: 'pointer',
+              transition: 'all 0.15s',
+            }}
+          >
+            ▦
+          </button>
+        </div>
+      </div>
+
       {/* Client List */}
       {loading ? (
         <div className={styles.loading}>Loading clients...</div>
@@ -396,7 +476,78 @@ export default function ClientsPage() {
           <p>No clients found</p>
           <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>Add Your First Client</button>
         </div>
+      ) : viewMode === 'table' ? (
+        /* ── Table View ── */
+        <div style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden', border: '1px solid var(--border-default)' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <thead>
+              <tr style={{ background: 'var(--bg-elevated)', textAlign: 'left' }}>
+                <th style={{ padding: '10px 12px', width: 36 }}>
+                  <input type="checkbox" checked={selectedIds.size === filtered.length && filtered.length > 0} onChange={toggleSelectAll} />
+                </th>
+                <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-tertiary)' }}>Client</th>
+                <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-tertiary)' }}>Phone</th>
+                <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-tertiary)' }}>Status</th>
+                <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-tertiary)', textAlign: 'right' }}>Visits</th>
+                <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-tertiary)', textAlign: 'right' }}>Spent</th>
+                <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-tertiary)', textAlign: 'right' }}>Points</th>
+                <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-tertiary)' }}>Last Visit</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((c, i) => (
+                <tr
+                  key={c.id}
+                  onClick={() => setSelectedClient(c)}
+                  style={{
+                    cursor: 'pointer',
+                    borderTop: '1px solid var(--border-subtle)',
+                    background: selectedIds.has(c.id) ? 'rgba(195, 126, 218, 0.06)' : i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)',
+                    transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(195, 126, 218, 0.08)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = selectedIds.has(c.id) ? 'rgba(195, 126, 218, 0.06)' : 'transparent')}
+                >
+                  <td style={{ padding: '10px 12px' }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(c.id)}
+                      onChange={(e) => { e.stopPropagation(); toggleSelect(c.id); }}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </td>
+                  <td style={{ padding: '10px 12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      {c.photo_url ? (
+                        <img src={c.photo_url} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />
+                      ) : (
+                        <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--color-primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 700, flexShrink: 0 }}>
+                          {c.first_name[0]}{c.last_name?.[0] || ''}
+                        </div>
+                      )}
+                      <div>
+                        <div style={{ fontWeight: 600, lineHeight: 1.3 }}>{c.first_name} {c.last_name || ''}</div>
+                        {c.email && <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>{displayEmail(c.email)}</div>}
+                      </div>
+                    </div>
+                  </td>
+                  <td style={{ padding: '10px 12px', color: 'var(--text-secondary)' }}>{displayPhone(c.phone) || '—'}</td>
+                  <td style={{ padding: '10px 12px' }}>
+                    <span className={`badge ${c.status === 'active' ? 'badge-success' : c.status === 'new' ? 'badge-info' : c.status === 'at_risk' ? 'badge-danger' : 'badge-warning'}`}>
+                      {c.status}
+                    </span>
+                  </td>
+                  <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600 }}>{c.visit_count}</td>
+                  <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600 }}>${c.lifetime_spend}</td>
+                  <td style={{ padding: '10px 12px', textAlign: 'right', color: 'var(--color-primary)', fontWeight: 600 }}>{c.loyalty_points}</td>
+                  <td style={{ padding: '10px 12px', fontSize: '12px', color: 'var(--text-tertiary)' }}>{c.last_visit ? new Date(c.last_visit).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       ) : (
+        /* ── Card View ── */
         <div className={styles.clientGrid}>
           {filtered.map((c) => (
             <div key={c.id} className={`card ${styles.clientCard} ${selectedIds.has(c.id) ? styles.clientCardSelected : ''}`} onClick={() => setSelectedClient(c)}>
