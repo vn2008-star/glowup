@@ -79,7 +79,7 @@ const navKeys = [
   { href: "/dashboard/packages", icon: <GiftIcon />, key: "packages" },
   { href: "/dashboard/staff", icon: <StaffIcon />, key: "staff" },
   { href: "/dashboard/gallery", icon: <CameraIcon />, key: "gallery" },
-  { href: "/dashboard/campaigns", icon: <MailIcon />, key: "campaigns" },
+  { href: "/dashboard/campaigns", icon: <MailIcon />, key: "promotions" },
   { href: "/dashboard/social", icon: <ShareIcon />, key: "social" },
   { href: "/dashboard/loyalty", icon: <HeartIcon />, key: "loyalty" },
   { href: "/dashboard/inbox", icon: <InboxIcon />, key: "inbox" },

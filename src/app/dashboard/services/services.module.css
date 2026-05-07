@@ -159,45 +159,52 @@
   gap: var(--space-2);
 }
 
-/* ── Drag & Drop ── */
-.dragHandle {
-  position: absolute;
-  top: var(--space-2);
-  left: var(--space-2);
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  color: var(--text-tertiary);
-  opacity: 0;
-  cursor: grab;
-  border-radius: var(--radius-sm);
-  transition: all var(--transition-fast);
-  z-index: 2;
-  letter-spacing: -1px;
-}
+/* ── Reorder Arrows ── */
 .serviceCard {
   position: relative;
 }
-.serviceCard:hover .dragHandle {
-  opacity: 0.6;
+.reorderBtns {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+  z-index: 2;
 }
-.dragHandle:hover {
-  opacity: 1 !important;
-  background: var(--bg-surface);
-  color: var(--text-primary);
+.serviceCard:hover .reorderBtns {
+  opacity: 1;
 }
-.serviceCard.dragging {
-  opacity: 0.4;
-  transform: scale(0.97);
-  box-shadow: none;
+/* Always show on touch devices */
+@media (hover: none) {
+  .reorderBtns {
+    opacity: 1;
+  }
 }
-.serviceCard.dragOver {
+.reorderArrow {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  color: var(--text-tertiary);
+  font-size: 10px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  backdrop-filter: blur(8px);
+}
+.reorderArrow:hover:not(:disabled) {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px var(--color-primary-200);
-  transform: translateY(-2px);
+  color: var(--color-primary);
+  background: var(--color-primary-200);
+}
+.reorderArrow:disabled {
+  opacity: 0.25;
+  cursor: default;
 }
 
 /* Service Image on Card */

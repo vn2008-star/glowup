@@ -419,7 +419,7 @@ export default function CampaignsPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Delete this campaign?")) return;
+    if (!confirm("Delete this promotion?")) return;
     await queryData("campaigns.delete", { id });
     setCampaigns((prev) => prev.filter((c) => c.id !== id));
   }
@@ -469,11 +469,11 @@ export default function CampaignsPage() {
     <div className={styles.page}>
       <div className={styles.pageHeader}>
         <div>
-          <h1>Campaigns & Automation</h1>
-          <p>Automated marketing, retention, and win-back campaigns</p>
+          <h1>Promotions & Automation</h1>
+          <p>Automated marketing, retention, and win-back promotions</p>
         </div>
         <button className="btn btn-primary" onClick={openNew}>
-          <RocketIcon /> Create Campaign
+          <RocketIcon /> Create Promotion
         </button>
       </div>
 
@@ -490,7 +490,7 @@ export default function CampaignsPage() {
           <span className={`${styles.summaryChange} ${styles.positive}`}>Industry avg: 48%</span>
         </div>
         <div className={`card ${styles.summaryCard}`}>
-          <span className={styles.summaryLabel}>Bookings from Campaigns</span>
+          <span className={styles.summaryLabel}>Bookings from Promotions</span>
           <span className={styles.summaryValue}>{totalBooked}</span>
           <span className={`${styles.summaryChange} ${styles.positive}`}>${totalRevenue.toLocaleString()} revenue</span>
         </div>
@@ -504,7 +504,7 @@ export default function CampaignsPage() {
           🎉 Holidays
         </button>
         <button className={`${styles.tab} ${activeTab === "campaigns" ? styles.activeTab : ""}`} onClick={() => setActiveTab("campaigns")}>
-          Campaigns ({campaigns.length})
+          Promotions ({campaigns.length})
         </button>
         <button className={`${styles.tab} ${activeTab === "automations" ? styles.activeTab : ""}`} onClick={() => setActiveTab("automations")}>
           Automations ({AUTOMATIONS_CONFIG.length})
@@ -512,12 +512,12 @@ export default function CampaignsPage() {
       </div>
 
       {loading ? (
-        <div style={{ padding: "2rem", textAlign: "center", color: "var(--text-secondary)" }}>Loading campaigns...</div>
+        <div style={{ padding: "2rem", textAlign: "center", color: "var(--text-secondary)" }}>Loading promotions...</div>
       ) : activeTab === "campaigns" ? (
         campaigns.length === 0 ? (
           <div style={{ textAlign: "center", padding: "3rem", color: "var(--text-secondary)" }}>
-            <p style={{ marginBottom: "1rem" }}>No campaigns yet. Create your first campaign to start engaging clients.</p>
-            <button className="btn btn-primary" onClick={openNew}>Create First Campaign</button>
+            <p style={{ marginBottom: "1rem" }}>No promotions yet. Create your first promotion to start engaging clients.</p>
+            <button className="btn btn-primary" onClick={openNew}>Create First Promotion</button>
           </div>
         ) : (
           <div className={styles.campaignList}>
@@ -577,7 +577,7 @@ export default function CampaignsPage() {
       ) : activeTab === "holidays" ? (
         <div>
           <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginBottom: "var(--space-4)" }}>
-            Create promotions for upcoming holidays. Campaigns are sent to all clients 7 days before each holiday.
+            Create promotions for upcoming holidays. Promotions are sent to all clients 7 days before each holiday.
           </p>
           <div className={styles.holidayGrid}>
             {getUpcomingHolidays().map((h) => {
@@ -614,7 +614,7 @@ export default function CampaignsPage() {
                         });
                         setShowModal(true);
                       }}>
-                        Create Campaign
+                        Create Promotion
                       </button>
                     )}
                   </div>
@@ -811,11 +811,11 @@ export default function CampaignsPage() {
       {showModal && (
         <div className={styles.modalOverlay} onClick={() => setShowModal(false)}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <h2>{editingCampaign ? "Edit Campaign" : "Create Campaign"}</h2>
+            <h2>{editingCampaign ? "Edit Promotion" : "Create Promotion"}</h2>
             <form onSubmit={handleSave}>
               <div className={styles.formGrid}>
                 <div className={styles.formGroup}>
-                  <label className="label">Campaign Name *</label>
+                  <label className="label">Promotion Name *</label>
                   <input className="input" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="e.g., April Birthday Special" required />
                 </div>
                 <div className={styles.formGroup}>
@@ -848,7 +848,7 @@ export default function CampaignsPage() {
               </div>
               <div className={styles.modalActions}>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">{editingCampaign ? "Save Changes" : "Create Campaign"}</button>
+                <button type="submit" className="btn btn-primary">{editingCampaign ? "Save Changes" : "Create Promotion"}</button>
               </div>
             </form>
           </div>

@@ -126,7 +126,7 @@
     "packages": "Gói dịch vụ",
     "staff": "Nhân viên",
     "gallery": "Thư viện ảnh",
-    "campaigns": "Chiến dịch",
+    "promotions": "Khuyến mãi",
     "social": "Mạng xã hội",
     "loyalty": "Khách thân thiết",
     "inbox": "Hộp thư",
@@ -200,7 +200,7 @@
     "noClientsYet": "Chưa có khách hàng. Thêm khách đầu tiên!",
     "visits": "lần đến",
     "atRiskClients": "⚠️ Khách có nguy cơ rời bỏ",
-    "sendCampaign": "Gửi chiến dịch",
+    "sendCampaign": "Gửi khuyến mãi",
     "noAtRisk": "Không có khách có nguy cơ — giữ chân tốt!",
     "lastVisit": "Lần đến cuối",
     "never": "Chưa bao giờ",
@@ -314,14 +314,14 @@
     "deleteConfirm": "Xóa ảnh này?"
   },
   "campaignsPage": {
-    "title": "Chiến dịch",
-    "newCampaign": "+ Chiến dịch mới",
+    "title": "Khuyến mãi",
+    "newCampaign": "+ Khuyến mãi mới",
     "fillMyOpenings": "Lấp lịch trống",
     "scheduled": "Đã lên lịch",
     "sent": "Đã gửi",
     "draft": "Bản nháp",
-    "noCampaigns": "Chưa có chiến dịch",
-    "createFirst": "Tạo chiến dịch marketing đầu tiên",
+    "noCampaigns": "Chưa có khuyến mãi",
+    "createFirst": "Tạo khuyến mãi đầu tiên",
     "subject": "Chủ đề",
     "recipients": "Người nhận",
     "status": "Trạng thái",
@@ -330,8 +330,8 @@
     "send": "Gửi",
     "save": "Lưu nháp",
     "cancel": "Hủy",
-    "deleteCampaign": "Xóa chiến dịch",
-    "deleteConfirm": "Xóa chiến dịch này?"
+    "deleteCampaign": "Xóa khuyến mãi",
+    "deleteConfirm": "Xóa khuyến mãi này?"
   },
   "socialPage": {
     "title": "Mạng xã hội",

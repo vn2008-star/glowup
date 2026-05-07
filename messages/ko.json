@@ -126,7 +126,7 @@
     "packages": "패키지",
     "staff": "직원",
     "gallery": "갤러리",
-    "campaigns": "캠페인",
+    "promotions": "프로모션",
     "social": "소셜",
     "loyalty": "로열티",
     "inbox": "받은편지함",
@@ -163,7 +163,7 @@
     "todaysSchedule": "오늘의 일정", "viewCalendar": "캘린더 보기 →",
     "loadingAppointments": "예약 로딩 중...", "noAppointments": "오늘 예약 없음",
     "recentClients": "최근 고객", "noClientsYet": "아직 고객이 없습니다. 첫 고객을 추가하세요!",
-    "visits": "방문", "atRiskClients": "⚠️ 이탈 위험 고객", "sendCampaign": "캠페인 보내기",
+    "visits": "방문", "atRiskClients": "⚠️ 이탈 위험 고객", "sendCampaign": "프로모션 보내기",
     "noAtRisk": "이탈 위험 고객 없음 — 훌륭한 유지율!", "lastVisit": "마지막 방문", "never": "없음",
     "fillMyOpenings": "빈자리 채우기", "fillDesc": "빈 시간대를 고객에게 알려 모든 자리를 채웁니다"
   },
@@ -208,12 +208,12 @@
     "caption": "설명", "save": "저장", "cancel": "취소", "delete": "삭제", "deleteConfirm": "이 사진을 삭제하시겠습니까?"
   },
   "campaignsPage": {
-    "title": "캠페인", "newCampaign": "+ 새 캠페인", "fillMyOpenings": "빈자리 채우기",
+    "title": "프로모션", "newCampaign": "+ 새 프로모션", "fillMyOpenings": "빈자리 채우기",
     "scheduled": "예약됨", "sent": "발송됨", "draft": "초안",
-    "noCampaigns": "아직 캠페인이 없습니다", "createFirst": "첫 마케팅 캠페인을 만드세요",
+    "noCampaigns": "아직 프로모션이 없습니다", "createFirst": "첫 프로모션을 만드세요",
     "subject": "제목", "recipients": "수신자", "status": "상태", "sentDate": "발송일", "openRate": "오픈율",
     "send": "보내기", "save": "초안 저장", "cancel": "취소",
-    "deleteCampaign": "캠페인 삭제", "deleteConfirm": "이 캠페인을 삭제하시겠습니까?"
+    "deleteCampaign": "프로모션 삭제", "deleteConfirm": "이 프로모션을 삭제하시겠습니까?"
   },
   "socialPage": {
     "title": "소셜", "newPost": "+ 새 게시물", "calendar": "캘린더", "posts": "게시물", "analytics": "분석",

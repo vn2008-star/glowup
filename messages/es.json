@@ -126,7 +126,7 @@
     "packages": "Paquetes",
     "staff": "Personal",
     "gallery": "Galería",
-    "campaigns": "Campañas",
+    "promotions": "Promociones",
     "social": "Redes sociales",
     "loyalty": "Lealtad",
     "inbox": "Bandeja",
@@ -163,7 +163,7 @@
     "todaysSchedule": "Agenda de hoy", "viewCalendar": "Ver Calendario →",
     "loadingAppointments": "Cargando citas...", "noAppointments": "Sin citas programadas para hoy",
     "recentClients": "Clientes Recientes", "noClientsYet": "Aún sin clientes. ¡Añade tu primer cliente!",
-    "visits": "visitas", "atRiskClients": "⚠️ Clientes en Riesgo", "sendCampaign": "Enviar Campaña",
+    "visits": "visitas", "atRiskClients": "⚠️ Clientes en Riesgo", "sendCampaign": "Enviar Promoción",
     "noAtRisk": "Sin clientes en riesgo — ¡excelente retención!",
     "lastVisit": "Última visita", "never": "Nunca",
     "fillMyOpenings": "Llenar Espacios", "fillDesc": "Envía disponibilidad de último minuto y mantén todas las sillas ocupadas"
@@ -210,12 +210,12 @@
     "caption": "Descripción", "save": "Guardar", "cancel": "Cancelar", "delete": "Eliminar", "deleteConfirm": "¿Eliminar esta foto?"
   },
   "campaignsPage": {
-    "title": "Campañas", "newCampaign": "+ Nueva Campaña", "fillMyOpenings": "Llenar Espacios",
+    "title": "Promociones", "newCampaign": "+ Nueva Promoción", "fillMyOpenings": "Llenar Espacios",
     "scheduled": "Programada", "sent": "Enviada", "draft": "Borrador",
-    "noCampaigns": "Aún sin campañas", "createFirst": "Crea tu primera campaña de marketing",
+    "noCampaigns": "Aún sin promociones", "createFirst": "Crea tu primera promoción de marketing",
     "subject": "Asunto", "recipients": "Destinatarios", "status": "Estado", "sentDate": "Fecha de envío", "openRate": "Tasa de apertura",
     "send": "Enviar", "save": "Guardar borrador", "cancel": "Cancelar",
-    "deleteCampaign": "Eliminar Campaña", "deleteConfirm": "¿Eliminar esta campaña?"
+    "deleteCampaign": "Eliminar Promoción", "deleteConfirm": "¿Eliminar esta promoción?"
   },
   "socialPage": {
     "title": "Social", "newPost": "+ Nueva Publicación", "calendar": "Calendario", "posts": "Publicaciones", "analytics": "Analítica",

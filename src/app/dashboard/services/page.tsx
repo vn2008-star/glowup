@@ -30,9 +30,7 @@ export default function ServicesPage() {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  /* ─── Drag & Drop state ─── */
-  const [dragId, setDragId] = useState<string | null>(null);
-  const [dragOverId, setDragOverId] = useState<string | null>(null);
+
 
   const fetchServices = useCallback(async () => {
     if (!tenant) return;
@@ -163,37 +161,15 @@ export default function ServicesPage() {
     setShowCatalog(false);
   }
 
-  /* ─── Drag & Drop handlers ─── */
-  function handleDragStart(id: string) {
-    setDragId(id);
-  }
+  /* ─── Move service up/down within its category ─── */
+  async function moveService(serviceId: string, direction: 'up' | 'down', categoryServices: Service[]) {
+    const fromIdx = categoryServices.findIndex(s => s.id === serviceId);
+    const toIdx = direction === 'up' ? fromIdx - 1 : fromIdx + 1;
+    if (fromIdx === -1 || toIdx < 0 || toIdx >= categoryServices.length) return;
 
-  function handleDragOver(e: React.DragEvent, id: string) {
-    e.preventDefault();
-    if (id !== dragId) setDragOverId(id);
-  }
-
-  function handleDragLeave() {
-    setDragOverId(null);
-  }
-
-  async function handleDrop(targetId: string, categoryServices: Service[]) {
-    if (!dragId || dragId === targetId) {
-      setDragId(null);
-      setDragOverId(null);
-      return;
-    }
-
-    const fromIdx = categoryServices.findIndex(s => s.id === dragId);
-    const toIdx = categoryServices.findIndex(s => s.id === targetId);
-    if (fromIdx === -1 || toIdx === -1) { setDragId(null); setDragOverId(null); return; }
-
-    // Reorder the array
     const reordered = [...categoryServices];
-    const [moved] = reordered.splice(fromIdx, 1);
-    reordered.splice(toIdx, 0, moved);
+    [reordered[fromIdx], reordered[toIdx]] = [reordered[toIdx], reordered[fromIdx]];
 
-    // Build sort_order updates
     const items = reordered.map((s, i) => ({ id: s.id, sort_order: i }));
 
     // Optimistic update
@@ -206,16 +182,7 @@ export default function ServicesPage() {
       return updated.sort((a, b) => a.sort_order - b.sort_order);
     });
 
-    setDragId(null);
-    setDragOverId(null);
-
-    // Persist to DB
     await queryData("services.reorder", { items });
-  }
-
-  function handleDragEnd() {
-    setDragId(null);
-    setDragOverId(null);
   }
 
   /* ─── Category reorder ─── */
@@ -349,7 +316,7 @@ export default function ServicesPage() {
       ) : (
         <>
           {services.length > 1 && (
-            <p className={styles.reorderHint}>⇅ Drag services to reorder how they appear to clients</p>
+            <p className={styles.reorderHint}>⇅ Use the arrow buttons to reorder how services appear to clients</p>
           )}
 
           {/* Category section headers when showing "All" */}
@@ -384,19 +351,16 @@ export default function ServicesPage() {
                     )}
                   </div>
                   <div className={styles.serviceGrid}>
-                    {catServices.map((s) => (
+                    {catServices.map((s, sIdx) => (
                       <ServiceCard
                         key={s.id} s={s}
                         getCategoryColor={getCategoryColor}
                         openEdit={openEdit}
                         handleDelete={handleDelete}
-                        isDragging={dragId === s.id}
-                        isDragOver={dragOverId === s.id}
-                        onDragStart={() => handleDragStart(s.id)}
-                        onDragOver={(e) => handleDragOver(e, s.id)}
-                        onDragLeave={handleDragLeave}
-                        onDrop={() => handleDrop(s.id, catServices)}
-                        onDragEnd={handleDragEnd}
+                        canMoveUp={sIdx > 0}
+                        canMoveDown={sIdx < catServices.length - 1}
+                        onMoveUp={() => moveService(s.id, 'up', catServices)}
+                        onMoveDown={() => moveService(s.id, 'down', catServices)}
                       />
                     ))}
                   </div>
@@ -405,19 +369,16 @@ export default function ServicesPage() {
             })
           ) : (
             <div className={styles.serviceGrid}>
-              {filteredServices.map((s) => (
+              {filteredServices.map((s, sIdx) => (
                 <ServiceCard
                   key={s.id} s={s}
                   getCategoryColor={getCategoryColor}
                   openEdit={openEdit}
                   handleDelete={handleDelete}
-                  isDragging={dragId === s.id}
-                  isDragOver={dragOverId === s.id}
-                  onDragStart={() => handleDragStart(s.id)}
-                  onDragOver={(e) => handleDragOver(e, s.id)}
-                  onDragLeave={handleDragLeave}
-                  onDrop={() => handleDrop(s.id, filteredServices)}
-                  onDragEnd={handleDragEnd}
+                  canMoveUp={sIdx > 0}
+                  canMoveDown={sIdx < filteredServices.length - 1}
+                  onMoveUp={() => moveService(s.id, 'up', filteredServices)}
+                  onMoveDown={() => moveService(s.id, 'down', filteredServices)}
                 />
               ))}
             </div>
@@ -672,30 +633,35 @@ export default function ServicesPage() {
 }
 
 /* ─── Service Card sub-component ─── */
-function ServiceCard({ s, getCategoryColor, openEdit, handleDelete, isDragging, isDragOver, onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd }: {
+function ServiceCard({ s, getCategoryColor, openEdit, handleDelete, canMoveUp, canMoveDown, onMoveUp, onMoveDown }: {
   s: Service;
   getCategoryColor: (label: string) => string;
   openEdit: (s: Service) => void;
   handleDelete: (id: string) => void;
-  isDragging: boolean;
-  isDragOver: boolean;
-  onDragStart: () => void;
-  onDragOver: (e: React.DragEvent) => void;
-  onDragLeave: () => void;
-  onDrop: () => void;
-  onDragEnd: () => void;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
 }) {
   return (
     <div
-      className={`${styles.serviceCard} ${!s.is_active ? styles.inactive : ""} ${isDragging ? styles.dragging : ""} ${isDragOver ? styles.dragOver : ""}`}
-      draggable
-      onDragStart={onDragStart}
-      onDragOver={onDragOver}
-      onDragLeave={onDragLeave}
-      onDrop={onDrop}
-      onDragEnd={onDragEnd}
+      className={`${styles.serviceCard} ${!s.is_active ? styles.inactive : ""}`}
     >
-      <div className={styles.dragHandle} title="Drag to reorder">⠿</div>
+      {/* Reorder arrows */}
+      <div className={styles.reorderBtns}>
+        <button
+          className={styles.reorderArrow}
+          disabled={!canMoveUp}
+          onClick={onMoveUp}
+          title="Move up"
+        >◀</button>
+        <button
+          className={styles.reorderArrow}
+          disabled={!canMoveDown}
+          onClick={onMoveDown}
+          title="Move down"
+        >▶</button>
+      </div>
       {s.image_url && (
         <div className={styles.serviceImage}>
           <img src={s.image_url} alt={s.name} />

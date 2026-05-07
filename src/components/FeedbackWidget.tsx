@@ -24,7 +24,7 @@ const PAGE_LABELS: Record<string, string> = {
   '/dashboard/packages': 'Packages',
   '/dashboard/staff': 'Staff',
   '/dashboard/gallery': 'Gallery',
-  '/dashboard/campaigns': 'Campaigns',
+  '/dashboard/campaigns': 'Promotions',
   '/dashboard/social': 'Social',
   '/dashboard/loyalty': 'Loyalty',
   '/dashboard/inbox': 'Inbox',

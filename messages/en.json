@@ -126,7 +126,7 @@
     "packages": "Packages",
     "staff": "Staff",
     "gallery": "Gallery",
-    "campaigns": "Campaigns",
+    "promotions": "Promotions",
     "social": "Social",
     "loyalty": "Loyalty",
     "inbox": "Inbox",
@@ -200,7 +200,7 @@
     "noClientsYet": "No clients yet. Add your first client!",
     "visits": "visits",
     "atRiskClients": "⚠️ At-Risk Clients",
-    "sendCampaign": "Send Campaign",
+    "sendCampaign": "Send Promotion",
     "noAtRisk": "No at-risk clients — great retention!",
     "lastVisit": "Last visit",
     "never": "Never",
@@ -314,14 +314,14 @@
     "deleteConfirm": "Delete this photo?"
   },
   "campaignsPage": {
-    "title": "Campaigns",
-    "newCampaign": "+ New Campaign",
+    "title": "Promotions",
+    "newCampaign": "+ New Promotion",
     "fillMyOpenings": "Fill My Openings",
     "scheduled": "Scheduled",
     "sent": "Sent",
     "draft": "Draft",
-    "noCampaigns": "No campaigns yet",
-    "createFirst": "Create your first marketing campaign",
+    "noCampaigns": "No promotions yet",
+    "createFirst": "Create your first marketing promotion",
     "subject": "Subject",
     "recipients": "Recipients",
     "status": "Status",
@@ -330,8 +330,8 @@
     "send": "Send",
     "save": "Save Draft",
     "cancel": "Cancel",
-    "deleteCampaign": "Delete Campaign",
-    "deleteConfirm": "Delete this campaign?"
+    "deleteCampaign": "Delete Promotion",
+    "deleteConfirm": "Delete this promotion?"
   },
   "socialPage": {
     "title": "Social",

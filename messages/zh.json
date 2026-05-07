@@ -126,7 +126,7 @@
     "packages": "套餐",
     "staff": "员工",
     "gallery": "相册",
-    "campaigns": "营销",
+    "promotions": "促销",
     "social": "社交",
     "loyalty": "会员",
     "inbox": "收件箱",
@@ -197,7 +197,7 @@
     "noClientsYet": "还没有客户，添加第一个客户！",
     "visits": "次到访",
     "atRiskClients": "⚠️ 流失风险客户",
-    "sendCampaign": "发送营销",
+    "sendCampaign": "发送促销",
     "noAtRisk": "没有流失风险客户 — 留存很好！",
     "lastVisit": "最近到访",
     "never": "从未",
@@ -246,12 +246,12 @@
     "caption": "说明", "save": "保存", "cancel": "取消", "delete": "删除", "deleteConfirm": "删除此照片？"
   },
   "campaignsPage": {
-    "title": "营销", "newCampaign": "+ 新营销活动", "fillMyOpenings": "填满空档",
+    "title": "促销", "newCampaign": "+ 新促销活动", "fillMyOpenings": "填满空档",
     "scheduled": "已安排", "sent": "已发送", "draft": "草稿",
-    "noCampaigns": "还没有营销活动", "createFirst": "创建第一个营销活动",
+    "noCampaigns": "还没有促销活动", "createFirst": "创建第一个促销活动",
     "subject": "主题", "recipients": "收件人", "status": "状态", "sentDate": "发送日期", "openRate": "打开率",
     "send": "发送", "save": "保存草稿", "cancel": "取消",
-    "deleteCampaign": "删除活动", "deleteConfirm": "删除此营销活动？"
+    "deleteCampaign": "删除促销", "deleteConfirm": "删除此促销活动？"
   },
   "socialPage": {
     "title": "社交", "newPost": "+ 新帖子", "calendar": "日历", "posts": "帖子", "analytics": "分析",
