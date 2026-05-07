@@ -17,7 +17,7 @@ interface OpenSlot {
   durationMin: number;
 }
 
-type FillAudience = "all" | "active" | "at_risk" | "vip";
+type FillAudience = "all" | "active" | "at_risk" | "vip" | "selected";
 
 const FILL_DEFAULT_MSG = `Hey {name}! ⚡ We just had an opening — {slots}. {discount}Book now before it's gone → `;
 
@@ -112,6 +112,8 @@ export default function BookingPage() {
   const [fillMessage, setFillMessage] = useState(FILL_DEFAULT_MSG);
   const [fillDiscount, setFillDiscount] = useState("");
   const [fillAudience, setFillAudience] = useState<FillAudience>("all");
+  const [selectedClientIds, setSelectedClientIds] = useState<Set<string>>(new Set());
+  const [clientSearch, setClientSearch] = useState("");
   const [fillSending, setFillSending] = useState(false);
   const [fillSent, setFillSent] = useState(false);
   const [allStaff, setAllStaff] = useState<Staff[]>([]);
@@ -177,7 +179,16 @@ export default function BookingPage() {
       case "active": return allClients.filter(c => c.status === "active").length;
       case "at_risk": return allClients.filter(c => c.status === "at_risk").length;
       case "vip": return allClients.filter(c => c.visit_count >= 10 || c.lifetime_spend >= 500).length;
+      case "selected": return selectedClientIds.size;
     }
+  }
+
+  function toggleClient(id: string) {
+    setSelectedClientIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
   }
 
   function getSelectedSlotsText(): string {
@@ -424,7 +435,7 @@ export default function BookingPage() {
         ) : fillStep === 3 ? (
           <>
             <div>
-              <h3 style={{ fontWeight: 700, marginBottom: 4 }}>Choose Your Audience</h3>
+              <h3 style={{ fontWeight: 700, marginBottom: 4 }}>Choose Your Clients</h3>
               <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>Who should receive this blast?</p>
             </div>
             <div className={styles.audienceGrid}>
@@ -433,6 +444,7 @@ export default function BookingPage() {
                 { key: "active" as FillAudience, icon: "✅", title: "Active Clients", desc: "Clients who visited recently" },
                 { key: "at_risk" as FillAudience, icon: "⚠️", title: "At-Risk Clients", desc: "Win them back with a deal" },
                 { key: "vip" as FillAudience, icon: "👑", title: "VIP Clients", desc: "Top spenders & loyal regulars" },
+                { key: "selected" as FillAudience, icon: "✋", title: "Select Clients", desc: "Pick specific people" },
               ]).map(opt => (
                 <div key={opt.key} className={`card ${styles.audienceCard} ${fillAudience === opt.key ? styles.audienceCardSelected : ""}`} onClick={() => setFillAudience(opt.key)}>
                   <div className={styles.audienceIcon}>{opt.icon}</div>
@@ -442,9 +454,48 @@ export default function BookingPage() {
                 </div>
               ))}
             </div>
+
+            {/* Individual client picker */}
+            {fillAudience === "selected" && (
+              <div className={`card ${styles.clientPicker}`}>
+                <div className={styles.clientPickerHeader}>
+                  <input
+                    className="input"
+                    placeholder="Search clients..."
+                    value={clientSearch}
+                    onChange={(e) => setClientSearch(e.target.value)}
+                    style={{ maxWidth: 320 }}
+                  />
+                  <span className={styles.clientPickerCount}>{selectedClientIds.size} selected</span>
+                </div>
+                <div className={styles.clientPickerList}>
+                  {allClients
+                    .filter(c => {
+                      if (!clientSearch) return true;
+                      const q = clientSearch.toLowerCase();
+                      const fullName = `${c.first_name} ${c.last_name || ""}`.toLowerCase();
+                      return fullName.includes(q) || (c.phone || "").includes(q);
+                    })
+                    .map(c => {
+                      const fullName = `${c.first_name} ${c.last_name || ""}`.trim();
+                      return (
+                      <label key={c.id} className={`${styles.clientPickerRow} ${selectedClientIds.has(c.id) ? styles.clientPickerRowSelected : ""}`}>
+                        <input type="checkbox" checked={selectedClientIds.has(c.id)} onChange={() => toggleClient(c.id)} />
+                        <div className={styles.clientPickerAvatar}>{c.first_name[0]}</div>
+                        <div className={styles.clientPickerInfo}>
+                          <span className={styles.clientPickerName}>{fullName || "Unknown"}</span>
+                          <span className={styles.clientPickerPhone}>{c.phone || "No phone"}</span>
+                        </div>
+                      </label>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
+
             <div className={styles.fillNav}>
               <button className="btn btn-secondary" onClick={() => setFillStep(2)}>← Back</button>
-              <button className="btn btn-primary" onClick={() => setFillStep(4)}>Next: Preview & Send →</button>
+              <button className="btn btn-primary" disabled={fillAudience === "selected" && selectedClientIds.size === 0} onClick={() => setFillStep(4)}>Next: Preview & Send →</button>
             </div>
           </>
         ) : (
