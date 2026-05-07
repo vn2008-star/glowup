@@ -274,7 +274,7 @@ export default function BookingPage() {
       <div className={styles.fillContainer}>
         {/* Step indicator */}
         <div className={styles.fillSteps}>
-          {["Select Openings", "Compose Message", "Choose Audience", "Preview & Send"].map((label, i) => {
+          {["Select Openings", "Compose Message", "Choose Client", "Preview & Send"].map((label, i) => {
             const step = i + 1;
             const cls = fillStep === step ? styles.fillStepActive : fillStep > step ? styles.fillStepDone : "";
             return (
@@ -418,7 +418,7 @@ export default function BookingPage() {
             </div>
             <div className={styles.fillNav}>
               <button className="btn btn-secondary" onClick={() => setFillStep(1)}>← Back</button>
-              <button className="btn btn-primary" onClick={() => setFillStep(3)}>Next: Choose Audience →</button>
+              <button className="btn btn-primary" onClick={() => setFillStep(3)}>Next: Choose Client →</button>
             </div>
           </div>
         ) : fillStep === 3 ? (
