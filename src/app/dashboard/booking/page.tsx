@@ -606,6 +606,85 @@ export default function BookingPage() {
             </div>
             );
           })}
+
+          {/* Fill My Openings Automation */}
+          {(() => {
+            const fmoChannel = (automationStates["auto_fill_openings_channel"] as unknown as string) || "both";
+            const fmoAudience = (automationStates["auto_fill_openings_audience"] as unknown as string) || "all";
+            return (
+              <div className={`card ${styles.automationCard} ${styles.automationCardExpanded}`}>
+                <div className={styles.automationCardRow}>
+                  <div className={styles.automationInfo}>
+                    <h3>⚡ Fill My Openings</h3>
+                    <div className={styles.automationMeta}>
+                      <span className={styles.trigger}>Auto-blast when openings appear</span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className={styles.toggleLabel}>
+                      <input type="checkbox" checked={!!automationStates["auto_fill_openings"]} onChange={() => handleToggleAutomation("auto_fill_openings")} />
+                      <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
+                    </label>
+                  </div>
+                </div>
+
+                {!!automationStates["auto_fill_openings"] && (
+                  <div className={styles.fmoSettings}>
+                    {/* Channel */}
+                    <div className={styles.channelPickerSmall}>
+                      <span className={styles.channelPickerLabel}>Send via:</span>
+                      {([["sms", "📱 SMS", "Send via text message"], ["email", "📧 Email", "Send via email"], ["both", "📱+📧 Both", "Send via SMS and email"]] as const).map(([ch, label, tip]) => (
+                        <button
+                          key={ch}
+                          type="button"
+                          title={tip}
+                          className={`${styles.channelBtnSm} ${fmoChannel === ch ? styles.channelBtnSmActive : ""}`}
+                          onClick={async () => {
+                            setAutomationStates(prev => ({ ...prev, auto_fill_openings_channel: ch }));
+                            await fetch("/api/save-settings", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ tenantId: tenant?.id, path: "automations.auto_fill_openings_channel", value: ch }),
+                            });
+                          }}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Audience */}
+                    <div className={styles.channelPickerSmall}>
+                      <span className={styles.channelPickerLabel}>Send to:</span>
+                      {([
+                        ["all", "📣 All Clients", "Notify everyone"],
+                        ["active", "✅ Active", "Recently visited clients"],
+                        ["at_risk", "⚠️ At-Risk", "Win them back"],
+                        ["vip", "👑 VIP", "Top spenders & regulars"],
+                      ] as const).map(([aud, label, tip]) => (
+                        <button
+                          key={aud}
+                          type="button"
+                          title={tip}
+                          className={`${styles.channelBtnSm} ${fmoAudience === aud ? styles.channelBtnSmActive : ""}`}
+                          onClick={async () => {
+                            setAutomationStates(prev => ({ ...prev, auto_fill_openings_audience: aud }));
+                            await fetch("/api/save-settings", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ tenantId: tenant?.id, path: "automations.auto_fill_openings_audience", value: aud }),
+                            });
+                          }}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       </div>
     </div>
