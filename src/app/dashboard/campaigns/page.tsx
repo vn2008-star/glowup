@@ -498,7 +498,7 @@ export default function CampaignsPage() {
           </p>
           <div className={styles.holidayGrid}>
             {getUpcomingHolidays().map((h) => {
-              const existingCampaign = campaigns.find(c => c.type === 'holiday' && c.name.includes(h.name));
+              const existingCampaign = campaigns.find(c => c.name.includes(h.name));
               const isEditing = editingHolidayName === h.name;
               const tmpl = existingCampaign?.template as Record<string, string> | undefined;
               const currentMessage = tmpl?.message || h.template;
