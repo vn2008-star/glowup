@@ -55,10 +55,42 @@ export async function GET() {
     clientMap[c.tenant_id] = (clientMap[c.tenant_id] || 0) + 1
   })
 
+  // Get current month usage data
+  const monthStart = new Date()
+  monthStart.setDate(1)
+  monthStart.setHours(0, 0, 0, 0)
+
+  // Appointments this month (each generates ~1 SMS reminder)
+  const { data: monthlyApts } = await svc
+    .from('appointments')
+    .select('tenant_id')
+    .gte('start_time', monthStart.toISOString())
+
+  const aptMap: Record<string, number> = {}
+  monthlyApts?.forEach(a => {
+    aptMap[a.tenant_id] = (aptMap[a.tenant_id] || 0) + 1
+  })
+
+  // Campaigns this month (track actual sent counts)
+  const { data: monthlyCampaigns } = await svc
+    .from('campaigns')
+    .select('tenant_id, metrics, type')
+    .gte('created_at', monthStart.toISOString())
+
+  const campaignSendMap: Record<string, number> = {}
+  monthlyCampaigns?.forEach(c => {
+    const sent = (c.metrics as Record<string, number>)?.sent || 0
+    campaignSendMap[c.tenant_id] = (campaignSendMap[c.tenant_id] || 0) + sent
+  })
+
   const enriched = (tenants || []).map(t => ({
     ...t,
     staff_count: staffMap[t.id] || 0,
     client_count: clientMap[t.id] || 0,
+    usage: {
+      appointments_this_month: aptMap[t.id] || 0,
+      campaign_sends_this_month: campaignSendMap[t.id] || 0,
+    },
   }))
 
   return NextResponse.json({

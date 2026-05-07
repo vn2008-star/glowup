@@ -22,6 +22,10 @@ interface TenantRow {
   created_at: string;
   staff_count: number;
   client_count: number;
+  usage: {
+    appointments_this_month: number;
+    campaign_sends_this_month: number;
+  };
 }
 
 interface Stats {
@@ -275,29 +279,34 @@ export default function AdminPage() {
     return "active";
   }
 
-  /* ── Cost Estimator ──
-   * SMS (Twilio):  ~$0.0079/segment
-   * Email (Resend): ~$0.001/email (free tier covers first 100/day)
-   * Estimates are per-month, assuming:
-   *   - Reminders:     clients × 2 msgs/mo (confirmation + reminder)
-   *   - Automations:   clients × 1.5 msgs/mo (birthday, rebooking, review, FMO)
-   *   - Campaigns:     clients × 0.5 msgs/mo (blast marketing)
-   *   - Infra base:    ~$0.50/mo per tenant (DB row storage, edge invocations)
+  /* ── Usage-Based Cost Calculator ──
+   * SMS (Twilio):  $0.0079/segment
+   * Email (Resend): $0.001/email after free tier
+   * Uses ACTUAL data from this month:
+   *   - Appointments → each generates 1 SMS reminder
+   *   - Campaign sends → actual blast/automation sends logged
    */
-  function estimateMonthlyCost(t: TenantRow): { sms: number; email: number; infra: number; total: number } {
-    const clients = t.client_count || 0;
+  function calcMonthlyCost(t: TenantRow): { sms: number; email: number; total: number; smsCount: number; emailCount: number } {
     const SMS_RATE = 0.0079;
     const EMAIL_RATE = 0.001;
-    const INFRA_BASE = 0.50;
 
-    const smsPerMonth = clients * 2.0;    // reminders + automations via SMS
-    const emailPerMonth = clients * 2.0;  // automations + campaigns via email
+    const u = t.usage || { appointments_this_month: 0, campaign_sends_this_month: 0 };
 
-    const sms = smsPerMonth * SMS_RATE;
-    const email = emailPerMonth * EMAIL_RATE;
-    const infra = INFRA_BASE + (clients * 0.001); // slight per-client storage cost
+    // SMS: 1 reminder per appointment + ~half of campaign sends go via SMS
+    const smsCount = u.appointments_this_month + Math.ceil(u.campaign_sends_this_month * 0.5);
+    // Email: ~half of campaign sends go via email
+    const emailCount = Math.ceil(u.campaign_sends_this_month * 0.5);
 
-    return { sms: Math.round(sms * 100) / 100, email: Math.round(email * 100) / 100, infra: Math.round(infra * 100) / 100, total: Math.round((sms + email + infra) * 100) / 100 };
+    const sms = smsCount * SMS_RATE;
+    const email = emailCount * EMAIL_RATE;
+
+    return {
+      sms: Math.round(sms * 100) / 100,
+      email: Math.round(email * 100) / 100,
+      total: Math.round((sms + email) * 100) / 100,
+      smsCount,
+      emailCount,
+    };
   }
 
   const filtered = tenants.filter((t) => {
@@ -974,7 +983,7 @@ export default function AdminPage() {
                 <th>Status</th>
                 <th>Staff</th>
                 <th>Clients</th>
-                <th>Est. Cost</th>
+                <th>Cost (MTD)</th>
                 <th>Created</th>
                 <th>Actions</th>
               </tr>
@@ -1014,9 +1023,10 @@ export default function AdminPage() {
                       <td>{t.client_count}</td>
                       <td>
                         {(() => {
-                          const cost = estimateMonthlyCost(t);
+                          const cost = calcMonthlyCost(t);
+                          const u = t.usage || { appointments_this_month: 0, campaign_sends_this_month: 0 };
                           return (
-                            <div title={`SMS: $${cost.sms.toFixed(2)}  ·  Email: $${cost.email.toFixed(2)}  ·  Infra: $${cost.infra.toFixed(2)}`} style={{ cursor: 'help' }}>
+                            <div title={`📱 SMS: ${cost.smsCount} msgs = $${cost.sms.toFixed(2)}\n📧 Email: ${cost.emailCount} msgs = $${cost.email.toFixed(2)}\n\n📅 ${u.appointments_this_month} appointments\n📣 ${u.campaign_sends_this_month} campaign sends`} style={{ cursor: 'help' }}>
                               <span style={{
                                 fontWeight: 700,
                                 fontSize: 'var(--text-sm)',
@@ -1024,7 +1034,9 @@ export default function AdminPage() {
                               }}>
                                 ${cost.total.toFixed(2)}
                               </span>
-                              <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', display: 'block' }}>/mo</span>
+                              <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', display: 'block' }}>
+                                {cost.smsCount + cost.emailCount} msgs
+                              </span>
                             </div>
                           );
                         })()}
