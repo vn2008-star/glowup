@@ -1521,7 +1521,7 @@ export default function CheckoutPage() {
                                   className={styles.gcInput}
                                   value={gcCode}
                                   onChange={(e) => setGcCode(e.target.value.toUpperCase())}
-                                  placeholder="e.g. ABCD1234EFGH"
+                                  placeholder="Enter code from gift card"
                                   maxLength={20}
                                   onKeyDown={(e) => { if (e.key === 'Enter') handleGcLookup(); }}
                                 />
