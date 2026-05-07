@@ -82,7 +82,7 @@ export default function AdminPage() {
   const [rewardToast, setRewardToast] = useState('');
 
   // Outreach state
-  const [outreachTab, setOutreachTab] = useState<'upload' | 'history' | 'followups'>('upload');
+  const [outreachTab, setOutreachTab] = useState<'upload' | 'sms' | 'history' | 'followups'>('upload');
   const [csvLeads, setCsvLeads] = useState<OutreachLead[]>([]);
   const [senderName, setSenderName] = useState('');
   const [senderEmail, setSenderEmail] = useState('');
@@ -99,6 +99,15 @@ export default function AdminPage() {
   const [queueStats, setQueueStats] = useState<{ queued: number; sent_today: number; daily_limit: number; remaining_today: number; estimated_days: number } | null>(null);
   const [dbLeadsLoading, setDbLeadsLoading] = useState(false);
   const [dbLeadsInfo, setDbLeadsInfo] = useState<{ total_in_db: number; already_contacted: number; ready_to_send: number } | null>(null);
+
+  // SMS outreach state
+  const [smsLeads, setSmsLeads] = useState<OutreachLead[]>([]);
+  const [smsLoading, setSmsLoading] = useState(false);
+  const [smsInfo, setSmsInfo] = useState<{ total_in_db: number; already_contacted: number; ready_to_send: number } | null>(null);
+  const [smsSending, setSmsSending] = useState(false);
+  const [smsResults, setSmsResults] = useState<{ summary: { total: number; sent: number; queued?: number; skipped: number; failed: number }; results: Array<{ salon_name: string; phone: string; status: string; code?: string; error?: string }> } | null>(null);
+  const [smsTemplate, setSmsTemplate] = useState('sms_intro');
+  const [smsError, setSmsError] = useState('');
 
   const templateOptions = [
     { id: 'feature_showcase', name: '🚀 Feature Showcase', desc: 'Highlights top features & stats — best for first cold outreach' },
@@ -420,7 +429,13 @@ export default function AdminPage() {
               className={`${styles.filterBtn} ${outreachTab === 'upload' ? styles.filterActive : ''}`}
               onClick={() => setOutreachTab('upload')}
             >
-              📨 Send
+              📨 Email
+            </button>
+            <button
+              className={`${styles.filterBtn} ${outreachTab === 'sms' ? styles.filterActive : ''}`}
+              onClick={() => setOutreachTab('sms')}
+            >
+              📱 SMS
             </button>
             <button
               className={`${styles.filterBtn} ${outreachTab === 'followups' ? styles.filterActive : ''}`}
@@ -758,6 +773,204 @@ export default function AdminPage() {
                   onClick={() => { setSendResults(null); setCsvLeads([]); }}
                 >
                   Upload Another Batch
+                </button>
+              </div>
+            )}
+          </div>
+        ) : outreachTab === 'sms' ? (
+          /* SMS Outreach Tab */
+          <div>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: 'var(--space-4)', lineHeight: 1.6 }}>
+              Send SMS outreach to salons with phone numbers. Each text includes a <strong>unique signup link</strong> for conversion tracking.
+            </p>
+
+            {/* SMS Template Picker */}
+            <div style={{ marginBottom: 'var(--space-4)' }}>
+              <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px', display: 'block' }}>SMS Template</label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-2)' }}>
+                {[
+                  { id: 'sms_intro', name: '👋 Introduction', desc: 'Quick intro — best for first contact' },
+                  { id: 'sms_offer', name: '🔥 Free Trial', desc: 'Highlights the 60-day free trial' },
+                  { id: 'sms_followup', name: '💬 Follow-Up', desc: 'Gentle nudge for non-responders' },
+                ].map(t => (
+                  <div
+                    key={t.id}
+                    onClick={() => setSmsTemplate(t.id)}
+                    style={{
+                      padding: 'var(--space-3)',
+                      borderRadius: 'var(--radius-md)',
+                      border: smsTemplate === t.id ? '2px solid var(--color-primary)' : '1px solid var(--border-default)',
+                      background: smsTemplate === t.id ? 'rgba(195, 126, 218, 0.08)' : 'transparent',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    <div style={{ fontSize: '13px', fontWeight: 700 }}>{t.name}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '4px' }}>{t.desc}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Load SMS Leads from DB */}
+            <div
+              style={{
+                border: '2px dashed #22c55e',
+                borderRadius: 'var(--radius-lg)',
+                padding: 'var(--space-6)',
+                textAlign: 'center',
+                cursor: smsLoading ? 'wait' : 'pointer',
+                transition: 'all 0.2s',
+                background: 'rgba(34, 197, 94, 0.05)',
+                marginBottom: 'var(--space-4)',
+                opacity: smsLoading ? 0.7 : 1,
+              }}
+              onClick={async () => {
+                if (smsLoading) return;
+                setSmsLoading(true);
+                setSmsError('');
+                setSmsResults(null);
+                try {
+                  const res = await fetch('/api/admin/outreach?action=load-sms-leads');
+                  if (!res.ok) throw new Error('Failed to load leads');
+                  const d = await res.json();
+                  setSmsInfo({ total_in_db: d.total_in_db, already_contacted: d.already_contacted, ready_to_send: d.ready_to_send });
+                  if (d.leads.length === 0) {
+                    setSmsError(`No new SMS leads. ${d.total_in_db} in DB, ${d.already_contacted} already contacted.`);
+                  } else {
+                    setSmsLeads(d.leads);
+                  }
+                } catch (err) {
+                  setSmsError('Failed to load SMS leads: ' + (err instanceof Error ? err.message : ''));
+                }
+                setSmsLoading(false);
+              }}
+            >
+              <div style={{ fontSize: '32px', marginBottom: '8px' }}>{smsLoading ? '⏳' : '📱'}</div>
+              <p style={{ fontSize: '14px', fontWeight: 700, color: '#22c55e', margin: '0 0 4px' }}>
+                {smsLoading ? 'Loading phone leads...' : 'Load Phone Leads from Database'}
+              </p>
+              <p style={{ fontSize: '12px', color: 'var(--text-tertiary)', margin: 0 }}>
+                Pull leads with phone numbers from InfoIQ
+              </p>
+              {smsInfo && (
+                <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                  📊 {smsInfo.total_in_db} total · ✅ {smsInfo.ready_to_send} ready · 🔒 {smsInfo.already_contacted} contacted
+                </div>
+              )}
+            </div>
+
+            {smsError && (
+              <div style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', fontSize: '13px', marginBottom: 'var(--space-4)' }}>
+                {smsError}
+              </div>
+            )}
+
+            {/* SMS Preview Table */}
+            {smsLeads.length > 0 && !smsResults && (
+              <div style={{ marginBottom: 'var(--space-4)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
+                  <span style={{ fontSize: '13px', fontWeight: 600 }}>Preview ({smsLeads.length} leads with phone)</span>
+                  <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                    <button
+                      className={styles.deleteBtn}
+                      onClick={() => { setSmsLeads([]); setSmsError(''); }}
+                    >
+                      Clear
+                    </button>
+                    <button
+                      className={styles.enableBtn}
+                      style={{ padding: '6px 20px', fontSize: '13px', background: 'linear-gradient(135deg, #22c55e, #16a34a)' }}
+                      disabled={smsSending}
+                      onClick={async () => {
+                        if (!confirm(`Send SMS to ${Math.min(smsLeads.length, 200)} salons? Twilio charges ~$0.0079/msg.`)) return;
+                        setSmsSending(true);
+                        setSmsResults(null);
+                        try {
+                          const res = await fetch('/api/admin/outreach', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ action: 'send-sms', leads: smsLeads, smsTemplateId: smsTemplate }),
+                          });
+                          const d = await res.json();
+                          if (res.ok) {
+                            setSmsResults(d);
+                          } else {
+                            setSmsError(d.error || 'SMS send failed');
+                          }
+                        } catch (err) {
+                          setSmsError('SMS send error: ' + (err instanceof Error ? err.message : ''));
+                        }
+                        setSmsSending(false);
+                      }}
+                    >
+                      {smsSending ? 'Sending...' : smsLeads.length > 200 ? `📱 Send 200 Now + Queue ${smsLeads.length - 200}` : `📱 Send ${smsLeads.length} SMS`}
+                    </button>
+                  </div>
+                </div>
+                <div className={styles.tableWrap} style={{ maxHeight: '300px', overflow: 'auto' }}>
+                  <table className={styles.table}>
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>Salon</th>
+                        <th>Phone</th>
+                        <th>City</th>
+                        <th>State</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {smsLeads.slice(0, 100).map((l, i) => (
+                        <tr key={i}>
+                          <td>{i + 1}</td>
+                          <td>{l.salon_name}</td>
+                          <td>{l.phone || '—'}</td>
+                          <td>{l.city || '—'}</td>
+                          <td>{l.state || '—'}</td>
+                        </tr>
+                      ))}
+                      {smsLeads.length > 100 && (
+                        <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-tertiary)', fontStyle: 'italic' }}>...and {smsLeads.length - 100} more</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* SMS Send Results */}
+            {smsResults && (
+              <div>
+                <div style={{ display: 'flex', gap: 'var(--space-4)', marginBottom: 'var(--space-4)', flexWrap: 'wrap' }}>
+                  <div className={styles.statCard} style={{ flex: '1 1 80px', padding: 'var(--space-3)' }}>
+                    <span style={{ fontSize: '20px', fontWeight: 800 }}>{smsResults.summary.total}</span>
+                    <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>Total</span>
+                  </div>
+                  <div className={styles.statCard} style={{ flex: '1 1 80px', padding: 'var(--space-3)' }}>
+                    <span style={{ fontSize: '20px', fontWeight: 800, color: '#22c55e' }}>{smsResults.summary.sent}</span>
+                    <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>Sent 📱</span>
+                  </div>
+                  {(smsResults.summary.queued || 0) > 0 && (
+                    <div className={styles.statCard} style={{ flex: '1 1 80px', padding: 'var(--space-3)' }}>
+                      <span style={{ fontSize: '20px', fontWeight: 800, color: '#818cf8' }}>{smsResults.summary.queued}</span>
+                      <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>Queued ⏳</span>
+                    </div>
+                  )}
+                  <div className={styles.statCard} style={{ flex: '1 1 80px', padding: 'var(--space-3)' }}>
+                    <span style={{ fontSize: '20px', fontWeight: 800, color: '#f59e0b' }}>{smsResults.summary.skipped}</span>
+                    <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>Skipped ⏭️</span>
+                  </div>
+                  <div className={styles.statCard} style={{ flex: '1 1 80px', padding: 'var(--space-3)' }}>
+                    <span style={{ fontSize: '20px', fontWeight: 800, color: '#ef4444' }}>{smsResults.summary.failed}</span>
+                    <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>Failed ❌</span>
+                  </div>
+                </div>
+                <button
+                  className={styles.enableBtn}
+                  style={{ marginTop: 'var(--space-3)' }}
+                  onClick={() => { setSmsResults(null); setSmsLeads([]); }}
+                >
+                  Send Another Batch
                 </button>
               </div>
             )}

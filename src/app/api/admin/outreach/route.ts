@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
-import { renderTemplate, TEMPLATES, TemplateId } from '@/lib/outreach-templates'
+import { renderTemplate, TEMPLATES, TemplateId, renderSmsTemplate, SMS_TEMPLATES, SmsTemplateId } from '@/lib/outreach-templates'
 
 const DAILY_LIMIT = 95 // Leave 5 buffer for follow-ups within Resend's 100/day free tier
+const SMS_BATCH_LIMIT = 200 // SMS batch limit per run
 
 // Verify the current user is a platform admin
 async function verifyAdmin() {
@@ -94,6 +95,58 @@ export async function GET(request: Request) {
     })
   }
 
+  // Load phone-ready leads from the InfoIQ `leads` table (for SMS outreach)
+  if (action === 'load-sms-leads') {
+    // Get all leads with phone numbers
+    const { data: rawLeads, error: leadsErr } = await svc
+      .from('leads')
+      .select('business_name, email, phone, city, state, rating, review_count')
+      .not('phone', 'is', null)
+      .order('created_at', { ascending: false })
+
+    if (leadsErr) return NextResponse.json({ error: leadsErr.message }, { status: 500 })
+
+    // Get already-contacted phones to exclude duplicates
+    const { data: contacted } = await svc
+      .from('outreach_campaigns')
+      .select('phone')
+      .eq('channel', 'sms')
+      .in('status', ['sent', 'queued', 'skipped_active'])
+
+    const contactedPhones = new Set((contacted || []).map(c => c.phone?.replace(/\D/g, '')))
+
+    // Map leads to outreach format, filtering out already-contacted
+    const leads = (rawLeads || [])
+      .filter(l => {
+        if (!l.phone) return false
+        const normalized = l.phone.replace(/\D/g, '')
+        if (normalized.length < 10) return false
+        return !contactedPhones.has(normalized)
+      })
+      .map(l => ({
+        salon_name: l.business_name || 'Unknown Salon',
+        owner_name: l.business_name || 'Salon Owner',
+        owner_email: l.email || '',
+        phone: l.phone,
+        city: l.city || undefined,
+        state: l.state || undefined,
+        rating: l.rating,
+        review_count: l.review_count,
+      }))
+
+    return NextResponse.json({
+      leads,
+      total_in_db: rawLeads?.length || 0,
+      already_contacted: contactedPhones.size,
+      ready_to_send: leads.length,
+    })
+  }
+
+  // Return SMS template list
+  if (action === 'sms-templates') {
+    return NextResponse.json({ templates: Object.values(SMS_TEMPLATES) })
+  }
+
   // Return queue stats
   if (action === 'queue-stats') {
     const { count: queuedCount } = await svc
@@ -160,7 +213,12 @@ export async function POST(request: Request) {
     return handleFollowUps(body)
   }
 
-  // Regular bulk send
+  // Handle bulk SMS send
+  if (action === 'send-sms') {
+    return handleBulkSms(body)
+  }
+
+  // Regular bulk email send
   return handleBulkSend(body)
 }
 
@@ -448,6 +506,164 @@ async function handleFollowUps(body: { senderName?: string; campaignIds?: string
       skipped: 0,
       failed: results.filter(r => r.status === 'failed').length,
     },
+    results,
+  })
+}
+
+async function handleBulkSms(body: {
+  leads: Array<{ salon_name: string; phone: string; city?: string; state?: string }>;
+  smsTemplateId?: SmsTemplateId;
+  batchSize?: number;
+}) {
+  const { leads, smsTemplateId = 'sms_intro', batchSize } = body
+
+  if (!leads || !Array.isArray(leads) || leads.length === 0) {
+    return NextResponse.json({ error: 'No leads provided' }, { status: 400 })
+  }
+
+  const twilioSid = process.env.TWILIO_ACCOUNT_SID
+  const twilioAuth = process.env.TWILIO_AUTH_TOKEN
+  const twilioFrom = process.env.TWILIO_PHONE_NUMBER
+
+  if (!twilioSid || !twilioAuth || !twilioFrom) {
+    return NextResponse.json({ error: 'Twilio not configured. Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER.' }, { status: 500 })
+  }
+
+  const svc = getSvc()
+  const maxToSend = batchSize || SMS_BATCH_LIMIT
+
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  const genCode = () => 'CR-' + Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
+
+  const results: Array<{
+    salon_name: string; phone: string;
+    status: string; code?: string; error?: string;
+  }> = []
+
+  let sentCount = 0
+  const BATCH_SIZE = 10
+  const BATCH_DELAY = 1500 // Slightly slower for SMS
+
+  for (let i = 0; i < leads.length && sentCount < maxToSend; i += BATCH_SIZE) {
+    const batch = leads.slice(i, i + BATCH_SIZE)
+
+    for (const lead of batch) {
+      if (sentCount >= maxToSend) {
+        results.push({ salon_name: lead.salon_name, phone: lead.phone, status: 'queued' })
+        continue
+      }
+
+      const { salon_name, phone } = lead
+      if (!salon_name || !phone) {
+        results.push({ salon_name, phone, status: 'skipped', error: 'Missing required fields' })
+        continue
+      }
+
+      // Normalize phone number
+      let normalizedPhone = phone.replace(/\D/g, '')
+      if (normalizedPhone.length === 10) normalizedPhone = '1' + normalizedPhone
+      if (!normalizedPhone.startsWith('+')) normalizedPhone = '+' + normalizedPhone
+
+      // Check if already contacted via SMS
+      const { data: existing } = await svc
+        .from('outreach_campaigns')
+        .select('id')
+        .eq('channel', 'sms')
+        .eq('phone', normalizedPhone)
+        .in('status', ['sent', 'queued'])
+        .single()
+
+      if (existing) {
+        results.push({ salon_name, phone, status: 'skipped_duplicate' })
+        continue
+      }
+
+      // Generate referral code
+      const code = genCode()
+      const signupLink = `${process.env.NEXT_PUBLIC_APP_URL || 'https://glowup-jade.vercel.app'}/auth/signup?cref=${code}`
+      const smsBody = renderSmsTemplate(smsTemplateId, salon_name.trim(), signupLink)
+
+      // Save referral code
+      await svc.from('client_referral_codes').insert({
+        code,
+        referrer_name: 'GlowUp SMS',
+        referrer_email: 'sms-outreach@glowup.com',
+        referred_salon_name: salon_name.trim(),
+        referred_owner_name: salon_name.trim(),
+        referred_owner_email: '',
+      })
+
+      // Send SMS via Twilio
+      let smsSent = false
+      try {
+        const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`
+        const twilioBody = new URLSearchParams({
+          To: normalizedPhone,
+          From: twilioFrom,
+          Body: smsBody,
+        })
+
+        const twilioRes = await fetch(twilioUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Basic ' + Buffer.from(`${twilioSid}:${twilioAuth}`).toString('base64'),
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: twilioBody.toString(),
+        })
+
+        if (twilioRes.ok) {
+          smsSent = true
+          sentCount++
+        } else {
+          const errData = await twilioRes.json()
+          console.error(`SMS to ${normalizedPhone} failed:`, errData.message || errData)
+          results.push({ salon_name, phone, status: 'failed', error: errData.message || 'Twilio error' })
+
+          // Still record in DB
+          await svc.from('outreach_campaigns').insert({
+            salon_name: salon_name.trim(), owner_name: salon_name.trim(), owner_email: '',
+            phone: normalizedPhone, city: lead.city?.trim() || null, state: lead.state?.trim() || null,
+            referral_code: code, template_id: smsTemplateId, channel: 'sms',
+            status: 'failed', follow_up_count: 0,
+          })
+          continue
+        }
+      } catch (err) {
+        console.error(`SMS to ${normalizedPhone} error:`, err)
+        results.push({ salon_name, phone, status: 'failed', error: 'Network error' })
+        continue
+      }
+
+      // Record success in outreach_campaigns
+      await svc.from('outreach_campaigns').insert({
+        salon_name: salon_name.trim(), owner_name: salon_name.trim(), owner_email: '',
+        phone: normalizedPhone, city: lead.city?.trim() || null, state: lead.state?.trim() || null,
+        referral_code: code, template_id: smsTemplateId, channel: 'sms',
+        status: 'sent', sent_at: new Date().toISOString(), follow_up_count: 0,
+      })
+
+      results.push({ salon_name, phone, status: 'sent', code })
+    }
+
+    if (i + BATCH_SIZE < leads.length && sentCount < maxToSend) {
+      await new Promise(resolve => setTimeout(resolve, BATCH_DELAY))
+    }
+  }
+
+  // Add remaining as queued
+  const remaining = leads.slice(results.length)
+  for (const lead of remaining) {
+    results.push({ salon_name: lead.salon_name, phone: lead.phone, status: 'queued' })
+  }
+
+  const sent = results.filter(r => r.status === 'sent').length
+  const queued = results.filter(r => r.status === 'queued').length
+  const skipped = results.filter(r => r.status.startsWith('skipped')).length
+  const failed = results.filter(r => r.status === 'failed').length
+
+  return NextResponse.json({
+    summary: { total: results.length, sent, queued, skipped, failed },
     results,
   })
 }

@@ -217,3 +217,51 @@ export function renderTemplate(
       return renderTemplate('feature_showcase', salonName, ownerName, signupLink, senderName);
   }
 }
+
+// ─── SMS Outreach Templates ───
+export type SmsTemplateId = 'sms_intro' | 'sms_offer' | 'sms_followup';
+
+export const SMS_TEMPLATES: Record<SmsTemplateId, {
+  id: SmsTemplateId;
+  name: string;
+  description: string;
+  icon: string;
+}> = {
+  sms_intro: {
+    id: 'sms_intro',
+    name: 'Introduction',
+    description: 'Quick intro to GlowUp — best for first contact',
+    icon: '👋',
+  },
+  sms_offer: {
+    id: 'sms_offer',
+    name: 'Free Trial Offer',
+    description: 'Highlight the free trial — drives signups',
+    icon: '🔥',
+  },
+  sms_followup: {
+    id: 'sms_followup',
+    name: 'Follow-Up',
+    description: 'Gentle nudge for non-responders',
+    icon: '💬',
+  },
+};
+
+export function renderSmsTemplate(
+  templateId: SmsTemplateId,
+  salonName: string,
+  signupLink: string,
+): string {
+  const salon = salonName.trim();
+
+  switch (templateId) {
+    case 'sms_intro':
+      return `Hi! Is ${salon} looking to automate bookings, cut no-shows by 60%, & grow clients? GlowUp is free for salons — try it: ${signupLink}`;
+    case 'sms_offer':
+      return `🔥 ${salon} — Get 60 days FREE of GlowUp! Auto bookings, reminders, loyalty & more. No credit card needed. Sign up: ${signupLink}`;
+    case 'sms_followup':
+      return `Hi again from GlowUp! Just checking if ${salon} had a chance to check us out. Free salon management — takes 2 min to set up: ${signupLink} Reply STOP to opt out.`;
+    default:
+      return renderSmsTemplate('sms_intro', salonName, signupLink);
+  }
+}
