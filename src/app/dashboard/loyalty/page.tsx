@@ -29,8 +29,6 @@ const TIER_COLORS: Record<string, string> = {
 
 const LOYALTY_AUTOMATIONS = [
   { key: "auto_birthday", name: "🎂 Birthday Auto-Send", trigger: "7 days before birthday", channel: "SMS + Email" },
-  { key: "auto_rebooking", name: "🔄 Rebooking Reminder", trigger: "Based on service cycle", channel: "SMS" },
-  { key: "auto_noshow", name: "⚠️ No-Show Follow-Up", trigger: "1 hour after missed appt", channel: "SMS" },
   { key: "auto_loyalty", name: "🏆 Loyalty Milestone", trigger: "When reaching point threshold", channel: "SMS + Email" },
 ];
 

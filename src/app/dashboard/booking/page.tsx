@@ -97,8 +97,13 @@ function formatHour(h: number): string {
   return `${h12}:${String(min).padStart(2, "0")} ${ampm}`;
 }
 
+const BOOKING_AUTOMATIONS = [
+  { key: "auto_rebooking", name: "🔄 Rebooking Reminder", trigger: "Based on service cycle", channel: "SMS" },
+  { key: "auto_noshow", name: "⚠️ No-Show Follow-Up", trigger: "1 hour after missed appt", channel: "SMS" },
+];
+
 export default function BookingPage() {
-  const { tenant } = useTenant();
+  const { tenant, refetch } = useTenant();
 
   const [fillStep, setFillStep] = useState(1);
   const [fillDays, setFillDays] = useState(3);
@@ -114,6 +119,9 @@ export default function BookingPage() {
   const [allAppointments, setAllAppointments] = useState<Appointment[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
 
+  // Automation toggles
+  const [automationStates, setAutomationStates] = useState<Record<string, boolean>>({});
+
   const loadFillData = useCallback(async () => {
     if (!tenant) return;
     const [staffRes, aptRes, clientRes] = await Promise.all([
@@ -128,6 +136,15 @@ export default function BookingPage() {
     setAllAppointments(apts);
     setAllClients(clients);
     setAllSlots(detectOpenSlots(staff, apts, fillDays));
+
+    // Load automation states
+    const settings = (tenant?.settings || {}) as Record<string, unknown>;
+    const autoSettings = (settings.automations || {}) as Record<string, boolean>;
+    const states: Record<string, boolean> = {};
+    BOOKING_AUTOMATIONS.forEach((a) => {
+      states[a.key] = autoSettings[a.key] ?? true;
+    });
+    setAutomationStates(states);
   }, [tenant, fillDays]);
 
   useEffect(() => { loadFillData(); }, [loadFillData]);
@@ -228,6 +245,21 @@ export default function BookingPage() {
 
     setFillSending(false);
     setFillSent(true);
+  }
+
+  async function handleToggleAutomation(key: string) {
+    const newStates = { ...automationStates, [key]: !automationStates[key] };
+    setAutomationStates(newStates);
+    const settings = (tenant?.settings || {}) as Record<string, unknown>;
+    const existingAuto = (settings.automations || {}) as Record<string, boolean>;
+    const res = await fetch("/api/save-settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        settings: { ...settings, automations: { ...existingAuto, ...newStates } },
+      }),
+    });
+    if (res.ok) refetch();
   }
 
   return (
@@ -399,6 +431,31 @@ export default function BookingPage() {
             </div>
           </>
         )}
+      </div>
+
+      {/* ── Auto-Send Settings ── */}
+      <div className={styles.autoSendSection}>
+        <h2>🤖 Booking Auto-Send</h2>
+        <p>Automatically follow up to keep your schedule full</p>
+        <div className={styles.automationList}>
+          {BOOKING_AUTOMATIONS.map((a) => (
+            <div key={a.key} className={`card ${styles.automationCard}`}>
+              <div className={styles.automationInfo}>
+                <h3>{a.name}</h3>
+                <div className={styles.automationMeta}>
+                  <span className={styles.trigger}>⚡ {a.trigger}</span>
+                  <span className={styles.channel}>📱 {a.channel}</span>
+                </div>
+              </div>
+              <div>
+                <label className={styles.toggleLabel}>
+                  <input type="checkbox" checked={automationStates[a.key] || false} onChange={() => handleToggleAutomation(a.key)} />
+                  <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
+                </label>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

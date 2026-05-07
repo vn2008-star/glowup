@@ -393,10 +393,82 @@
   color: #fff;
 }
 
+/* ── Auto-Send Section ── */
+.autoSendSection {
+  margin-top: var(--space-8);
+}
+.autoSendSection h2 {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  margin-bottom: var(--space-4);
+}
+.autoSendSection > p {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin-bottom: var(--space-4);
+}
+.automationList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.automationCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-5);
+}
+.automationInfo h3 {
+  font-size: var(--text-base);
+  font-weight: 700;
+  margin-bottom: var(--space-2);
+}
+.automationMeta {
+  display: flex;
+  gap: var(--space-4);
+}
+.trigger, .channel {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+.toggleLabel {
+  display: flex;
+  cursor: pointer;
+}
+.toggleLabel input { display: none; }
+.toggleTrack {
+  width: 44px;
+  height: 24px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-full);
+  position: relative;
+  transition: all var(--transition-fast);
+}
+.toggleThumb {
+  width: 18px;
+  height: 18px;
+  background: var(--text-tertiary);
+  border-radius: var(--radius-full);
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  transition: all var(--transition-fast);
+}
+.toggleLabel input:checked ~ .toggleTrack {
+  background: var(--color-primary-200);
+  border-color: var(--color-primary);
+}
+.toggleLabel input:checked ~ .toggleTrack .toggleThumb {
+  transform: translateX(20px);
+  background: var(--color-primary);
+}
+
 /* ── Responsive ── */
 @media (max-width: 768px) {
   .slotGrid { grid-template-columns: 1fr; }
   .audienceGrid { grid-template-columns: 1fr; }
   .previewStats { grid-template-columns: 1fr; }
   .fillSteps { flex-wrap: wrap; }
+  .automationCard { flex-direction: column; align-items: flex-start; gap: var(--space-3); }
 }
