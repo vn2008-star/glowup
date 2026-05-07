@@ -156,6 +156,7 @@ export default function BookingPage() {
     states["auto_fill_openings_channel"] = autoSettings["auto_fill_openings_channel"] || "both";
     states["auto_fill_openings_audience"] = autoSettings["auto_fill_openings_audience"] || "all";
     states["auto_fill_openings_list"] = autoSettings["auto_fill_openings_list"] || "";
+    states["auto_fill_openings_days"] = autoSettings["auto_fill_openings_days"] || "3";
     setAutomationStates(states);
 
     // Load saved client lists
@@ -640,6 +641,19 @@ export default function BookingPage() {
           {(() => {
             const fmoChannel = (automationStates["auto_fill_openings_channel"] as unknown as string) || "both";
             const fmoAudience = (automationStates["auto_fill_openings_audience"] as unknown as string) || "all";
+            const fmoDays = parseInt((automationStates["auto_fill_openings_days"] as unknown as string) || "3", 10);
+
+            async function saveFmoSetting(key: string, value: string) {
+              setAutomationStates(prev => ({ ...prev, [key]: value }));
+              const s = (tenant?.settings || {}) as Record<string, unknown>;
+              const a = (s.automations || {}) as Record<string, unknown>;
+              await fetch("/api/save-settings", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ settings: { ...s, automations: { ...a, [key]: value } } }),
+              });
+            }
+
             return (
               <div className={`card ${styles.automationCard} ${styles.automationCardExpanded}`}>
                 <div className={styles.automationCardRow}>
@@ -659,6 +673,22 @@ export default function BookingPage() {
 
                 {!!automationStates["auto_fill_openings"] && (
                   <div className={styles.fmoSettings}>
+                    {/* Look-ahead days */}
+                    <div className={styles.channelPickerSmall}>
+                      <span className={styles.channelPickerLabel}>Look ahead:</span>
+                      {[1, 2, 3, 5, 7].map(d => (
+                        <button
+                          key={d}
+                          type="button"
+                          title={`Scan the next ${d} day${d !== 1 ? "s" : ""} for openings`}
+                          className={`${styles.channelBtnSm} ${fmoDays === d ? styles.channelBtnSmActive : ""}`}
+                          onClick={() => saveFmoSetting("auto_fill_openings_days", String(d))}
+                        >
+                          {d === 1 ? "Today" : `${d} days`}
+                        </button>
+                      ))}
+                    </div>
+
                     {/* Channel */}
                     <div className={styles.channelPickerSmall}>
                       <span className={styles.channelPickerLabel}>Send via:</span>
@@ -668,14 +698,7 @@ export default function BookingPage() {
                           type="button"
                           title={tip}
                           className={`${styles.channelBtnSm} ${fmoChannel === ch ? styles.channelBtnSmActive : ""}`}
-                          onClick={async () => {
-                            setAutomationStates(prev => ({ ...prev, auto_fill_openings_channel: ch }));
-                            await fetch("/api/save-settings", {
-                              method: "POST",
-                              headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({ tenantId: tenant?.id, path: "automations.auto_fill_openings_channel", value: ch }),
-                            });
-                          }}
+                          onClick={() => saveFmoSetting("auto_fill_openings_channel", ch)}
                         >
                           {label}
                         </button>
@@ -697,14 +720,7 @@ export default function BookingPage() {
                           type="button"
                           title={tip}
                           className={`${styles.channelBtnSm} ${fmoAudience === aud ? styles.channelBtnSmActive : ""}`}
-                          onClick={async () => {
-                            setAutomationStates(prev => ({ ...prev, auto_fill_openings_audience: aud }));
-                            await fetch("/api/save-settings", {
-                              method: "POST",
-                              headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({ tenantId: tenant?.id, path: "automations.auto_fill_openings_audience", value: aud }),
-                            });
-                          }}
+                          onClick={() => saveFmoSetting("auto_fill_openings_audience", aud)}
                         >
                           {label}
                         </button>
@@ -722,14 +738,7 @@ export default function BookingPage() {
                             className="input"
                             style={{ maxWidth: 220, fontSize: "var(--text-xs)" }}
                             value={(automationStates["auto_fill_openings_list"] as string) || ""}
-                            onChange={async (e) => {
-                              setAutomationStates(prev => ({ ...prev, auto_fill_openings_list: e.target.value }));
-                              await fetch("/api/save-settings", {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ tenantId: tenant?.id, path: "automations.auto_fill_openings_list", value: e.target.value }),
-                              });
-                            }}
+                            onChange={(e) => saveFmoSetting("auto_fill_openings_list", e.target.value)}
                           >
                             <option value="" disabled>Choose a list…</option>
                             {savedLists.map(l => (

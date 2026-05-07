@@ -54,14 +54,151 @@ export async function GET(request: Request) {
     rebooking: 0,
     noshow: 0,
     review: 0,
+    fill_openings: 0,
   }
 
   for (const tenant of tenants) {
     const settings = (tenant.settings || {}) as Record<string, unknown>
-    const automations = (settings.automations || {}) as Record<string, boolean>
+    const automations = (settings.automations || {}) as Record<string, boolean | string>
     const businessName = tenant.name || 'our salon'
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
     const bookingUrl = `${baseUrl}/book/${tenant.slug}`
+
+    // ── Fill My Openings Auto-Blast ──
+    if (automations.auto_fill_openings) {
+      const lookAheadDays = parseInt(String(automations.auto_fill_openings_days || '3'), 10)
+      const fmoChannel = String(automations.auto_fill_openings_channel || 'both') as 'sms' | 'email' | 'both'
+      const fmoAudience = String(automations.auto_fill_openings_audience || 'all')
+      const fmoListName = String(automations.auto_fill_openings_list || '')
+
+      // Fetch staff + appointments for slot detection
+      const { data: staffList } = await supabase
+        .from('staff')
+        .select('id, name, is_active, schedule')
+        .eq('tenant_id', tenant.id)
+        .eq('is_active', true)
+
+      const now = new Date()
+      const lookAheadEnd = new Date(now)
+      lookAheadEnd.setDate(lookAheadEnd.getDate() + lookAheadDays)
+
+      const { data: aptList } = await supabase
+        .from('appointments')
+        .select('id, staff_id, start_time, end_time, status')
+        .eq('tenant_id', tenant.id)
+        .neq('status', 'cancelled')
+        .gte('start_time', now.toISOString())
+        .lte('start_time', lookAheadEnd.toISOString())
+
+      // Detect open slots (server-side version of the client-side detectOpenSlots)
+      const DAY_NAMES = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday']
+      let totalOpenSlots = 0
+      const slotDescriptions: string[] = []
+
+      for (let d = 0; d < lookAheadDays; d++) {
+        const date = new Date(now)
+        date.setDate(date.getDate() + d)
+        const dayName = DAY_NAMES[date.getDay()]
+        const dateStr = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`
+
+        for (const s of (staffList || [])) {
+          const sched = (s.schedule && typeof s.schedule === 'object' && Object.keys(s.schedule).length > 0)
+            ? s.schedule as Record<string, { start?: string; end?: string; off?: boolean }>
+            : null
+          const dayConfig = sched?.[dayName]
+          if (dayConfig?.off) continue
+          if (!dayConfig && date.getDay() === 0) continue
+
+          const workStart = dayConfig?.start ? parseInt(dayConfig.start, 10) : 9
+          const workEnd = dayConfig?.end ? parseInt(dayConfig.end, 10) : 17
+          if (workEnd <= workStart) continue
+
+          // Build booked intervals
+          const booked: { start: number; end: number }[] = []
+          for (const apt of (aptList || [])) {
+            if (apt.staff_id !== s.id) continue
+            const aptDate = new Date(apt.start_time)
+            const aptDateStr = `${aptDate.getFullYear()}-${String(aptDate.getMonth()+1).padStart(2,'0')}-${String(aptDate.getDate()).padStart(2,'0')}`
+            if (aptDateStr !== dateStr) continue
+            const startH = aptDate.getHours() + aptDate.getMinutes() / 60
+            const endDate = new Date(apt.end_time)
+            const endH = endDate.getHours() + endDate.getMinutes() / 60
+            booked.push({ start: startH, end: endH })
+          }
+          booked.sort((a, b) => a.start - b.start)
+
+          let cursor = workStart
+          for (const b of booked) {
+            if (b.start > cursor && (b.start - cursor) >= 0.5) totalOpenSlots++
+            cursor = Math.max(cursor, b.end)
+          }
+          if (workEnd > cursor && (workEnd - cursor) >= 0.5) totalOpenSlots++
+        }
+
+        // Build a human-readable summary for the first few days
+        if (totalOpenSlots > 0 && slotDescriptions.length < 3) {
+          const dateLabel = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+          slotDescriptions.push(dateLabel)
+        }
+      }
+
+      // Only blast if there are open slots
+      if (totalOpenSlots > 0) {
+        // Build recipient query
+        let clientQuery = supabase
+          .from('clients')
+          .select('id, first_name, last_name, phone, email, sms_opt_out, status, visit_count, lifetime_spend')
+          .eq('tenant_id', tenant.id)
+          .limit(200)
+
+        if (fmoAudience === 'active') clientQuery = clientQuery.eq('status', 'active')
+        else if (fmoAudience === 'at_risk') clientQuery = clientQuery.eq('status', 'at_risk')
+        else if (fmoAudience === 'vip') clientQuery = clientQuery.or('visit_count.gte.10,lifetime_spend.gte.500')
+        else if (fmoAudience === 'saved_list' && fmoListName) {
+          // Fetch saved list client IDs from settings
+          const savedLists = (settings.savedClientLists || []) as { name: string; clientIds: string[] }[]
+          const targetList = savedLists.find(l => l.name === fmoListName)
+          if (targetList && targetList.clientIds.length > 0) {
+            clientQuery = clientQuery.in('id', targetList.clientIds)
+          } else {
+            continue // skip if saved list not found or empty
+          }
+        }
+
+        const { data: recipients } = await clientQuery
+
+        if (recipients && recipients.length > 0) {
+          const slotsText = slotDescriptions.length > 0 ? slotDescriptions.join(', ') : `the next ${lookAheadDays} day${lookAheadDays !== 1 ? 's' : ''}`
+          const message = `Hey {name}! ⚡ We have ${totalOpenSlots} opening${totalOpenSlots !== 1 ? 's' : ''} on ${slotsText}. Book now before they're gone → ${bookingUrl}`
+
+          for (const client of recipients) {
+            const clientName = `${client.first_name || ''}`.trim() || 'there'
+            const personalizedMsg = message.replace(/\{name\}/g, clientName)
+
+            await sendMessage({
+              client,
+              message: personalizedMsg,
+              businessName,
+              twilioClient,
+              resendClient,
+              channel: fmoChannel,
+            })
+            results.fill_openings++
+          }
+
+          // Log as campaign
+          await supabase.from('campaigns').insert({
+            tenant_id: tenant.id,
+            name: `[Auto] Fill My Openings — ${new Date().toLocaleDateString()}`,
+            type: 'fill_openings',
+            status: 'completed',
+            last_sent: new Date().toISOString(),
+            template: { audience: fmoAudience, channel: fmoChannel, days: lookAheadDays, slots: totalOpenSlots },
+            metrics: { sent: results.fill_openings, opened: 0, booked: 0, revenue: 0 },
+          })
+        }
+      }
+    }
 
     // ── Birthday Auto-Send ──
     if (automations.auto_birthday !== false) {
