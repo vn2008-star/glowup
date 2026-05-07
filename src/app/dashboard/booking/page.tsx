@@ -816,27 +816,35 @@ export default function BookingPage() {
                 </div>
 
                 {/* Message Preview */}
-                <details style={{ marginTop: "var(--space-3)" }}>
-                  <summary style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)", cursor: "pointer", userSelect: "none" }}>
-                    💬 Preview message
-                  </summary>
+                <div style={{
+                  marginTop: "var(--space-3)",
+                  borderTop: "1px solid var(--border-subtle)",
+                  paddingTop: "var(--space-3)",
+                }}>
+                  <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: "6px" }}>
+                    {currentChannel === "email" ? "📧" : "📱"} Preview Message
+                  </span>
                   <div style={{
-                    marginTop: "var(--space-2)",
-                    padding: "var(--space-3)",
-                    background: "var(--bg-surface)",
-                    borderRadius: "var(--radius-md)",
-                    border: "1px solid var(--border-subtle)",
-                    fontSize: "var(--text-xs)",
-                    lineHeight: 1.7,
+                    background: currentChannel === "email" ? "rgba(195, 126, 218, 0.08)" : "rgba(34, 197, 94, 0.08)",
+                    border: `1px solid ${currentChannel === "email" ? "rgba(195, 126, 218, 0.2)" : "rgba(34, 197, 94, 0.2)"}`,
+                    borderRadius: "var(--radius-lg)",
+                    padding: "var(--space-3) var(--space-4)",
+                    fontSize: "13px",
+                    lineHeight: 1.6,
                     color: "var(--text-primary)",
-                    whiteSpace: "pre-wrap",
                   }}>
-                    {a.key === "auto_rebooking"
-                      ? `Hey Sarah! It's been 30 days since your last visit to ${tenant?.name || "Your Salon"}. Time for a refresh? Book now → ${typeof window !== "undefined" ? window.location.origin : ""}/book/${tenant?.slug || "your-salon"}`
-                      : `Hi Sarah, we missed you today at ${tenant?.name || "Your Salon"}! 😊 Life happens — we'd love to help you rebook. Book your next visit → ${typeof window !== "undefined" ? window.location.origin : ""}/book/${tenant?.slug || "your-salon"}`
-                    }
+                    <div style={{ fontStyle: "italic", color: "var(--text-secondary)" }}>
+                      {a.key === "auto_rebooking"
+                        ? <>Hey <strong>Sarah</strong>! It&apos;s been <strong>30 days</strong> since your last visit to <strong>{tenant?.name || "Your Salon"}</strong>. Time for a refresh? Book now →</>
+                        : <>Hi <strong>Sarah</strong>, we missed you today at <strong>{tenant?.name || "Your Salon"}</strong>! 😊 Life happens — we&apos;d love to help you rebook. Book your next visit →</>
+                      }
+                    </div>
+                    <div style={{ marginTop: "8px", fontSize: "11px", color: "var(--text-tertiary)", display: "flex", gap: "12px", flexWrap: "wrap" }}>
+                      <span>📱 Via: <strong>{currentChannel === "both" ? "SMS + Email" : currentChannel === "sms" ? "SMS" : "Email"}</strong></span>
+                      <span>⚡ Trigger: <strong>{a.trigger}</strong></span>
+                    </div>
                   </div>
-                </details>
+                </div>
               </div>
               <div>
                 <label className={styles.toggleLabel}>
