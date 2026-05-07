@@ -983,7 +983,7 @@ export default function AdminPage() {
                 <th>Status</th>
                 <th>Staff</th>
                 <th>Clients</th>
-                <th>Cost (MTD)</th>
+                <th>Cost This Month</th>
                 <th>Created</th>
                 <th>Actions</th>
               </tr>
