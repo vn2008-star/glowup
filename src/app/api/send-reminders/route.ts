@@ -58,7 +58,7 @@ export async function GET(request: Request) {
   const tenantIds = [...new Set(reminders.map(r => r.tenant_id))]
   const { data: tenants } = await supabase
     .from('tenants')
-    .select('id, name, settings')
+    .select('id, name, address, settings')
     .in('id', tenantIds)
 
   const tenantMap = new Map(tenants?.map(t => [t.id, t]) || [])
@@ -88,12 +88,13 @@ export async function GET(request: Request) {
     const serviceName = service?.name || 'your appointment'
     const staffName = staff?.name || ''
     const businessName = tenant?.name || 'our salon'
+    const businessAddress = (tenant?.address as string) || ''
     const dateStr = startTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
     const timeStr = startTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
 
     // Build message from template or default
     const customTemplates = (settings.reminder_templates || {}) as Record<string, string>
-    const smsTemplate = customTemplates.sms || `Hi {client_name}! This is a reminder that your {service} appointment at {business_name} is tomorrow, {date} at {time}. Reply STOP to opt out.`
+    const smsTemplate = customTemplates.sms || `Hi {client_name}! This is a reminder that your {service} appointment at {business_name} is tomorrow, {date} at {time}.${businessAddress ? ' 📍 {address}' : ''} Reply STOP to opt out.`
     const emailSubject = customTemplates.email_subject || `Appointment Reminder — {business_name}`
     const emailBody = customTemplates.email || `Hi {client_name},\n\nThis is a friendly reminder about your upcoming appointment:\n\n📋 Service: {service}\n📅 Date: {date}\n🕐 Time: {time}\n${staffName ? `💇 With: {staff}\n` : ''}\n📍 At: {business_name}\n\nNeed to reschedule? Please contact us as soon as possible.\n\nSee you soon!\n— {business_name}`
 
@@ -103,6 +104,7 @@ export async function GET(request: Request) {
         .replace(/\{service\}/g, serviceName)
         .replace(/\{staff\}/g, staffName)
         .replace(/\{business_name\}/g, businessName)
+        .replace(/\{address\}/g, businessAddress)
         .replace(/\{date\}/g, dateStr)
         .replace(/\{time\}/g, timeStr)
     }
