@@ -69,7 +69,7 @@ export default function SettingsPage() {
   const [reminderTemplates, setReminderTemplates] = useState({
     sms: "Hi {client_name}! This is a reminder that your {service} appointment at {business_name} is tomorrow, {date} at {time}. 📍 {address} Reply STOP to opt out.",
     email_subject: "Appointment Reminder — {business_name}",
-    email: "Hi {client_name},\n\nThis is a friendly reminder about your upcoming appointment:\n\n📋 Service: {service}\n📅 Date: {date}\n🕐 Time: {time}\n📍 At: {business_name}\n\nNeed to reschedule? Please contact us as soon as possible.\n\nSee you soon!\n— {business_name}",
+    email: "Hi {client_name},\n\nThis is a friendly reminder about your upcoming appointment:\n\n📋 Service: {service}\n📅 Date: {date}\n🕐 Time: {time}\n📍 At: {business_name}\n🏠 Address: {address}\n\nNeed to reschedule? Please contact us as soon as possible.\n\nSee you soon!\n— {business_name}",
   });
   const [staffReminderTemplates, setStaffReminderTemplates] = useState({
     sms: "Hi {staff_name}, reminder: {client_name} has a {service} appointment with you on {date} at {time}.",
