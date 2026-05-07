@@ -352,7 +352,11 @@ export async function GET(request: Request) {
           if (apt.notes?.includes('[Auto] Review request sent')) continue
 
           const clientName = `${client.first_name || ''}`.trim() || 'there'
-          const message = `Thanks for visiting ${businessName} today, ${clientName}! 🌟 We'd love to hear how it went — a quick review means the world to us ❤️`
+          const googleReviewUrl = (settings.google_review_url as string) || ''
+          let message = `Thanks for visiting ${businessName} today, ${clientName}! 🌟 We'd love a quick review — it means the world to us ❤️`
+          if (googleReviewUrl) {
+            message += `\n\nLeave a review → ${googleReviewUrl}`
+          }
 
           const reviewChannel = String(automations.auto_review_channel || 'sms') as 'sms' | 'email' | 'both'
           await sendMessage({ client, message, businessName, twilioClient, resendClient, channel: reviewChannel })

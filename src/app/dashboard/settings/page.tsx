@@ -872,6 +872,68 @@ export default function SettingsPage() {
             })}
           </span>
         </div>
+
+        {/* Google Review URL */}
+        <div style={{ marginTop: "var(--space-4)" }}>
+          <label style={{ fontSize: "var(--text-sm)", fontWeight: 600, display: "block", marginBottom: "var(--space-2)" }}>
+            🔗 Google Review Link
+          </label>
+          <p style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)", marginBottom: "var(--space-2)", lineHeight: 1.5 }}>
+            Paste your Google review link so clients get a direct link to leave a review. <a href="https://support.google.com/business/answer/7035772" target="_blank" rel="noopener noreferrer" style={{ color: "var(--color-primary)" }}>How to find your link →</a>
+          </p>
+          <input
+            type="url"
+            placeholder="https://g.page/r/your-salon/review"
+            value={((tenant?.settings as Record<string, unknown>)?.google_review_url as string) || ""}
+            onChange={(e) => {
+              const s = { ...(typeof tenant?.settings === "object" && tenant.settings ? tenant.settings : {}) } as Record<string, unknown>;
+              s.google_review_url = e.target.value;
+              fetch("/api/save-settings", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ settings: s }),
+              }).then(() => refetch());
+            }}
+            style={{
+              width: "100%",
+              padding: "var(--space-2) var(--space-3)",
+              borderRadius: "var(--radius-md)",
+              border: "1px solid var(--border-default)",
+              background: "var(--bg-surface)",
+              color: "var(--text-primary)",
+              fontSize: "var(--text-sm)",
+            }}
+          />
+        </div>
+
+        {/* Message Preview */}
+        <div style={{ marginTop: "var(--space-4)" }}>
+          <label style={{ fontSize: "var(--text-sm)", fontWeight: 600, display: "block", marginBottom: "var(--space-2)" }}>
+            💬 Message Preview
+          </label>
+          <div style={{
+            padding: "var(--space-4)",
+            background: "var(--bg-surface)",
+            borderRadius: "var(--radius-md)",
+            border: "1px solid var(--border-subtle)",
+            fontSize: "var(--text-sm)",
+            lineHeight: 1.7,
+            color: "var(--text-primary)",
+            whiteSpace: "pre-wrap",
+          }}>
+            {(() => {
+              const reviewUrl = ((tenant?.settings as Record<string, unknown>)?.google_review_url as string) || "";
+              const bizName = tenant?.name || "Your Salon";
+              let msg = `Thanks for visiting ${bizName} today, Sarah! 🌟 We'd love a quick review — it means the world to us ❤️`;
+              if (reviewUrl) {
+                msg += `\n\nLeave a review → ${reviewUrl}`;
+              } else {
+                msg += "\n\n⚠️ Add your Google Review link above to include it in the message.";
+              }
+              return msg;
+            })()}
+          </div>
+        </div>
       </div>
       {/* Billing & Subscription */}
       <div className={`card ${styles.section}`}>
