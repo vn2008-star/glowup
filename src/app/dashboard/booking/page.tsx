@@ -111,6 +111,7 @@ export default function BookingPage() {
   const [selectedSlots, setSelectedSlots] = useState<Set<string>>(new Set());
   const [fillMessage, setFillMessage] = useState(FILL_DEFAULT_MSG);
   const [fillDiscount, setFillDiscount] = useState("");
+  const [fillChannel, setFillChannel] = useState<"sms" | "email" | "both">("both");
   const [fillAudience, setFillAudience] = useState<FillAudience>("all");
   const [selectedClientIds, setSelectedClientIds] = useState<Set<string>>(new Set());
   const [clientSearch, setClientSearch] = useState("");
@@ -237,7 +238,7 @@ export default function BookingPage() {
           message: personalizedMessage,
           audience: fillAudience,
           tenant_id: tenant?.id,
-          channel: "sms",
+          channel: fillChannel,
         }),
       });
       const result = await res.json();
@@ -426,6 +427,21 @@ export default function BookingPage() {
             <div className={styles.discountRow}>
               <label className={styles.discountLabel}>💰 Optional Discount:</label>
               <input className={`input ${styles.discountInput}`} value={fillDiscount} onChange={e => setFillDiscount(e.target.value)} placeholder="e.g., 15% off" />
+            </div>
+            <div className={styles.formGroup}>
+              <label className="label">📡 Send Via</label>
+              <div className={styles.channelPicker}>
+                {(["sms", "email", "both"] as const).map(ch => (
+                  <button
+                    key={ch}
+                    type="button"
+                    className={`${styles.channelBtn} ${fillChannel === ch ? styles.channelBtnActive : ""}`}
+                    onClick={() => setFillChannel(ch)}
+                  >
+                    {ch === "sms" ? "📱 SMS" : ch === "email" ? "📧 Email" : "📱+📧 Both"}
+                  </button>
+                ))}
+              </div>
             </div>
             <div className={styles.fillNav}>
               <button className="btn btn-secondary" onClick={() => setFillStep(1)}>← Back</button>
