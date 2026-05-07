@@ -748,6 +748,36 @@ export default function BookingPage() {
                         )}
                       </div>
                     )}
+
+                    {/* Message Preview */}
+                    <div style={{
+                      marginTop: "var(--space-3)",
+                      borderTop: "1px solid var(--border-subtle)",
+                      paddingTop: "var(--space-3)",
+                    }}>
+                      <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: "6px" }}>
+                        {fmoChannel === "email" ? "📧" : "📱"} Preview Message
+                      </span>
+                      <div style={{
+                        background: fmoChannel === "email" ? "rgba(195, 126, 218, 0.08)" : "rgba(34, 197, 94, 0.08)",
+                        border: `1px solid ${fmoChannel === "email" ? "rgba(195, 126, 218, 0.2)" : "rgba(34, 197, 94, 0.2)"}`,
+                        borderRadius: "var(--radius-lg)",
+                        padding: "var(--space-3) var(--space-4)",
+                        fontSize: "13px",
+                        lineHeight: 1.6,
+                        color: "var(--text-primary)",
+                        position: "relative",
+                      }}>
+                        <div style={{ fontStyle: "italic", color: "var(--text-secondary)" }}>
+                          Hey <strong>Sarah</strong>! ⚡ We just had an opening — <strong>{fmoDays === 1 ? "Today" : `next ${fmoDays} days`}, 9:00 AM – 5:00 PM</strong>. Book now before it&apos;s gone →
+                        </div>
+                        <div style={{ marginTop: "8px", fontSize: "11px", color: "var(--text-tertiary)", display: "flex", gap: "12px", flexWrap: "wrap" }}>
+                          <span>📱 Via: <strong>{fmoChannel === "both" ? "SMS + Email" : fmoChannel === "sms" ? "SMS" : "Email"}</strong></span>
+                          <span>👥 To: <strong>{fmoAudience === "all" ? "All clients" : fmoAudience === "active" ? "Active" : fmoAudience === "at_risk" ? "At-Risk" : fmoAudience === "vip" ? "VIP" : "Saved List"}</strong></span>
+                          <span>📅 Scans: <strong>{fmoDays === 1 ? "Today only" : `Next ${fmoDays} days`}</strong></span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
