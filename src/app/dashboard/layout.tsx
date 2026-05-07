@@ -78,10 +78,10 @@ const ClipboardIcon = () => (
 const navKeys = [
   { href: "/dashboard/quick-start", icon: <RocketIcon />, key: "quickStart" },
   { href: "/dashboard", icon: <HomeIcon />, key: "overview" },
+  { href: "/dashboard/checkout", icon: <FrontDeskIcon />, key: "frontDesk" },
   { href: "/dashboard/calendar", icon: <CalendarIcon />, key: "calendar" },
   { href: "/dashboard/booking", icon: <ClipboardIcon />, key: "booking" },
   { href: "/dashboard/campaigns", icon: <PartyIcon />, key: "holidays" },
-  { href: "/dashboard/checkout", icon: <FrontDeskIcon />, key: "frontDesk" },
   { href: "/dashboard/staff", icon: <StaffIcon />, key: "staff" },
   { href: "/dashboard/clients", icon: <UsersIcon />, key: "clients" },
   { href: "/dashboard/services", icon: <ScissorsIcon />, key: "services" },
