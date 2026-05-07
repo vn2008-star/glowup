@@ -49,12 +49,29 @@ export async function GET(request: Request) {
     return NextResponse.json({ message: 'No tenants found', processed: 0 })
   }
 
+  // Holiday calendar (must match the UI list in campaigns/page.tsx)
+  const HOLIDAYS = [
+    { name: 'Lunar New Year', emoji: '🧧', month: 0, day: 29, template: '🧧 Lunar New Year Special! Start the Year of the Snake looking radiant. 20% off all services + lucky red gift cards available 🎊 Book now → {booking_url}' },
+    { name: "Valentine's Day", emoji: '💖', month: 1, day: 14, template: "💖 Valentine's Day Special! Look & feel amazing for your date. 15% off any service this week. Book now → {booking_url}" },
+    { name: "International Women's Day", emoji: '💜', month: 2, day: 8, template: "💜 Happy Women's Day, {name}! Celebrate YOU with a self-care session. 20% off this week only → {booking_url}" },
+    { name: "Mother's Day", emoji: '🌹', month: 4, day: 11, template: "🌹 Mother's Day Special! Give Mom the gift of pampering. Gift cards + 15% off spa & beauty packages → {booking_url}" },
+    { name: 'Memorial Day', emoji: '🇺🇸', month: 4, day: 26, template: '🇺🇸 Memorial Day Sale! Get summer-ready. 20% off all services this weekend → {booking_url}' },
+    { name: '4th of July', emoji: '🎆', month: 6, day: 4, template: '🎆 4th of July Glow-Up! Get party-ready with our holiday special. Book now → {booking_url}' },
+    { name: 'Back to School', emoji: '🎒', month: 7, day: 15, template: '🎒 Back to School Special! Start the year fresh with a new look. Student discount: 15% off → {booking_url}' },
+    { name: 'Halloween', emoji: '🎃', month: 9, day: 31, template: '🎃 Halloween Glam! Get costume-ready with our spooky season specials. Book now → {booking_url}' },
+    { name: 'Thanksgiving', emoji: '🦃', month: 10, day: 27, template: '🦃 Look stunning for Thanksgiving! Book your holiday session. Family discounts available → {booking_url}' },
+    { name: 'Black Friday', emoji: '💰', month: 10, day: 28, template: '💰 Black Friday DEAL! Our biggest sale of the year. Up to 30% off services + bonus gift cards → {booking_url}' },
+    { name: 'Christmas', emoji: '🎄', month: 11, day: 25, template: '🎄 Holiday Glow! Get party-ready for the season. Gift cards make the perfect present 🎁 Book now → {booking_url}' },
+    { name: "New Year's Eve", emoji: '🎉', month: 11, day: 31, template: '🎉 New Year\'s Glow-Up! Ring in the new year looking & feeling amazing. Limited spots available → {booking_url}' },
+  ]
+
   const results: Record<string, number> = {
     birthday: 0,
     rebooking: 0,
     noshow: 0,
     review: 0,
     fill_openings: 0,
+    holiday_promo: 0,
   }
 
   for (const tenant of tenants) {
@@ -257,7 +274,7 @@ export async function GET(request: Request) {
           const daysSince = Math.round((Date.now() - new Date(client.last_visit).getTime()) / (1000 * 60 * 60 * 24))
           const message = `Hey ${clientName}! It's been ${daysSince} days since your last visit to ${businessName}. Time for a refresh? Book now → ${bookingUrl}`
 
-          await sendMessage({ client, message, businessName, twilioClient, resendClient, channel: 'sms' })
+          await sendMessage({ client, message, businessName, twilioClient, resendClient, channel: 'both' })
           results.rebooking++
 
           // Mark client as reminded to prevent duplicate sends
@@ -297,7 +314,7 @@ export async function GET(request: Request) {
           const clientName = `${client.first_name || ''}`.trim() || 'there'
           const message = `Hi ${clientName}, we missed you today at ${businessName}! 😊 Life happens — we'd love to help you rebook. Book your next visit → ${bookingUrl}`
 
-          await sendMessage({ client, message, businessName, twilioClient, resendClient, channel: 'sms' })
+          await sendMessage({ client, message, businessName, twilioClient, resendClient, channel: 'both' })
           results.noshow++
 
           // Mark as followed up
@@ -347,6 +364,70 @@ export async function GET(request: Request) {
             .update({ notes: `${apt.notes || ''}\n[Auto] Review request sent ${new Date().toLocaleDateString()}` })
             .eq('id', apt.id)
         }
+      }
+    }
+
+    // ── Holiday Promo Auto-Send ──
+    if (automations.auto_holiday !== false) {
+      const holidaySettings = (settings.holiday_settings || {}) as Record<string, number>
+      const sendDaysBefore = holidaySettings.send_days_before ?? 7
+      const today = new Date()
+      const year = today.getFullYear()
+
+      for (const holiday of HOLIDAYS) {
+        // Calculate the holiday date (this year or next)
+        let holidayDate = new Date(year, holiday.month, holiday.day)
+        if (holidayDate < today) holidayDate = new Date(year + 1, holiday.month, holiday.day)
+
+        const daysUntil = Math.ceil((holidayDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+
+        // Only fire on the exact target day
+        if (daysUntil !== sendDaysBefore) continue
+
+        // Check if we already sent this holiday promo this year (prevent duplicate)
+        const campaignName = `[Auto] ${holiday.emoji} ${holiday.name} — ${holidayDate.getFullYear()}`
+        const { data: existingCampaign } = await supabase
+          .from('campaigns')
+          .select('id')
+          .eq('tenant_id', tenant.id)
+          .eq('name', campaignName)
+          .maybeSingle()
+
+        if (existingCampaign) continue // Already sent
+
+        // Fetch all clients for this tenant
+        const { data: holidayClients } = await supabase
+          .from('clients')
+          .select('id, first_name, last_name, phone, email, sms_opt_out')
+          .eq('tenant_id', tenant.id)
+          .limit(500)
+
+        if (!holidayClients || holidayClients.length === 0) continue
+
+        let holidaySent = 0
+        for (const client of holidayClients) {
+          const clientName = `${client.first_name || ''}`.trim() || 'there'
+          const personalizedMsg = holiday.template
+            .replace(/\{name\}/g, clientName)
+            .replace(/\{booking_url\}/g, bookingUrl)
+            .replace(/\{business_name\}/g, businessName)
+
+          await sendMessage({ client, message: personalizedMsg, businessName, twilioClient, resendClient, channel: 'both' })
+          holidaySent++
+        }
+
+        results.holiday_promo += holidaySent
+
+        // Log as campaign
+        await supabase.from('campaigns').insert({
+          tenant_id: tenant.id,
+          name: campaignName,
+          type: 'holiday',
+          status: 'completed',
+          last_sent: new Date().toISOString(),
+          template: { holiday: holiday.name, channel: 'both', days_before: sendDaysBefore },
+          metrics: { sent: holidaySent, opened: 0, booked: 0, revenue: 0 },
+        })
       }
     }
   }
