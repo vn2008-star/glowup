@@ -187,22 +187,18 @@ export default function CampaignsPage() {
   const t = useTranslations("campaignsPage");
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"campaigns" | "automations" | "holidays" | "fill_openings">(() => {
+  const [activeTab, setActiveTab] = useState<"automations" | "holidays" | "fill_openings">(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const tab = params.get("tab");
-      if (tab === "fill_openings" || tab === "automations" || tab === "holidays") return tab;
+      if (tab === "fill_openings" || tab === "automations") return tab;
     }
-    return "campaigns";
+    return "holidays";
   });
-  const [showModal, setShowModal] = useState(false);
-  const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
-  const [formData, setFormData] = useState({
-    name: "",
-    type: "promo" as string,
-    message: "",
-    status: "draft" as string,
-  });
+
+  // Inline holiday editing state
+  const [editingHolidayName, setEditingHolidayName] = useState<string | null>(null);
+  const [editingMessage, setEditingMessage] = useState("");
 
   // Automation toggles from tenant settings
   const [automationStates, setAutomationStates] = useState<Record<string, boolean>>({});
@@ -379,44 +375,42 @@ export default function CampaignsPage() {
     setFillSent(true);
   }
 
-  function openNew() {
-    setEditingCampaign(null);
-    setFormData({ name: "", type: "promo", message: DEFAULT_TEMPLATES.promo, status: "draft" });
-    setShowModal(true);
-  }
-
-  function openEdit(c: Campaign) {
-    setEditingCampaign(c);
-    const tmpl = c.template as Record<string, string>;
-    setFormData({
-      name: c.name,
-      type: c.type,
-      message: tmpl.message || "",
-      status: c.status,
-    });
-    setShowModal(true);
-  }
-
-  async function handleSave(e: React.FormEvent) {
-    e.preventDefault();
-    if (!formData.name) return;
-
+  // ── Inline holiday CRUD helpers ──
+  async function handleCreateHolidayPromo(h: HolidayInfo & { date: Date }) {
     const payload = {
-      name: formData.name,
-      type: formData.type,
-      template: { message: formData.message },
-      status: formData.status,
+      name: `${h.name} ${h.date.getFullYear()} Special`,
+      type: 'holiday',
+      template: { message: h.template },
+      status: 'active',
     };
-
-    if (editingCampaign) {
-      const { data } = await queryData<Campaign>("campaigns.update", { id: editingCampaign.id, ...payload });
-      if (data) setCampaigns((prev) => prev.map((c) => (c.id === data.id ? data : c)));
-    } else {
-      const { data } = await queryData<Campaign>("campaigns.add", payload);
-      if (data) setCampaigns((prev) => [data, ...prev]);
-    }
-    setShowModal(false);
+    const { data } = await queryData<Campaign>('campaigns.add', payload);
+    if (data) setCampaigns(prev => [data, ...prev]);
   }
+
+  function startEditHoliday(h: { name: string }, existingCampaign: Campaign) {
+    const tmpl = existingCampaign.template as Record<string, string>;
+    setEditingHolidayName(h.name);
+    setEditingMessage(tmpl.message || '');
+  }
+
+  async function handleSaveHolidayEdit(existingCampaign: Campaign) {
+    const { data } = await queryData<Campaign>('campaigns.update', {
+      id: existingCampaign.id,
+      template: { message: editingMessage },
+    });
+    if (data) setCampaigns(prev => prev.map(c => c.id === data.id ? data : c));
+    setEditingHolidayName(null);
+  }
+
+  async function handleRestoreHolidayTemplate(existingCampaign: Campaign, originalTemplate: string) {
+    const { data } = await queryData<Campaign>('campaigns.update', {
+      id: existingCampaign.id,
+      template: { message: originalTemplate },
+    });
+    if (data) setCampaigns(prev => prev.map(c => c.id === data.id ? data : c));
+    setEditingHolidayName(null);
+  }
+
 
   async function handleDelete(id: string) {
     if (!confirm("Delete this promotion?")) return;
@@ -448,16 +442,6 @@ export default function CampaignsPage() {
     if (res.ok) refetch();
   }
 
-  function getTypeBadge(type: string) {
-    const t = CAMPAIGN_TYPES.find((ct) => ct.value === type);
-    return t ? t.color : "badge-primary";
-  }
-
-  function getTypeLabel(type: string) {
-    const t = CAMPAIGN_TYPES.find((ct) => ct.value === type);
-    return t ? t.label : type;
-  }
-
   // Computed stats
   const totalSent = campaigns.reduce((sum, c) => sum + (c.metrics?.sent || 0), 0);
   const totalOpened = campaigns.reduce((sum, c) => sum + (c.metrics?.opened || 0), 0);
@@ -470,11 +454,8 @@ export default function CampaignsPage() {
       <div className={styles.pageHeader}>
         <div>
           <h1>Promotions & Automation</h1>
-          <p>Automated marketing, retention, and win-back promotions</p>
+          <p>Holiday promos, automated marketing, and win-back tools</p>
         </div>
-        <button className="btn btn-primary" onClick={openNew}>
-          <RocketIcon /> Create Promotion
-        </button>
       </div>
 
       {/* Summary Cards */}
@@ -497,93 +478,32 @@ export default function CampaignsPage() {
       </div>
 
       <div className={styles.tabs}>
-        <button className={`${styles.tab} ${activeTab === "fill_openings" ? styles.activeTab : ""}`} onClick={() => setActiveTab("fill_openings")} style={activeTab !== "fill_openings" ? { color: "var(--color-primary)" } : {}}>
-          ⚡ Fill My Openings
-        </button>
         <button className={`${styles.tab} ${activeTab === "holidays" ? styles.activeTab : ""}`} onClick={() => setActiveTab("holidays")}>
           🎉 Holidays
         </button>
-        <button className={`${styles.tab} ${activeTab === "campaigns" ? styles.activeTab : ""}`} onClick={() => setActiveTab("campaigns")}>
-          Promotions ({campaigns.length})
+        <button className={`${styles.tab} ${activeTab === "fill_openings" ? styles.activeTab : ""}`} onClick={() => setActiveTab("fill_openings")} style={activeTab !== "fill_openings" ? { color: "var(--color-primary)" } : {}}>
+          ⚡ Fill My Openings
         </button>
         <button className={`${styles.tab} ${activeTab === "automations" ? styles.activeTab : ""}`} onClick={() => setActiveTab("automations")}>
-          Automations ({AUTOMATIONS_CONFIG.length})
+          🤖 Automations ({AUTOMATIONS_CONFIG.length})
         </button>
       </div>
 
       {loading ? (
         <div style={{ padding: "2rem", textAlign: "center", color: "var(--text-secondary)" }}>Loading promotions...</div>
-      ) : activeTab === "campaigns" ? (
-        campaigns.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "3rem", color: "var(--text-secondary)" }}>
-            <p style={{ marginBottom: "1rem" }}>No promotions yet. Create your first promotion to start engaging clients.</p>
-            <button className="btn btn-primary" onClick={openNew}>Create First Promotion</button>
-          </div>
-        ) : (
-          <div className={styles.campaignList}>
-            {campaigns.map((c) => {
-              const tmpl = c.template as Record<string, string>;
-              return (
-                <div key={c.id} className={`card ${styles.campaignCard}`}>
-                  <div className={styles.campaignHeader}>
-                    <div>
-                      <h3>{c.name}</h3>
-                      <div className={styles.campaignMeta}>
-                        <span className={`badge ${getTypeBadge(c.type)}`}>{getTypeLabel(c.type)}</span>
-                        <span className={styles.lastSent}>
-                          {c.last_sent ? `Last sent: ${new Date(c.last_sent).toLocaleDateString()}` : "Never sent"}
-                        </span>
-                      </div>
-                    </div>
-                    <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-                      <span className={`badge ${c.status === "active" ? "badge-success" : c.status === "paused" ? "badge-warning" : "badge-info"}`}>
-                        {c.status}
-                      </span>
-                      <button className="btn btn-ghost btn-sm" onClick={() => handleToggleStatus(c)} title={c.status === "active" ? "Pause" : "Activate"}>
-                        {c.status === "active" ? "⏸️" : "▶️"}
-                      </button>
-                      <button className="btn btn-ghost btn-sm" onClick={() => openEdit(c)} title="Edit">✏️</button>
-                      <button className="btn btn-ghost btn-sm" onClick={() => handleDelete(c.id)} title="Delete">🗑️</button>
-                    </div>
-                  </div>
-                  {tmpl.message && (
-                    <div className={styles.messagePreview}>
-                      <p>{tmpl.message}</p>
-                    </div>
-                  )}
-                  <div className={styles.campaignStats}>
-                    <div className={styles.campaignStat}>
-                      <span className={styles.cStatValue}>{c.metrics?.sent || 0}</span>
-                      <span className={styles.cStatLabel}>Sent</span>
-                    </div>
-                    <div className={styles.campaignStat}>
-                      <span className={styles.cStatValue}>{c.metrics?.opened || 0}</span>
-                      <span className={styles.cStatLabel}>Opened</span>
-                    </div>
-                    <div className={styles.campaignStat}>
-                      <span className={styles.cStatValue}>{c.metrics?.booked || 0}</span>
-                      <span className={styles.cStatLabel}>Booked</span>
-                    </div>
-                    <div className={styles.campaignStat}>
-                      <span className={styles.cStatValue}>${c.metrics?.revenue || 0}</span>
-                      <span className={styles.cStatLabel}>Revenue</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )
       ) : activeTab === "holidays" ? (
         <div>
           <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginBottom: "var(--space-4)" }}>
-            Create promotions for upcoming holidays. Promotions are sent to all clients 7 days before each holiday.
+            Tap ✨ to activate a holiday promotion. Messages are sent to all clients 7 days before each holiday.
           </p>
           <div className={styles.holidayGrid}>
             {getUpcomingHolidays().map((h) => {
               const existingCampaign = campaigns.find(c => c.type === 'holiday' && c.name.includes(h.name));
+              const isEditing = editingHolidayName === h.name;
+              const tmpl = existingCampaign?.template as Record<string, string> | undefined;
+              const currentMessage = tmpl?.message || h.template;
               return (
-                <div key={h.name} className={`card ${styles.holidayCard}`}>
+                <div key={h.name} className={`card ${styles.holidayCard} ${h.daysUntil <= 30 ? styles.holidayUrgent : ''}`}>
                   <div className={styles.holidayHeader}>
                     <span className={styles.holidayEmoji}>{h.emoji}</span>
                     <div>
@@ -591,30 +511,59 @@ export default function CampaignsPage() {
                       <span className={styles.holidayDate}>
                         {h.date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
                         {h.daysUntil <= 30 && (
-                          <span className={styles.holidayCountdown}> · {h.daysUntil} days away</span>
+                          <span className={styles.holidayCountdown}> · ⏰ {h.daysUntil} days!</span>
                         )}
                       </span>
                     </div>
                   </div>
                   <p className={styles.holidayIdea}>💡 {h.promoIdea}</p>
-                  <div className={styles.holidayPreview}>{h.template}</div>
+
+                  {/* Message: editable textarea or read-only preview */}
+                  {isEditing ? (
+                    <textarea
+                      className={styles.holidayEditArea}
+                      value={editingMessage}
+                      onChange={e => setEditingMessage(e.target.value)}
+                      rows={4}
+                      autoFocus
+                    />
+                  ) : (
+                    <div className={styles.holidayPreview}>{currentMessage}</div>
+                  )}
+
+                  {/* Actions */}
                   <div className={styles.holidayActions}>
                     {existingCampaign ? (
-                      <span className={`badge ${existingCampaign.status === 'active' ? 'badge-success' : 'badge-info'}`}>
-                        {existingCampaign.status === 'active' ? '✓ Active' : existingCampaign.status}
-                      </span>
+                      <>
+                        {/* Status indicator */}
+                        <div className={styles.holidayStatus}>
+                          <span className={`${styles.statusDot} ${existingCampaign.status === 'active' ? styles.statusActive : styles.statusPaused}`} />
+                          <span className={styles.statusLabel}>
+                            {existingCampaign.status === 'active' ? 'Sending' : 'Paused'}
+                          </span>
+                        </div>
+                        {/* Action buttons */}
+                        <div className={styles.holidayBtnRow}>
+                          {isEditing ? (
+                            <>
+                              <button className={`${styles.holidayBtn} ${styles.holidayBtnSave}`} onClick={() => handleSaveHolidayEdit(existingCampaign)} title="Save">💾 Save</button>
+                              <button className={styles.holidayBtn} onClick={() => setEditingHolidayName(null)} title="Cancel">✕</button>
+                            </>
+                          ) : (
+                            <>
+                              <button className={styles.holidayBtn} onClick={() => handleToggleStatus(existingCampaign)} title={existingCampaign.status === 'active' ? 'Pause' : 'Activate'}>
+                                {existingCampaign.status === 'active' ? '⏸️' : '▶️'}
+                              </button>
+                              <button className={styles.holidayBtn} onClick={() => startEditHoliday(h, existingCampaign)} title="Edit message">✏️</button>
+                              <button className={styles.holidayBtn} onClick={() => handleRestoreHolidayTemplate(existingCampaign, h.template)} title="Restore original">🔄</button>
+                              <button className={styles.holidayBtn} onClick={() => handleDelete(existingCampaign.id)} title="Delete">🗑️</button>
+                            </>
+                          )}
+                        </div>
+                      </>
                     ) : (
-                      <button className="btn btn-primary btn-sm" onClick={() => {
-                        setEditingCampaign(null);
-                        setFormData({
-                          name: `${h.name} ${h.date.getFullYear()} Special`,
-                          type: 'holiday',
-                          message: h.template,
-                          status: 'draft',
-                        });
-                        setShowModal(true);
-                      }}>
-                        Create Promotion
+                      <button className={styles.holidayBtnCreate} onClick={() => handleCreateHolidayPromo(h)}>
+                        ✨ Create Promotion
                       </button>
                     )}
                   </div>
@@ -807,53 +756,7 @@ export default function CampaignsPage() {
         </div>
       ) : null}
 
-      {/* Create/Edit Modal */}
-      {showModal && (
-        <div className={styles.modalOverlay} onClick={() => setShowModal(false)}>
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <h2>{editingCampaign ? "Edit Promotion" : "Create Promotion"}</h2>
-            <form onSubmit={handleSave}>
-              <div className={styles.formGrid}>
-                <div className={styles.formGroup}>
-                  <label className="label">Promotion Name *</label>
-                  <input className="input" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="e.g., April Birthday Special" required />
-                </div>
-                <div className={styles.formGroup}>
-                  <label className="label">Type</label>
-                  <select className="input" value={formData.type} onChange={(e) => {
-                    setFormData({
-                      ...formData,
-                      type: e.target.value,
-                      message: formData.message || DEFAULT_TEMPLATES[e.target.value] || "",
-                    });
-                  }}>
-                    {CAMPAIGN_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-                  </select>
-                </div>
-                <div className={styles.formGroup}>
-                  <label className="label">Status</label>
-                  <select className="input" value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })}>
-                    <option value="draft">Draft</option>
-                    <option value="active">Active</option>
-                    <option value="paused">Paused</option>
-                  </select>
-                </div>
-              </div>
-              <div className={styles.formGroup} style={{ marginTop: "1rem" }}>
-                <label className="label">Message Template</label>
-                <textarea className="input" rows={4} value={formData.message} onChange={(e) => setFormData({ ...formData, message: e.target.value })} placeholder="Use {name}, {service}, {days} as merge tags..." />
-                <small style={{ color: "var(--text-tertiary)", marginTop: 4, display: "block" }}>
-                  Merge tags: {"{name}"}, {"{service}"}, {"{days}"}, {"{details}"}
-                </small>
-              </div>
-              <div className={styles.modalActions}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">{editingCampaign ? "Save Changes" : "Create Promotion"}</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+
     </div>
   );
 }

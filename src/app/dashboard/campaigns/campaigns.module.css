@@ -218,7 +218,7 @@
 /* ── Holiday Cards ── */
 .holidayGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: var(--space-4);
 }
 .holidayCard {
@@ -227,6 +227,7 @@
   gap: var(--space-3);
   position: relative;
   overflow: hidden;
+  transition: box-shadow var(--transition-fast), border-color var(--transition-fast);
 }
 .holidayCard::before {
   content: '';
@@ -236,6 +237,14 @@
   right: 0;
   height: 3px;
   background: var(--gradient-primary);
+}
+.holidayUrgent {
+  border-color: var(--color-primary-200);
+  box-shadow: 0 0 16px rgba(195, 126, 218, 0.15);
+}
+.holidayUrgent::before {
+  height: 4px;
+  background: linear-gradient(90deg, var(--color-primary), var(--color-accent, #f59e0b));
 }
 .holidayHeader {
   display: flex;
@@ -277,10 +286,109 @@
   border-left: 3px solid var(--color-primary);
   font-style: italic;
 }
+.holidayEditArea {
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+  padding: var(--space-3);
+  background: var(--bg-card);
+  border: 2px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--color-primary);
+  resize: vertical;
+  min-height: 80px;
+  font-family: inherit;
+  color: var(--text-primary);
+  outline: none;
+  width: 100%;
+}
+.holidayEditArea:focus {
+  box-shadow: 0 0 0 3px rgba(195, 126, 218, 0.2);
+}
 .holidayActions {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.holidayStatus {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.statusDot {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-full);
+  display: inline-block;
+  flex-shrink: 0;
+}
+.statusActive { background: var(--color-success); box-shadow: 0 0 6px rgba(34, 197, 94, 0.5); }
+.statusPaused { background: #f59e0b; box-shadow: 0 0 6px rgba(245, 158, 11, 0.5); }
+.statusLabel {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.holidayBtnRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.holidayBtn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  cursor: pointer;
+  font-size: 1.1rem;
+  transition: all var(--transition-fast);
+  padding: 0;
+  line-height: 1;
+}
+.holidayBtn:hover {
+  border-color: var(--color-primary);
+  background: var(--bg-elevated);
+  transform: scale(1.08);
+}
+.holidayBtnSave {
+  width: auto;
+  padding: 0 var(--space-3);
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  gap: var(--space-1);
+}
+.holidayBtnSave:hover {
+  background: var(--color-primary-600, #a855f7);
+  border-color: var(--color-primary-600, #a855f7);
+}
+.holidayBtnCreate {
+  width: 100%;
+  padding: var(--space-3);
+  background: var(--gradient-primary);
+  border: none;
+  border-radius: var(--radius-md);
+  color: #fff;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+.holidayBtnCreate:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(195, 126, 218, 0.35);
 }
 
 /* ═══ Fill My Openings Wizard ═══ */
