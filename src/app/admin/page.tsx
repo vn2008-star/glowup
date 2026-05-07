@@ -295,7 +295,7 @@ export default function AdminPage() {
    * Email (Resend): $0.001/email after free tier
    * Uses ACTUAL data from this month:
    *   - Appointments → each generates 1 SMS reminder
-   *   - Campaign sends → actual blast/automation sends logged
+   *   - Campaign sends → blasts (Fill My Openings, promos) go to ALL active clients via SMS
    */
   function calcMonthlyCost(t: TenantRow): { sms: number; email: number; total: number; smsCount: number; emailCount: number } {
     const SMS_RATE = 0.0079;
@@ -303,10 +303,10 @@ export default function AdminPage() {
 
     const u = t.usage || { appointments_this_month: 0, campaign_sends_this_month: 0 };
 
-    // SMS: 1 reminder per appointment + ~half of campaign sends go via SMS
-    const smsCount = u.appointments_this_month + Math.ceil(u.campaign_sends_this_month * 0.5);
-    // Email: ~half of campaign sends go via email
-    const emailCount = Math.ceil(u.campaign_sends_this_month * 0.5);
+    // SMS: 1 reminder per appointment + ALL campaign sends are SMS blasts to clients
+    const smsCount = u.appointments_this_month + u.campaign_sends_this_month;
+    // Email: ~10% of campaign sends may also trigger email (confirmation copies)
+    const emailCount = Math.ceil(u.campaign_sends_this_month * 0.1);
 
     const sms = smsCount * SMS_RATE;
     const email = emailCount * EMAIL_RATE;
