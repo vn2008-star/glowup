@@ -576,10 +576,12 @@ export default function BookingPage() {
                   <span className={styles.trigger}>⚡ {a.trigger}</span>
                 </div>
                 <div className={styles.channelPickerSmall}>
-                  {(["sms", "email", "both"] as const).map(ch => (
+                  <span className={styles.channelPickerLabel}>Send via:</span>
+                  {([["sms", "📱 SMS", "Send via text message"], ["email", "📧 Email", "Send via email"], ["both", "📱+📧 Both", "Send via SMS and email"]] as const).map(([ch, label, tip]) => (
                     <button
                       key={ch}
                       type="button"
+                      title={tip}
                       className={`${styles.channelBtnSm} ${currentChannel === ch ? styles.channelBtnSmActive : ""}`}
                       onClick={async () => {
                         setAutomationStates(prev => ({ ...prev, [a.channelKey]: ch }));
@@ -590,7 +592,7 @@ export default function BookingPage() {
                         });
                       }}
                     >
-                      {ch === "sms" ? "📱" : ch === "email" ? "📧" : "📱+📧"}
+                      {label}
                     </button>
                   ))}
                 </div>
