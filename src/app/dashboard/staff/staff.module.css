@@ -552,6 +552,72 @@
   z-index: 2;
 }
 
+/* ═══ Vacation ═══ */
+.vacationBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  background: rgba(139, 92, 246, 0.08);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--color-primary);
+  white-space: nowrap;
+}
+.vacationList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.vacationItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  transition: all var(--transition-fast);
+}
+.vacationItem:hover {
+  border-color: var(--border-default);
+}
+.vacationDates {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.vacationNote {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  margin-top: 2px;
+  font-style: italic;
+}
+.onVacationTag {
+  display: inline-block;
+  margin-left: var(--space-2);
+  padding: 1px 8px;
+  border-radius: var(--radius-full);
+  background: rgba(251, 191, 36, 0.15);
+  color: #f59e0b;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.pastVacationTag {
+  display: inline-block;
+  margin-left: var(--space-2);
+  padding: 1px 8px;
+  border-radius: var(--radius-full);
+  background: var(--bg-surface);
+  color: var(--text-tertiary);
+  font-size: 10px;
+  font-weight: 700;
+}
+
 @media (max-width: 768px) {
   .staffGrid { grid-template-columns: 1fr; }
   .formGrid { grid-template-columns: 1fr; }

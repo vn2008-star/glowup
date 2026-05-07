@@ -35,6 +35,13 @@ export default function StaffPage() {
   const [agreementStaff, setAgreementStaff] = useState<Staff | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
+  // Vacation state
+  const [showVacationModal, setShowVacationModal] = useState(false);
+  const [vacationStaff, setVacationStaff] = useState<Staff | null>(null);
+  const [vacationStart, setVacationStart] = useState("");
+  const [vacationEnd, setVacationEnd] = useState("");
+  const [vacationNote, setVacationNote] = useState("");
+
   const fetchStaff = useCallback(async () => {
     if (!tenant) return;
     setLoading(true);
@@ -265,13 +272,66 @@ export default function StaffPage() {
   async function handleSaveSchedule(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedStaff) return;
-    const { data } = await queryData<Staff>("staff.update", { id: selectedStaff.id, schedule: scheduleData });
+    // preserve existing vacations when saving schedule
+    const existingSchedule = (selectedStaff.schedule || {}) as Record<string, unknown>;
+    const merged = { ...scheduleData, vacations: existingSchedule.vacations || [] };
+    const { data } = await queryData<Staff>("staff.update", { id: selectedStaff.id, schedule: merged });
     if (data) {
       setStaffMembers((prev) => prev.map((s) => (s.id === data.id ? data : s)));
       setSelectedStaff(data);
     }
     setShowScheduleModal(false);
     setSelectedStaff(null);
+  }
+
+  function openVacation(s: Staff) {
+    setVacationStaff(s);
+    setVacationStart("");
+    setVacationEnd("");
+    setVacationNote("");
+    setShowVacationModal(true);
+  }
+
+  function getVacations(s: Staff): { start: string; end: string; note: string }[] {
+    const sched = (s.schedule || {}) as Record<string, unknown>;
+    return (sched.vacations || []) as { start: string; end: string; note: string }[];
+  }
+
+  function getUpcomingVacation(s: Staff): { start: string; end: string; note: string } | null {
+    const today = new Date().toISOString().slice(0, 10);
+    const vacs = getVacations(s).filter(v => v.end >= today).sort((a, b) => a.start.localeCompare(b.start));
+    return vacs[0] || null;
+  }
+
+  async function handleAddVacation(e: React.FormEvent) {
+    e.preventDefault();
+    if (!vacationStaff || !vacationStart || !vacationEnd) return;
+    const existing = getVacations(vacationStaff);
+    const updated = [...existing, { start: vacationStart, end: vacationEnd, note: vacationNote }]
+      .sort((a, b) => a.start.localeCompare(b.start));
+    const sched = { ...(vacationStaff.schedule || {}), vacations: updated } as Record<string, unknown>;
+    const { data } = await queryData<Staff>("staff.update", { id: vacationStaff.id, schedule: sched });
+    if (data) {
+      setStaffMembers(prev => prev.map(s => s.id === data.id ? data : s));
+      setVacationStaff(data);
+      if (selectedStaff?.id === data.id) setSelectedStaff(data);
+    }
+    setVacationStart("");
+    setVacationEnd("");
+    setVacationNote("");
+  }
+
+  async function handleRemoveVacation(index: number) {
+    if (!vacationStaff) return;
+    const existing = getVacations(vacationStaff);
+    const updated = existing.filter((_, i) => i !== index);
+    const sched = { ...(vacationStaff.schedule || {}), vacations: updated } as Record<string, unknown>;
+    const { data } = await queryData<Staff>("staff.update", { id: vacationStaff.id, schedule: sched });
+    if (data) {
+      setStaffMembers(prev => prev.map(s => s.id === data.id ? data : s));
+      setVacationStaff(data);
+      if (selectedStaff?.id === data.id) setSelectedStaff(data);
+    }
   }
   /* Helper: extract professional title from stored specialties */
   function getStaffProfTitle(s: Staff): string | null {
@@ -363,9 +423,20 @@ export default function StaffPage() {
                   {s.email && <span>✉️ {s.email}</span>}
                   {s.phone && <span>📱 {s.phone}</span>}
                 </div>
+                {getUpcomingVacation(s) && (() => {
+                  const v = getUpcomingVacation(s)!;
+                  const today = new Date().toISOString().slice(0, 10);
+                  const isOnVacation = v.start <= today && v.end >= today;
+                  return (
+                    <div className={styles.vacationBadge} style={isOnVacation ? { background: 'rgba(251,191,36,0.15)', color: '#f59e0b', borderColor: 'rgba(251,191,36,0.3)' } : undefined}>
+                      🏖️ {isOnVacation ? 'On Vacation' : 'Upcoming'}: {new Date(v.start + 'T00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – {new Date(v.end + 'T00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </div>
+                  );
+                })()}
                 <div className={styles.staffActions}>
                   <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); openEdit(s); }}>✏️ Edit</button>
                   <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); openSchedule(s); }}>📅 Schedule</button>
+                  <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); openVacation(s); }}>🏖️ Vacation</button>
                   <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); setAgreementStaff(s); }}>{(s as any).agreement_signed_at ? '✅' : '📝'} Agreement</button>
                   <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(s.id); }} style={{ color: "var(--color-danger)" }}>🗑️</button>
                 </div>
@@ -486,6 +557,39 @@ export default function StaffPage() {
                 </div>
               </div>
 
+              {/* Vacations */}
+              {(() => {
+                const vacs = getVacations(selectedStaff);
+                const today = new Date().toISOString().slice(0, 10);
+                const upcoming = vacs.filter(v => v.end >= today);
+                return (
+                  <div className={styles.drawerSection}>
+                    <h3>🏖️ Vacation Schedule</h3>
+                    {upcoming.length === 0 ? (
+                      <p style={{ color: 'var(--text-tertiary)', fontSize: 'var(--text-sm)' }}>No upcoming vacations</p>
+                    ) : (
+                      <div className={styles.vacationList}>
+                        {upcoming.map((v, i) => {
+                          const isOnVacation = v.start <= today && v.end >= today;
+                          return (
+                            <div key={i} className={styles.vacationItem} style={isOnVacation ? { borderColor: 'rgba(251,191,36,0.4)', background: 'rgba(251,191,36,0.06)' } : undefined}>
+                              <div>
+                                <span className={styles.vacationDates}>
+                                  {new Date(v.start + 'T00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} – {new Date(v.end + 'T00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                </span>
+                                {isOnVacation && <span className={styles.onVacationTag}>Currently Away</span>}
+                                {v.note && <div className={styles.vacationNote}>{v.note}</div>}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    <button className="btn btn-ghost btn-sm" style={{ marginTop: 'var(--space-2)' }} onClick={() => openVacation(selectedStaff)}>+ Add Vacation</button>
+                  </div>
+                );
+              })()}
+
               {/* Stats */}
               <div className={styles.drawerSection}>
                 <h3>Compensation</h3>
@@ -497,8 +601,9 @@ export default function StaffPage() {
 
               <div className={styles.drawerActions}>
                 <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => openEdit(selectedStaff)}>✏️ Edit Profile</button>
-                <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => openSchedule(selectedStaff)}>📅 Edit Schedule</button>
-                <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setAgreementStaff(selectedStaff)}>{(selectedStaff as any).agreement_signed_at ? '✅ View Agreement' : '📝 Sign Agreement'}</button>
+                <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => openSchedule(selectedStaff)}>📅 Schedule</button>
+                <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => openVacation(selectedStaff)}>🏖️ Vacation</button>
+                <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setAgreementStaff(selectedStaff)}>{(selectedStaff as any).agreement_signed_at ? '✅ Agreement' : '📝 Agreement'}</button>
                 <button className="btn btn-ghost" style={{ color: "var(--color-danger)" }} onClick={() => setDeleteConfirmId(selectedStaff.id)}>🗑️</button>
               </div>
             </div>
@@ -784,6 +889,77 @@ export default function StaffPage() {
           onClose={() => setAgreementStaff(null)}
           onSigned={() => { setAgreementStaff(null); fetchStaff(); }}
         />
+      )}
+
+      {/* ── Vacation Editor Modal ── */}
+      {showVacationModal && vacationStaff && (
+        <div className={styles.modalOverlay} onClick={() => { setShowVacationModal(false); setVacationStaff(null); }}>
+          <div className={`${styles.modal}`} onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
+            <div className={styles.modalHeader}>
+              <h2>🏖️ Vacation — {vacationStaff.name}</h2>
+            </div>
+            <div className={styles.modalBody}>
+              {/* Existing vacations */}
+              {(() => {
+                const vacs = getVacations(vacationStaff);
+                const today = new Date().toISOString().slice(0, 10);
+                return vacs.length > 0 ? (
+                  <div className={styles.vacationList} style={{ marginBottom: 'var(--space-4)' }}>
+                    {vacs.map((v, i) => {
+                      const isOnVacation = v.start <= today && v.end >= today;
+                      const isPast = v.end < today;
+                      return (
+                        <div key={i} className={styles.vacationItem} style={
+                          isOnVacation ? { borderColor: 'rgba(251,191,36,0.4)', background: 'rgba(251,191,36,0.06)' }
+                          : isPast ? { opacity: 0.5 } : undefined
+                        }>
+                          <div style={{ flex: 1 }}>
+                            <span className={styles.vacationDates}>
+                              {new Date(v.start + 'T00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                              {' '}–{' '}
+                              {new Date(v.end + 'T00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                            </span>
+                            {isOnVacation && <span className={styles.onVacationTag}>Currently Away</span>}
+                            {isPast && <span className={styles.pastVacationTag}>Past</span>}
+                            {v.note && <div className={styles.vacationNote}>{v.note}</div>}
+                          </div>
+                          <button type="button" className={styles.slotRemoveBtn} onClick={() => handleRemoveVacation(i)} title="Remove">✕</button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p style={{ color: 'var(--text-tertiary)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-4)' }}>No vacations scheduled yet</p>
+                );
+              })()}
+
+              {/* Add new vacation */}
+              <form onSubmit={handleAddVacation}>
+                <h4 style={{ fontSize: 'var(--text-sm)', fontWeight: 600, marginBottom: 'var(--space-3)', color: 'var(--text-secondary)' }}>Add Time Off</h4>
+                <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap', alignItems: 'end' }}>
+                  <div className={styles.formGroup} style={{ flex: 1, minWidth: 140 }}>
+                    <label className="label">Start Date *</label>
+                    <input className="input" type="date" value={vacationStart} onChange={(e) => setVacationStart(e.target.value)} required min={new Date().toISOString().slice(0, 10)} />
+                  </div>
+                  <div className={styles.formGroup} style={{ flex: 1, minWidth: 140 }}>
+                    <label className="label">End Date *</label>
+                    <input className="input" type="date" value={vacationEnd} onChange={(e) => setVacationEnd(e.target.value)} required min={vacationStart || new Date().toISOString().slice(0, 10)} />
+                  </div>
+                </div>
+                <div className={styles.formGroup} style={{ marginTop: 'var(--space-3)' }}>
+                  <label className="label">Note (optional)</label>
+                  <input className="input" value={vacationNote} onChange={(e) => setVacationNote(e.target.value)} placeholder="e.g., Family trip, Personal day" />
+                </div>
+                <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
+                  <button type="submit" className="btn btn-primary" disabled={!vacationStart || !vacationEnd}>+ Add Vacation</button>
+                </div>
+              </form>
+            </div>
+            <div className={styles.modalFooter}>
+              <button type="button" className="btn btn-secondary" onClick={() => { setShowVacationModal(false); setVacationStaff(null); }}>Done</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── Delete Confirmation Modal ── */}
