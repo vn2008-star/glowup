@@ -652,7 +652,7 @@ export default function SettingsPage() {
               <div className={styles.templateGroup}>
                 <div className={styles.templateGroupLabel}>👤 Client Templates</div>
                 <small style={{ color: "var(--text-tertiary)", display: "block", marginBottom: "var(--space-3)" }}>
-                  Merge tags: {'{client_name}'}, {'{service}'}, {'{staff}'}, {'{business_name}'}, {'{date}'}, {'{time}'}
+                  Merge tags: {'{client_name}'}, {'{service}'}, {'{staff}'}, {'{business_name}'}, {'{address}'}, {'{date}'}, {'{time}'}
                 </small>
 
                 {(reminderSettings.r24h_sms || reminderSettings.r2h_sms || reminderSettings.r1h_sms) && (
@@ -689,6 +689,21 @@ export default function SettingsPage() {
                     </div>
                   </>
                 )}
+
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ marginTop: "var(--space-3)", fontSize: "var(--text-xs)" }}
+                  onClick={() => {
+                    setReminderTemplates({
+                      sms: "Hi {client_name}! This is a reminder that your {service} appointment at {business_name} is tomorrow, {date} at {time}. 📍 {address}\n\nReply C to Confirm, M to Modify, X to Cancel. Reply STOP to opt out.",
+                      email_subject: "Appointment Reminder — {business_name}",
+                      email: "Hi {client_name},\n\nThis is a friendly reminder about your upcoming appointment:\n\n📋 Service: {service}\n📅 Date: {date}\n🕐 Time: {time}\n📍 At: {business_name}\n🏠 Address: {address}\n\nTo confirm, modify, or cancel your appointment, please reply to this email or contact us directly.\n\nSee you soon!\n— {business_name}",
+                    });
+                  }}
+                >
+                  ↻ Reset to Default
+                </button>
               </div>
             )}
 
