@@ -53,8 +53,80 @@ export async function POST(request: Request) {
     console.log(`SMS opt-in: ${from} (${clients?.length || 0} client records updated)`)
     replyMessage = 'You have been re-subscribed to appointment reminders. Reply STOP at any time to opt out.'
 
+  } else if (['C', 'CONFIRM'].includes(body)) {
+    // Confirm appointment — find the most recent upcoming appointment for this phone
+    const { data: clients } = await supabase
+      .from('clients')
+      .select('id, tenant_id')
+      .eq('phone', from)
+    
+    if (clients && clients.length > 0) {
+      const clientIds = clients.map(c => c.id)
+      const now = new Date().toISOString()
+      
+      const { data: upcomingApt } = await supabase
+        .from('appointments')
+        .select('id')
+        .in('client_id', clientIds)
+        .gte('start_time', now)
+        .neq('status', 'cancelled')
+        .order('start_time', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+
+      if (upcomingApt) {
+        await supabase
+          .from('appointments')
+          .update({ status: 'confirmed' })
+          .eq('id', upcomingApt.id)
+        replyMessage = '✅ Your appointment is confirmed! We look forward to seeing you.'
+      } else {
+        replyMessage = 'We couldn\'t find an upcoming appointment. Please contact the salon directly.'
+      }
+    } else {
+      replyMessage = 'We couldn\'t find your account. Please contact the salon directly.'
+    }
+
+  } else if (['X'].includes(body)) {
+    // Cancel appointment
+    const { data: clients } = await supabase
+      .from('clients')
+      .select('id, tenant_id')
+      .eq('phone', from)
+    
+    if (clients && clients.length > 0) {
+      const clientIds = clients.map(c => c.id)
+      const now = new Date().toISOString()
+      
+      const { data: upcomingApt } = await supabase
+        .from('appointments')
+        .select('id')
+        .in('client_id', clientIds)
+        .gte('start_time', now)
+        .neq('status', 'cancelled')
+        .order('start_time', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+
+      if (upcomingApt) {
+        await supabase
+          .from('appointments')
+          .update({ status: 'cancelled' })
+          .eq('id', upcomingApt.id)
+        replyMessage = '❌ Your appointment has been cancelled. Reply or call us anytime to rebook!'
+      } else {
+        replyMessage = 'We couldn\'t find an upcoming appointment to cancel. Please contact the salon directly.'
+      }
+    } else {
+      replyMessage = 'We couldn\'t find your account. Please contact the salon directly.'
+    }
+
+  } else if (['M', 'MODIFY', 'RESCHEDULE', 'CHANGE'].includes(body)) {
+    // Modify — direct them to contact salon
+    replyMessage = '📞 To modify your appointment, please call or text us directly and we\'ll find a new time for you!'
+
   } else {
-    replyMessage = 'Thanks for your message! Please contact our salon directly for appointment changes.'
+    replyMessage = 'Thanks for your message! Reply C to Confirm, M to Modify, X to Cancel your appointment. Reply STOP to opt out.'
   }
 
   // Return TwiML response

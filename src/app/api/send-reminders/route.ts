@@ -94,9 +94,9 @@ export async function GET(request: Request) {
 
     // Build message from template or default
     const customTemplates = (settings.reminder_templates || {}) as Record<string, string>
-    const smsTemplate = customTemplates.sms || `Hi {client_name}! This is a reminder that your {service} appointment at {business_name} is tomorrow, {date} at {time}.${businessAddress ? ' 📍 {address}' : ''} Reply STOP to opt out.`
+    const smsTemplate = customTemplates.sms || `Hi {client_name}! This is a reminder that your {service} appointment at {business_name} is tomorrow, {date} at {time}.${businessAddress ? ' 📍 {address}' : ''}\n\nReply C to Confirm, M to Modify, X to Cancel. Reply STOP to opt out.`
     const emailSubject = customTemplates.email_subject || `Appointment Reminder — {business_name}`
-    const emailBody = customTemplates.email || `Hi {client_name},\n\nThis is a friendly reminder about your upcoming appointment:\n\n📋 Service: {service}\n📅 Date: {date}\n🕐 Time: {time}\n${staffName ? `💇 With: {staff}\n` : ''}\n📍 At: {business_name}\n🏠 Address: {address}\n\nNeed to reschedule? Please contact us as soon as possible.\n\nSee you soon!\n— {business_name}`
+    const emailBody = customTemplates.email || `Hi {client_name},\n\nThis is a friendly reminder about your upcoming appointment:\n\n📋 Service: {service}\n📅 Date: {date}\n🕐 Time: {time}\n${staffName ? `💇 With: {staff}\n` : ''}\n📍 At: {business_name}\n🏠 Address: {address}\n\nTo confirm, modify, or cancel your appointment, please reply to this email or contact us directly.\n\nSee you soon!\n— {business_name}`
 
     function fillTemplate(template: string): string {
       return template
