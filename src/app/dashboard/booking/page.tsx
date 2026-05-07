@@ -115,6 +115,9 @@ export default function BookingPage() {
   const [fillAudience, setFillAudience] = useState<FillAudience>("all");
   const [selectedClientIds, setSelectedClientIds] = useState<Set<string>>(new Set());
   const [clientSearch, setClientSearch] = useState("");
+  const [savedLists, setSavedLists] = useState<{ name: string; clientIds: string[] }[]>([]);
+  const [saveListName, setSaveListName] = useState("");
+  const [showSaveList, setShowSaveList] = useState(false);
   const [fillSending, setFillSending] = useState(false);
   const [fillSent, setFillSent] = useState(false);
   const [allStaff, setAllStaff] = useState<Staff[]>([]);
@@ -142,12 +145,22 @@ export default function BookingPage() {
 
     // Load automation states
     const settings = (tenant?.settings || {}) as Record<string, unknown>;
-    const autoSettings = (settings.automations || {}) as Record<string, boolean>;
-    const states: Record<string, boolean> = {};
+    const autoSettings = (settings.automations || {}) as Record<string, boolean | string>;
+    const states: Record<string, boolean | string> = {};
     BOOKING_AUTOMATIONS.forEach((a) => {
       states[a.key] = autoSettings[a.key] ?? true;
+      if (autoSettings[a.channelKey]) states[a.channelKey] = autoSettings[a.channelKey];
     });
+    // Load FMO settings
+    states["auto_fill_openings"] = autoSettings["auto_fill_openings"] ?? false;
+    states["auto_fill_openings_channel"] = autoSettings["auto_fill_openings_channel"] || "both";
+    states["auto_fill_openings_audience"] = autoSettings["auto_fill_openings_audience"] || "all";
+    states["auto_fill_openings_list"] = autoSettings["auto_fill_openings_list"] || "";
     setAutomationStates(states);
+
+    // Load saved client lists
+    const lists = (settings.savedClientLists || []) as { name: string; clientIds: string[] }[];
+    setSavedLists(lists);
   }, [tenant, fillDays]);
 
   useEffect(() => { loadFillData(); }, [loadFillData]);
@@ -495,6 +508,63 @@ export default function BookingPage() {
                     <button type="button" className={styles.chipClearAll} onClick={() => setSelectedClientIds(new Set())}>Clear all</button>
                   </div>
                 )}
+                {/* Save / Load list controls */}
+                <div className={styles.listActions}>
+                  {savedLists.length > 0 && (
+                    <div className={styles.loadListRow}>
+                      <label className={styles.channelPickerLabel}>Load saved list:</label>
+                      <select
+                        className="input"
+                        style={{ maxWidth: 200, fontSize: "var(--text-xs)" }}
+                        defaultValue=""
+                        onChange={(e) => {
+                          const list = savedLists.find(l => l.name === e.target.value);
+                          if (list) setSelectedClientIds(new Set(list.clientIds));
+                        }}
+                      >
+                        <option value="" disabled>Choose a list…</option>
+                        {savedLists.map(l => (
+                          <option key={l.name} value={l.name}>{l.name} ({l.clientIds.length})</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  {selectedClientIds.size > 0 && !showSaveList && (
+                    <button type="button" className={styles.saveListBtn} onClick={() => setShowSaveList(true)}>💾 Save this list</button>
+                  )}
+                  {showSaveList && (
+                    <div className={styles.saveListRow}>
+                      <input
+                        className="input"
+                        placeholder="List name (e.g., VIP Regulars)"
+                        value={saveListName}
+                        onChange={e => setSaveListName(e.target.value)}
+                        style={{ maxWidth: 220, fontSize: "var(--text-xs)" }}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        style={{ fontSize: "var(--text-xs)", padding: "var(--space-2) var(--space-3)" }}
+                        disabled={!saveListName.trim()}
+                        onClick={async () => {
+                          const newList = { name: saveListName.trim(), clientIds: Array.from(selectedClientIds) };
+                          const updated = [...savedLists.filter(l => l.name !== newList.name), newList];
+                          setSavedLists(updated);
+                          setSaveListName("");
+                          setShowSaveList(false);
+                          await fetch("/api/save-settings", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ tenantId: tenant?.id, path: "savedClientLists", value: updated }),
+                          });
+                        }}
+                      >
+                        Save
+                      </button>
+                      <button type="button" className={styles.chipClearAll} onClick={() => { setShowSaveList(false); setSaveListName(""); }}>Cancel</button>
+                    </div>
+                  )}
+                </div>
                 <div className={styles.clientPickerList}>
                   {allClients
                     .filter(c => {
@@ -654,13 +724,14 @@ export default function BookingPage() {
                     </div>
 
                     {/* Audience */}
-                    <div className={styles.channelPickerSmall}>
+                    <div className={styles.channelPickerSmall} style={{ flexWrap: "wrap" }}>
                       <span className={styles.channelPickerLabel}>Send to:</span>
                       {([
-                        ["all", "📣 All Clients", "Notify everyone"],
+                        ["all", "📣 All", "Notify everyone"],
                         ["active", "✅ Active", "Recently visited clients"],
                         ["at_risk", "⚠️ At-Risk", "Win them back"],
                         ["vip", "👑 VIP", "Top spenders & regulars"],
+                        ["saved_list", "📋 Saved List", "Use a saved client list"],
                       ] as const).map(([aud, label, tip]) => (
                         <button
                           key={aud}
@@ -680,6 +751,35 @@ export default function BookingPage() {
                         </button>
                       ))}
                     </div>
+
+                    {/* Saved list selector */}
+                    {fmoAudience === "saved_list" && (
+                      <div className={styles.channelPickerSmall}>
+                        <span className={styles.channelPickerLabel}>Use list:</span>
+                        {savedLists.length === 0 ? (
+                          <span style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)" }}>No saved lists yet — save one from the wizard above</span>
+                        ) : (
+                          <select
+                            className="input"
+                            style={{ maxWidth: 220, fontSize: "var(--text-xs)" }}
+                            value={(automationStates["auto_fill_openings_list"] as string) || ""}
+                            onChange={async (e) => {
+                              setAutomationStates(prev => ({ ...prev, auto_fill_openings_list: e.target.value }));
+                              await fetch("/api/save-settings", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ tenantId: tenant?.id, path: "automations.auto_fill_openings_list", value: e.target.value }),
+                              });
+                            }}
+                          >
+                            <option value="" disabled>Choose a list…</option>
+                            {savedLists.map(l => (
+                              <option key={l.name} value={l.name}>{l.name} ({l.clientIds.length} clients)</option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
