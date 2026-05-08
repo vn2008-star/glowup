@@ -729,7 +729,8 @@
 }
 .trigger, .channel {
   font-size: var(--text-sm);
-  color: var(--text-secondary);
+  font-weight: 500;
+  color: var(--text-primary);
 }
 .channelPickerSmall {
   display: flex;
@@ -739,8 +740,8 @@
 }
 .channelPickerLabel {
   font-size: var(--text-xs);
-  font-weight: 600;
-  color: var(--text-tertiary);
+  font-weight: 700;
+  color: var(--text-secondary);
   margin-right: var(--space-1);
 }
 .channelBtnSm {
@@ -749,21 +750,22 @@
   border: 1.5px solid var(--border-default);
   background: var(--bg-card);
   font-size: var(--text-xs);
-  font-weight: 600;
-  color: var(--text-secondary);
+  font-weight: 700;
+  color: var(--text-primary);
   cursor: pointer;
   transition: all var(--transition-fast);
   line-height: 1.2;
 }
 .channelBtnSm:hover {
   border-color: var(--color-primary-200);
-  background: rgba(195, 126, 218, 0.05);
+  background: rgba(195, 126, 218, 0.08);
   color: var(--text-primary);
 }
 .channelBtnSmActive {
   border-color: var(--color-primary);
-  background: rgba(195, 126, 218, 0.15);
+  background: rgba(195, 126, 218, 0.18);
   color: var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-primary);
 }
 .toggleLabel {
   display: flex;
@@ -771,31 +773,32 @@
 }
 .toggleLabel input { display: none; }
 .toggleTrack {
-  width: 44px;
-  height: 24px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-default);
+  width: 48px;
+  height: 26px;
+  background: var(--border-strong);
+  border: 2px solid var(--border-strong);
   border-radius: var(--radius-full);
   position: relative;
   transition: all var(--transition-fast);
 }
 .toggleThumb {
-  width: 18px;
-  height: 18px;
-  background: var(--text-tertiary);
+  width: 20px;
+  height: 20px;
+  background: #fff;
   border-radius: var(--radius-full);
   position: absolute;
-  top: 2px;
-  left: 2px;
+  top: 1px;
+  left: 1px;
   transition: all var(--transition-fast);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
 }
 .toggleLabel input:checked ~ .toggleTrack {
-  background: var(--color-primary-200);
+  background: var(--color-primary);
   border-color: var(--color-primary);
 }
 .toggleLabel input:checked ~ .toggleTrack .toggleThumb {
-  transform: translateX(20px);
-  background: var(--color-primary);
+  transform: translateX(22px);
+  background: #fff;
 }
 
 /* ── Responsive ── */

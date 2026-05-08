@@ -61,13 +61,19 @@ export function LandingHeader() {
 
       {/* Mobile dropdown */}
       {menuOpen && (
-        <nav className={styles.mobileNav} onClick={() => setMenuOpen(false)}>
+        <nav className={styles.mobileNav} onClick={(e) => {
+          const target = e.target as HTMLElement
+          // Only close menu when clicking actual nav links, not the language switcher
+          if (target.closest('a') && !target.closest('[title="Change language"]')) {
+            setMenuOpen(false)
+          }
+        }}>
           <a href="#features">{t('features')}</a>
           <a href="#pricing">{t('pricing')}</a>
           <Link href="/refer">🎁 Refer & Earn</Link>
           <LanguageSwitcher variant="header" />
           <Link href="/auth/login">{t('signIn')}</Link>
-          <Link href="/auth/signup" className="btn btn-sm btn-primary" style={{ width: '100%', justifyContent: 'center' }}>{t('getStarted')}</Link>
+          <Link href="/auth/signup" className="btn btn-sm btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setMenuOpen(false)}>{t('getStarted')}</Link>
         </nav>
       )}
     </header>

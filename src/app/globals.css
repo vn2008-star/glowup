@@ -174,8 +174,8 @@
 
   --bg-base: #0e0b14;
   --bg-elevated: #150f1e;
-  --bg-surface: #1c1528;
-  --bg-surface-hover: #261e36;
+  --bg-surface: #221a30;
+  --bg-surface-hover: #2e2440;
   --bg-card: #1e1729;
   --bg-card-hover: #2a2040;
   --bg-input: #18122488;
@@ -183,16 +183,16 @@
   --bg-glass-hover: rgba(42, 32, 60, 0.8);
   --bg-overlay: rgba(8, 5, 12, 0.65);
 
-  --text-primary: #f2eef8;
-  --text-secondary: #b0a8c4;
-  --text-tertiary: #756d8a;
+  --text-primary: #f4f0fa;
+  --text-secondary: #cdc4de;
+  --text-tertiary: #9990ad;
   --text-inverse: #0e0b14;
   --text-link: #d4a0e3;
 
-  --border-subtle: rgba(201, 160, 220, 0.06);
-  --border-default: rgba(201, 160, 220, 0.1);
-  --border-strong: rgba(201, 160, 220, 0.2);
-  --border-accent: rgba(240, 163, 181, 0.35);
+  --border-subtle: rgba(201, 160, 220, 0.10);
+  --border-default: rgba(201, 160, 220, 0.18);
+  --border-strong: rgba(201, 160, 220, 0.32);
+  --border-accent: rgba(240, 163, 181, 0.40);
 
   --gradient-primary: linear-gradient(135deg, #c9a0dc 0%, #f0a3b5 100%);
   --gradient-primary-reverse: linear-gradient(135deg, #f0a3b5 0%, #c9a0dc 100%);
@@ -324,7 +324,7 @@ select option {
   padding: var(--space-3) var(--space-6);
   font-family: var(--font-body);
   font-size: var(--text-sm);
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1;
   border: none;
   border-radius: var(--radius-md);
@@ -470,8 +470,8 @@ select option {
 .label {
   display: block;
   font-size: var(--text-sm);
-  font-weight: 500;
-  color: var(--text-secondary);
+  font-weight: 600;
+  color: var(--text-primary);
   margin-bottom: var(--space-2);
 }
 

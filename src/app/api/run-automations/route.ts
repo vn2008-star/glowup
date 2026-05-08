@@ -276,10 +276,11 @@ export async function GET(request: Request) {
       }
     }
 
-    // ── Rebooking Reminder (clients not seen in 30+ days) ──
+    // ── Rebooking Reminder (clients not seen in configured service cycle) ──
     if (automations.auto_rebooking !== false) {
-      const thirtyDaysAgo = new Date()
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+      const cycleDays = parseInt(String(automations.auto_rebooking_cycle || '30'), 10)
+      const cycleAgo = new Date()
+      cycleAgo.setDate(cycleAgo.getDate() - cycleDays)
 
       const { data: staleClients } = await supabase
         .from('clients')
@@ -287,7 +288,7 @@ export async function GET(request: Request) {
         .eq('tenant_id', tenant.id)
         .eq('status', 'active')
         .not('last_visit', 'is', null)
-        .lte('last_visit', thirtyDaysAgo.toISOString())
+        .lte('last_visit', cycleAgo.toISOString())
         .limit(50) // Process in batches
 
       if (staleClients) {

@@ -178,6 +178,8 @@ export default function BookingPage() {
       states[a.key] = autoSettings[a.key] ?? true;
       if (autoSettings[a.channelKey]) states[a.channelKey] = autoSettings[a.channelKey];
     });
+    // Load rebooking cycle setting
+    states["auto_rebooking_cycle"] = autoSettings["auto_rebooking_cycle"] || "30";
     // Load FMO settings
     states["auto_fill_openings"] = autoSettings["auto_fill_openings"] ?? false;
     states["auto_fill_openings_channel"] = autoSettings["auto_fill_openings_channel"] || "both";
@@ -854,13 +856,43 @@ export default function BookingPage() {
 
           {BOOKING_AUTOMATIONS.map((a) => {
             const currentChannel = (automationStates[a.channelKey] as unknown as string) || "both";
+            const rebookingCycle = parseInt((automationStates["auto_rebooking_cycle"] as string) || "30", 10);
+
+            async function saveRebookingCycle(days: string) {
+              setAutomationStates(prev => ({ ...prev, auto_rebooking_cycle: days }));
+              await fetch("/api/save-settings", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ tenantId: tenant?.id, path: "automations.auto_rebooking_cycle", value: days }),
+              });
+            }
+
             return (
             <div key={a.key} className={`card ${styles.automationCard}`}>
               <div className={styles.automationInfo}>
                 <h3>{a.name}</h3>
                 <div className={styles.automationMeta}>
-                  <span className={styles.trigger}>⚡ {a.trigger}</span>
+                  <span className={styles.trigger}>⚡ {a.key === "auto_rebooking" ? `Triggers after ${rebookingCycle} days` : a.trigger}</span>
                 </div>
+
+                {/* Service Cycle Picker (rebooking only) */}
+                {a.key === "auto_rebooking" && (
+                  <div className={styles.channelPickerSmall}>
+                    <span className={styles.channelPickerLabel}>Service cycle:</span>
+                    {[14, 21, 30, 45, 60, 90].map(d => (
+                      <button
+                        key={d}
+                        type="button"
+                        title={`Remind clients after ${d} days since last visit`}
+                        className={`${styles.channelBtnSm} ${rebookingCycle === d ? styles.channelBtnSmActive : ""}`}
+                        onClick={() => saveRebookingCycle(String(d))}
+                      >
+                        {d} days
+                      </button>
+                    ))}
+                  </div>
+                )}
+
                 <div className={styles.channelPickerSmall}>
                   <span className={styles.channelPickerLabel}>Send via:</span>
                   {([["sms", "📱 SMS", "Send via text message"], ["email", "📧 Email", "Send via email"], ["both", "📱+📧 Both", "Send via SMS and email"]] as const).map(([ch, label, tip]) => (
@@ -903,13 +935,13 @@ export default function BookingPage() {
                   }}>
                     <div style={{ fontStyle: "italic", color: "var(--text-secondary)" }}>
                       {a.key === "auto_rebooking"
-                        ? <>Hey <strong>Sarah</strong>! It&apos;s been <strong>30 days</strong> since your last visit to <strong>{tenant?.name || "Your Salon"}</strong>. Time for a refresh? Book now →</>
+                        ? <>Hey <strong>Sarah</strong>! It&apos;s been <strong>{rebookingCycle} days</strong> since your last visit to <strong>{tenant?.name || "Your Salon"}</strong>. Time for a refresh? Book now →</>
                         : <>Hi <strong>Sarah</strong>, we missed you today at <strong>{tenant?.name || "Your Salon"}</strong>! 😊 Life happens — we&apos;d love to help you rebook. Book your next visit →</>
                       }
                     </div>
                     <div style={{ marginTop: "8px", fontSize: "11px", color: "var(--text-tertiary)", display: "flex", gap: "12px", flexWrap: "wrap" }}>
                       <span>📱 Via: <strong>{currentChannel === "both" ? "SMS + Email" : currentChannel === "sms" ? "SMS" : "Email"}</strong></span>
-                      <span>⚡ Trigger: <strong>{a.trigger}</strong></span>
+                      <span>⚡ Trigger: <strong>{a.key === "auto_rebooking" ? `After ${rebookingCycle} days` : a.trigger}</strong></span>
                     </div>
                   </div>
                 </div>
