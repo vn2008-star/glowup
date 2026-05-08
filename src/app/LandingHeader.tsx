@@ -40,10 +40,14 @@ export function LandingHeader() {
           <a href="#features">{t('features')}</a>
           <a href="#pricing">{t('pricing')}</a>
           <Link href="/refer" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>🎁 Refer & Earn</Link>
-          <LanguageSwitcher variant="header" />
           <Link href="/auth/login">{t('signIn')}</Link>
           <Link href="/auth/signup" className="btn btn-sm btn-primary">{t('getStarted')}</Link>
         </nav>
+
+        {/* Language switcher — always visible, even on mobile */}
+        <div className={styles.langSwitcherAlways}>
+          <LanguageSwitcher variant="header" />
+        </div>
 
         {/* Mobile hamburger */}
         <button
@@ -63,15 +67,13 @@ export function LandingHeader() {
       {menuOpen && (
         <nav className={styles.mobileNav} onClick={(e) => {
           const target = e.target as HTMLElement
-          // Only close menu when clicking actual nav links, not the language switcher
-          if (target.closest('a') && !target.closest('[title="Change language"]')) {
+          if (target.closest('a')) {
             setMenuOpen(false)
           }
         }}>
           <a href="#features">{t('features')}</a>
           <a href="#pricing">{t('pricing')}</a>
           <Link href="/refer">🎁 Refer & Earn</Link>
-          <LanguageSwitcher variant="header" />
           <Link href="/auth/login">{t('signIn')}</Link>
           <Link href="/auth/signup" className="btn btn-sm btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setMenuOpen(false)}>{t('getStarted')}</Link>
         </nav>
