@@ -625,10 +625,11 @@ export default function BookingPage() {
                           setSavedLists(updated);
                           setSaveListName("");
                           setShowSaveList(false);
+                          const s = (tenant?.settings || {}) as Record<string, unknown>;
                           await fetch("/api/save-settings", {
-                            method: "POST",
+                            method: "PUT",
                             headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ tenantId: tenant?.id, path: "savedClientLists", value: updated }),
+                            body: JSON.stringify({ settings: { ...s, savedClientLists: updated } }),
                           });
                         }}
                       >
@@ -902,10 +903,12 @@ export default function BookingPage() {
 
             async function saveRebookingCycle(days: string) {
               setAutomationStates(prev => ({ ...prev, auto_rebooking_cycle: days }));
+              const s = (tenant?.settings || {}) as Record<string, unknown>;
+              const a = (s.automations || {}) as Record<string, unknown>;
               await fetch("/api/save-settings", {
-                method: "POST",
+                method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ tenantId: tenant?.id, path: "automations.auto_rebooking_cycle", value: days }),
+                body: JSON.stringify({ settings: { ...s, automations: { ...a, auto_rebooking_cycle: days } } }),
               });
             }
 
@@ -945,10 +948,12 @@ export default function BookingPage() {
                       className={`${styles.channelBtnSm} ${currentChannel === ch ? styles.channelBtnSmActive : ""}`}
                       onClick={async () => {
                         setAutomationStates(prev => ({ ...prev, [a.channelKey]: ch }));
+                        const s = (tenant?.settings || {}) as Record<string, unknown>;
+                        const au = (s.automations || {}) as Record<string, unknown>;
                         await fetch("/api/save-settings", {
-                          method: "POST",
+                          method: "PUT",
                           headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ tenantId: tenant?.id, path: `automations.${a.channelKey}`, value: ch }),
+                          body: JSON.stringify({ settings: { ...s, automations: { ...au, [a.channelKey]: ch } } }),
                         });
                       }}
                     >
