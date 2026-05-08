@@ -108,9 +108,14 @@ export async function GET(request: Request) {
         .lte('start_time', lookAheadEnd.toISOString())
 
       // Detect open slots (server-side version of the client-side detectOpenSlots)
-      const DAY_NAMES = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday']
+      const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
       let totalOpenSlots = 0
       const slotDescriptions: string[] = []
+
+      function parseTime(t: string): number {
+        const [h, m] = t.split(':').map(Number)
+        return h + (m || 0) / 60
+      }
 
       for (let d = 0; d < lookAheadDays; d++) {
         const date = new Date(now)
@@ -120,15 +125,11 @@ export async function GET(request: Request) {
 
         for (const s of (staffList || [])) {
           const sched = (s.schedule && typeof s.schedule === 'object' && Object.keys(s.schedule).length > 0)
-            ? s.schedule as Record<string, { start?: string; end?: string; off?: boolean }>
+            ? s.schedule as Record<string, { open?: string; close?: string; start?: string; end?: string; off?: boolean; useSlots?: boolean; slots?: { start: string; end: string }[] }>
             : null
           const dayConfig = sched?.[dayName]
           if (dayConfig?.off) continue
           if (!dayConfig && date.getDay() === 0) continue
-
-          const workStart = dayConfig?.start ? parseInt(dayConfig.start, 10) : 9
-          const workEnd = dayConfig?.end ? parseInt(dayConfig.end, 10) : 17
-          if (workEnd <= workStart) continue
 
           // Build booked intervals
           const booked: { start: number; end: number }[] = []
@@ -144,12 +145,33 @@ export async function GET(request: Request) {
           }
           booked.sort((a, b) => a.start - b.start)
 
-          let cursor = workStart
-          for (const b of booked) {
-            if (b.start > cursor && (b.start - cursor) >= 0.5) totalOpenSlots++
-            cursor = Math.max(cursor, b.end)
+          // Determine work windows — either custom slots or one continuous block
+          const useCustomSlots = dayConfig?.useSlots && dayConfig.slots && dayConfig.slots.length > 0
+          const workWindows: { start: number; end: number }[] = []
+
+          if (useCustomSlots) {
+            for (const sl of dayConfig!.slots!) {
+              const slStart = parseTime(sl.start)
+              const slEnd = parseTime(sl.end)
+              if (slEnd > slStart) workWindows.push({ start: slStart, end: slEnd })
+            }
+          } else {
+            const workStart = dayConfig?.open ? parseTime(dayConfig.open) : (dayConfig?.start ? parseInt(dayConfig.start, 10) : 9)
+            const workEnd = dayConfig?.close ? parseTime(dayConfig.close) : (dayConfig?.end ? parseInt(dayConfig.end, 10) : 17)
+            if (workEnd > workStart) workWindows.push({ start: workStart, end: workEnd })
           }
-          if (workEnd > cursor && (workEnd - cursor) >= 0.5) totalOpenSlots++
+
+          // For each work window, subtract booked intervals and count open slots
+          for (const win of workWindows) {
+            let cursor = win.start
+            for (const b of booked) {
+              if (b.end <= win.start || b.start >= win.end) continue
+              const bStart = Math.max(b.start, win.start)
+              if (bStart > cursor && (bStart - cursor) >= 0.5) totalOpenSlots++
+              cursor = Math.max(cursor, Math.min(b.end, win.end))
+            }
+            if (win.end > cursor && (win.end - cursor) >= 0.5) totalOpenSlots++
+          }
         }
 
         // Build a human-readable summary for the first few days

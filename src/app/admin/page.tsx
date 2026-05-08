@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import styles from "./admin.module.css";
 import GrowthDashboard from "./GrowthDashboard";
+import FeedbackCenter from "./FeedbackCenter";
 
 interface TenantRow {
   id: string;
@@ -381,6 +382,9 @@ export default function AdminPage() {
 
       {/* Growth Command Center */}
       <GrowthDashboard />
+
+      {/* Feedback Center */}
+      <FeedbackCenter />
 
       {/* Referral Settings */}
       <div className={styles.settingsCard}>

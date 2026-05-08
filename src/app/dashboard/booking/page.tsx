@@ -21,10 +21,15 @@ type FillAudience = "all" | "active" | "at_risk" | "vip" | "selected";
 
 const FILL_DEFAULT_MSG = `Hey {name}! ⚡ We just had an opening — {slots}. {discount}Book now before it's gone → `;
 
+function parseTimeToHours(t: string): number {
+  const [h, m] = t.split(':').map(Number);
+  return h + (m || 0) / 60;
+}
+
 function detectOpenSlots(staff: Staff[], appointments: Appointment[], days: number): OpenSlot[] {
   const slots: OpenSlot[] = [];
   const now = new Date();
-  const DAY_NAMES = ["sunday","monday","tuesday","wednesday","thursday","friday","saturday"];
+  const DAY_NAMES = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 
   for (let d = 0; d < days; d++) {
     const date = new Date(now);
@@ -35,7 +40,7 @@ function detectOpenSlots(staff: Staff[], appointments: Appointment[], days: numb
     for (const s of staff) {
       if (!s.is_active) continue;
       const sched = (s.schedule && typeof s.schedule === 'object' && Object.keys(s.schedule).length > 0)
-        ? s.schedule as Record<string, { start?: string; end?: string; off?: boolean }>
+        ? s.schedule as Record<string, { open?: string; close?: string; start?: string; end?: string; off?: boolean; useSlots?: boolean; slots?: { start: string; end: string }[] }>
         : null;
       const dayConfig = sched?.[dayName];
 
@@ -46,10 +51,7 @@ function detectOpenSlots(staff: Staff[], appointments: Appointment[], days: numb
         continue;
       }
 
-      const workStart = dayConfig?.start ? parseInt(dayConfig.start, 10) : 9;
-      const workEnd = dayConfig?.end ? parseInt(dayConfig.end, 10) : 17;
-      if (workEnd <= workStart) continue;
-
+      // Build booked intervals for this staff on this date
       const booked: { start: number; end: number }[] = [];
       for (const apt of appointments) {
         if (apt.staff_id !== s.id) continue;
@@ -64,25 +66,50 @@ function detectOpenSlots(staff: Staff[], appointments: Appointment[], days: numb
       }
       booked.sort((a, b) => a.start - b.start);
 
-      let cursor = workStart;
-      for (const b of booked) {
-        if (b.start > cursor && (b.start - cursor) >= 0.5) {
+      // Determine work windows — either custom slots or one continuous block
+      const useCustomSlots = dayConfig?.useSlots && dayConfig.slots && dayConfig.slots.length > 0;
+      const workWindows: { start: number; end: number }[] = [];
+
+      if (useCustomSlots) {
+        // Use each individual custom slot as a work window
+        for (const sl of dayConfig!.slots!) {
+          const slStart = parseTimeToHours(sl.start);
+          const slEnd = parseTimeToHours(sl.end);
+          if (slEnd > slStart) workWindows.push({ start: slStart, end: slEnd });
+        }
+      } else {
+        // Continuous mode — use open/close (fallback to start/end for compat)
+        const workStart = dayConfig?.open ? parseTimeToHours(dayConfig.open) : (dayConfig?.start ? parseInt(dayConfig.start, 10) : 9);
+        const workEnd = dayConfig?.close ? parseTimeToHours(dayConfig.close) : (dayConfig?.end ? parseInt(dayConfig.end, 10) : 17);
+        if (workEnd > workStart) workWindows.push({ start: workStart, end: workEnd });
+      }
+
+      // For each work window, subtract booked intervals and emit open slots
+      for (const win of workWindows) {
+        let cursor = win.start;
+        for (const b of booked) {
+          // Skip bookings that don't overlap this window
+          if (b.end <= win.start || b.start >= win.end) continue;
+          const bStart = Math.max(b.start, win.start);
+          const bEnd = Math.min(b.end, win.end);
+          if (bStart > cursor && (bStart - cursor) >= 0.5) {
+            slots.push({
+              id: `${s.id}-${dateStr}-${cursor}`,
+              staffId: s.id, staffName: s.name,
+              date: new Date(date), startHour: cursor, endHour: bStart,
+              durationMin: Math.round((bStart - cursor) * 60),
+            });
+          }
+          cursor = Math.max(cursor, bEnd);
+        }
+        if (win.end > cursor && (win.end - cursor) >= 0.5) {
           slots.push({
             id: `${s.id}-${dateStr}-${cursor}`,
             staffId: s.id, staffName: s.name,
-            date: new Date(date), startHour: cursor, endHour: b.start,
-            durationMin: Math.round((b.start - cursor) * 60),
+            date: new Date(date), startHour: cursor, endHour: win.end,
+            durationMin: Math.round((win.end - cursor) * 60),
           });
         }
-        cursor = Math.max(cursor, b.end);
-      }
-      if (workEnd > cursor && (workEnd - cursor) >= 0.5) {
-        slots.push({
-          id: `${s.id}-${dateStr}-${cursor}`,
-          staffId: s.id, staffName: s.name,
-          date: new Date(date), startHour: cursor, endHour: workEnd,
-          durationMin: Math.round((workEnd - cursor) * 60),
-        });
       }
     }
   }
@@ -400,16 +427,57 @@ export default function BookingPage() {
                           </button>
                         </div>
                         <div className={styles.slotGrid}>
-                          {slots.map(slot => (
-                            <div key={slot.id} className={`${styles.slotCard} ${selectedSlots.has(slot.id) ? styles.slotCardSelected : ""}`} onClick={() => toggleSlot(slot.id)}>
-                              <div className={styles.slotCheck}>{selectedSlots.has(slot.id) ? "✓" : ""}</div>
-                              <div className={styles.slotDate}>{slot.date.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}</div>
-                              <div className={styles.slotTime}>
-                                {formatHour(slot.startHour)} – {formatHour(slot.endHour)}
-                                <span className={styles.slotDuration}>{slot.durationMin} min</span>
-                              </div>
-                            </div>
-                          ))}
+                          {(() => {
+                            // Group this staff's slots by date
+                            const byDate = new Map<string, OpenSlot[]>();
+                            slots.forEach(slot => {
+                              const dateKey = slot.date.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
+                              if (!byDate.has(dateKey)) byDate.set(dateKey, []);
+                              byDate.get(dateKey)!.push(slot);
+                            });
+
+                            return Array.from(byDate.entries()).map(([dateLabel, daySlots]) => {
+                              const daySlotIds = daySlots.map(s => s.id);
+                              const allDaySelected = daySlotIds.every(id => selectedSlots.has(id));
+
+                              function toggleDaySlots() {
+                                setSelectedSlots(prev => {
+                                  const next = new Set(prev);
+                                  if (allDaySelected) {
+                                    daySlotIds.forEach(id => next.delete(id));
+                                  } else {
+                                    daySlotIds.forEach(id => next.add(id));
+                                  }
+                                  return next;
+                                });
+                              }
+
+                              return (
+                                <div key={dateLabel} className={styles.dayGroup}>
+                                  <div className={styles.dayGroupHeader}>
+                                    <span className={styles.dayGroupLabel}>📅 {dateLabel}</span>
+                                    <button
+                                      className={`${styles.daySelectBtn} ${allDaySelected ? styles.daySelectBtnActive : ""}`}
+                                      onClick={toggleDaySlots}
+                                    >
+                                      {allDaySelected ? "✓ Day Selected" : `Select Day (${daySlots.length})`}
+                                    </button>
+                                  </div>
+                                  <div className={styles.daySlotRow}>
+                                    {daySlots.map(slot => (
+                                      <div key={slot.id} className={`${styles.slotCard} ${selectedSlots.has(slot.id) ? styles.slotCardSelected : ""}`} onClick={() => toggleSlot(slot.id)}>
+                                        <div className={styles.slotCheck}>{selectedSlots.has(slot.id) ? "✓" : ""}</div>
+                                        <div className={styles.slotTime}>
+                                          {formatHour(slot.startHour)} – {formatHour(slot.endHour)}
+                                          <span className={styles.slotDuration}>{slot.durationMin} min</span>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            });
+                          })()}
                         </div>
                       </div>
                     );

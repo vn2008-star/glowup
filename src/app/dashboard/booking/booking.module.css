@@ -132,15 +132,63 @@
   color: #fff;
 }
 
-/* Slot selection grid */
+/* Slot container — now vertical for day groups */
 .slotGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: var(--space-3);
-  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+/* ── Day Group ── */
+.dayGroup {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: var(--space-3);
+}
+.dayGroup:first-child {
+  border-top: none;
+  padding-top: var(--space-4);
+}
+.dayGroupHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0 var(--space-2);
+}
+.dayGroupLabel {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--text-secondary);
+  letter-spacing: -0.01em;
+}
+.daySelectBtn {
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1.5px solid var(--border-default);
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.daySelectBtn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+.daySelectBtnActive {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+}
+.daySlotRow {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  padding-bottom: var(--space-3);
 }
 .slotCard {
-  padding: var(--space-4);
+  padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-lg);
   border: 2px solid var(--border-subtle);
   background: var(--bg-card);
@@ -148,6 +196,8 @@
   transition: all var(--transition-fast);
   position: relative;
   overflow: hidden;
+  min-width: 180px;
+  flex: 0 0 auto;
 }
 .slotCard::before {
   content: '';
@@ -750,7 +800,8 @@
 
 /* ── Responsive ── */
 @media (max-width: 768px) {
-  .slotGrid { grid-template-columns: 1fr; }
+  .daySlotRow { flex-direction: column; }
+  .slotCard { min-width: 0; width: 100%; }
   .audienceGrid { grid-template-columns: 1fr; }
   .previewStats { grid-template-columns: 1fr; }
   .fillSteps { flex-wrap: wrap; }
