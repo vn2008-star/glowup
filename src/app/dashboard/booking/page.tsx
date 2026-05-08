@@ -186,6 +186,8 @@ export default function BookingPage() {
     states["auto_fill_openings_audience"] = autoSettings["auto_fill_openings_audience"] || "all";
     states["auto_fill_openings_list"] = autoSettings["auto_fill_openings_list"] || "";
     states["auto_fill_openings_days"] = autoSettings["auto_fill_openings_days"] || "3";
+    states["auto_fill_openings_schedule_days"] = autoSettings["auto_fill_openings_schedule_days"] || "Monday,Thursday";
+    states["auto_fill_openings_send_hour"] = autoSettings["auto_fill_openings_send_hour"] || "9";
     setAutomationStates(states);
 
     // Load saved client lists
@@ -712,6 +714,8 @@ export default function BookingPage() {
             const fmoChannel = (automationStates["auto_fill_openings_channel"] as unknown as string) || "both";
             const fmoAudience = (automationStates["auto_fill_openings_audience"] as unknown as string) || "all";
             const fmoDays = parseInt((automationStates["auto_fill_openings_days"] as unknown as string) || "3", 10);
+            const fmoScheduleDays = ((automationStates["auto_fill_openings_schedule_days"] as unknown as string) || "Monday,Thursday").split(",").filter(Boolean);
+            const fmoSendHour = (automationStates["auto_fill_openings_send_hour"] as unknown as string) || "9";
 
             async function saveFmoSetting(key: string, value: string) {
               setAutomationStates(prev => ({ ...prev, [key]: value }));
@@ -757,6 +761,44 @@ export default function BookingPage() {
                           {d === 1 ? "Today" : `${d} days`}
                         </button>
                       ))}
+                    </div>
+
+                    {/* Schedule: days of week */}
+                    <div className={styles.channelPickerSmall} style={{ flexWrap: "wrap" }}>
+                      <span className={styles.channelPickerLabel}>Send on:</span>
+                      {["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"].map(day => (
+                        <button
+                          key={day}
+                          type="button"
+                          title={fmoScheduleDays.includes(day) ? `Remove ${day}` : `Add ${day}`}
+                          className={`${styles.channelBtnSm} ${fmoScheduleDays.includes(day) ? styles.channelBtnSmActive : ""}`}
+                          onClick={() => {
+                            const next = fmoScheduleDays.includes(day)
+                              ? fmoScheduleDays.filter(d => d !== day)
+                              : [...fmoScheduleDays, day];
+                            if (next.length > 0) saveFmoSetting("auto_fill_openings_schedule_days", next.join(","));
+                          }}
+                        >
+                          {day.slice(0, 3)}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Schedule: send time */}
+                    <div className={styles.channelPickerSmall}>
+                      <span className={styles.channelPickerLabel}>Send at:</span>
+                      <select
+                        className="input"
+                        style={{ maxWidth: 140, fontSize: "var(--text-xs)", padding: "4px 8px" }}
+                        value={fmoSendHour}
+                        onChange={(e) => saveFmoSetting("auto_fill_openings_send_hour", e.target.value)}
+                      >
+                        {Array.from({ length: 14 }, (_, i) => i + 6).map(h => (
+                          <option key={h} value={String(h)}>
+                            {h === 0 ? "12 AM" : h < 12 ? `${h} AM` : h === 12 ? "12 PM" : `${h - 12} PM`}
+                          </option>
+                        ))}
+                      </select>
                     </div>
 
                     {/* Channel */}

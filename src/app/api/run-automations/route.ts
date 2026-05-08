@@ -83,6 +83,18 @@ export async function GET(request: Request) {
 
     // ── Fill My Openings Auto-Blast ──
     if (automations.auto_fill_openings) {
+      // Schedule gate: only fire on configured days + hour
+      const DAY_NAMES_FULL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+      const nowForSchedule = new Date()
+      const currentDayName = DAY_NAMES_FULL[nowForSchedule.getUTCDay()]
+      const currentHourUTC = nowForSchedule.getUTCHours()
+      const scheduleDays = String(automations.auto_fill_openings_schedule_days || 'Monday,Thursday').split(',').filter(Boolean)
+      const sendHour = parseInt(String(automations.auto_fill_openings_send_hour || '9'), 10)
+
+      if (!scheduleDays.includes(currentDayName) || currentHourUTC !== sendHour) {
+        // Not the right day/hour — skip FMO for this tenant
+      } else {
+
       const lookAheadDays = parseInt(String(automations.auto_fill_openings_days || '3'), 10)
       const fmoChannel = String(automations.auto_fill_openings_channel || 'both') as 'sms' | 'email' | 'both'
       const fmoAudience = String(automations.auto_fill_openings_audience || 'all')
@@ -237,7 +249,14 @@ export async function GET(request: Request) {
           })
         }
       }
+      } // end schedule gate else
     }
+
+    // ── Daily automations gate ──
+    // Since the cron now runs hourly (to support custom FMO schedules),
+    // run all daily automations only at 8 AM UTC to prevent duplicate sends.
+    const dailyGateHour = new Date().getUTCHours()
+    if (dailyGateHour === 8) {
 
     // ── Birthday Auto-Send ──
     if (automations.auto_birthday !== false) {
@@ -457,7 +476,8 @@ export async function GET(request: Request) {
         })
       }
     }
-  }
+    }
+    } // end dailyGateHour === 8
 
   return NextResponse.json({
     message: 'Automations processed',
