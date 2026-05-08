@@ -186,7 +186,7 @@ export default function BookingPage() {
     states["auto_fill_openings_audience"] = autoSettings["auto_fill_openings_audience"] || "all";
     states["auto_fill_openings_list"] = autoSettings["auto_fill_openings_list"] || "";
     states["auto_fill_openings_days"] = autoSettings["auto_fill_openings_days"] || "3";
-    states["auto_fill_openings_schedule_days"] = autoSettings["auto_fill_openings_schedule_days"] || "Monday,Thursday";
+    states["auto_fill_openings_schedule_days"] = autoSettings["auto_fill_openings_schedule_days"] || "Monday";
     states["auto_fill_openings_send_hour"] = autoSettings["auto_fill_openings_send_hour"] || "9";
     setAutomationStates(states);
 
@@ -714,7 +714,7 @@ export default function BookingPage() {
             const fmoChannel = (automationStates["auto_fill_openings_channel"] as unknown as string) || "both";
             const fmoAudience = (automationStates["auto_fill_openings_audience"] as unknown as string) || "all";
             const fmoDays = parseInt((automationStates["auto_fill_openings_days"] as unknown as string) || "3", 10);
-            const fmoScheduleDays = ((automationStates["auto_fill_openings_schedule_days"] as unknown as string) || "Monday,Thursday").split(",").filter(Boolean);
+            const fmoScheduleDays = ((automationStates["auto_fill_openings_schedule_days"] as unknown as string) || "Monday").split(",").filter(Boolean);
             const fmoSendHour = (automationStates["auto_fill_openings_send_hour"] as unknown as string) || "9";
 
             async function saveFmoSetting(key: string, value: string) {

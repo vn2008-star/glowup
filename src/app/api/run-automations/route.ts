@@ -88,7 +88,7 @@ export async function GET(request: Request) {
       const nowForSchedule = new Date()
       const currentDayName = DAY_NAMES_FULL[nowForSchedule.getUTCDay()]
       const currentHourUTC = nowForSchedule.getUTCHours()
-      const scheduleDays = String(automations.auto_fill_openings_schedule_days || 'Monday,Thursday').split(',').filter(Boolean)
+      const scheduleDays = String(automations.auto_fill_openings_schedule_days || 'Monday').split(',').filter(Boolean)
       const sendHour = parseInt(String(automations.auto_fill_openings_send_hour || '9'), 10)
 
       if (!scheduleDays.includes(currentDayName) || currentHourUTC !== sendHour) {
