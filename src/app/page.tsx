@@ -218,8 +218,8 @@ export default async function LandingPage() {
             </div>
             <div>
               <h4>{t('footerCompany')}</h4>
-              <a href="#">{t('footerAbout')}</a>
-              <a href="#">{t('footerContact')}</a>
+              <Link href="/about">{t('footerAbout')}</Link>
+              <Link href="/contact">{t('footerContact')}</Link>
             </div>
           </div>
           <p className={styles.copyright}>{t('copyright')}</p>
