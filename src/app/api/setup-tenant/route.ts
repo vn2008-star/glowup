@@ -34,13 +34,18 @@ export async function POST(request: Request) {
     .replace(/^-|-$/g, '') +
     '-' + Math.random().toString(36).slice(2, 6)
 
+  // Check if this user is a platform admin (exempt from subscription)
+  const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase());
+  const isAdmin = adminEmails.includes(email.toLowerCase());
+
   const { data: tenant, error: tenantError } = await supabase
     .from('tenants')
     .insert({
       name: bName,
       slug,
       business_type: 'nail_salon',
-      plan: 'free',
+      plan: isAdmin ? 'professional' : 'free',
+      subscription_status: isAdmin ? 'active' : 'trialing',
       referred_by: referralCode || null,
     })
     .select('id')
