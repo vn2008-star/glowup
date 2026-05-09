@@ -992,38 +992,44 @@ export default function CheckoutPage() {
             <span className={styles.avatarName}>{t("allStaff")}</span>
           </button>
         )}
-        {activeStaff.map((s, i) => {
-          const colors = [
-            "linear-gradient(135deg, #8B5CF6, #EC4899)",
-            "linear-gradient(135deg, #06B6D4, #3B82F6)",
-            "linear-gradient(135deg, #F59E0B, #EF4444)",
-            "linear-gradient(135deg, #10B981, #059669)",
-            "linear-gradient(135deg, #F472B6, #FB923C)",
-            "linear-gradient(135deg, #6366F1, #8B5CF6)",
-          ];
-          return (
-            <button
-              key={s.id}
-              className={`${styles.staffAvatar} ${activeStaffId === s.id ? styles.staffAvatarActive : ""}`}
-              onClick={() => handleStaffTap(s.id)}
-            >
-              <div className={styles.avatarCircle} style={{ background: colors[i % colors.length] }}>
-                {s.photo_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={s.photo_url} alt={s.name} className={styles.avatarImg} />
-                ) : (
-                  getInitials(s.name)
-                )}
-              </div>
-              <span className={styles.avatarName}>{s.name.split(" ")[0]}</span>
-              {/* Show appointment count badge */}
-              {(() => {
-                const count = appointments.filter((a) => a.staff_id === s.id && !a.checked_out_at).length;
-                return count > 0 ? <span className={styles.avatarBadge}>{count}</span> : null;
-              })()}
-            </button>
-          );
-        })}
+        {(() => {
+          // Technicians only see their own avatar; owners/managers see all staff
+          const unlockedRole = staffMembers.find((s) => s.id === unlockedStaffId)?.role;
+          const isManagerOrOwner = unlockedRole === "owner" || unlockedRole === "manager";
+          const visibleStaff = isManagerOrOwner ? activeStaff : activeStaff.filter(s => s.id === unlockedStaffId);
+          return visibleStaff.map((s, i) => {
+            const colors = [
+              "linear-gradient(135deg, #8B5CF6, #EC4899)",
+              "linear-gradient(135deg, #06B6D4, #3B82F6)",
+              "linear-gradient(135deg, #F59E0B, #EF4444)",
+              "linear-gradient(135deg, #10B981, #059669)",
+              "linear-gradient(135deg, #F472B6, #FB923C)",
+              "linear-gradient(135deg, #6366F1, #8B5CF6)",
+            ];
+            return (
+              <button
+                key={s.id}
+                className={`${styles.staffAvatar} ${activeStaffId === s.id ? styles.staffAvatarActive : ""}`}
+                onClick={() => handleStaffTap(s.id)}
+              >
+                <div className={styles.avatarCircle} style={{ background: colors[i % colors.length] }}>
+                  {s.photo_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={s.photo_url} alt={s.name} className={styles.avatarImg} />
+                  ) : (
+                    getInitials(s.name)
+                  )}
+                </div>
+                <span className={styles.avatarName}>{s.name.split(" ")[0]}</span>
+                {/* Show appointment count badge */}
+                {(() => {
+                  const count = appointments.filter((a) => a.staff_id === s.id && !a.checked_out_at).length;
+                  return count > 0 ? <span className={styles.avatarBadge}>{count}</span> : null;
+                })()}
+              </button>
+            );
+          });
+        })()}
         {unlockedStaffId && (
           <button className={styles.lockBtn} onClick={handleLock} title={t("lock")}>
             🔒 {t("lock")}
