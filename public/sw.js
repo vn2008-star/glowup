@@ -1,4 +1,4 @@
-const CACHE_NAME = 'glowup-v1';
+const CACHE_NAME = 'glowup-v2';
 
 // Pre-cache the app shell
 const APP_SHELL = [
