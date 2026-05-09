@@ -664,7 +664,7 @@ export default function SettingsPage() {
                     <label className="label">SMS Template</label>
                     <textarea
                       className="input"
-                      rows={3}
+                      rows={5}
                       value={reminderTemplates.sms}
                       onChange={(e) => setReminderTemplates({ ...reminderTemplates, sms: e.target.value })}
                     />
@@ -686,7 +686,7 @@ export default function SettingsPage() {
                       <label className="label">Email Body</label>
                       <textarea
                         className="input"
-                        rows={5}
+                        rows={12}
                         value={reminderTemplates.email}
                         onChange={(e) => setReminderTemplates({ ...reminderTemplates, email: e.target.value })}
                       />
@@ -724,7 +724,7 @@ export default function SettingsPage() {
                     <label className="label">SMS Template</label>
                     <textarea
                       className="input"
-                      rows={3}
+                      rows={5}
                       value={staffReminderTemplates.sms}
                       onChange={(e) => setStaffReminderTemplates({ ...staffReminderTemplates, sms: e.target.value })}
                     />
@@ -746,7 +746,7 @@ export default function SettingsPage() {
                       <label className="label">Email Body</label>
                       <textarea
                         className="input"
-                        rows={5}
+                        rows={12}
                         value={staffReminderTemplates.email}
                         onChange={(e) => setStaffReminderTemplates({ ...staffReminderTemplates, email: e.target.value })}
                       />
