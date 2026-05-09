@@ -663,36 +663,28 @@ export default function StaffPage() {
                   <div style={{
                     gridColumn: "1 / -1",
                     background: formData.pin
-                      ? "linear-gradient(135deg, rgba(16,185,129,0.08), rgba(6,182,212,0.06))"
-                      : "linear-gradient(135deg, rgba(251,191,36,0.10), rgba(239,68,68,0.06))",
-                    border: `1.5px solid ${formData.pin ? "rgba(16,185,129,0.3)" : "rgba(251,191,36,0.4)"}`,
+                      ? "rgba(16,185,129,0.05)"
+                      : "rgba(139,92,246,0.05)",
+                    border: `1px solid ${formData.pin ? "rgba(16,185,129,0.2)" : "rgba(139,92,246,0.2)"}`,
                     borderRadius: "var(--radius-lg)",
                     padding: "var(--space-4) var(--space-5)",
                   }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", marginBottom: "var(--space-3)" }}>
-                      <span style={{
-                        fontSize: "1.5rem",
-                        width: 40, height: 40,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        borderRadius: "var(--radius-md)",
-                        background: formData.pin ? "rgba(16,185,129,0.15)" : "rgba(251,191,36,0.15)",
-                      }}>
-                        {formData.pin ? "🛡️" : "⚠️"}
+                      <span style={{ fontSize: "1.1rem" }}>
+                        {formData.pin ? "🔒" : "🔓"}
                       </span>
                       <div>
                         <div style={{
-                          fontWeight: 700,
+                          fontWeight: 600,
                           fontSize: "var(--text-sm)",
-                          color: formData.pin ? "rgb(16,185,129)" : "rgb(251,191,36)",
-                          textTransform: "uppercase",
-                          letterSpacing: "0.05em",
+                          color: "var(--text-primary)",
                         }}>
-                          {formData.pin ? "Front Desk PIN Active" : "Front Desk PIN Required"}
+                          Front Desk PIN
                         </div>
-                        <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: 2 }}>
+                        <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginTop: 1 }}>
                           {formData.pin
-                            ? "This staff member's Front Desk is PIN-protected"
-                            : "Without a PIN, anyone can access this staff's Front Desk, view appointments, and process checkouts"
+                            ? "PIN-protected — staff must enter PIN to access Front Desk"
+                            : "Recommended — protects appointments and checkout access"
                           }
                         </div>
                       </div>
@@ -705,31 +697,28 @@ export default function StaffPage() {
                         pattern="[0-9]*"
                         maxLength={4}
                         value={formData.pin}
-                        placeholder="Enter 4-digit PIN"
+                        placeholder="4-digit PIN"
                         style={{
                           flex: 1,
-                          fontSize: "1.1rem",
-                          letterSpacing: "0.3em",
-                          fontWeight: 700,
+                          fontSize: "1rem",
+                          letterSpacing: "0.25em",
+                          fontWeight: 600,
                           textAlign: "center",
-                          maxWidth: 200,
+                          maxWidth: 180,
                         }}
                         onChange={(e) => {
                           const v = e.target.value.replace(/\D/g, "").slice(0, 4);
                           setFormData({ ...formData, pin: v });
                         }}
                       />
-                      {formData.pin && (
+                      {formData.pin && formData.pin.length === 4 && (
                         <span style={{
                           display: "inline-flex", alignItems: "center", gap: 4,
-                          background: "rgba(16,185,129,0.12)",
                           color: "rgb(16,185,129)",
-                          padding: "4px 10px",
-                          borderRadius: "var(--radius-full)",
                           fontSize: "12px",
-                          fontWeight: 600,
+                          fontWeight: 500,
                         }}>
-                          ✓ {formData.pin.length === 4 ? "Ready" : `${formData.pin.length}/4 digits`}
+                          ✓ Set
                         </span>
                       )}
                     </div>
