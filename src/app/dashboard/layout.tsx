@@ -109,7 +109,7 @@ function ThemeToggle() {
   );
 }
 
-const ADMIN_EMAILS = ['vn2008@gmail.com'];
+const ADMIN_EMAILS = ['joinglowup@gmail.com'];
 
 function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
