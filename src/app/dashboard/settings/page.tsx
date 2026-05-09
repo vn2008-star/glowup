@@ -686,7 +686,8 @@ export default function SettingsPage() {
                       <label className="label">Email Body</label>
                       <textarea
                         className="input"
-                        rows={12}
+                        rows={16}
+                        style={{ minHeight: 280, resize: 'vertical' }}
                         value={reminderTemplates.email}
                         onChange={(e) => setReminderTemplates({ ...reminderTemplates, email: e.target.value })}
                       />
@@ -746,7 +747,8 @@ export default function SettingsPage() {
                       <label className="label">Email Body</label>
                       <textarea
                         className="input"
-                        rows={12}
+                        rows={16}
+                        style={{ minHeight: 280, resize: 'vertical' }}
                         value={staffReminderTemplates.email}
                         onChange={(e) => setStaffReminderTemplates({ ...staffReminderTemplates, email: e.target.value })}
                       />
