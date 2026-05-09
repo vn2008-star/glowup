@@ -270,8 +270,8 @@
   position: absolute;
   left: 64px;
   right: 8px;
-  background: rgba(52, 211, 153, 0.05);
-  border: 1.5px dashed rgba(52, 211, 153, 0.3);
+  background: transparent;
+  border: none;
   border-radius: var(--radius-md);
   display: flex;
   flex-direction: column;
@@ -281,19 +281,30 @@
   cursor: pointer;
   transition: all var(--transition-fast);
   z-index: 0;
+  pointer-events: none;
 }
 .openSlot span {
-  font-size: var(--text-xs);
+  font-size: 10px;
   font-weight: 700;
-  color: rgba(52, 211, 153, 0.6);
+  color: rgba(52, 211, 153, 0.35);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  pointer-events: auto;
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  border: 1px dashed rgba(52, 211, 153, 0.25);
+  background: rgba(52, 211, 153, 0.04);
+  transition: all var(--transition-fast);
 }
-.openSlot svg { color: rgba(52, 211, 153, 0.5); }
-.openSlot:hover {
-  background: rgba(52, 211, 153, 0.1);
+.openSlot span:hover {
+  background: rgba(52, 211, 153, 0.12);
   border-color: rgba(52, 211, 153, 0.5);
+  color: rgba(52, 211, 153, 0.8);
   box-shadow: 0 0 12px rgba(52, 211, 153, 0.1);
+}
+.openSlot svg {
+  color: rgba(52, 211, 153, 0.3);
+  pointer-events: auto;
 }
 
 /* Appointment Blocks (Day View) */
@@ -312,7 +323,7 @@
   overflow: hidden;
   cursor: pointer;
   transition: all var(--transition-fast);
-  z-index: 1;
+  z-index: 2;
   box-shadow: var(--shadow-sm);
 }
 .aptBlock:hover {
