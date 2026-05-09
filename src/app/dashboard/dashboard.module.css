@@ -151,6 +151,7 @@
 /* Quick Start attention animation — draws new users in */
 .navItemQuickStart {
   overflow: hidden;
+  border: 1px solid rgba(201, 160, 220, 0.25);
 }
 .navItemQuickStart svg {
   opacity: 1 !important;
