@@ -23,7 +23,7 @@ export default function StaffPage() {
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
   const [formData, setFormData] = useState({
     name: "", email: "", phone: "", role: "technician" as string,
-    professional_title: PROFESSIONAL_TYPES[0].title,
+    professional_titles: [] as string[],
     specialties: [] as string[], commission_rate: 0, is_active: true, photo_url: "", pin: "",
   });
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -52,21 +52,20 @@ export default function StaffPage() {
 
   useEffect(() => { fetchStaff(); }, [fetchStaff]);
 
-  /* Derive professional title from specialties for existing staff */
-  function inferProfessionalTitle(s: Staff): string {
-    // Check if specialties match any professional type
+  /* Derive professional titles from specialties for existing staff */
+  function inferProfessionalTitles(s: Staff): string[] {
+    const titles: string[] = [];
     for (const pt of PROFESSIONAL_TYPES) {
-      const overlap = (s.specialties || []).filter(sp => pt.specialties.includes(sp));
-      if (overlap.length > 0) return pt.title;
+      if (s.specialties?.includes(pt.title)) titles.push(pt.title);
     }
-    return PROFESSIONAL_TYPES[0].title;
+    return titles;
   }
 
   function openNew() {
     setEditingStaff(null);
     setFormData({
       name: "", email: "", phone: "", role: "technician",
-      professional_title: PROFESSIONAL_TYPES[0].title,
+      professional_titles: [],
       specialties: [], commission_rate: 0, is_active: true, photo_url: "", pin: "",
     });
     setPhotoPreview(null);
@@ -80,7 +79,7 @@ export default function StaffPage() {
       email: s.email || "",
       phone: s.phone || "",
       role: s.role,
-      professional_title: inferProfessionalTitle(s),
+      professional_titles: inferProfessionalTitles(s),
       specialties: s.specialties || [],
       commission_rate: s.commission_rate,
       is_active: s.is_active,
@@ -183,18 +182,23 @@ export default function StaffPage() {
   }
 
   function handleProfessionalTitleChange(title: string) {
-    setFormData(prev => ({
-      ...prev,
-      professional_title: title,
-      specialties: [], // reset specialties when type changes
-    }));
+    setFormData(prev => {
+      const has = prev.professional_titles.includes(title);
+      const next = has
+        ? prev.professional_titles.filter(t => t !== title)
+        : [...prev.professional_titles, title];
+      // Remove specialties that no longer belong to any selected type
+      const validSpecs = new Set(next.flatMap(t => getProfessionalType(t)?.specialties || []));
+      const filtered = prev.specialties.filter(sp => validSpecs.has(sp));
+      return { ...prev, professional_titles: next, specialties: filtered };
+    });
   }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
 
     // Prepend the professional title to specialties for storage
-    const allSpecialties = [formData.professional_title, ...formData.specialties];
+    const allSpecialties = [...formData.professional_titles, ...formData.specialties];
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const payload: Record<string, any> = {
@@ -334,11 +338,8 @@ export default function StaffPage() {
     }
   }
   /* Helper: extract professional title from stored specialties */
-  function getStaffProfTitle(s: Staff): string | null {
-    for (const pt of PROFESSIONAL_TYPES) {
-      if (s.specialties?.includes(pt.title)) return pt.title;
-    }
-    return null;
+  function getStaffProfTitles(s: Staff): string[] {
+    return PROFESSIONAL_TYPES.filter(pt => s.specialties?.includes(pt.title)).map(pt => pt.title);
   }
 
   function getStaffSkills(s: Staff): string[] {
@@ -354,7 +355,7 @@ export default function StaffPage() {
   const inactiveStaff = staffMembers.filter((s) => !s.is_active);
 
   /* Current form's professional type */
-  const currentProfType = getProfessionalType(formData.professional_title);
+  const selectedProfTypes = formData.professional_titles.map(t => getProfessionalType(t)).filter(Boolean) as NonNullable<ReturnType<typeof getProfessionalType>>[];
 
   return (
     <div className={styles.page}>
@@ -376,8 +377,7 @@ export default function StaffPage() {
       ) : (
         <div className={styles.staffGrid}>
           {staffMembers.map((s) => {
-            const profTitle = getStaffProfTitle(s);
-            const typeInfo = getTypeInfo(profTitle);
+            const profTitles = getStaffProfTitles(s);
             const skills = getStaffSkills(s);
 
             return (
@@ -390,9 +390,16 @@ export default function StaffPage() {
                   )}
                   <div>
                     <h3>{s.name}</h3>
-                    {profTitle && typeInfo ? (
-                      <div className={styles.profTitleBadge} style={{ background: `${typeInfo.color}18`, color: typeInfo.color, borderColor: `${typeInfo.color}40` }}>
-                        <span>{typeInfo.icon}</span> {profTitle}
+                    {profTitles.length > 0 ? (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                        {profTitles.map(pt => {
+                          const ti = getTypeInfo(pt);
+                          return ti ? (
+                            <div key={pt} className={styles.profTitleBadge} style={{ background: `${ti.color}18`, color: ti.color, borderColor: `${ti.color}40` }}>
+                              <span>{ti.icon}</span> {pt.split(" / ")[0].split(" & ")[0]}
+                            </div>
+                          ) : null;
+                        })}
                       </div>
                     ) : (
                       <span className={styles.staffRole}>{s.role}</span>
@@ -448,8 +455,7 @@ export default function StaffPage() {
 
       {/* ── Staff Detail Drawer ── */}
       {selectedStaff && !showModal && !showScheduleModal && (() => {
-        const profTitle = getStaffProfTitle(selectedStaff);
-        const typeInfo = getTypeInfo(profTitle);
+        const profTitles = getStaffProfTitles(selectedStaff);
         const skills = getStaffSkills(selectedStaff);
 
         return (
@@ -466,9 +472,16 @@ export default function StaffPage() {
                   </div>
                 )}
                 <h2>{selectedStaff.name}</h2>
-                {profTitle && typeInfo ? (
-                  <div className={styles.profTitleBadgeLg} style={{ background: `${typeInfo.color}18`, color: typeInfo.color, borderColor: `${typeInfo.color}40` }}>
-                    <span>{typeInfo.icon}</span> {profTitle}
+                {profTitles.length > 0 ? (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>
+                    {profTitles.map(pt => {
+                      const ti = getTypeInfo(pt);
+                      return ti ? (
+                        <div key={pt} className={styles.profTitleBadgeLg} style={{ background: `${ti.color}18`, color: ti.color, borderColor: `${ti.color}40` }}>
+                          <span>{ti.icon}</span> {pt}
+                        </div>
+                      ) : null;
+                    })}
                   </div>
                 ) : (
                   <span className={`badge ${selectedStaff.role === "owner" ? "badge-primary" : selectedStaff.role === "manager" ? "badge-info" : "badge-success"}`}>
@@ -495,19 +508,24 @@ export default function StaffPage() {
                 </div>
               </div>
 
-              {/* Professional Title */}
-              {profTitle && typeInfo && (
+              {/* Professional Types */}
+              {profTitles.length > 0 && (
                 <div className={styles.drawerSection}>
-                  <h3>Professional Type</h3>
-                  <div className={styles.profTypeCard} style={{ borderColor: `${typeInfo.color}40` }}>
-                    <span className={styles.profTypeIcon} style={{ background: `${typeInfo.color}18`, color: typeInfo.color }}>{typeInfo.icon}</span>
-                    <div>
-                      <div className={styles.profTypeTitle}>{profTitle}</div>
-                      {typeInfo.aliases.length > 0 && (
-                        <div className={styles.profTypeAliases}>Also known as: {typeInfo.aliases.join(", ")}</div>
-                      )}
-                    </div>
-                  </div>
+                  <h3>Professional Type{profTitles.length > 1 ? 's' : ''}</h3>
+                  {profTitles.map(pt => {
+                    const ti = getTypeInfo(pt);
+                    return ti ? (
+                      <div key={pt} className={styles.profTypeCard} style={{ borderColor: `${ti.color}40`, marginBottom: 8 }}>
+                        <span className={styles.profTypeIcon} style={{ background: `${ti.color}18`, color: ti.color }}>{ti.icon}</span>
+                        <div>
+                          <div className={styles.profTypeTitle}>{pt}</div>
+                          {ti.aliases.length > 0 && (
+                            <div className={styles.profTypeAliases}>Also known as: {ti.aliases.join(", ")}</div>
+                          )}
+                        </div>
+                      </div>
+                    ) : null;
+                  })}
                 </div>
               )}
 
@@ -516,9 +534,12 @@ export default function StaffPage() {
                 <div className={styles.drawerSection}>
                   <h3>Specialties</h3>
                   <div className={styles.skillTags}>
-                    {skills.map((sp) => (
-                      <span key={sp} className={styles.skillTag} style={typeInfo ? { background: `${typeInfo.color}12`, color: typeInfo.color, borderColor: `${typeInfo.color}30` } : undefined}>{sp}</span>
-                    ))}
+                    {skills.map((sp) => {
+                      const matchType = PROFESSIONAL_TYPES.find(pt => pt.specialties.includes(sp));
+                      return (
+                        <span key={sp} className={styles.skillTag} style={matchType ? { background: `${matchType.color}12`, color: matchType.color, borderColor: `${matchType.color}30` } : undefined}>{sp}</span>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -699,29 +720,32 @@ export default function StaffPage() {
                 {/* ── Professional Type Picker ── */}
                 <div className={styles.profSection}>
                   <label className="label">Professional Type</label>
-                  <p className={styles.profHint}>Select the type of beauty professional to see relevant specialties</p>
+                  <p className={styles.profHint}>Select one or more types of beauty professional</p>
                   <div className={styles.profTypeGrid}>
-                    {PROFESSIONAL_TYPES.map((pt) => (
-                      <button
-                        key={pt.id}
-                        type="button"
-                        className={`${styles.profTypeBtn} ${formData.professional_title === pt.title ? styles.profTypeBtnActive : ""}`}
-                        style={formData.professional_title === pt.title ? { borderColor: pt.color, background: `${pt.color}12` } : undefined}
-                        onClick={() => handleProfessionalTitleChange(pt.title)}
-                      >
-                        <span className={styles.profTypeBtnIcon} style={{ background: `${pt.color}18`, color: pt.color }}>{pt.icon}</span>
-                        <span className={styles.profTypeBtnLabel}>{pt.title.split(" / ")[0].split(" & ")[0]}</span>
-                      </button>
-                    ))}
+                    {PROFESSIONAL_TYPES.map((pt) => {
+                      const isActive = formData.professional_titles.includes(pt.title);
+                      return (
+                        <button
+                          key={pt.id}
+                          type="button"
+                          className={`${styles.profTypeBtn} ${isActive ? styles.profTypeBtnActive : ""}`}
+                          style={isActive ? { borderColor: pt.color, background: `${pt.color}12` } : undefined}
+                          onClick={() => handleProfessionalTitleChange(pt.title)}
+                        >
+                          <span className={styles.profTypeBtnIcon} style={{ background: `${pt.color}18`, color: pt.color }}>{pt.icon}</span>
+                          <span className={styles.profTypeBtnLabel}>{pt.title.split(" / ")[0].split(" & ")[0]}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
                 {/* ── Specialties Chips ── */}
-                {currentProfType && (
+                {selectedProfTypes.length > 0 && (
                   <div className={styles.profSection}>
                     <div className={styles.specHeader}>
                       <label className="label">
-                        {currentProfType.icon} {currentProfType.title} — Specialties
+                        {selectedProfTypes.map(pt => pt.icon).join(' ')} Specialties
                       </label>
                       <span className={styles.specCount}>
                         {formData.specialties.length} selected
@@ -729,14 +753,14 @@ export default function StaffPage() {
                     </div>
                     <p className={styles.profHint}>Click to select skills this team member specializes in</p>
                     <div className={styles.specGrid}>
-                      {currentProfType.specialties.map((sp) => {
+                      {selectedProfTypes.flatMap(pt => pt.specialties.map(sp => ({ sp, pt }))).filter((v, i, a) => a.findIndex(x => x.sp === v.sp) === i).map(({ sp, pt }) => {
                         const isSelected = formData.specialties.includes(sp);
                         return (
                           <button
                             key={sp}
                             type="button"
                             className={`${styles.specChip} ${isSelected ? styles.specChipActive : ""}`}
-                            style={isSelected ? { background: `${currentProfType.color}18`, color: currentProfType.color, borderColor: `${currentProfType.color}50` } : undefined}
+                            style={isSelected ? { background: `${pt.color}18`, color: pt.color, borderColor: `${pt.color}50` } : undefined}
                             onClick={() => toggleSpecialty(sp)}
                           >
                             {isSelected && <span className={styles.specCheck}>✓</span>}
