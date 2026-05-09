@@ -187,7 +187,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
             <Link
               key={item.href}
               href={item.href}
-              className={`${styles.navItem} ${pathname === item.href ? styles.navItemActive : ''}`}
+              className={`${styles.navItem} ${pathname === item.href ? styles.navItemActive : ''} ${item.key === 'quickStart' && pathname !== item.href ? styles.navItemQuickStart : ''}`}
               onClick={handleNavClick}
             >
               {item.icon}
