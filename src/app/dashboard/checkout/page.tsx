@@ -573,6 +573,15 @@ export default function CheckoutPage() {
       return;
     }
 
+    // Owners/managers can freely switch between any staff view without re-authenticating
+    const unlockedRole = staffMembers.find((s) => s.id === unlockedStaffId)?.role;
+    if (unlockedStaffId && (unlockedRole === "owner" || unlockedRole === "manager")) {
+      setActiveStaffId(staffId);
+      setSelectedApt(null);
+      setEditingCheckout(false);
+      return;
+    }
+
     // Find the staff member to check if they have a PIN
     if (staffId === "all") {
       // Owner view — find the owner staff member
