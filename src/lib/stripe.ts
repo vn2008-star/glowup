@@ -18,19 +18,19 @@ export interface PlanConfig {
 //   3. Copy each Price ID (starts with price_...) and paste below
 export const PLANS: Record<string, PlanConfig> = {
   starter: {
-    priceId: process.env.STRIPE_PRICE_STARTER || 'price_1TV3f5Gs3kamiabpIqBrIUHG',
+    priceId: process.env.STRIPE_PRICE_STARTER || 'price_1TV4PLGb0kiXG0faNTpw97kH',
     name: 'Starter',
     price: 29,
     staffLimit: 4,
   },
   growth: {
-    priceId: process.env.STRIPE_PRICE_GROWTH || 'price_1TV3fhGs3kamiabpntPnEMVQ',
+    priceId: process.env.STRIPE_PRICE_GROWTH || 'price_1TV4PJGb0kiXG0fa4vwZFlLd',
     name: 'Growth',
     price: 79,
     staffLimit: 10,
   },
   professional: {
-    priceId: process.env.STRIPE_PRICE_PROFESSIONAL || 'price_1TV3gCGs3kamiabpCLIIvFWL',
+    priceId: process.env.STRIPE_PRICE_PROFESSIONAL || 'price_1TV4PIGb0kiXG0faBoIeT9LZ',
     name: 'Professional',
     price: 149,
     staffLimit: 20,
