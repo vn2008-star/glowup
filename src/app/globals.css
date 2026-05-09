@@ -506,14 +506,16 @@ select option {
 [data-theme="dark"] input[type="datetime-local"]::-webkit-calendar-picker-indicator,
 [data-theme="dark"] input[type="month"]::-webkit-calendar-picker-indicator,
 [data-theme="dark"] input[type="week"]::-webkit-calendar-picker-indicator {
-  filter: invert(0.85) sepia(0.2) hue-rotate(220deg);
+  filter: invert(1) brightness(2);
   cursor: pointer;
-  opacity: 0.8;
+  opacity: 1;
+  width: 20px;
+  height: 20px;
 }
 [data-theme="dark"] input[type="time"]::-webkit-calendar-picker-indicator:hover,
 [data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator:hover,
 [data-theme="dark"] input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {
-  opacity: 1;
+  filter: invert(1) brightness(2.5);
 }
 
 /* Light mode — ensure pickers stay light scheme */
