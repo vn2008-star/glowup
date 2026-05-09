@@ -296,7 +296,7 @@ export default function SettingsPage() {
                   value={hours[day]?.open || ""}
                   onChange={(e) => updateHour(day, "open", e.target.value)}
                   disabled={hours[day]?.closed}
-                  style={{ width: 120 }}
+                  style={{ width: 160 }}
                 />
                 <span>to</span>
                 <input
@@ -305,7 +305,7 @@ export default function SettingsPage() {
                   value={hours[day]?.close || ""}
                   onChange={(e) => updateHour(day, "close", e.target.value)}
                   disabled={hours[day]?.closed}
-                  style={{ width: 120 }}
+                  style={{ width: 160 }}
                 />
               </div>
               <label className={styles.closedToggle}>
