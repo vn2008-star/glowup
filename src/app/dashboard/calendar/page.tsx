@@ -487,7 +487,7 @@ export default function CalendarPage() {
                     style={isActive ? { background: `${color}18`, borderColor: color, color } : undefined}
                     onClick={() => {
                       setActiveStaffFilter(prev =>
-                        prev.includes(s.id) ? prev.filter(id => id !== s.id) : [...prev, s.id]
+                        prev.length === 1 && prev[0] === s.id ? [] : [s.id]
                       );
                     }}
                   >
