@@ -29,7 +29,7 @@ export async function GET() {
   // Fetch all tenants
   const { data: tenants, error } = await svc
     .from('tenants')
-    .select('id, name, slug, business_type, plan, email, phone, is_active, deleted_at, deletion_scheduled_at, subscription_status, trial_ends_at, created_at, updated_at')
+    .select('id, name, slug, business_type, plan, email, phone, is_active, deleted_at, deletion_scheduled_at, subscription_status, trial_ends_at, current_period_end, stripe_customer_id, stripe_subscription_id, stripe_price_id, created_at, updated_at')
     .order('created_at', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

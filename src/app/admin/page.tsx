@@ -20,6 +20,10 @@ interface TenantRow {
   deletion_scheduled_at: string | null;
   subscription_status: string | null;
   trial_ends_at: string | null;
+  current_period_end: string | null;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  stripe_price_id: string | null;
   created_at: string;
   staff_count: number;
   client_count: number;
@@ -75,7 +79,7 @@ export default function AdminPage() {
   const [stats, setStats] = useState<Stats>({ total: 0, active: 0, suspended: 0, pendingDeletion: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [filter, setFilter] = useState<"all" | "active" | "suspended" | "deletion">("all");
+  const [filter, setFilter] = useState<"all" | "active" | "suspended" | "deletion" | "paying" | "trialing" | "past_due">("all");
   const [search, setSearch] = useState("");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [rewardAmount, setRewardAmount] = useState('25');
@@ -326,6 +330,9 @@ export default function AdminPage() {
     if (filter === "active" && status !== "active") return false;
     if (filter === "suspended" && status !== "suspended") return false;
     if (filter === "deletion" && status !== "deletion") return false;
+    if (filter === "paying" && !(t.subscription_status === 'active' && t.plan !== 'free')) return false;
+    if (filter === "trialing" && t.subscription_status !== 'trialing') return false;
+    if (filter === "past_due" && t.subscription_status !== 'past_due') return false;
 
     if (search) {
       const q = search.toLowerCase();
@@ -379,6 +386,35 @@ export default function AdminPage() {
           <span className={styles.statLabel}>Pending Deletion</span>
         </div>
       </div>
+
+      {/* Subscription Revenue Stats */}
+      {(() => {
+        const paying = tenants.filter(t => t.subscription_status === 'active' && t.plan !== 'free');
+        const trialing = tenants.filter(t => t.subscription_status === 'trialing');
+        const pastDue = tenants.filter(t => t.subscription_status === 'past_due');
+        const planPrices: Record<string, number> = { starter: 29, growth: 79, professional: 149 };
+        const mrr = paying.reduce((sum, t) => sum + (planPrices[t.plan] || 0), 0);
+        return (
+          <div className={styles.statsGrid} style={{ marginTop: 'var(--space-3)' }}>
+            <div className={styles.statCard}>
+              <span className={`${styles.statValue} ${styles.statGreen}`}>{paying.length}</span>
+              <span className={styles.statLabel}>💳 Paying</span>
+            </div>
+            <div className={styles.statCard}>
+              <span className={`${styles.statValue}`} style={{ color: '#818cf8' }}>{trialing.length}</span>
+              <span className={styles.statLabel}>⏳ Trialing</span>
+            </div>
+            <div className={styles.statCard}>
+              <span className={`${styles.statValue}`} style={{ color: '#f59e0b' }}>{pastDue.length}</span>
+              <span className={styles.statLabel}>⚠️ Past Due</span>
+            </div>
+            <div className={styles.statCard}>
+              <span className={`${styles.statValue} ${styles.statGreen}`}>${mrr}</span>
+              <span className={styles.statLabel}>💰 Monthly Revenue</span>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Growth Command Center */}
       <GrowthDashboard />
@@ -1220,13 +1256,13 @@ export default function AdminPage() {
       {/* Filters + Search */}
       <div className={styles.toolbar}>
         <div className={styles.filters}>
-          {(["all", "active", "suspended", "deletion"] as const).map((f) => (
+          {(["all", "active", "paying", "trialing", "past_due", "suspended", "deletion"] as const).map((f) => (
             <button
               key={f}
               className={`${styles.filterBtn} ${filter === f ? styles.filterActive : ""}`}
               onClick={() => setFilter(f)}
             >
-              {f === "all" ? "All" : f === "active" ? "Active" : f === "suspended" ? "Suspended" : "Pending Deletion"}
+              {f === "all" ? "All" : f === "active" ? "Active" : f === "paying" ? "💳 Paying" : f === "trialing" ? "⏳ Trialing" : f === "past_due" ? "⚠️ Past Due" : f === "suspended" ? "Suspended" : "Pending Deletion"}
             </button>
           ))}
         </div>
@@ -1249,6 +1285,8 @@ export default function AdminPage() {
               <tr>
                 <th>Business</th>
                 <th>Plan</th>
+                <th>Subscription</th>
+                <th>Billing</th>
                 <th>Status</th>
                 <th>Staff</th>
                 <th>Clients</th>
@@ -1260,11 +1298,16 @@ export default function AdminPage() {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className={styles.emptyRow}>No tenants found</td>
+                  <td colSpan={10} className={styles.emptyRow}>No tenants found</td>
                 </tr>
               ) : (
                 filtered.map((t) => {
                   const status = getStatus(t);
+                  const subStatus = t.subscription_status || 'trialing';
+                  const trialEnd = t.trial_ends_at ? new Date(t.trial_ends_at) : null;
+                  const periodEnd = t.current_period_end ? new Date(t.current_period_end) : null;
+                  const now = new Date();
+                  const trialDaysLeft = trialEnd ? Math.max(0, Math.ceil((trialEnd.getTime() - now.getTime()) / 86400000)) : 0;
                   return (
                     <tr key={t.id} className={status === "deletion" ? styles.rowDeletion : status === "suspended" ? styles.rowSuspended : ""}>
                       <td>
@@ -1278,6 +1321,77 @@ export default function AdminPage() {
                         <span className={`${styles.planBadge} ${styles[`plan_${t.plan}`] || ""}`}>
                           {t.plan}
                         </span>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                          <span style={{
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            padding: '2px 8px',
+                            borderRadius: '10px',
+                            display: 'inline-block',
+                            width: 'fit-content',
+                            background: subStatus === 'active' ? 'rgba(34, 197, 94, 0.15)' :
+                                       subStatus === 'trialing' ? 'rgba(129, 140, 248, 0.15)' :
+                                       subStatus === 'past_due' ? 'rgba(245, 158, 11, 0.15)' :
+                                       subStatus === 'canceled' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(100,100,100,0.15)',
+                            color: subStatus === 'active' ? '#22c55e' :
+                                   subStatus === 'trialing' ? '#818cf8' :
+                                   subStatus === 'past_due' ? '#f59e0b' :
+                                   subStatus === 'canceled' ? '#ef4444' : 'var(--text-tertiary)',
+                          }}>
+                            {subStatus === 'active' ? '💳 Active' :
+                             subStatus === 'trialing' ? '⏳ Trial' :
+                             subStatus === 'past_due' ? '⚠️ Past Due' :
+                             subStatus === 'canceled' ? '❌ Canceled' : subStatus}
+                          </span>
+                          {subStatus === 'trialing' && trialEnd && (
+                            <span style={{
+                              fontSize: '10px',
+                              color: trialDaysLeft <= 7 ? '#f59e0b' : 'var(--text-tertiary)',
+                              fontWeight: trialDaysLeft <= 7 ? 600 : 400,
+                            }}>
+                              {trialDaysLeft}d left → {trialEnd.toLocaleDateString()}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                          {subStatus === 'active' && periodEnd ? (
+                            <>
+                              <span style={{ fontSize: '11px', color: 'var(--text-primary)', fontWeight: 600 }}>
+                                Next: {periodEnd.toLocaleDateString()}
+                              </span>
+                              {t.stripe_customer_id && (
+                                <a
+                                  href={`https://dashboard.stripe.com/customers/${t.stripe_customer_id}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{ fontSize: '10px', color: 'var(--color-primary)', textDecoration: 'none' }}
+                                >
+                                  View in Stripe ↗
+                                </a>
+                              )}
+                            </>
+                          ) : subStatus === 'past_due' ? (
+                            <span style={{ fontSize: '11px', color: '#f59e0b', fontWeight: 600 }}>
+                              Payment failed
+                              {t.stripe_customer_id && (
+                                <a
+                                  href={`https://dashboard.stripe.com/customers/${t.stripe_customer_id}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{ display: 'block', fontSize: '10px', color: 'var(--color-primary)', textDecoration: 'none', marginTop: '2px' }}
+                                >
+                                  Fix in Stripe ↗
+                                </a>
+                              )}
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>—</span>
+                          )}
+                        </div>
                       </td>
                       <td>
                         {status === "active" && <span className={`${styles.statusBadge} ${styles.statusActive}`}>Active</span>}
