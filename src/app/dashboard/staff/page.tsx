@@ -660,68 +660,31 @@ export default function StaffPage() {
                     <label className="label">Commission Rate (%)</label>
                     <input className="input" type="number" value={formData.commission_rate} onChange={(e) => setFormData({ ...formData, commission_rate: Number(e.target.value) })} />
                   </div>
-                  <div style={{
-                    gridColumn: "1 / -1",
-                    background: formData.pin
-                      ? "rgba(16,185,129,0.05)"
-                      : "rgba(139,92,246,0.05)",
-                    border: `1px solid ${formData.pin ? "rgba(16,185,129,0.2)" : "rgba(139,92,246,0.2)"}`,
-                    borderRadius: "var(--radius-lg)",
-                    padding: "var(--space-4) var(--space-5)",
-                  }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", marginBottom: "var(--space-3)" }}>
-                      <span style={{ fontSize: "1.1rem" }}>
-                        {formData.pin ? "🔒" : "🔓"}
-                      </span>
-                      <div>
-                        <div style={{
-                          fontWeight: 600,
-                          fontSize: "var(--text-sm)",
-                          color: "var(--text-primary)",
-                        }}>
-                          Front Desk PIN
-                        </div>
-                        <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginTop: 1 }}>
-                          {formData.pin
-                            ? "PIN-protected — staff must enter PIN to access Front Desk"
-                            : "Recommended — protects appointments and checkout access"
-                          }
-                        </div>
-                      </div>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
-                      <input
-                        className="input"
-                        type="text"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        maxLength={4}
-                        value={formData.pin}
-                        placeholder="4-digit PIN"
-                        style={{
-                          flex: 1,
-                          fontSize: "1rem",
-                          letterSpacing: "0.25em",
-                          fontWeight: 600,
-                          textAlign: "center",
-                          maxWidth: 180,
-                        }}
-                        onChange={(e) => {
-                          const v = e.target.value.replace(/\D/g, "").slice(0, 4);
-                          setFormData({ ...formData, pin: v });
-                        }}
-                      />
-                      {formData.pin && formData.pin.length === 4 && (
-                        <span style={{
-                          display: "inline-flex", alignItems: "center", gap: 4,
-                          color: "rgb(16,185,129)",
-                          fontSize: "12px",
-                          fontWeight: 500,
-                        }}>
-                          ✓ Set
-                        </span>
-                      )}
-                    </div>
+                  <div className={styles.formGroup}>
+                    <label className="label">{formData.pin ? "🔒" : "🔓"} Front Desk PIN</label>
+                    <input
+                      className="input"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={4}
+                      value={formData.pin}
+                      placeholder="4-digit PIN"
+                      style={{
+                        letterSpacing: "0.2em",
+                        fontWeight: 600,
+                      }}
+                      onChange={(e) => {
+                        const v = e.target.value.replace(/\D/g, "").slice(0, 4);
+                        setFormData({ ...formData, pin: v });
+                      }}
+                    />
+                    <span style={{ fontSize: "11px", color: formData.pin ? "rgb(16,185,129)" : "var(--text-tertiary)", marginTop: "3px" }}>
+                      {formData.pin
+                        ? "✓ PIN set — Front Desk protected"
+                        : "Recommended for Front Desk security"
+                      }
+                    </span>
                   </div>
                   {editingStaff && (
                     <div className={styles.formGroup}>
