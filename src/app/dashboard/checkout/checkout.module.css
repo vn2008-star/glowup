@@ -253,17 +253,28 @@
   gap: var(--space-3);
 }
 .dashboardLink {
-  font-size: 18px;
-  opacity: 0.25;
+  font-size: 28px;
+  opacity: 0.6;
   text-decoration: none;
-  transition: opacity 0.2s;
+  transition: all 0.3s ease;
   margin-top: var(--space-4);
   background: none;
   border: none;
   cursor: pointer;
+  padding: var(--space-2);
+  border-radius: 50%;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  filter: drop-shadow(0 0 6px rgba(212, 160, 212, 0.4));
 }
 .dashboardLink:hover {
-  opacity: 0.8;
+  opacity: 1;
+  background: rgba(212, 160, 212, 0.12);
+  filter: drop-shadow(0 0 12px rgba(212, 160, 212, 0.6));
+  transform: rotate(45deg);
 }
 .pageHeader h1 {
   font-size: var(--text-2xl);
