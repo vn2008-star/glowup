@@ -467,6 +467,63 @@ select option {
 }
 .input::placeholder { color: var(--text-tertiary); }
 
+/* --- Native Date/Time/Color Picker Visibility --- */
+/* Force dark color scheme for native pickers in dark mode */
+[data-theme="dark"] input[type="time"],
+[data-theme="dark"] input[type="date"],
+[data-theme="dark"] input[type="datetime-local"],
+[data-theme="dark"] input[type="month"],
+[data-theme="dark"] input[type="week"],
+[data-theme="dark"] input[type="number"],
+[data-theme="dark"] select {
+  color-scheme: dark;
+  color: var(--text-primary);
+}
+
+/* Style the calendar/clock picker icon */
+[data-theme="dark"] input[type="time"]::-webkit-calendar-picker-indicator,
+[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator,
+[data-theme="dark"] input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+[data-theme="dark"] input[type="month"]::-webkit-calendar-picker-indicator,
+[data-theme="dark"] input[type="week"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.85) sepia(0.2) hue-rotate(220deg);
+  cursor: pointer;
+  opacity: 0.8;
+}
+[data-theme="dark"] input[type="time"]::-webkit-calendar-picker-indicator:hover,
+[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator:hover,
+[data-theme="dark"] input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover,
+[data-theme="dark"] input[type="month"]::-webkit-calendar-picker-indicator:hover,
+[data-theme="dark"] input[type="week"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
+/* Ensure inner text of date/time fields is visible */
+[data-theme="dark"] input[type="time"]::-webkit-datetime-edit,
+[data-theme="dark"] input[type="date"]::-webkit-datetime-edit,
+[data-theme="dark"] input[type="datetime-local"]::-webkit-datetime-edit {
+  color: var(--text-primary);
+}
+[data-theme="dark"] input[type="time"]::-webkit-datetime-edit-fields-wrapper,
+[data-theme="dark"] input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+[data-theme="dark"] input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
+  color: var(--text-primary);
+}
+[data-theme="dark"] input[type="time"]::-webkit-datetime-edit-text,
+[data-theme="dark"] input[type="date"]::-webkit-datetime-edit-text,
+[data-theme="dark"] input[type="datetime-local"]::-webkit-datetime-edit-text {
+  color: var(--text-secondary);
+}
+
+/* Light mode — ensure pickers stay light scheme */
+input[type="time"],
+input[type="date"],
+input[type="datetime-local"],
+input[type="month"],
+input[type="week"] {
+  color-scheme: light;
+}
+
 .label {
   display: block;
   font-size: var(--text-sm);
