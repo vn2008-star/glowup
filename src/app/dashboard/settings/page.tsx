@@ -32,6 +32,7 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [linkCopied, setLinkCopied] = useState(false);
   const [clientCount, setClientCount] = useState(0);
+  const [staffCount, setStaffCount] = useState(0);
 
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
 
@@ -113,6 +114,9 @@ export default function SettingsPage() {
     if (!tenant) return;
     queryData<{ id: string }[]>("clients.list").then(({ data }) => {
       setClientCount(data?.length || 0);
+    });
+    queryData<{ id: string }[]>("staff.list").then(({ data }) => {
+      setStaffCount(data?.length || 0);
     });
   }, [tenant]);
 
@@ -1015,42 +1019,68 @@ export default function SettingsPage() {
               </button>
             ) : null}
             {(!tenant?.subscription_status || tenant.subscription_status === 'trialing' || tenant.subscription_status === 'canceled') && (
-              <div className={styles.upgradePlans}>
-                {[
-                  { key: 'starter', name: 'Starter', price: '$29/mo' },
-                  { key: 'growth', name: 'Growth', price: '$79/mo' },
-                  { key: 'professional', name: 'Professional', price: '$149/mo' },
-                ].map(plan => (
-                  <button
-                    key={plan.key}
-                    className={`btn ${plan.key === 'growth' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
-                    onClick={async () => {
-                      try {
-                        const res = await fetch('/api/stripe/checkout', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            planKey: plan.key,
-                            tenantId: tenant!.id,
-                            tenantEmail: tenant!.email,
-                            tenantName: tenant!.name,
-                          }),
-                        });
-                        const data = await res.json();
-                        if (data.url) {
-                          window.location.href = data.url;
-                        } else {
-                          alert(`Checkout failed: ${data.error || 'Unable to create checkout session. Please verify your Stripe Price IDs are configured correctly.'}`);
-                        }
-                      } catch (err) {
-                        alert(`Checkout error: ${err instanceof Error ? err.message : 'Network error. Please try again.'}`);
-                      }
-                    }}
-                  >
-                    {plan.name} — {plan.price}
-                  </button>
-                ))}
-              </div>
+              <>
+                <p className={styles.billingDetail} style={{ marginBottom: '4px' }}>
+                  👥 Your team: <strong>{staffCount} staff member{staffCount !== 1 ? 's' : ''}</strong>
+                </p>
+                <div className={styles.planCards}>
+                  {[
+                    { key: 'starter', name: 'Starter', price: 29, staffLimit: 4, features: ['Up to 4 staff', 'Booking & CRM', 'SMS reminders', 'Basic analytics'] },
+                    { key: 'growth', name: 'Growth', price: 79, staffLimit: 10, popular: true, features: ['Up to 10 staff', 'All Starter features', 'Campaigns & loyalty', 'Fill My Openings'] },
+                    { key: 'professional', name: 'Professional', price: 149, staffLimit: 20, features: ['Up to 20 staff', 'All Growth features', 'AI receptionist', 'Priority support'] },
+                  ].map(plan => {
+                    const tooSmall = staffCount > plan.staffLimit;
+                    return (
+                      <div key={plan.key} className={`${styles.planCard} ${plan.popular ? styles.planCardPopular : ''} ${tooSmall ? styles.planCardDisabled : ''}`}>
+                        {plan.popular && <div className={styles.planCardBadge}>Most Popular</div>}
+                        <div className={styles.planCardHeader}>
+                          <span className={styles.planCardName}>{plan.name}</span>
+                          <span className={styles.planCardPrice}>${plan.price}<small>/mo</small></span>
+                        </div>
+                        <ul className={styles.planCardFeatures}>
+                          {plan.features.map((f, i) => (
+                            <li key={i}>✓ {f}</li>
+                          ))}
+                        </ul>
+                        {tooSmall ? (
+                          <div className={styles.planCardLocked}>
+                            🔒 You have {staffCount} staff — this plan supports up to {plan.staffLimit}
+                          </div>
+                        ) : (
+                          <button
+                            className={`btn ${plan.popular ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+                            style={{ width: '100%' }}
+                            onClick={async () => {
+                              try {
+                                const res = await fetch('/api/stripe/checkout', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({
+                                    planKey: plan.key,
+                                    tenantId: tenant!.id,
+                                    tenantEmail: tenant!.email,
+                                    tenantName: tenant!.name,
+                                  }),
+                                });
+                                const data = await res.json();
+                                if (data.url) {
+                                  window.location.href = data.url;
+                                } else {
+                                  alert(`Checkout failed: ${data.error || 'Unable to create checkout session.'}`);
+                                }
+                              } catch (err) {
+                                alert(`Checkout error: ${err instanceof Error ? err.message : 'Network error. Please try again.'}`);
+                              }
+                            }}
+                          >
+                            Subscribe
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
             )}
           </div>
         </div>
