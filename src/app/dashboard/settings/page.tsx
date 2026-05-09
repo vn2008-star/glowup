@@ -1017,9 +1017,9 @@ export default function SettingsPage() {
             {(!tenant?.subscription_status || tenant.subscription_status === 'trialing' || tenant.subscription_status === 'canceled') && (
               <div className={styles.upgradePlans}>
                 {[
-                  { key: 'starter', name: 'Starter', price: '$25/mo' },
-                  { key: 'growth', name: 'Growth', price: '$75/mo' },
-                  { key: 'professional', name: 'Professional', price: '$150/mo' },
+                  { key: 'starter', name: 'Starter', price: '$29/mo' },
+                  { key: 'growth', name: 'Growth', price: '$79/mo' },
+                  { key: 'professional', name: 'Professional', price: '$149/mo' },
                 ].map(plan => (
                   <button
                     key={plan.key}

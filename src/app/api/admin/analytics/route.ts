@@ -35,8 +35,8 @@ export async function GET() {
   // Plan pricing map (monthly estimates)
   const planPricing: Record<string, number> = {
     starter: 29,
-    growth: 59,
-    professional: 99,
+    growth: 79,
+    professional: 149,
   }
 
   const paying = tenants.filter(t =>

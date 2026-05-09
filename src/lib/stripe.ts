@@ -14,25 +14,25 @@ export interface PlanConfig {
 // ─── Plan Configuration ───
 // Create these products/prices in your Stripe Dashboard:
 //   1. Go to stripe.com/dashboard → Products → + Add Product
-//   2. Create 3 products: Starter ($25/mo), Growth ($75/mo), Professional ($150/mo)
+//   2. Create 3 products: Starter ($29/mo), Growth ($79/mo), Professional ($149/mo)
 //   3. Copy each Price ID (starts with price_...) and paste below
 export const PLANS: Record<string, PlanConfig> = {
   starter: {
-    priceId: process.env.STRIPE_PRICE_STARTER || 'price_1TQeAqL9FTcxTGSWITgYCk5u',
+    priceId: process.env.STRIPE_PRICE_STARTER || 'price_1TV3f5Gs3kamiabpIqBrIUHG',
     name: 'Starter',
-    price: 25,
+    price: 29,
     staffLimit: 4,
   },
   growth: {
-    priceId: process.env.STRIPE_PRICE_GROWTH || 'price_1TQeBFL9FTcxTGSWF79jl49G',
+    priceId: process.env.STRIPE_PRICE_GROWTH || 'price_1TV3fhGs3kamiabpntPnEMVQ',
     name: 'Growth',
-    price: 75,
+    price: 79,
     staffLimit: 10,
   },
   professional: {
-    priceId: process.env.STRIPE_PRICE_PROFESSIONAL || 'price_1TQeBaL9FTcxTGSWKlpvL8v3',
+    priceId: process.env.STRIPE_PRICE_PROFESSIONAL || 'price_1TV3gCGs3kamiabpCLIIvFWL',
     name: 'Professional',
-    price: 150,
+    price: 149,
     staffLimit: 20,
   },
 };

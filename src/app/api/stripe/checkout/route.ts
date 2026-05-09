@@ -25,6 +25,16 @@ export async function POST(req: NextRequest) {
 
     let customerId = tenant?.stripe_customer_id;
 
+    // Validate existing customer ID still works (could be from a different Stripe account)
+    if (customerId) {
+      try {
+        await stripe.customers.retrieve(customerId);
+      } catch {
+        // Customer doesn't exist on this Stripe account — create a new one
+        customerId = null;
+      }
+    }
+
     if (!customerId) {
       const customer = await stripe.customers.create({
         email: tenantEmail,

@@ -50,17 +50,17 @@ export default async function LandingPage() {
 
   const plans = [
     {
-      name: t('starterName'), price: "25", target: t('starterTarget'),
+      name: t('starterName'), price: "29", target: t('starterTarget'),
       features: [t('starterF1'), t('starterF2'), t('starterF3'), t('starterF4'), t('starterF5')],
       cta: t('startTrial'), highlighted: false,
     },
     {
-      name: t('growthName'), price: "75", target: t('growthTarget'),
+      name: t('growthName'), price: "79", target: t('growthTarget'),
       features: [t('growthF1'), t('growthF2'), t('growthF3'), t('growthF4'), t('growthF5'), t('growthF6')],
       cta: t('startTrial'), highlighted: true,
     },
     {
-      name: t('proName'), price: "150", target: t('proTarget'),
+      name: t('proName'), price: "149", target: t('proTarget'),
       features: [t('proF1'), t('proF2'), t('proF3'), t('proF4'), t('proF5'), t('proF6'), t('proF7')],
       cta: t('startTrial'), highlighted: false,
     },
