@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/run-automations",
-      "schedule": "0 * * * *"
+      "schedule": "0 9 * * *"
     },
     {
       "path": "/api/process-outreach-queue",
