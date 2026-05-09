@@ -22,6 +22,24 @@ function maskEmail(email: string | null): string | null {
   return `${email[0]}${'•'.repeat(Math.max(at - 1, 2))}${email.slice(at)}`;
 }
 
+/* ── Dynamic client status computation ── */
+function computeClientStatus(c: Client): 'new' | 'active' | 'at_risk' | 'inactive' {
+  const now = Date.now();
+  const dayMs = 86400000;
+  const createdDaysAgo = c.created_at ? (now - new Date(c.created_at).getTime()) / dayMs : 999;
+  const lastVisitDaysAgo = c.last_visit ? (now - new Date(c.last_visit).getTime()) / dayMs : 999;
+  const visits = c.visit_count || 0;
+
+  // New: created within 30 days AND 2 or fewer visits
+  if (createdDaysAgo <= 30 && visits <= 2) return 'new';
+  // Active: last visit within 45 days
+  if (lastVisitDaysAgo <= 45) return 'active';
+  // At Risk: last visit 45-90 days ago
+  if (lastVisitDaysAgo <= 90) return 'at_risk';
+  // Inactive: last visit > 90 days ago (or never visited)
+  return 'inactive';
+}
+
 export default function ClientsPage() {
   const { tenant, currentStaff } = useTenant();
   const t = useTranslations("clientsPage");
@@ -73,7 +91,9 @@ export default function ClientsPage() {
     if (!tenant) return;
     setLoading(true);
     const { data } = await queryData<Client[]>("clients.list");
-    setClients(data || []);
+    // Compute status dynamically from visit data
+    const enriched = (data || []).map(c => ({ ...c, status: computeClientStatus(c) }));
+    setClients(enriched);
     setLoading(false);
   }, [tenant]);
 
@@ -400,11 +420,15 @@ export default function ClientsPage() {
       <div className={styles.toolbar}>
         <input className={`input ${styles.searchInput}`} placeholder="Search clients..." value={search} onChange={(e) => setSearch(e.target.value)} />
         <div className={styles.filters}>
-          {["all", "active", "new", "at_risk", "inactive"].map((f) => (
-            <button key={f} className={`${styles.filterBtn} ${filter === f ? styles.activeFilter : ""}`} onClick={() => setFilter(f)}>
-              {f === "all" ? "All" : f === "at_risk" ? "At Risk" : f.charAt(0).toUpperCase() + f.slice(1)}
-            </button>
-          ))}
+          {["all", "active", "new", "at_risk", "inactive"].map((f) => {
+            const count = f === "all" ? clients.length : clients.filter(c => c.status === f).length;
+            return (
+              <button key={f} className={`${styles.filterBtn} ${filter === f ? styles.activeFilter : ""}`} onClick={() => setFilter(f)}>
+                {f === "all" ? "All" : f === "at_risk" ? "At Risk" : f.charAt(0).toUpperCase() + f.slice(1)}
+                <span style={{ opacity: 0.7, marginLeft: 4, fontSize: '11px' }}>({count})</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
