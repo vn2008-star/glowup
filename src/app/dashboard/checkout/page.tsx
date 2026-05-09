@@ -1106,7 +1106,7 @@ export default function CheckoutPage() {
                   </div>
                 ) : (() => {
                   // Calendar time grid constants — dynamic based on appointments
-                  const CAL_SLOT_H = 80; // px per hour
+                  const CAL_SLOT_H = 120; // px per hour
                   const DEFAULT_START = 9;
                   const DEFAULT_END = 19;
 
@@ -1142,7 +1142,7 @@ export default function CheckoutPage() {
                     const s = new Date(start);
                     const e = new Date(end);
                     const hrs = (e.getTime() - s.getTime()) / (1000 * 60 * 60);
-                    return Math.max(hrs * CAL_SLOT_H, 40);
+                    return Math.max(hrs * CAL_SLOT_H, 54);
                   };
 
                   const aptColor = (status: string) => {
@@ -1245,7 +1245,7 @@ export default function CheckoutPage() {
                                 />
                               ))}
                               {/* Appointment blocks */}
-                              {staffApts.map((apt) => {
+                              {staffApts.map((apt, aptIdx) => {
                                 const clientName = apt.client
                                   ? `${apt.client.first_name} ${apt.client.last_name || ""}`.trim()
                                   : t("walkIn");
@@ -1258,6 +1258,7 @@ export default function CheckoutPage() {
                                       height: `${getH(apt.start_time, apt.end_time)}px`,
                                       borderLeftColor: aptColor(apt.status),
                                       left: 4, right: 4,
+                                      zIndex: aptIdx + 2,
                                     }}
                                     onClick={() => handleSelectApt(apt)}
                                   >
@@ -1314,7 +1315,7 @@ export default function CheckoutPage() {
                       })()}
 
                       {/* Appointment blocks */}
-                      {filteredApts.map((apt) => {
+                      {filteredApts.map((apt, aptIdx) => {
                         const clientName = apt.client
                           ? `${apt.client.first_name} ${apt.client.last_name || ""}`.trim()
                           : t("walkIn");
@@ -1326,6 +1327,7 @@ export default function CheckoutPage() {
                               top: `${getPos(apt.start_time)}px`,
                               height: `${getH(apt.start_time, apt.end_time)}px`,
                               borderLeftColor: aptColor(apt.status),
+                              zIndex: aptIdx + 2,
                             }}
                             onClick={() => handleSelectApt(apt)}
                           >

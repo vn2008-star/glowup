@@ -946,7 +946,7 @@
   position: relative;
 }
 .calTimeSlot {
-  height: 80px;
+  height: 120px;
   display: flex;
   align-items: flex-start;
   justify-content: flex-end;
@@ -1021,7 +1021,7 @@
   padding-left: 0;
 }
 .calSlot {
-  height: 80px;
+  height: 120px;
   display: flex;
   align-items: flex-start;
   position: relative;
