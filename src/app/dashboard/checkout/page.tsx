@@ -307,9 +307,6 @@ export default function CheckoutPage() {
   // Filter appointments by selected staff
   const filteredApts = appointments.filter((a) => {
     if (activeStaffId === "all") return true;
-    // Owners and managers see all appointments
-    const selectedStaff = staffMembers.find((s) => s.id === activeStaffId);
-    if (selectedStaff?.role === "owner" || selectedStaff?.role === "manager") return true;
     return a.staff_id === activeStaffId;
   });
 
@@ -319,16 +316,10 @@ export default function CheckoutPage() {
     return rd !== 0 ? rd : a.name.localeCompare(b.name);
   });
 
-  // Filtered tally: staff sees only their own, owner/manager sees all
+  // Filtered tally: staff sees only their own, All Staff sees all
   const filteredTally = useMemo(() => {
     if (!tally) return null;
     if (activeStaffId === "all") return tally;
-
-    // If the selected staff member is an owner or manager, show all staff data
-    const selectedStaff = staffMembers.find((s) => s.id === activeStaffId);
-    if (selectedStaff?.role === "owner" || selectedStaff?.role === "manager") {
-      return tally;
-    }
 
     // Filter to the selected staff member only
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
