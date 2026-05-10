@@ -254,8 +254,10 @@ export async function POST(request: Request) {
           .from('staff')
           .select('*')
           .eq('tenant_id', tenantId)
+        // Hide system "Admin" records used only for tenant-user linking
+        const visible = (data || []).filter((s: { name: string }) => s.name !== 'Admin')
         const rolePriority: Record<string, number> = { owner: 0, manager: 1, technician: 2 }
-        const sorted = (data || []).sort((a: { role: string; name: string }, b: { role: string; name: string }) => {
+        const sorted = visible.sort((a: { role: string; name: string }, b: { role: string; name: string }) => {
           const ra = rolePriority[a.role] ?? 3
           const rb = rolePriority[b.role] ?? 3
           if (ra !== rb) return ra - rb
@@ -699,7 +701,8 @@ export async function POST(request: Request) {
             .eq('tenant_id', tenantId),
           svc.from('staff')
             .select('id, name')
-            .eq('tenant_id', tenantId),
+            .eq('tenant_id', tenantId)
+            .neq('name', 'Admin'),
           svc.from('appointments')
             .select('id', { count: 'exact', head: true })
             .eq('tenant_id', tenantId)

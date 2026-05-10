@@ -63,7 +63,9 @@ export default function DashboardOverview() {
   const now = new Date();
   const hour = now.getHours();
   const greeting = hour < 12 ? t("goodMorning") : hour < 17 ? t("goodAfternoon") : t("goodEvening");
-  const staffName = currentStaff?.name?.split(" ")[0] || "there";
+  const staffName = currentStaff?.name === 'Admin'
+    ? (tenant?.name?.split(' ')[0] || 'there')
+    : (currentStaff?.name?.split(" ")[0] || "there");
 
   const dayName = now.toLocaleDateString("en-US", { weekday: "long" });
   const dateStr = now.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });

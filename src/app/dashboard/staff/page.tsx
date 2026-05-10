@@ -46,8 +46,7 @@ export default function StaffPage() {
     if (!tenant) return;
     setLoading(true);
     const { data } = await queryData<Staff[]>("staff.list");
-    // Hide system "Admin" records used only for tenant-user linking
-    setStaffMembers((data || []).filter(s => s.name !== "Admin"));
+    setStaffMembers(data || []);
     setLoading(false);
   }, [tenant]);
 
