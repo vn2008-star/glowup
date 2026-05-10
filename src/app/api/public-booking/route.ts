@@ -41,6 +41,7 @@ export async function GET(request: Request) {
     .select('id, name, role, specialties, schedule')
     .eq('tenant_id', tenant.id)
     .eq('is_active', true)
+    .neq('name', 'Admin')
     .order('name')
 
   // Get existing appointments for availability checking (next 30 days)

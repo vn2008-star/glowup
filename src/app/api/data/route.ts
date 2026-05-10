@@ -1086,7 +1086,7 @@ export async function POST(request: Request) {
         const [aptsRes, staffRes] = await Promise.all([
           svc.from('appointments').select('*').eq('tenant_id', tenantId)
             .gte('start_time', monthStart).lte('start_time', monthEnd),
-          svc.from('staff').select('id, name, schedule, commission_rate, is_active, specialties').eq('tenant_id', tenantId)
+          svc.from('staff').select('id, name, schedule, commission_rate, is_active, specialties').eq('tenant_id', tenantId).neq('name', 'Admin')
         ])
 
         const apts = aptsRes.data || []
@@ -1179,6 +1179,7 @@ export async function POST(request: Request) {
             .eq('status', 'completed'),
           svc.from('staff').select('id, name, email, role, commission_rate, is_active, specialties, photo_url')
             .eq('tenant_id', tenantId)
+            .neq('name', 'Admin')
         ])
 
         const apts = aptsRes.data || []
