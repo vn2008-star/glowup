@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import styles from "./admin.module.css";
@@ -38,6 +38,54 @@ interface Stats {
   active: number;
   suspended: number;
   pendingDeletion: number;
+}
+
+interface StaffDetail {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  role: string;
+  specialties: string[];
+  commission_rate: number;
+  schedule: Record<string, unknown>;
+  is_active: boolean;
+  created_at: string;
+}
+
+interface ClientDetail {
+  id: string;
+  first_name: string;
+  last_name: string | null;
+  phone: string | null;
+  email: string | null;
+  birthday: string | null;
+  lifetime_spend: number;
+  visit_count: number;
+  last_visit: string | null;
+  status: string;
+  tags: string[];
+  loyalty_points: number;
+  notes: string | null;
+  created_at: string;
+}
+
+interface AppointmentDetail {
+  id: string;
+  start_time: string;
+  end_time: string;
+  status: string;
+  notes: string | null;
+  staff: { name: string } | null;
+  client: { first_name: string; last_name: string | null } | null;
+  services: unknown;
+}
+
+interface TenantDetail {
+  tenant: Record<string, unknown>;
+  staff: StaffDetail[];
+  clients: ClientDetail[];
+  appointments: AppointmentDetail[];
 }
 
 interface OutreachLead {
@@ -85,6 +133,13 @@ export default function AdminPage() {
   const [rewardAmount, setRewardAmount] = useState('25');
   const [rewardSaving, setRewardSaving] = useState(false);
   const [rewardToast, setRewardToast] = useState('');
+
+  // Detail panel state
+  const [expandedTenant, setExpandedTenant] = useState<string | null>(null);
+  const [detailData, setDetailData] = useState<Record<string, TenantDetail>>({});
+  const [detailLoading, setDetailLoading] = useState<string | null>(null);
+  const [detailTab, setDetailTab] = useState<'info' | 'staff' | 'clients'>('info');
+  const [clientSearch, setClientSearch] = useState('');
 
   // Outreach state
   const [outreachTab, setOutreachTab] = useState<'upload' | 'sms' | 'history' | 'followups'>('upload');
@@ -293,6 +348,35 @@ export default function AdminPage() {
     if (t.deletion_scheduled_at) return "deletion";
     if (t.is_active === false) return "suspended";
     return "active";
+  }
+
+  async function toggleDetail(tenantId: string) {
+    if (expandedTenant === tenantId) {
+      setExpandedTenant(null);
+      return;
+    }
+    setExpandedTenant(tenantId);
+    setDetailTab('info');
+    setClientSearch('');
+
+    // Already fetched?
+    if (detailData[tenantId]) return;
+
+    setDetailLoading(tenantId);
+    try {
+      const res = await fetch('/api/admin/tenants', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tenant_id: tenantId, action: 'get-tenant-detail' }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setDetailData(prev => ({ ...prev, [tenantId]: data }));
+      }
+    } catch (err) {
+      console.error('Failed to load tenant detail:', err);
+    }
+    setDetailLoading(null);
   }
 
   /* ── Usage-Based Cost Calculator ──
@@ -1309,7 +1393,8 @@ export default function AdminPage() {
                   const now = new Date();
                   const trialDaysLeft = trialEnd ? Math.max(0, Math.ceil((trialEnd.getTime() - now.getTime()) / 86400000)) : 0;
                   return (
-                    <tr key={t.id} className={status === "deletion" ? styles.rowDeletion : status === "suspended" ? styles.rowSuspended : ""}>
+                    <React.Fragment key={t.id}>
+                    <tr className={status === "deletion" ? styles.rowDeletion : status === "suspended" ? styles.rowSuspended : ""}>
                       <td>
                         <div className={styles.tenantCell}>
                           <strong>{t.name}</strong>
@@ -1429,6 +1514,12 @@ export default function AdminPage() {
                       </td>
                       <td>
                         <div className={styles.actionBtns}>
+                          <button
+                            className={`${styles.viewBtn} ${expandedTenant === t.id ? styles.viewBtnActive : ''}`}
+                            onClick={() => toggleDetail(t.id)}
+                          >
+                            {expandedTenant === t.id ? '▼ Close' : '▶ View'}
+                          </button>
                           {status === "active" && (
                             <button
                               className={styles.suspendBtn}
@@ -1468,6 +1559,208 @@ export default function AdminPage() {
                         </div>
                       </td>
                     </tr>
+                    {/* ── Expandable Detail Panel ── */}
+                    {expandedTenant === t.id && (
+                      <tr className={styles.detailRow}>
+                        <td colSpan={10}>
+                          <div className={styles.detailPanel}>
+                            <div className={styles.detailTabs}>
+                              <button className={`${styles.detailTab} ${detailTab === 'info' ? styles.detailTabActive : ''}`} onClick={() => setDetailTab('info')}>📋 Business Info</button>
+                              <button className={`${styles.detailTab} ${detailTab === 'staff' ? styles.detailTabActive : ''}`} onClick={() => setDetailTab('staff')}>👥 Staff ({detailData[t.id]?.staff.length ?? t.staff_count})</button>
+                              <button className={`${styles.detailTab} ${detailTab === 'clients' ? styles.detailTabActive : ''}`} onClick={() => { setDetailTab('clients'); setClientSearch(''); }}>👤 Clients ({detailData[t.id]?.clients.length ?? t.client_count})</button>
+                            </div>
+                            <div className={styles.detailBody}>
+                              {detailLoading === t.id ? (
+                                <div style={{ textAlign: 'center', padding: 'var(--space-8)', color: 'var(--text-tertiary)' }}>Loading tenant data...</div>
+                              ) : !detailData[t.id] ? (
+                                <div style={{ textAlign: 'center', padding: 'var(--space-8)', color: 'var(--text-tertiary)' }}>Failed to load data</div>
+                              ) : detailTab === 'info' ? (
+                                /* ── Business Info Tab ── */
+                                <div className={styles.infoGrid}>
+                                  <div className={styles.infoCard}>
+                                    <h4>📍 Contact Information</h4>
+                                    {[['Email', detailData[t.id].tenant.email as string],
+                                      ['Phone', detailData[t.id].tenant.phone as string],
+                                      ['Website', detailData[t.id].tenant.website as string],
+                                      ['Address', detailData[t.id].tenant.address as string],
+                                    ].map(([label, value]) => (
+                                      <div key={label} className={styles.infoField}>
+                                        <span className={styles.infoLabel}>{label}</span>
+                                        <span className={value ? styles.infoValue : `${styles.infoValue} ${styles.infoEmpty}`}>
+                                          {value || 'Not set'}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                  <div className={styles.infoCard}>
+                                    <h4>💼 Account Details</h4>
+                                    {[['Business Type', detailData[t.id].tenant.business_type as string],
+                                      ['Plan', detailData[t.id].tenant.plan as string],
+                                      ['Subscription', detailData[t.id].tenant.subscription_status as string],
+                                      ['Slug', `/${detailData[t.id].tenant.slug as string}`],
+                                      ['Created', new Date(detailData[t.id].tenant.created_at as string).toLocaleDateString()],
+                                    ].map(([label, value]) => (
+                                      <div key={label} className={styles.infoField}>
+                                        <span className={styles.infoLabel}>{label}</span>
+                                        <span className={value ? styles.infoValue : `${styles.infoValue} ${styles.infoEmpty}`}>
+                                          {value || '—'}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                  <div className={styles.infoCard}>
+                                    <h4>💳 Billing</h4>
+                                    {[['Stripe Customer', detailData[t.id].tenant.stripe_customer_id as string],
+                                      ['Stripe Sub', detailData[t.id].tenant.stripe_subscription_id as string],
+                                      ['Trial Ends', detailData[t.id].tenant.trial_ends_at ? new Date(detailData[t.id].tenant.trial_ends_at as string).toLocaleDateString() : null],
+                                      ['Period End', detailData[t.id].tenant.current_period_end ? new Date(detailData[t.id].tenant.current_period_end as string).toLocaleDateString() : null],
+                                    ].map(([label, value]) => (
+                                      <div key={label as string} className={styles.infoField}>
+                                        <span className={styles.infoLabel}>{label as string}</span>
+                                        <span className={value ? styles.infoValue : `${styles.infoValue} ${styles.infoEmpty}`}>
+                                          {(value as string) || 'None'}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                  <div className={styles.infoCard}>
+                                    <h4>📅 Recent Activity</h4>
+                                    {detailData[t.id].appointments.length === 0 ? (
+                                      <div style={{ fontSize: '13px', color: 'var(--text-tertiary)', padding: 'var(--space-3) 0' }}>No appointments yet</div>
+                                    ) : (
+                                      detailData[t.id].appointments.slice(0, 5).map((apt) => (
+                                        <div key={apt.id} className={styles.infoField}>
+                                          <span className={styles.infoLabel}>
+                                            {new Date(apt.start_time).toLocaleDateString()} · {apt.staff?.name || '?'}
+                                          </span>
+                                          <span className={styles.infoValue} style={{ fontSize: '12px' }}>
+                                            {apt.client ? `${apt.client.first_name} ${apt.client.last_name || ''}`.trim() : '—'}
+                                          </span>
+                                        </div>
+                                      ))
+                                    )}
+                                  </div>
+                                </div>
+                              ) : detailTab === 'staff' ? (
+                                /* ── Staff Tab ── */
+                                <div>
+                                  <div className={styles.detailHeader}>
+                                    <span className={styles.detailCount}>{detailData[t.id].staff.length} staff members</span>
+                                  </div>
+                                  {detailData[t.id].staff.length === 0 ? (
+                                    <div style={{ textAlign: 'center', padding: 'var(--space-6)', color: 'var(--text-tertiary)' }}>No staff members</div>
+                                  ) : (
+                                    <div style={{ maxHeight: '400px', overflow: 'auto', borderRadius: 'var(--radius-lg)' }}>
+                                      <table className={styles.innerTable}>
+                                        <thead>
+                                          <tr>
+                                            <th>Name</th>
+                                            <th>Email</th>
+                                            <th>Phone</th>
+                                            <th>Role</th>
+                                            <th>Specialties</th>
+                                            <th>Commission</th>
+                                            <th>Status</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {detailData[t.id].staff.map((s) => (
+                                            <tr key={s.id}>
+                                              <td><strong>{s.name}</strong></td>
+                                              <td style={{ fontSize: '12px' }}>{s.email || <span className={styles.infoEmpty}>—</span>}</td>
+                                              <td style={{ fontSize: '12px' }}>{s.phone || <span className={styles.infoEmpty}>—</span>}</td>
+                                              <td>
+                                                <span className={`${styles.roleBadge} ${
+                                                  s.role === 'owner' ? styles.roleOwner
+                                                  : s.role === 'manager' ? styles.roleManager
+                                                  : styles.roleTechnician
+                                                }`}>{s.role}</span>
+                                              </td>
+                                              <td style={{ fontSize: '12px' }}>{s.specialties?.length ? s.specialties.join(', ') : '—'}</td>
+                                              <td style={{ textAlign: 'center' }}>{s.commission_rate}%</td>
+                                              <td>
+                                                <span className={s.is_active ? styles.clientActive : styles.clientInactive}>
+                                                  {s.is_active ? '✅' : '❌'}
+                                                </span>
+                                              </td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                /* ── Clients Tab ── */
+                                <div>
+                                  <div className={styles.detailHeader}>
+                                    <span className={styles.detailCount}>{detailData[t.id].clients.length} clients</span>
+                                    <input
+                                      type="text"
+                                      className={styles.detailSearch}
+                                      placeholder="Search clients by name, phone, email..."
+                                      value={clientSearch}
+                                      onChange={(e) => setClientSearch(e.target.value)}
+                                    />
+                                  </div>
+                                  {(() => {
+                                    const q = clientSearch.toLowerCase();
+                                    const filteredClients = q
+                                      ? detailData[t.id].clients.filter(c =>
+                                          `${c.first_name} ${c.last_name || ''}`.toLowerCase().includes(q) ||
+                                          (c.email || '').toLowerCase().includes(q) ||
+                                          (c.phone || '').includes(q)
+                                        )
+                                      : detailData[t.id].clients;
+                                    return filteredClients.length === 0 ? (
+                                      <div style={{ textAlign: 'center', padding: 'var(--space-6)', color: 'var(--text-tertiary)' }}>
+                                        {q ? `No clients matching "${q}"` : 'No clients'}
+                                      </div>
+                                    ) : (
+                                      <div style={{ maxHeight: '400px', overflow: 'auto', borderRadius: 'var(--radius-lg)' }}>
+                                        <table className={styles.innerTable}>
+                                          <thead>
+                                            <tr>
+                                              <th>Name</th>
+                                              <th>Phone</th>
+                                              <th>Email</th>
+                                              <th>Visits</th>
+                                              <th>Lifetime Spend</th>
+                                              <th>Last Visit</th>
+                                              <th>Loyalty Pts</th>
+                                              <th>Status</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {filteredClients.map((c) => (
+                                              <tr key={c.id}>
+                                                <td><strong>{c.first_name} {c.last_name || ''}</strong></td>
+                                                <td style={{ fontSize: '12px' }}>{c.phone || <span className={styles.infoEmpty}>—</span>}</td>
+                                                <td style={{ fontSize: '12px' }}>{c.email || <span className={styles.infoEmpty}>—</span>}</td>
+                                                <td style={{ textAlign: 'center' }}>{c.visit_count}</td>
+                                                <td style={{ fontWeight: 600 }}>${Number(c.lifetime_spend || 0).toFixed(2)}</td>
+                                                <td className={styles.dateCell}>{c.last_visit ? new Date(c.last_visit).toLocaleDateString() : '—'}</td>
+                                                <td style={{ textAlign: 'center' }}>{c.loyalty_points}</td>
+                                                <td>
+                                                  <span className={c.status === 'active' ? styles.clientActive : styles.clientInactive}>
+                                                    {c.status || 'active'}
+                                                  </span>
+                                                </td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                    );
+                                  })()}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    </React.Fragment>
                   );
                 })
               )}

@@ -195,5 +195,45 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true })
   }
 
+  if (action === 'get-tenant-detail') {
+    // Full tenant record
+    const { data: tenant } = await svc
+      .from('tenants')
+      .select('*')
+      .eq('id', tenant_id)
+      .single()
+    if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
+
+    // All staff
+    const { data: staff } = await svc
+      .from('staff')
+      .select('id, name, email, phone, role, specialties, commission_rate, schedule, is_active, created_at')
+      .eq('tenant_id', tenant_id)
+      .neq('name', 'Admin')
+      .order('name')
+
+    // All clients
+    const { data: clients } = await svc
+      .from('clients')
+      .select('id, first_name, last_name, phone, email, birthday, lifetime_spend, visit_count, last_visit, status, tags, loyalty_points, notes, created_at')
+      .eq('tenant_id', tenant_id)
+      .order('last_name')
+
+    // Recent appointments (last 30)
+    const { data: appointments } = await svc
+      .from('appointments')
+      .select('id, start_time, end_time, status, notes, staff:staff_id(name), client:client_id(first_name, last_name), services')
+      .eq('tenant_id', tenant_id)
+      .order('start_time', { ascending: false })
+      .limit(30)
+
+    return NextResponse.json({
+      tenant,
+      staff: staff || [],
+      clients: clients || [],
+      appointments: appointments || [],
+    })
+  }
+
   return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
 }
