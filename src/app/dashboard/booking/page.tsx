@@ -863,34 +863,136 @@ export default function BookingPage() {
                     )}
 
                     {/* Message Preview */}
-                    <div style={{
-                      marginTop: "var(--space-3)",
-                      borderTop: "1px solid var(--border-subtle)",
-                      paddingTop: "var(--space-3)",
-                    }}>
-                      <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: "6px" }}>
-                        {fmoChannel === "email" ? "📧" : "📱"} Preview Message
-                      </span>
-                      <div style={{
-                        background: fmoChannel === "email" ? "rgba(195, 126, 218, 0.08)" : "rgba(34, 197, 94, 0.08)",
-                        border: `1px solid ${fmoChannel === "email" ? "rgba(195, 126, 218, 0.2)" : "rgba(34, 197, 94, 0.2)"}`,
-                        borderRadius: "var(--radius-lg)",
-                        padding: "var(--space-3) var(--space-4)",
-                        fontSize: "13px",
-                        lineHeight: 1.6,
-                        color: "var(--text-primary)",
-                        position: "relative",
-                      }}>
-                        <div style={{ fontStyle: "italic", color: "var(--text-secondary)" }}>
-                          Hey <strong>Sarah</strong>! ⚡ We just had an opening — <strong>{fmoDays === 1 ? "Today" : `next ${fmoDays} days`}, 9:00 AM – 5:00 PM</strong>. Book now before it&apos;s gone →
+                    {(() => {
+                      // Detect real openings for preview
+                      const previewSlots = detectOpenSlots(allStaff, allAppointments, fmoDays);
+                      // Group by staff
+                      const byStaff = new Map<string, OpenSlot[]>();
+                      previewSlots.forEach(slot => {
+                        if (!byStaff.has(slot.staffName)) byStaff.set(slot.staffName, []);
+                        byStaff.get(slot.staffName)!.push(slot);
+                      });
+
+                      // Build a staff-organized summary for the message text
+                      function buildStaffSummary(): string {
+                        if (byStaff.size === 0) return "no openings found";
+                        const parts: string[] = [];
+                        byStaff.forEach((slots, name) => {
+                          const byDate = new Map<string, OpenSlot[]>();
+                          slots.forEach(s => {
+                            const dk = s.date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+                            if (!byDate.has(dk)) byDate.set(dk, []);
+                            byDate.get(dk)!.push(s);
+                          });
+                          const dayParts: string[] = [];
+                          byDate.forEach((ds, dateLabel) => {
+                            const times = ds.map(s => `${formatHour(s.startHour)}–${formatHour(s.endHour)}`).join(", ");
+                            dayParts.push(`${dateLabel}: ${times}`);
+                          });
+                          parts.push(`${name} → ${dayParts.join(" | ")}`);
+                        });
+                        return parts.join("\n");
+                      }
+
+                      return (
+                        <div style={{
+                          marginTop: "var(--space-3)",
+                          borderTop: "1px solid var(--border-subtle)",
+                          paddingTop: "var(--space-3)",
+                        }}>
+                          <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: "6px" }}>
+                            {fmoChannel === "email" ? "📧" : "📱"} Preview Message — {previewSlots.length} opening{previewSlots.length !== 1 ? "s" : ""} across {byStaff.size} staff
+                          </span>
+
+                          {/* Message bubble */}
+                          <div style={{
+                            background: fmoChannel === "email" ? "rgba(195, 126, 218, 0.08)" : "rgba(34, 197, 94, 0.08)",
+                            border: `1px solid ${fmoChannel === "email" ? "rgba(195, 126, 218, 0.2)" : "rgba(34, 197, 94, 0.2)"}`,
+                            borderRadius: "var(--radius-lg)",
+                            padding: "var(--space-3) var(--space-4)",
+                            fontSize: "13px",
+                            lineHeight: 1.6,
+                            color: "var(--text-primary)",
+                            position: "relative",
+                          }}>
+                            <div style={{ fontStyle: "italic", color: "var(--text-secondary)" }}>
+                              Hey <strong>Sarah</strong>! ⚡ We have openings at <strong>{tenant?.name || "Your Salon"}</strong>. Book now before they&apos;re gone →
+                            </div>
+                            <div style={{ marginTop: "8px", fontSize: "11px", color: "var(--text-tertiary)", display: "flex", gap: "12px", flexWrap: "wrap" }}>
+                              <span>📱 Via: <strong>{fmoChannel === "both" ? "SMS + Email" : fmoChannel === "sms" ? "SMS" : "Email"}</strong></span>
+                              <span>👥 To: <strong>{fmoAudience === "all" ? "All clients" : fmoAudience === "active" ? "Active" : fmoAudience === "at_risk" ? "At-Risk" : fmoAudience === "vip" ? "VIP" : "Saved List"}</strong></span>
+                              <span>📅 Scans: <strong>{fmoDays === 1 ? "Today only" : `Next ${fmoDays} days`}</strong></span>
+                            </div>
+                          </div>
+
+                          {/* Staff-organized openings breakdown */}
+                          {previewSlots.length > 0 && (
+                            <div style={{
+                              marginTop: "var(--space-3)",
+                              background: "rgba(139, 92, 246, 0.06)",
+                              border: "1px solid rgba(139, 92, 246, 0.15)",
+                              borderRadius: "var(--radius-lg)",
+                              padding: "var(--space-3) var(--space-4)",
+                              fontSize: "12px",
+                            }}>
+                              <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "8px" }}>
+                                📋 Detected Openings by Staff
+                              </div>
+                              {Array.from(byStaff.entries()).map(([staffName, slots]) => {
+                                // Group slots by date
+                                const byDate = new Map<string, OpenSlot[]>();
+                                slots.forEach(s => {
+                                  const dk = s.date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+                                  if (!byDate.has(dk)) byDate.set(dk, []);
+                                  byDate.get(dk)!.push(s);
+                                });
+                                return (
+                                  <div key={staffName} style={{ marginBottom: "8px" }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
+                                      <span style={{
+                                        width: 22, height: 22, borderRadius: "50%",
+                                        background: "linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))",
+                                        display: "inline-flex", alignItems: "center", justifyContent: "center",
+                                        fontSize: "10px", fontWeight: 700, color: "#fff", flexShrink: 0,
+                                      }}>{staffName[0]}</span>
+                                      <strong style={{ color: "var(--text-primary)" }}>{staffName}</strong>
+                                      <span style={{ color: "var(--text-tertiary)", fontSize: "11px" }}>
+                                        ({slots.length} slot{slots.length !== 1 ? "s" : ""})
+                                      </span>
+                                    </div>
+                                    <div style={{ paddingLeft: "28px" }}>
+                                      {Array.from(byDate.entries()).map(([dateLabel, daySlots]) => (
+                                        <div key={dateLabel} style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "2px" }}>
+                                          <span style={{ color: "var(--text-secondary)", minWidth: "110px" }}>📅 {dateLabel}:</span>
+                                          <span style={{ color: "var(--accent-primary)", fontWeight: 600 }}>
+                                            {daySlots.map(s => `${formatHour(s.startHour)} – ${formatHour(s.endHour)}`).join("  •  ")}
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+
+                          {previewSlots.length === 0 && (
+                            <div style={{
+                              marginTop: "var(--space-3)",
+                              background: "rgba(34, 197, 94, 0.08)",
+                              border: "1px solid rgba(34, 197, 94, 0.2)",
+                              borderRadius: "var(--radius-lg)",
+                              padding: "var(--space-3) var(--space-4)",
+                              fontSize: "12px",
+                              color: "var(--text-secondary)",
+                              textAlign: "center",
+                            }}>
+                              🎉 No openings right now — schedule is fully booked for the next {fmoDays} day{fmoDays !== 1 ? "s" : ""}!
+                            </div>
+                          )}
                         </div>
-                        <div style={{ marginTop: "8px", fontSize: "11px", color: "var(--text-tertiary)", display: "flex", gap: "12px", flexWrap: "wrap" }}>
-                          <span>📱 Via: <strong>{fmoChannel === "both" ? "SMS + Email" : fmoChannel === "sms" ? "SMS" : "Email"}</strong></span>
-                          <span>👥 To: <strong>{fmoAudience === "all" ? "All clients" : fmoAudience === "active" ? "Active" : fmoAudience === "at_risk" ? "At-Risk" : fmoAudience === "vip" ? "VIP" : "Saved List"}</strong></span>
-                          <span>📅 Scans: <strong>{fmoDays === 1 ? "Today only" : `Next ${fmoDays} days`}</strong></span>
-                        </div>
-                      </div>
-                    </div>
+                      );
+                    })()}
                   </div>
                 )}
               </div>
