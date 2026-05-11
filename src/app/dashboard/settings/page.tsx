@@ -1027,9 +1027,39 @@ export default function SettingsPage() {
                 </p>
                 <div className={styles.planCards}>
                   {[
-                    { key: 'starter', name: 'Starter', price: 29, staffLimit: 4, features: ['Up to 4 staff', 'Booking & CRM', 'SMS reminders', 'Basic analytics'] },
-                    { key: 'growth', name: 'Growth', price: 79, staffLimit: 10, popular: true, features: ['Up to 10 staff', 'All Starter features', 'Campaigns & loyalty', 'Fill My Openings'] },
-                    { key: 'professional', name: 'Professional', price: 149, staffLimit: 20, features: ['Up to 20 staff', 'All Growth features', 'AI receptionist', 'Priority support'] },
+                    { key: 'starter', name: 'Starter', price: 29, staffLimit: 4, features: [
+                      'Up to 4 staff members',
+                      'Online booking page',
+                      'Calendar & scheduling',
+                      'Client CRM & history',
+                      'Checkout & invoicing',
+                      'SMS & email reminders',
+                      'Fill My Openings',
+                      'Campaigns & outreach',
+                      'Loyalty & referrals',
+                      'Reports & analytics',
+                      'Venmo & Zelle QR pay',
+                      'Email support',
+                    ] },
+                    { key: 'growth', name: 'Growth', price: 79, staffLimit: 10, popular: true, features: [
+                      'Up to 10 staff members',
+                      'Everything in Starter',
+                      'Staff performance reports',
+                      'Commission tracking',
+                      'Multi-channel blasts',
+                      'Saved client lists',
+                      'Auto rebooking reminders',
+                      'No-show follow-ups',
+                      'Priority email support',
+                    ] },
+                    { key: 'professional', name: 'Professional', price: 149, staffLimit: 20, features: [
+                      'Up to 20 staff members',
+                      'Everything in Growth',
+                      'Dedicated account manager',
+                      'Priority phone & chat',
+                      'Custom onboarding',
+                      'Advanced team analytics',
+                    ] },
                   ].map(plan => {
                     const tooSmall = staffCount > plan.staffLimit;
                     return (
