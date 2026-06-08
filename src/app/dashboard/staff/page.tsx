@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData } from "@/lib/api";
 import styles from "./staff.module.css";
-import type { Staff } from "@/lib/types";
+import type { Staff, Service } from "@/lib/types";
 import { PROFESSIONAL_TYPES, getProfessionalType } from "./staff-specialties";
 import StaffAgreement from "./StaffAgreement";
 
@@ -42,6 +42,12 @@ export default function StaffPage() {
   const [vacationEnd, setVacationEnd] = useState("");
   const [vacationNote, setVacationNote] = useState("");
 
+  // Custom service durations state
+  const [showDurationsModal, setShowDurationsModal] = useState(false);
+  const [durationsStaff, setDurationsStaff] = useState<Staff | null>(null);
+  const [allServices, setAllServices] = useState<Service[]>([]);
+  const [durationOverrides, setDurationOverrides] = useState<Record<string, string>>({});
+
   const fetchStaff = useCallback(async () => {
     if (!tenant) return;
     setLoading(true);
@@ -51,6 +57,15 @@ export default function StaffPage() {
   }, [tenant]);
 
   useEffect(() => { fetchStaff(); }, [fetchStaff]);
+
+  // Fetch services for custom durations modal
+  const fetchServices = useCallback(async () => {
+    if (!tenant) return;
+    const { data } = await queryData<Service[]>("services.list");
+    setAllServices((data || []).filter(s => s.is_active));
+  }, [tenant]);
+
+  useEffect(() => { fetchServices(); }, [fetchServices]);
 
   /* Derive professional titles from specialties for existing staff */
   function inferProfessionalTitles(s: Staff): string[] {
@@ -337,6 +352,51 @@ export default function StaffPage() {
       if (selectedStaff?.id === data.id) setSelectedStaff(data);
     }
   }
+
+  // Custom service durations
+  function openDurations(s: Staff) {
+    setDurationsStaff(s);
+    const sched = (s.schedule || {}) as Record<string, unknown>;
+    const existing = (sched.service_durations || {}) as Record<string, number>;
+    // Convert to string values for input fields (empty string means "use default")
+    const overrides: Record<string, string> = {};
+    Object.entries(existing).forEach(([serviceId, mins]) => {
+      overrides[serviceId] = String(mins);
+    });
+    setDurationOverrides(overrides);
+    setShowDurationsModal(true);
+  }
+
+  async function handleSaveDurations(e: React.FormEvent) {
+    e.preventDefault();
+    if (!durationsStaff) return;
+    // Build clean map: only include overrides that differ from default
+    const serviceDurations: Record<string, number> = {};
+    Object.entries(durationOverrides).forEach(([serviceId, val]) => {
+      const mins = parseInt(val, 10);
+      if (mins > 0) {
+        const svc = allServices.find(s => s.id === serviceId);
+        // Only store if different from default
+        if (svc && mins !== svc.duration_minutes) {
+          serviceDurations[serviceId] = mins;
+        }
+      }
+    });
+    const sched = { ...(durationsStaff.schedule || {}), service_durations: serviceDurations } as Record<string, unknown>;
+    const { data } = await queryData<Staff>("staff.update", { id: durationsStaff.id, schedule: sched });
+    if (data) {
+      setStaffMembers(prev => prev.map(s => s.id === data.id ? data : s));
+      if (selectedStaff?.id === data.id) setSelectedStaff(data);
+    }
+    setShowDurationsModal(false);
+    setDurationsStaff(null);
+  }
+
+  function getCustomDurationCount(s: Staff): number {
+    const sched = (s.schedule || {}) as Record<string, unknown>;
+    const durations = sched.service_durations as Record<string, number> | undefined;
+    return durations ? Object.keys(durations).length : 0;
+  }
   /* Helper: extract professional title from stored specialties */
   function getStaffProfTitles(s: Staff): string[] {
     return PROFESSIONAL_TYPES.filter(pt => s.specialties?.includes(pt.title)).map(pt => pt.title);
@@ -443,6 +503,7 @@ export default function StaffPage() {
                 <div className={styles.staffActions}>
                   <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); openSchedule(s); }}>📅 Schedule</button>
                   <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); openVacation(s); }}>🏖️ Vacation</button>
+                  <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); openDurations(s); }}>{getCustomDurationCount(s) > 0 ? `⏱️ Durations (${getCustomDurationCount(s)})` : '⏱️ Durations'}</button>
                   <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); setAgreementStaff(s); }}>{(s as any).agreement_signed_at ? '✅' : '📝'} Agreement</button>
                   <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); openEdit(s); }}>✏️ Edit</button>
                   <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(s.id); }} style={{ color: "var(--color-danger)" }}>🗑️</button>
@@ -624,6 +685,7 @@ export default function StaffPage() {
                 <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => openEdit(selectedStaff)}>✏️ Edit Profile</button>
                 <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => openSchedule(selectedStaff)}>📅 Schedule</button>
                 <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => openVacation(selectedStaff)}>🏖️ Vacation</button>
+                <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => openDurations(selectedStaff)}>⏱️ Durations</button>
                 <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setAgreementStaff(selectedStaff)}>{(selectedStaff as any).agreement_signed_at ? '✅ Agreement' : '📝 Agreement'}</button>
                 <button className="btn btn-ghost" style={{ color: "var(--color-danger)" }} onClick={() => setDeleteConfirmId(selectedStaff.id)}>🗑️</button>
               </div>
@@ -989,6 +1051,75 @@ export default function StaffPage() {
             <div className={styles.modalFooter}>
               <button type="button" className="btn btn-secondary" onClick={() => { setShowVacationModal(false); setVacationStaff(null); }}>Done</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Custom Service Durations Modal ── */}
+      {showDurationsModal && durationsStaff && (
+        <div className={styles.modalOverlay} onClick={() => { setShowDurationsModal(false); setDurationsStaff(null); }}>
+          <div className={`${styles.modal}`} onClick={(e) => e.stopPropagation()} style={{ maxWidth: 560 }}>
+            <div className={styles.modalHeader}>
+              <h2>⏱️ Custom Durations — {durationsStaff.name}</h2>
+            </div>
+            <form onSubmit={handleSaveDurations}>
+              <div className={styles.modalBody}>
+                <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-4)' }}>
+                  Override default service durations for this staff member. Leave blank to use the default.
+                </p>
+                {allServices.length === 0 ? (
+                  <p style={{ color: 'var(--text-tertiary)' }}>No active services found. Add services first.</p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                    {/* Header */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 90px 90px', gap: 'var(--space-3)', padding: '0 0 var(--space-2)', borderBottom: '1px solid var(--border-primary)', fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>
+                      <span>Service</span>
+                      <span style={{ textAlign: 'center' }}>Default</span>
+                      <span style={{ textAlign: 'center' }}>Custom</span>
+                    </div>
+                    {allServices.map(svc => {
+                      const hasOverride = durationOverrides[svc.id] && parseInt(durationOverrides[svc.id], 10) !== svc.duration_minutes;
+                      return (
+                        <div key={svc.id} style={{
+                          display: 'grid', gridTemplateColumns: '1fr 90px 90px', gap: 'var(--space-3)',
+                          alignItems: 'center', padding: 'var(--space-2) 0',
+                          borderBottom: '1px solid var(--border-secondary)',
+                          ...(hasOverride ? { background: 'rgba(195, 126, 218, 0.06)', borderRadius: 'var(--radius-md)', padding: 'var(--space-2) var(--space-3)', margin: '0 calc(-1 * var(--space-3))' } : {})
+                        }}>
+                          <div>
+                            <div style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-primary)' }}>{svc.name}</div>
+                            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>{svc.category}</div>
+                          </div>
+                          <div style={{ textAlign: 'center', fontSize: 'var(--text-sm)', color: 'var(--text-tertiary)' }}>
+                            {svc.duration_minutes} min
+                          </div>
+                          <div style={{ textAlign: 'center' }}>
+                            <input
+                              className="input"
+                              type="number"
+                              min={5}
+                              step={5}
+                              placeholder="—"
+                              value={durationOverrides[svc.id] || ''}
+                              onChange={(e) => setDurationOverrides(prev => ({ ...prev, [svc.id]: e.target.value }))}
+                              style={{
+                                width: 80, textAlign: 'center', fontSize: 'var(--text-sm)',
+                                padding: 'var(--space-1) var(--space-2)',
+                                ...(hasOverride ? { borderColor: 'var(--color-primary)', background: 'rgba(195, 126, 218, 0.08)' } : {})
+                              }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              <div className={styles.modalFooter}>
+                <button type="button" className="btn btn-secondary" onClick={() => { setShowDurationsModal(false); setDurationsStaff(null); }}>Cancel</button>
+                <button type="submit" className="btn btn-primary">Save Durations</button>
+              </div>
+            </form>
           </div>
         </div>
       )}

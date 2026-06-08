@@ -7,7 +7,7 @@ import { formatPhone } from '@/lib/utils'
 
 /* ── Types ── */
 interface ServiceInfo { id: string; name: string; category: string; description: string | null; duration_minutes: number; price: number; sort_order: number; image_url: string | null }
-interface StaffInfo { id: string; name: string; specialties: string[]; schedule: Record<string, unknown> }
+interface StaffInfo { id: string; name: string; specialties: string[]; schedule: Record<string, unknown>; service_durations: Record<string, number> }
 interface BookedSlot { staff_id: string | null; start: string; end: string }
 interface BusinessInfo { name: string; slug: string; phone: string | null; logo_url: string | null; address: string | null; hours: Record<string, { open: string; close: string; closed: boolean }> | null }
 
@@ -40,6 +40,15 @@ export default function BookingClient({ slug }: { slug: string }) {
   const [clientNotes, setClientNotes] = useState('')
   const [clientBirthday, setClientBirthday] = useState('')
 
+  // Effective duration: use staff-specific override if available, otherwise service default
+  const effectiveDuration = useMemo(() => {
+    if (!selectedService) return 0
+    if (selectedStaff?.service_durations?.[selectedService.id]) {
+      return selectedStaff.service_durations[selectedService.id]
+    }
+    return selectedService.duration_minutes
+  }, [selectedService, selectedStaff])
+
   // Fetch business data
   useEffect(() => {
     async function load() {
@@ -70,45 +79,75 @@ export default function BookingClient({ slug }: { slug: string }) {
 
   // Generate available time slots for selected date
   const timeSlots = useMemo(() => {
-    if (!selectedDate || !selectedService) return []
+    if (!selectedDate || !selectedService || !effectiveDuration) return []
     const date = new Date(selectedDate + 'T00:00:00')
     const dayName = date.toLocaleDateString('en-US', { weekday: 'long' })
     const hours = business?.hours?.[dayName]
 
-    // Default hours if not set
-    const openStr = hours?.open || '09:00'
-    const closeStr = hours?.close || '18:00'
     if (hours?.closed) return []
 
-    const [openH, openM] = openStr.split(':').map(Number)
-    const [closeH, closeM] = closeStr.split(':').map(Number)
-    const openMinutes = openH * 60 + openM
-    const closeMinutes = closeH * 60 + closeM
+    const staffDaySched = selectedStaff?.schedule?.[dayName] as
+      { open?: string; close?: string; off?: boolean; useSlots?: boolean; slots?: { start: string; end: string }[] } | undefined
+
+    if (staffDaySched?.off) return [] // Staff is off this day
 
     const slots: string[] = []
-    for (let m = openMinutes; m + selectedService.duration_minutes <= closeMinutes; m += 30) {
-      const h = Math.floor(m / 60)
-      const min = m % 60
-      const time = `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`
 
-      // Check if this slot conflicts with any booked appointment
-      const slotStart = new Date(`${selectedDate}T${time}:00`)
-      const slotEnd = new Date(slotStart.getTime() + selectedService.duration_minutes * 60 * 1000)
+    if (selectedStaff && staffDaySched?.useSlots && staffDaySched.slots && staffDaySched.slots.length > 0) {
+      // Staff has custom slots — each slot is a bookable appointment block.
+      // Only show the slot start time if the service fits within the slot window.
+      for (const sl of staffDaySched.slots) {
+        const [sH, sM] = sl.start.split(':').map(Number)
+        const [eH, eM] = sl.end.split(':').map(Number)
+        const slotDurationMin = (eH * 60 + eM) - (sH * 60 + sM)
+        if (slotDurationMin < effectiveDuration) continue // service doesn't fit in this slot
 
-      const isBooked = bookedSlots.some(b => {
-        // If staff is selected, only check that staff's appointments
-        if (selectedStaff && b.staff_id !== selectedStaff.id) return false
-        const bStart = new Date(b.start)
-        const bEnd = new Date(b.end)
-        return slotStart < bEnd && slotEnd > bStart
-      })
+        const time = sl.start // bookable time = slot start
 
-      if (!isBooked) slots.push(time)
+        // Check if this slot conflicts with any booked appointment
+        const slotStart = new Date(`${selectedDate}T${time}:00`)
+        const slotEnd = new Date(slotStart.getTime() + effectiveDuration * 60 * 1000)
+
+        const isBooked = bookedSlots.some(b => {
+          if (selectedStaff && b.staff_id !== selectedStaff.id) return false
+          const bStart = new Date(b.start)
+          const bEnd = new Date(b.end)
+          return slotStart < bEnd && slotEnd > bStart
+        })
+
+        if (!isBooked) slots.push(time)
+      }
+    } else {
+      // No custom slots — generate 30-min increment slots from business/staff hours
+      const openStr = staffDaySched?.open || hours?.open || '09:00'
+      const closeStr = staffDaySched?.close || hours?.close || '18:00'
+      const [openH, openM] = openStr.split(':').map(Number)
+      const [closeH, closeM] = closeStr.split(':').map(Number)
+      const openMinutes = openH * 60 + openM
+      const closeMinutes = closeH * 60 + closeM
+
+      for (let m = openMinutes; m + effectiveDuration <= closeMinutes; m += 30) {
+        const h = Math.floor(m / 60)
+        const min = m % 60
+        const time = `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`
+
+        const slotStart = new Date(`${selectedDate}T${time}:00`)
+        const slotEnd = new Date(slotStart.getTime() + effectiveDuration * 60 * 1000)
+
+        const isBooked = bookedSlots.some(b => {
+          if (selectedStaff && b.staff_id !== selectedStaff.id) return false
+          const bStart = new Date(b.start)
+          const bEnd = new Date(b.end)
+          return slotStart < bEnd && slotEnd > bStart
+        })
+
+        if (!isBooked) slots.push(time)
+      }
     }
     return slots
-  }, [selectedDate, selectedService, selectedStaff, bookedSlots, business])
+  }, [selectedDate, selectedService, selectedStaff, bookedSlots, business, effectiveDuration])
 
-  // Get next 14 days for date picker
+  // Get next 30 days for date picker
   const availableDates = useMemo(() => {
     const dates: { value: string; label: string; dayName: string }[] = []
     const today = new Date()
@@ -116,7 +155,10 @@ export default function BookingClient({ slug }: { slug: string }) {
       const d = new Date(today.getTime() + i * 24 * 60 * 60 * 1000)
       const dayName = d.toLocaleDateString('en-US', { weekday: 'long' })
       const isClosed = business?.hours?.[dayName]?.closed
-      if (!isClosed) {
+      // Also check if selected staff is off this day
+      const staffDaySched = selectedStaff?.schedule?.[dayName] as { off?: boolean } | undefined
+      const isStaffOff = selectedStaff && staffDaySched?.off
+      if (!isClosed && !isStaffOff) {
         dates.push({
           value: d.toISOString().split('T')[0],
           label: d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
@@ -125,7 +167,7 @@ export default function BookingClient({ slug }: { slug: string }) {
       }
     }
     return dates
-  }, [business])
+  }, [business, selectedStaff])
 
   // Submit booking
   async function handleSubmit() {
@@ -143,7 +185,7 @@ export default function BookingClient({ slug }: { slug: string }) {
           service_id: selectedService.id,
           staff_id: selectedStaff?.id || null,
           start_time: localStart.toISOString(),
-          duration_minutes: selectedService.duration_minutes,
+          duration_minutes: effectiveDuration,
           client_name: clientName,
           client_email: clientEmail,
           client_phone: clientPhone,
@@ -216,7 +258,7 @@ export default function BookingClient({ slug }: { slug: string }) {
           </div>
           <div className={styles.successRow}>
             <span>Duration</span>
-            <strong>{selectedService?.duration_minutes} minutes</strong>
+            <strong>{effectiveDuration} minutes</strong>
           </div>
         </div>
         {!birthdaySaved && (
@@ -377,7 +419,7 @@ export default function BookingClient({ slug }: { slug: string }) {
           {step === 2 && (
             <div className={styles.stepPanel}>
               <h2 className={styles.stepTitle}>Pick a Date & Time</h2>
-              <p className={styles.stepSubtitle}>{selectedService?.name} • {selectedService?.duration_minutes} min{selectedStaff ? ` with ${selectedStaff.name}` : ''}</p>
+              <p className={styles.stepSubtitle}>{selectedService?.name} • {effectiveDuration} min{selectedStaff ? ` with ${selectedStaff.name}` : ''}</p>
 
               <div className={styles.dateGrid}>
                 {availableDates.map(d => (
@@ -484,7 +526,7 @@ export default function BookingClient({ slug }: { slug: string }) {
                 </div>
                 <div className={styles.summaryRow}>
                   <span className={styles.summaryLabel}>Duration</span>
-                  <span className={styles.summaryValue}>{selectedService?.duration_minutes} min</span>
+                  <span className={styles.summaryValue}>{effectiveDuration} min</span>
                 </div>
                 <div className={`${styles.summaryRow} ${styles.summaryTotal}`}>
                   <span className={styles.summaryLabel}>Total</span>

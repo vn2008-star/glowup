@@ -35,7 +35,7 @@ export async function GET(request: Request) {
     .eq('is_active', true)
     .order('sort_order', { ascending: true })
 
-  // Get active staff
+  // Get active staff (include schedule for custom service durations)
   const { data: staff } = await svc
     .from('staff')
     .select('id, name, role, specialties, schedule')
@@ -65,7 +65,17 @@ export async function GET(request: Request) {
       hours: (tenant.settings as Record<string, unknown>)?.business_hours || null,
     },
     services: services || [],
-    staff: staff || [],
+    staff: (staff || []).map(s => {
+      const sched = (s.schedule || {}) as Record<string, unknown>
+      const service_durations = (sched.service_durations || {}) as Record<string, number>
+      return {
+        id: s.id,
+        name: s.name,
+        specialties: s.specialties,
+        schedule: s.schedule,
+        service_durations,
+      }
+    }),
     bookedSlots: (appointments || []).map(a => ({
       staff_id: a.staff_id,
       start: a.start_time,
