@@ -237,6 +237,26 @@ export default function AdminPage() {
     setActionLoading(null);
   }
 
+  async function handleExtendTrial(tenantId: string, tenantName: string, months: number) {
+    if (!confirm(`Extend free trial for "${tenantName}" by ${months} months?`)) return;
+    setActionLoading(tenantId);
+    const res = await fetch("/api/admin/tenants", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tenant_id: tenantId, action: "extend-trial", months }),
+    });
+    if (res.ok) {
+      const d = await res.json();
+      const newDate = new Date(d.new_trial_ends_at).toLocaleDateString();
+      alert(`✅ Trial extended by ${months} months. New trial end: ${newDate}`);
+      await fetchTenants();
+    } else {
+      const d = await res.json();
+      alert(d.error || "Failed to extend trial");
+    }
+    setActionLoading(null);
+  }
+
   // CSV parser
   function parseCsvFile(file: File) {
     setCsvError('');
@@ -1555,6 +1575,28 @@ export default function AdminPage() {
                             >
                               Delete
                             </button>
+                          )}
+                          {t.plan === 'free' && (
+                            <>
+                              <button
+                                className={styles.enableBtn}
+                                onClick={() => handleExtendTrial(t.id, t.name, 3)}
+                                disabled={actionLoading === t.id}
+                                title="Extend free trial by 3 months"
+                                style={{ fontSize: '11px', padding: '3px 8px' }}
+                              >
+                                +3mo
+                              </button>
+                              <button
+                                className={styles.enableBtn}
+                                onClick={() => handleExtendTrial(t.id, t.name, 6)}
+                                disabled={actionLoading === t.id}
+                                title="Extend free trial by 6 months"
+                                style={{ fontSize: '11px', padding: '3px 8px' }}
+                              >
+                                +6mo
+                              </button>
+                            </>
                           )}
                         </div>
                       </td>

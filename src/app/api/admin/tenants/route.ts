@@ -235,5 +235,44 @@ export async function POST(request: Request) {
     })
   }
 
+  if (action === 'extend-trial') {
+    const body = await request.clone().json()
+    const months = parseInt(body.months, 10)
+    if (!months || months < 1 || months > 12) {
+      return NextResponse.json({ error: 'months must be between 1 and 12' }, { status: 400 })
+    }
+
+    // Get current trial_ends_at to extend from
+    const { data: tenant } = await svc
+      .from('tenants')
+      .select('trial_ends_at, subscription_status')
+      .eq('id', tenant_id)
+      .single()
+
+    if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
+
+    // Extend from current trial end or from now, whichever is later
+    const now = new Date()
+    const currentEnd = tenant.trial_ends_at ? new Date(tenant.trial_ends_at) : now
+    const base = currentEnd > now ? currentEnd : now
+    const newEnd = new Date(base)
+    newEnd.setMonth(newEnd.getMonth() + months)
+
+    const { error } = await svc
+      .from('tenants')
+      .update({
+        trial_ends_at: newEnd.toISOString(),
+        subscription_status: 'trialing',
+      })
+      .eq('id', tenant_id)
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({
+      success: true,
+      new_trial_ends_at: newEnd.toISOString(),
+      months_added: months,
+    })
+  }
+
   return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
 }
