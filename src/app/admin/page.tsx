@@ -1453,10 +1453,12 @@ export default function AdminPage() {
                           {subStatus === 'trialing' && trialEnd && (
                             <span style={{
                               fontSize: '10px',
-                              color: trialDaysLeft <= 7 ? '#f59e0b' : 'var(--text-tertiary)',
-                              fontWeight: trialDaysLeft <= 7 ? 600 : 400,
+                              color: trialDaysLeft > 30 ? '#22c55e' : trialDaysLeft <= 7 ? '#f59e0b' : 'var(--text-tertiary)',
+                              fontWeight: trialDaysLeft <= 7 || trialDaysLeft > 30 ? 600 : 400,
                             }}>
-                              {trialDaysLeft}d left → {trialEnd.toLocaleDateString()}
+                              {trialDaysLeft > 30
+                                ? `✅ Extended → ${trialEnd.toLocaleDateString()}`
+                                : `${trialDaysLeft}d left → ${trialEnd.toLocaleDateString()}`}
                             </span>
                           )}
                         </div>

@@ -114,8 +114,31 @@ export async function POST(request: Request) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
-  const { action, tenant_id } = await request.json()
+  const { action, tenant_id, months, key, value } = await request.json()
 
+  // Settings actions don't require tenant_id
+  if (action === 'get-settings') {
+    const { data: settings } = await svc
+      .from('platform_settings')
+      .select('key, value')
+
+    const result: Record<string, string> = {}
+    settings?.forEach(s => { result[s.key] = s.value })
+    return NextResponse.json(result)
+  }
+
+  if (action === 'update-settings') {
+    if (!key || value === undefined) {
+      return NextResponse.json({ error: 'key and value required' }, { status: 400 })
+    }
+    const { error } = await svc
+      .from('platform_settings')
+      .upsert({ key, value: String(value), updated_at: new Date().toISOString() })
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ success: true })
+  }
+
+  // All other actions require tenant_id
   if (!tenant_id) {
     return NextResponse.json({ error: 'tenant_id required' }, { status: 400 })
   }
@@ -173,28 +196,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true })
   }
 
-  if (action === 'get-settings') {
-    const { data: settings } = await svc
-      .from('platform_settings')
-      .select('key, value')
-
-    const result: Record<string, string> = {}
-    settings?.forEach(s => { result[s.key] = s.value })
-    return NextResponse.json(result)
-  }
-
-  if (action === 'update-settings') {
-    const { key, value } = await request.clone().json()
-    if (!key || value === undefined) {
-      return NextResponse.json({ error: 'key and value required' }, { status: 400 })
-    }
-    const { error } = await svc
-      .from('platform_settings')
-      .upsert({ key, value: String(value), updated_at: new Date().toISOString() })
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    return NextResponse.json({ success: true })
-  }
-
   if (action === 'get-tenant-detail') {
     // Full tenant record
     const { data: tenant } = await svc
@@ -236,9 +237,8 @@ export async function POST(request: Request) {
   }
 
   if (action === 'extend-trial') {
-    const body = await request.clone().json()
-    const months = parseInt(body.months, 10)
-    if (!months || months < 1 || months > 12) {
+    const mo = parseInt(months, 10)
+    if (!mo || mo < 1 || mo > 12) {
       return NextResponse.json({ error: 'months must be between 1 and 12' }, { status: 400 })
     }
 
@@ -256,7 +256,7 @@ export async function POST(request: Request) {
     const currentEnd = tenant.trial_ends_at ? new Date(tenant.trial_ends_at) : now
     const base = currentEnd > now ? currentEnd : now
     const newEnd = new Date(base)
-    newEnd.setMonth(newEnd.getMonth() + months)
+    newEnd.setMonth(newEnd.getMonth() + mo)
 
     const { error } = await svc
       .from('tenants')
@@ -270,7 +270,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       new_trial_ends_at: newEnd.toISOString(),
-      months_added: months,
+      months_added: mo,
     })
   }
 
