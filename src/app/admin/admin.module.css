@@ -1,6 +1,6 @@
 /* ── Platform Admin Panel ── */
 .page {
-  max-width: 1200px;
+  max-width: 1440px;
   margin: 0 auto;
   padding: var(--space-8);
   min-height: 100vh;
@@ -245,6 +245,7 @@
 .actionBtns {
   display: flex;
   gap: var(--space-2);
+  flex-wrap: wrap;
 }
 .suspendBtn,
 .enableBtn,
