@@ -70,6 +70,20 @@ export default function BookingClient({ slug }: { slug: string }) {
     load()
   }, [slug])
 
+  // Re-fetch booked slots when entering date/time step to prevent stale data
+  useEffect(() => {
+    if (step !== 2) return
+    async function refreshSlots() {
+      try {
+        const res = await fetch(`/api/public-booking?slug=${encodeURIComponent(slug)}`)
+        if (!res.ok) return
+        const data = await res.json()
+        setBookedSlots(data.bookedSlots)
+      } catch { /* keep existing data */ }
+    }
+    refreshSlots()
+  }, [step, slug])
+
   // Group services by category
   const servicesByCategory = useMemo(() => {
     const map: Record<string, ServiceInfo[]> = {}
@@ -109,14 +123,17 @@ export default function BookingClient({ slug }: { slug: string }) {
         const time = sl.start // bookable time = slot start
 
         // Check if this slot conflicts with any booked appointment
-        const slotStart = new Date(`${selectedDate}T${time}:00`)
-        const slotEnd = new Date(slotStart.getTime() + effectiveDuration * 60 * 1000)
+        const slotStartMs = new Date(`${selectedDate}T${time}:00`).getTime()
+        const slotEndMs = slotStartMs + effectiveDuration * 60 * 1000
 
         const isBooked = bookedSlots.some(b => {
           if (selectedStaff && b.staff_id !== selectedStaff.id) return false
-          const bStart = new Date(b.start)
-          const bEnd = new Date(b.end)
-          return slotStart < bEnd && slotEnd > bStart
+          // No staff selected ("Any Available"): skip unassigned bookings,
+          // but block if ANY specific staff member is booked at this time.
+          // (Conservative approach — prevents overbooking until staff is auto-assigned.)
+          const bStartMs = new Date(b.start).getTime()
+          const bEndMs = new Date(b.end).getTime()
+          return slotStartMs < bEndMs && slotEndMs > bStartMs
         })
 
         if (!isBooked) slots.push(time)
@@ -135,20 +152,27 @@ export default function BookingClient({ slug }: { slug: string }) {
         const min = m % 60
         const time = `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`
 
-        const slotStart = new Date(`${selectedDate}T${time}:00`)
-        const slotEnd = new Date(slotStart.getTime() + effectiveDuration * 60 * 1000)
+        const slotStartMs = new Date(`${selectedDate}T${time}:00`).getTime()
+        const slotEndMs = slotStartMs + effectiveDuration * 60 * 1000
 
         const isBooked = bookedSlots.some(b => {
           if (selectedStaff && b.staff_id !== selectedStaff.id) return false
-          const bStart = new Date(b.start)
-          const bEnd = new Date(b.end)
-          return slotStart < bEnd && slotEnd > bStart
+          const bStartMs = new Date(b.start).getTime()
+          const bEndMs = new Date(b.end).getTime()
+          return slotStartMs < bEndMs && slotEndMs > bStartMs
         })
 
         if (!isBooked) slots.push(time)
       }
     }
-    return slots
+    // Filter out past time slots if the selected date is today
+    const now = new Date()
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+    const isToday = selectedDate === todayStr
+    const filtered = isToday
+      ? slots.filter(t => new Date(`${selectedDate}T${t}:00`).getTime() > now.getTime())
+      : slots
+    return filtered
   }, [selectedDate, selectedService, selectedStaff, bookedSlots, business, effectiveDuration])
 
   // Check if a specific date is available for booking
@@ -219,6 +243,18 @@ export default function BookingClient({ slug }: { slug: string }) {
         setBookedTime(startDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) + ' at ' + startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }))
         if (clientBirthday) setBirthdaySaved(true)
         setBooked(true)
+      } else if (res.status === 409) {
+        // Slot was taken — refresh availability and go back to time picker
+        alert('Sorry, that time slot was just booked by someone else. Please choose another time.')
+        try {
+          const refreshRes = await fetch(`/api/public-booking?slug=${encodeURIComponent(slug)}`)
+          if (refreshRes.ok) {
+            const data = await refreshRes.json()
+            setBookedSlots(data.bookedSlots)
+          }
+        } catch { /* keep existing data */ }
+        setSelectedTime('')
+        setStep(2)
       } else {
         alert('Booking failed. Please try again.')
       }

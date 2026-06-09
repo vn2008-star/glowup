@@ -110,6 +110,29 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Business not found' }, { status: 404 })
   }
 
+  // ── Server-side double-booking prevention ──
+  const start = new Date(start_time)
+  const end = new Date(start.getTime() + (duration_minutes || 60) * 60 * 1000)
+
+  if (staff_id) {
+    const { data: conflicts } = await svc
+      .from('appointments')
+      .select('id')
+      .eq('tenant_id', tenant.id)
+      .eq('staff_id', staff_id)
+      .in('status', ['pending', 'confirmed'])
+      .lt('start_time', end.toISOString())
+      .gt('end_time', start.toISOString())
+      .limit(1)
+
+    if (conflicts && conflicts.length > 0) {
+      return NextResponse.json(
+        { error: 'This time slot is no longer available. Please choose another time.' },
+        { status: 409 }
+      )
+    }
+  }
+
   // Upsert client by email or phone
   let clientId: string | null = null
   const [firstName, ...lastParts] = client_name.trim().split(' ')
@@ -166,9 +189,6 @@ export async function POST(request: Request) {
   }
 
   // Create the appointment
-  const start = new Date(start_time)
-  const end = new Date(start.getTime() + (duration_minutes || 60) * 60 * 1000)
-
   // Get service price
   const { data: service } = await svc
     .from('services')
