@@ -115,31 +115,51 @@ export default function BookingClient({ slug }: { slug: string }) {
 
     const slots: string[] = []
 
-    if (selectedStaff && staffDaySched?.useSlots && staffDaySched.slots && staffDaySched.slots.length > 0) {
-      // Staff has custom slots — each slot is a bookable appointment block.
-      // Only show the slot start time if the service fits within the slot window.
-      for (const sl of staffDaySched.slots) {
-        const [sH, sM] = sl.start.split(':').map(Number)
-        const [eH, eM] = sl.end.split(':').map(Number)
-        const slotDurationMin = (eH * 60 + eM) - (sH * 60 + sM)
-        if (slotDurationMin < effectiveDuration) continue // service doesn't fit in this slot
+    // Determine which staff schedule(s) to use for slot generation.
+    // When "Any Available" is selected, aggregate custom slots from all staff.
+    const staffWithSlots = selectedStaff
+      ? (staffDaySched?.useSlots && staffDaySched.slots?.length ? [{ staff: selectedStaff, sched: staffDaySched }] : [])
+      : staff
+          .map(s => {
+            const sd = s.schedule?.[dayName] as typeof staffDaySched
+            return { staff: s, sched: sd }
+          })
+          .filter(x => x.sched?.useSlots && x.sched.slots && x.sched.slots.length > 0 && !x.sched.off)
 
-        const time = sl.start // bookable time = slot start
+    if (staffWithSlots.length > 0) {
+      // Use custom slots — collect unique start times across all matching staff
+      const seen = new Set<string>()
+      for (const { staff: st, sched } of staffWithSlots) {
+        for (const sl of sched!.slots!) {
+          const [sH, sM] = sl.start.split(':').map(Number)
+          const [eH, eM] = sl.end.split(':').map(Number)
+          const slotDurationMin = (eH * 60 + eM) - (sH * 60 + sM)
+          if (slotDurationMin < effectiveDuration) continue
 
-        // Check if this slot conflicts with any booked appointment
-        // Convert slot time from salon-local to UTC for comparison
-        const slotStartUTC = localToUTC(selectedDate, time, salonTz).getTime()
-        const slotEndUTC = slotStartUTC + effectiveDuration * 60 * 1000
+          const time = sl.start
+          if (seen.has(time)) continue
 
-        const isBooked = bookedSlots.some(b => {
-          if (selectedStaff && b.staff_id !== selectedStaff.id) return false
-          const bStartMs = new Date(b.start).getTime()
-          const bEndMs = new Date(b.end).getTime()
-          return slotStartUTC < bEndMs && slotEndUTC > bStartMs
-        })
+          const slotStartUTC = localToUTC(selectedDate, time, salonTz).getTime()
+          const slotEndUTC = slotStartUTC + effectiveDuration * 60 * 1000
 
-        if (!isBooked) slots.push(time)
+          const isBooked = bookedSlots.some(b => {
+            if (selectedStaff && b.staff_id !== selectedStaff.id) return false
+            // For "Any Available", check if at least one staff member is free
+            if (!selectedStaff && b.staff_id === st.id) {
+              const bStartMs = new Date(b.start).getTime()
+              const bEndMs = new Date(b.end).getTime()
+              return slotStartUTC < bEndMs && slotEndUTC > bStartMs
+            }
+            if (!selectedStaff) return false
+            const bStartMs = new Date(b.start).getTime()
+            const bEndMs = new Date(b.end).getTime()
+            return slotStartUTC < bEndMs && slotEndUTC > bStartMs
+          })
+
+          if (!isBooked) { slots.push(time); seen.add(time) }
+        }
       }
+      slots.sort()
     } else {
       // No custom slots — generate 30-min increment slots from business/staff hours
       const openStr = staffDaySched?.open || hours?.open || '09:00'
