@@ -285,34 +285,107 @@
   text-align: center;
 }
 
-/* ── Step 2: Date & Time ── */
-.dateGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 0.5rem;
+/* ── Step 2: Calendar ── */
+.calendar {
+  background: #1a1a28;
+  border: 1px solid #2a2a3d;
+  border-radius: 14px;
+  padding: 1.25rem;
   margin-bottom: 1.5rem;
 }
-.dateCard {
-  padding: 0.75rem;
+.calendarHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+.calendarMonthLabel {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #f0f0f5;
+  letter-spacing: 0.01em;
+}
+.calendarNav {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: #1e1e2e;
   border: 1px solid #2a2a3d;
   border-radius: 10px;
-  font-size: 0.8rem;
-  font-weight: 600;
   color: #c0c0d8;
+  font-size: 1.4rem;
   cursor: pointer;
   transition: all 0.2s ease;
+  line-height: 1;
+}
+.calendarNav:hover:not(:disabled) {
+  border-color: #c37eda;
+  color: #f0f0f5;
+}
+.calendarNav:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+.calendarWeekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  margin-bottom: 6px;
+}
+.calendarWeekdays span {
   text-align: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #5a5a7a;
+  padding: 4px 0;
 }
-.dateCard:hover {
+.calendarGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+.calendarDay {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #c0c0d8;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+.calendarDay:hover:not(:disabled) {
+  background: rgba(195, 126, 218, 0.08);
   border-color: #c37eda;
   color: #f0f0f5;
 }
-.dateSelected {
-  background: rgba(195, 126, 218, 0.1);
-  border-color: #c37eda;
-  color: #f0f0f5;
+.calendarDayToday {
+  border-color: #c37eda44;
+  color: #c37eda;
+  font-weight: 800;
 }
+.calendarDaySelected {
+  background: linear-gradient(135deg, #c37eda, #e8a87c) !important;
+  border-color: transparent !important;
+  color: #fff !important;
+  box-shadow: 0 4px 14px rgba(195, 126, 218, 0.35);
+  font-weight: 800;
+}
+.calendarDayDisabled {
+  color: #2e2e44;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ── Time Slots ── */
 .timeSectionTitle {
   font-size: 0.75rem;
   font-weight: 700;
@@ -766,7 +839,8 @@
   .page { padding: 1rem 0.5rem; }
   .stepPanel { padding: 1.25rem; }
   .formRow { grid-template-columns: 1fr; }
-  .dateGrid { grid-template-columns: repeat(3, 1fr); }
+  .calendar { padding: 0.75rem; }
+  .calendarDay { font-size: 0.78rem; border-radius: 8px; }
   .timeGrid { grid-template-columns: repeat(3, 1fr); }
   .progressLabel { display: none; }
   .staffGrid { grid-template-columns: repeat(2, 1fr); }

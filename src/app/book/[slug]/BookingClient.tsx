@@ -34,6 +34,10 @@ export default function BookingClient({ slug }: { slug: string }) {
   const [selectedStaff, setSelectedStaff] = useState<StaffInfo | null>(null)
   const [selectedDate, setSelectedDate] = useState<string>('')
   const [selectedTime, setSelectedTime] = useState<string>('')
+  const [calendarMonth, setCalendarMonth] = useState(() => {
+    const now = new Date()
+    return { year: now.getFullYear(), month: now.getMonth() }
+  })
   const [clientName, setClientName] = useState('')
   const [clientEmail, setClientEmail] = useState('')
   const [clientPhone, setClientPhone] = useState('')
@@ -147,28 +151,43 @@ export default function BookingClient({ slug }: { slug: string }) {
     return slots
   }, [selectedDate, selectedService, selectedStaff, bookedSlots, business, effectiveDuration])
 
-  // Get next 30 days for date picker
-  const availableDates = useMemo(() => {
-    const dates: { value: string; label: string; dayName: string }[] = []
-    const today = new Date()
+  // Check if a specific date is available for booking
+  const isDateAvailable = useMemo(() => {
     const maxDays = business?.advanceBookingDays || 30
-    for (let i = 0; i <= maxDays; i++) {
-      const d = new Date(today.getTime() + i * 24 * 60 * 60 * 1000)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const maxDate = new Date(today.getTime() + maxDays * 24 * 60 * 60 * 1000)
+
+    return (dateStr: string) => {
+      const d = new Date(dateStr + 'T00:00:00')
+      if (d < today || d > maxDate) return false
       const dayName = d.toLocaleDateString('en-US', { weekday: 'long' })
-      const isClosed = business?.hours?.[dayName]?.closed
-      // Also check if selected staff is off this day
-      const staffDaySched = selectedStaff?.schedule?.[dayName] as { off?: boolean } | undefined
-      const isStaffOff = selectedStaff && staffDaySched?.off
-      if (!isClosed && !isStaffOff) {
-        dates.push({
-          value: d.toISOString().split('T')[0],
-          label: d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
-          dayName,
-        })
+      if (business?.hours?.[dayName]?.closed) return false
+      if (selectedStaff) {
+        const staffDaySched = selectedStaff.schedule?.[dayName] as { off?: boolean } | undefined
+        if (staffDaySched?.off) return false
       }
+      return true
     }
-    return dates
   }, [business, selectedStaff])
+
+  // Generate calendar grid for a given month
+  const calendarDays = useMemo(() => {
+    const { year, month } = calendarMonth
+    const firstDay = new Date(year, month, 1)
+    const startDow = firstDay.getDay() // 0=Sun
+    const daysInMonth = new Date(year, month + 1, 0).getDate()
+
+    const cells: (string | null)[] = []
+    // Leading blanks
+    for (let i = 0; i < startDow; i++) cells.push(null)
+    // Actual days
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+      cells.push(dateStr)
+    }
+    return cells
+  }, [calendarMonth])
 
   // Submit booking
   async function handleSubmit() {
@@ -422,16 +441,56 @@ export default function BookingClient({ slug }: { slug: string }) {
               <h2 className={styles.stepTitle}>Pick a Date & Time</h2>
               <p className={styles.stepSubtitle}>{selectedService?.name} • {effectiveDuration} min{selectedStaff ? ` with ${selectedStaff.name}` : ''}</p>
 
-              <div className={styles.dateGrid}>
-                {availableDates.map(d => (
+              {/* Calendar */}
+              <div className={styles.calendar}>
+                <div className={styles.calendarHeader}>
                   <button
-                    key={d.value}
-                    className={`${styles.dateCard} ${selectedDate === d.value ? styles.dateSelected : ''}`}
-                    onClick={() => { setSelectedDate(d.value); setSelectedTime('') }}
+                    className={styles.calendarNav}
+                    onClick={() => setCalendarMonth(prev => {
+                      const d = new Date(prev.year, prev.month - 1, 1)
+                      return { year: d.getFullYear(), month: d.getMonth() }
+                    })}
+                    disabled={calendarMonth.year === new Date().getFullYear() && calendarMonth.month === new Date().getMonth()}
                   >
-                    {d.label}
+                    ‹
                   </button>
-                ))}
+                  <span className={styles.calendarMonthLabel}>
+                    {new Date(calendarMonth.year, calendarMonth.month).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                  </span>
+                  <button
+                    className={styles.calendarNav}
+                    onClick={() => setCalendarMonth(prev => {
+                      const d = new Date(prev.year, prev.month + 1, 1)
+                      return { year: d.getFullYear(), month: d.getMonth() }
+                    })}
+                  >
+                    ›
+                  </button>
+                </div>
+                <div className={styles.calendarWeekdays}>
+                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
+                    <span key={d}>{d}</span>
+                  ))}
+                </div>
+                <div className={styles.calendarGrid}>
+                  {calendarDays.map((dateStr, i) => {
+                    if (!dateStr) return <span key={`blank-${i}`} />
+                    const day = new Date(dateStr + 'T00:00:00').getDate()
+                    const available = isDateAvailable(dateStr)
+                    const isSelected = selectedDate === dateStr
+                    const isToday = dateStr === new Date().toLocaleDateString('en-CA') // YYYY-MM-DD
+                    return (
+                      <button
+                        key={dateStr}
+                        className={`${styles.calendarDay} ${isSelected ? styles.calendarDaySelected : ''} ${!available ? styles.calendarDayDisabled : ''} ${isToday ? styles.calendarDayToday : ''}`}
+                        disabled={!available}
+                        onClick={() => { setSelectedDate(dateStr); setSelectedTime('') }}
+                      >
+                        {day}
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
 
               {selectedDate && (
