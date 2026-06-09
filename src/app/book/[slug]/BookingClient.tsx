@@ -9,7 +9,7 @@ import { formatPhone } from '@/lib/utils'
 interface ServiceInfo { id: string; name: string; category: string; description: string | null; duration_minutes: number; price: number; sort_order: number; image_url: string | null }
 interface StaffInfo { id: string; name: string; specialties: string[]; schedule: Record<string, unknown>; service_durations: Record<string, number> }
 interface BookedSlot { staff_id: string | null; start: string; end: string }
-interface BusinessInfo { name: string; slug: string; phone: string | null; logo_url: string | null; address: string | null; hours: Record<string, { open: string; close: string; closed: boolean }> | null }
+interface BusinessInfo { name: string; slug: string; phone: string | null; logo_url: string | null; address: string | null; hours: Record<string, { open: string; close: string; closed: boolean }> | null; advanceBookingDays?: number }
 
 const STEPS = ['Service', 'Staff', 'Date & Time', 'Your Info', 'Confirm'] as const
 type Step = 0 | 1 | 2 | 3 | 4
@@ -151,7 +151,8 @@ export default function BookingClient({ slug }: { slug: string }) {
   const availableDates = useMemo(() => {
     const dates: { value: string; label: string; dayName: string }[] = []
     const today = new Date()
-    for (let i = 0; i <= 30; i++) {
+    const maxDays = business?.advanceBookingDays || 30
+    for (let i = 0; i <= maxDays; i++) {
       const d = new Date(today.getTime() + i * 24 * 60 * 60 * 1000)
       const dayName = d.toLocaleDateString('en-US', { weekday: 'long' })
       const isClosed = business?.hours?.[dayName]?.closed

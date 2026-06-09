@@ -44,15 +44,20 @@ export async function GET(request: Request) {
     .neq('name', 'Admin')
     .order('name')
 
-  // Get existing appointments for availability checking (next 30 days)
+  // Read advance booking limit from tenant settings (default 30 days)
+  const tenantSettings = (tenant.settings || {}) as Record<string, unknown>
+  const bookingConfig = (tenantSettings.booking || {}) as Record<string, string>
+  const advanceBookingDays = parseInt(bookingConfig.advanceBookingDays || '30', 10) || 30
+
+  // Get existing appointments for availability checking
   const now = new Date()
-  const thirtyDays = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
+  const futureLimit = new Date(now.getTime() + advanceBookingDays * 24 * 60 * 60 * 1000)
   const { data: appointments } = await svc
     .from('appointments')
     .select('staff_id, start_time, end_time, status')
     .eq('tenant_id', tenant.id)
     .gte('start_time', now.toISOString())
-    .lte('start_time', thirtyDays.toISOString())
+    .lte('start_time', futureLimit.toISOString())
     .in('status', ['pending', 'confirmed'])
 
   return NextResponse.json({
@@ -62,7 +67,8 @@ export async function GET(request: Request) {
       phone: tenant.phone,
       logo_url: tenant.logo_url,
       address: tenant.address,
-      hours: (tenant.settings as Record<string, unknown>)?.business_hours || null,
+      hours: tenantSettings.business_hours || null,
+      advanceBookingDays,
     },
     services: services || [],
     staff: (staff || []).map(s => {
