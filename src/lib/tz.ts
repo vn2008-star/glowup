@@ -130,3 +130,93 @@ export const US_TIMEZONES = [
   { value: 'America/Anchorage', label: 'Alaska Time (AKT)' },
   { value: 'Pacific/Honolulu', label: 'Hawaii Time (HT)' },
 ] as const
+
+/**
+ * US state abbreviation → IANA timezone mapping.
+ * For states spanning multiple timezones (e.g., IN, ND, SD, NE, KS, TX, FL),
+ * we use the timezone covering the majority of the population.
+ */
+const STATE_TZ: Record<string, string> = {
+  // Eastern
+  CT: 'America/New_York', DE: 'America/New_York', DC: 'America/New_York',
+  FL: 'America/New_York', GA: 'America/New_York', IN: 'America/New_York',
+  KY: 'America/New_York', ME: 'America/New_York', MD: 'America/New_York',
+  MA: 'America/New_York', MI: 'America/New_York', NH: 'America/New_York',
+  NJ: 'America/New_York', NY: 'America/New_York', NC: 'America/New_York',
+  OH: 'America/New_York', PA: 'America/New_York', RI: 'America/New_York',
+  SC: 'America/New_York', VT: 'America/New_York', VA: 'America/New_York',
+  WV: 'America/New_York',
+  // Central
+  AL: 'America/Chicago', AR: 'America/Chicago', IL: 'America/Chicago',
+  IA: 'America/Chicago', KS: 'America/Chicago', LA: 'America/Chicago',
+  MN: 'America/Chicago', MS: 'America/Chicago', MO: 'America/Chicago',
+  NE: 'America/Chicago', ND: 'America/Chicago', OK: 'America/Chicago',
+  SD: 'America/Chicago', TN: 'America/Chicago', TX: 'America/Chicago',
+  WI: 'America/Chicago',
+  // Mountain
+  AZ: 'America/Denver', CO: 'America/Denver', ID: 'America/Denver',
+  MT: 'America/Denver', NM: 'America/Denver', UT: 'America/Denver',
+  WY: 'America/Denver',
+  // Pacific
+  CA: 'America/Los_Angeles', NV: 'America/Los_Angeles',
+  OR: 'America/Los_Angeles', WA: 'America/Los_Angeles',
+  // Alaska & Hawaii
+  AK: 'America/Anchorage',
+  HI: 'Pacific/Honolulu',
+  // Territories
+  PR: 'America/Puerto_Rico', GU: 'Pacific/Guam',
+  VI: 'America/Virgin', AS: 'Pacific/Pago_Pago',
+}
+
+/**
+ * Infer timezone from a US business address string.
+ * Looks for a 2-letter state abbreviation in common address formats:
+ *   "123 Main St, City, CA 90210"
+ *   "123 Main St, City, California 90210"
+ *   "City, TX"
+ *
+ * Returns the IANA timezone or null if no state is detected.
+ */
+export function timezoneFromAddress(address: string | null | undefined): string | null {
+  if (!address) return null
+
+  // Strategy 1: Match "ST ZIPCODE" or "ST, " pattern (most common US address format)
+  // Look for 2-letter uppercase state code followed by space+zip or end/comma
+  const stateZipMatch = address.match(/\b([A-Z]{2})\s+\d{5}/)
+  if (stateZipMatch && STATE_TZ[stateZipMatch[1]]) {
+    return STATE_TZ[stateZipMatch[1]]
+  }
+
+  // Strategy 2: Match ", ST" at end or before zip
+  const commaStateMatch = address.match(/,\s*([A-Z]{2})\s*(?:\d{5}|$)/)
+  if (commaStateMatch && STATE_TZ[commaStateMatch[1]]) {
+    return STATE_TZ[commaStateMatch[1]]
+  }
+
+  // Strategy 3: Match full state names (case-insensitive)
+  const fullStateNames: Record<string, string> = {
+    'alabama': 'AL', 'alaska': 'AK', 'arizona': 'AZ', 'arkansas': 'AR',
+    'california': 'CA', 'colorado': 'CO', 'connecticut': 'CT', 'delaware': 'DE',
+    'florida': 'FL', 'georgia': 'GA', 'hawaii': 'HI', 'idaho': 'ID',
+    'illinois': 'IL', 'indiana': 'IN', 'iowa': 'IA', 'kansas': 'KS',
+    'kentucky': 'KY', 'louisiana': 'LA', 'maine': 'ME', 'maryland': 'MD',
+    'massachusetts': 'MA', 'michigan': 'MI', 'minnesota': 'MN', 'mississippi': 'MS',
+    'missouri': 'MO', 'montana': 'MT', 'nebraska': 'NE', 'nevada': 'NV',
+    'new hampshire': 'NH', 'new jersey': 'NJ', 'new mexico': 'NM', 'new york': 'NY',
+    'north carolina': 'NC', 'north dakota': 'ND', 'ohio': 'OH', 'oklahoma': 'OK',
+    'oregon': 'OR', 'pennsylvania': 'PA', 'rhode island': 'RI', 'south carolina': 'SC',
+    'south dakota': 'SD', 'tennessee': 'TN', 'texas': 'TX', 'utah': 'UT',
+    'vermont': 'VT', 'virginia': 'VA', 'washington': 'WA', 'west virginia': 'WV',
+    'wisconsin': 'WI', 'wyoming': 'WY', 'district of columbia': 'DC',
+  }
+
+  const lowerAddr = address.toLowerCase()
+  for (const [fullName, abbr] of Object.entries(fullStateNames)) {
+    if (lowerAddr.includes(fullName)) {
+      return STATE_TZ[abbr] || null
+    }
+  }
+
+  return null
+}
+

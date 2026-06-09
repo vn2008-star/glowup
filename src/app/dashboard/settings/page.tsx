@@ -7,7 +7,7 @@ import Link from "next/link";
 
 import { useTenant } from "@/lib/tenant-context";
 import { queryData } from "@/lib/api";
-import { US_TIMEZONES } from "@/lib/tz";
+import { US_TIMEZONES, timezoneFromAddress } from "@/lib/tz";
 import styles from "./settings.module.css";
 import { formatPhone } from "@/lib/utils";
 
@@ -95,7 +95,12 @@ export default function SettingsPage() {
     setEmail(tenant.email || "");
     setWebsite(tenant.website || "");
     setAddress(tenant.address || "");
-    setTimezone(tenant.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Los_Angeles");
+    setTimezone(
+      tenant.timezone
+      || timezoneFromAddress(tenant.address)
+      || Intl.DateTimeFormat().resolvedOptions().timeZone
+      || "America/Los_Angeles"
+    );
     setLogoUrl(tenant.logo_url || null);
 
     // Load business hours from tenant settings JSON
@@ -286,7 +291,14 @@ export default function SettingsPage() {
           </div>
           <div className={`${styles.formGroup} ${styles.fullWidth}`}>
             <label className="label">Address</label>
-            <input className="input" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="123 Main St, City, State ZIP" />
+            <input className="input" value={address} onChange={(e) => {
+              setAddress(e.target.value);
+              // Auto-detect timezone from address if tenant doesn't have one explicitly set
+              if (!tenant?.timezone) {
+                const detected = timezoneFromAddress(e.target.value);
+                if (detected) setTimezone(detected);
+              }
+            }} placeholder="123 Main St, City, State ZIP" />
           </div>
           <div className={styles.formGroup}>
             <label className="label">Timezone</label>

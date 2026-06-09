@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { timezoneFromAddress, DEFAULT_TZ } from '@/lib/tz'
 
 // Public API — no auth required. Used by the /book/[slug] public booking page.
 const svc = createClient(
@@ -67,7 +68,7 @@ export async function GET(request: Request) {
       phone: tenant.phone,
       logo_url: tenant.logo_url,
       address: tenant.address,
-      timezone: tenant.timezone || 'America/Los_Angeles',
+      timezone: tenant.timezone || timezoneFromAddress(tenant.address) || DEFAULT_TZ,
       hours: tenantSettings.business_hours || null,
       advanceBookingDays,
     },
