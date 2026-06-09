@@ -3,6 +3,9 @@ import { createClient } from '@supabase/supabase-js'
 import { timezoneFromAddress, DEFAULT_TZ } from '@/lib/tz'
 
 // Public API — no auth required. Used by the /book/[slug] public booking page.
+if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  console.error('[public-booking] MISSING ENV: NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set')
+}
 const svc = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -25,6 +28,7 @@ export async function GET(request: Request) {
     .single()
 
   if (tErr || !tenant) {
+    console.error('[public-booking] tenant lookup failed', { slug, error: tErr?.message, code: tErr?.code })
     return NextResponse.json({ error: 'Business not found' }, { status: 404 })
   }
 
