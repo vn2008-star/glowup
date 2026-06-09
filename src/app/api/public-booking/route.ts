@@ -51,14 +51,16 @@ export async function GET(request: Request) {
   const advanceBookingDays = parseInt(bookingConfig.advanceBookingDays || '30', 10) || 30
 
   // Get existing appointments for availability checking
+  // Use end_time > now (not start_time >= now) to include in-progress appointments
+  // e.g., a 2hr appointment that started 30min ago still blocks the next 90min of slots
   const now = new Date()
   const futureLimit = new Date(now.getTime() + advanceBookingDays * 24 * 60 * 60 * 1000)
   const { data: appointments } = await svc
     .from('appointments')
     .select('staff_id, start_time, end_time, status')
     .eq('tenant_id', tenant.id)
-    .gte('start_time', now.toISOString())
-    .lte('start_time', futureLimit.toISOString())
+    .gt('end_time', now.toISOString())
+    .lt('start_time', futureLimit.toISOString())
     .in('status', ['pending', 'confirmed'])
 
   return NextResponse.json({
