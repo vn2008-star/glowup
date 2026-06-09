@@ -29,7 +29,7 @@ export async function GET(request: Request) {
 
   if (tErr || !tenant) {
     console.error('[public-booking] tenant lookup failed', { slug, error: tErr?.message, code: tErr?.code })
-    return NextResponse.json({ error: 'Business not found' }, { status: 404 })
+    return NextResponse.json({ error: 'Business not found', debug: { slug, msg: tErr?.message, code: tErr?.code, hint: tErr?.hint } }, { status: 404 })
   }
 
   // Get active services
