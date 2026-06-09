@@ -450,7 +450,11 @@ export default function BookingClient({ slug }: { slug: string }) {
                       <button
                         key={s.id}
                         className={`${styles.serviceCard} ${selectedService?.id === s.id ? styles.serviceSelected : ''} ${s.image_url ? styles.serviceWithImage : ''}`}
-                        onClick={() => { setSelectedService(s); setStep(1) }}
+                        onClick={() => {
+                          setSelectedService(s)
+                          if (staff.length === 1) { setSelectedStaff(staff[0]); setStep(2) }
+                          else { setStep(1) }
+                        }}
                       >
                         {s.image_url && (
                           <div className={styles.serviceThumb}>
