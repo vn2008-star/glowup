@@ -7,6 +7,7 @@ import Link from "next/link";
 
 import { useTenant } from "@/lib/tenant-context";
 import { queryData } from "@/lib/api";
+import { US_TIMEZONES } from "@/lib/tz";
 import styles from "./settings.module.css";
 import { formatPhone } from "@/lib/utils";
 
@@ -47,6 +48,7 @@ export default function SettingsPage() {
   const [email, setEmail] = useState("");
   const [website, setWebsite] = useState("");
   const [address, setAddress] = useState("");
+  const [timezone, setTimezone] = useState("America/Los_Angeles");
   const [hours, setHours] = useState<BusinessHours>(DEFAULT_HOURS);
   const [bookingSettings, setBookingSettings] = useState({
     advanceBookingDays: "30",
@@ -93,6 +95,7 @@ export default function SettingsPage() {
     setEmail(tenant.email || "");
     setWebsite(tenant.website || "");
     setAddress(tenant.address || "");
+    setTimezone(tenant.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Los_Angeles");
     setLogoUrl(tenant.logo_url || null);
 
     // Load business hours from tenant settings JSON
@@ -184,6 +187,7 @@ export default function SettingsPage() {
         email: email || null,
         website: website || null,
         address: address || null,
+        timezone,
         logo_url: logoUrl,
         settings,
       }),
@@ -283,6 +287,18 @@ export default function SettingsPage() {
           <div className={`${styles.formGroup} ${styles.fullWidth}`}>
             <label className="label">Address</label>
             <input className="input" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="123 Main St, City, State ZIP" />
+          </div>
+          <div className={styles.formGroup}>
+            <label className="label">Timezone</label>
+            <select
+              className="input"
+              value={timezone}
+              onChange={(e) => setTimezone(e.target.value)}
+            >
+              {US_TIMEZONES.map(tz => (
+                <option key={tz.value} value={tz.value}>{tz.label}</option>
+              ))}
+            </select>
           </div>
         </div>
       </div>

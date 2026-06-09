@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData } from "@/lib/api";
+import { todayInTz, DEFAULT_TZ } from "@/lib/tz";
 import { GlowUpLogo } from "@/components/GlowUpLogo";
 import styles from "./checkout.module.css";
 import { useRouter } from "next/navigation";
@@ -23,8 +24,7 @@ export default function CheckoutPage() {
   const [services, setServices] = useState<Service[]>([]);
   const [staffMembers, setStaffMembers] = useState<Staff[]>([]);
   const [selectedDate, setSelectedDate] = useState(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    return todayInTz(DEFAULT_TZ);
   });
 
   // Checkout state

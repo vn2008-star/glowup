@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData } from "@/lib/api";
+import { localToUTC, todayInTz, DEFAULT_TZ } from "@/lib/tz";
 import styles from "./calendar.module.css";
 import type { Appointment, Client, Service, Staff } from "@/lib/types";
 
@@ -16,6 +17,7 @@ const DEFAULT_WORK_END = 18;
 
 export default function CalendarPage() {
   const { tenant } = useTenant();
+  const salonTz = tenant?.timezone || DEFAULT_TZ;
   const t = useTranslations("calendarPage");
   const [view, setView] = useState<"day" | "week" | "month">("week");
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -98,16 +100,14 @@ export default function CalendarPage() {
     });
   }, [tenant]);
 
-  // Build timezone-aware ISO boundaries for a local date
+  // Build timezone-aware ISO boundaries for a date in the salon's timezone
   function localDayStart(d: Date) {
-    const copy = new Date(d);
-    copy.setHours(0, 0, 0, 0);
-    return copy.toISOString();
+    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    return localToUTC(dateStr, '00:00', salonTz).toISOString();
   }
   function localDayEnd(d: Date) {
-    const copy = new Date(d);
-    copy.setHours(23, 59, 59, 999);
-    return copy.toISOString();
+    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    return localToUTC(dateStr, '23:59', salonTz).toISOString();
   }
 
   // Fetch appointments on date/view change

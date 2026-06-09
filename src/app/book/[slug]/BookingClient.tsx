@@ -4,12 +4,13 @@ import { useState, useEffect, useMemo } from 'react'
 import styles from './booking.module.css'
 import ChatWidget from './ChatWidget'
 import { formatPhone } from '@/lib/utils'
+import { localToUTC, todayInTz, nowInTz, DEFAULT_TZ } from '@/lib/tz'
 
 /* ── Types ── */
 interface ServiceInfo { id: string; name: string; category: string; description: string | null; duration_minutes: number; price: number; sort_order: number; image_url: string | null }
 interface StaffInfo { id: string; name: string; specialties: string[]; schedule: Record<string, unknown>; service_durations: Record<string, number> }
 interface BookedSlot { staff_id: string | null; start: string; end: string }
-interface BusinessInfo { name: string; slug: string; phone: string | null; logo_url: string | null; address: string | null; hours: Record<string, { open: string; close: string; closed: boolean }> | null; advanceBookingDays?: number }
+interface BusinessInfo { name: string; slug: string; phone: string | null; logo_url: string | null; address: string | null; timezone: string; hours: Record<string, { open: string; close: string; closed: boolean }> | null; advanceBookingDays?: number }
 
 const STEPS = ['Service', 'Staff', 'Date & Time', 'Your Info', 'Confirm'] as const
 type Step = 0 | 1 | 2 | 3 | 4
@@ -96,6 +97,9 @@ export default function BookingClient({ slug }: { slug: string }) {
   }, [services])
 
   // Generate available time slots for selected date
+  // Salon timezone — all time operations should use this, not the browser's timezone
+  const salonTz = business?.timezone || DEFAULT_TZ
+
   const timeSlots = useMemo(() => {
     if (!selectedDate || !selectedService || !effectiveDuration) return []
     const date = new Date(selectedDate + 'T00:00:00')
@@ -123,17 +127,15 @@ export default function BookingClient({ slug }: { slug: string }) {
         const time = sl.start // bookable time = slot start
 
         // Check if this slot conflicts with any booked appointment
-        const slotStartMs = new Date(`${selectedDate}T${time}:00`).getTime()
-        const slotEndMs = slotStartMs + effectiveDuration * 60 * 1000
+        // Convert slot time from salon-local to UTC for comparison
+        const slotStartUTC = localToUTC(selectedDate, time, salonTz).getTime()
+        const slotEndUTC = slotStartUTC + effectiveDuration * 60 * 1000
 
         const isBooked = bookedSlots.some(b => {
           if (selectedStaff && b.staff_id !== selectedStaff.id) return false
-          // No staff selected ("Any Available"): skip unassigned bookings,
-          // but block if ANY specific staff member is booked at this time.
-          // (Conservative approach — prevents overbooking until staff is auto-assigned.)
           const bStartMs = new Date(b.start).getTime()
           const bEndMs = new Date(b.end).getTime()
-          return slotStartMs < bEndMs && slotEndMs > bStartMs
+          return slotStartUTC < bEndMs && slotEndUTC > bStartMs
         })
 
         if (!isBooked) slots.push(time)
@@ -152,39 +154,43 @@ export default function BookingClient({ slug }: { slug: string }) {
         const min = m % 60
         const time = `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`
 
-        const slotStartMs = new Date(`${selectedDate}T${time}:00`).getTime()
-        const slotEndMs = slotStartMs + effectiveDuration * 60 * 1000
+        const slotStartUTC = localToUTC(selectedDate, time, salonTz).getTime()
+        const slotEndUTC = slotStartUTC + effectiveDuration * 60 * 1000
 
         const isBooked = bookedSlots.some(b => {
           if (selectedStaff && b.staff_id !== selectedStaff.id) return false
           const bStartMs = new Date(b.start).getTime()
           const bEndMs = new Date(b.end).getTime()
-          return slotStartMs < bEndMs && slotEndMs > bStartMs
+          return slotStartUTC < bEndMs && slotEndUTC > bStartMs
         })
 
         if (!isBooked) slots.push(time)
       }
     }
-    // Filter out past time slots if the selected date is today
-    const now = new Date()
-    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-    const isToday = selectedDate === todayStr
+    // Filter out past time slots if the selected date is today (in the salon's timezone)
+    const salonNow = nowInTz(salonTz)
+    const isToday = selectedDate === salonNow.dateStr
     const filtered = isToday
-      ? slots.filter(t => new Date(`${selectedDate}T${t}:00`).getTime() > now.getTime())
+      ? slots.filter(t => {
+          const [h, m] = t.split(':').map(Number)
+          return h > salonNow.hour || (h === salonNow.hour && m > salonNow.minute)
+        })
       : slots
     return filtered
-  }, [selectedDate, selectedService, selectedStaff, bookedSlots, business, effectiveDuration])
+  }, [selectedDate, selectedService, selectedStaff, bookedSlots, business, effectiveDuration, salonTz])
 
   // Check if a specific date is available for booking
   const isDateAvailable = useMemo(() => {
     const maxDays = business?.advanceBookingDays || 30
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const maxDate = new Date(today.getTime() + maxDays * 24 * 60 * 60 * 1000)
+    // Use salon timezone for "today"
+    const todayStr = todayInTz(salonTz)
+    const todayDate = new Date(todayStr + 'T00:00:00')
+    todayDate.setHours(0, 0, 0, 0)
+    const maxDate = new Date(todayDate.getTime() + maxDays * 24 * 60 * 60 * 1000)
 
     return (dateStr: string) => {
       const d = new Date(dateStr + 'T00:00:00')
-      if (d < today || d > maxDate) return false
+      if (d < todayDate || d > maxDate) return false
       const dayName = d.toLocaleDateString('en-US', { weekday: 'long' })
       if (business?.hours?.[dayName]?.closed) return false
       if (selectedStaff) {
@@ -193,7 +199,7 @@ export default function BookingClient({ slug }: { slug: string }) {
       }
       return true
     }
-  }, [business, selectedStaff])
+  }, [business, selectedStaff, salonTz])
 
   // Generate calendar grid for a given month
   const calendarDays = useMemo(() => {
@@ -219,8 +225,8 @@ export default function BookingClient({ slug }: { slug: string }) {
     setSubmitting(true)
 
     try {
-      // Build a proper timezone-aware Date from the user's local date+time selection
-      const localStart = new Date(`${selectedDate}T${selectedTime}:00`)
+      // Convert salon-local date+time to UTC using the salon's timezone
+      const utcStart = localToUTC(selectedDate, selectedTime, salonTz)
       const res = await fetch('/api/public-booking', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -228,7 +234,7 @@ export default function BookingClient({ slug }: { slug: string }) {
           slug,
           service_id: selectedService.id,
           staff_id: selectedStaff?.id || null,
-          start_time: localStart.toISOString(),
+          start_time: utcStart.toISOString(),
           duration_minutes: effectiveDuration,
           client_name: clientName,
           client_email: clientEmail,
@@ -239,8 +245,14 @@ export default function BookingClient({ slug }: { slug: string }) {
       })
 
       if (res.ok) {
-        const startDate = new Date(`${selectedDate}T${selectedTime}:00`)
-        setBookedTime(startDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) + ' at ' + startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }))
+        // Display confirmation in the salon's timezone so the client sees the correct local time
+        const confirmDate = new Date(selectedDate + 'T12:00:00') // just for the date portion
+        const dateDisplay = confirmDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+        const [h, m] = selectedTime.split(':').map(Number)
+        const ampm = h >= 12 ? 'PM' : 'AM'
+        const h12 = h > 12 ? h - 12 : h === 0 ? 12 : h
+        const timeDisplay = `${h12}:${String(m).padStart(2, '0')} ${ampm}`
+        setBookedTime(`${dateDisplay} at ${timeDisplay}`)
         if (clientBirthday) setBirthdaySaved(true)
         setBooked(true)
       } else if (res.status === 409) {

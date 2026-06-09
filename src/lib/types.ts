@@ -11,6 +11,7 @@ export interface Tenant {
   website: string | null
   address: string | null
   logo_url: string | null
+  timezone: string
   settings: Record<string, unknown>
   stripe_customer_id: string | null
   stripe_subscription_id: string | null

@@ -19,7 +19,7 @@ export async function GET(request: Request) {
   // Get tenant
   const { data: tenant, error: tErr } = await svc
     .from('tenants')
-    .select('id, name, slug, phone, logo_url, address, settings')
+    .select('id, name, slug, phone, logo_url, address, timezone, settings')
     .eq('slug', slug)
     .single()
 
@@ -67,6 +67,7 @@ export async function GET(request: Request) {
       phone: tenant.phone,
       logo_url: tenant.logo_url,
       address: tenant.address,
+      timezone: tenant.timezone || 'America/Los_Angeles',
       hours: tenantSettings.business_hours || null,
       advanceBookingDays,
     },
