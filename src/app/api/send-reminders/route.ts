@@ -58,7 +58,7 @@ export async function GET(request: Request) {
   const tenantIds = [...new Set(reminders.map(r => r.tenant_id))]
   const { data: tenants } = await supabase
     .from('tenants')
-    .select('id, name, address, settings')
+    .select('id, name, email, address, settings')
     .in('id', tenantIds)
 
   const tenantMap = new Map(tenants?.map(t => [t.id, t]) || [])
@@ -147,7 +147,7 @@ export async function GET(request: Request) {
           const { Resend } = await import('resend')
           const resend = new Resend(process.env.RESEND_API_KEY)
           await resend.emails.send({
-            from: 'GlowUp <onboarding@resend.dev>',
+            from: tenant?.email ? `${businessName} <${tenant.email}>` : `${businessName} <onboarding@resend.dev>`,
             to: [client.email as string],
             subject: fillTemplate(emailSubject),
             text: fillTemplate(emailBody),

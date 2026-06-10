@@ -79,7 +79,7 @@ export async function POST(request: Request) {
   // Fetch tenant name for templates
   const { data: tenant } = await supabase
     .from('tenants')
-    .select('name, slug')
+    .select('name, email, slug')
     .eq('id', tenant_id)
     .single()
 
@@ -117,7 +117,7 @@ export async function POST(request: Request) {
       if ((channel === 'email' || channel === 'both') && client.email) {
         if (resend) {
           await resend.emails.send({
-            from: `${businessName} <onboarding@resend.dev>`,
+            from: tenant?.email ? `${businessName} <${tenant.email}>` : `${businessName} <onboarding@resend.dev>`,
             to: [client.email],
             subject: `${businessName} — Special for You! ✨`,
             text: personalizedMsg,

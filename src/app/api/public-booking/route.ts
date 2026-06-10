@@ -110,7 +110,7 @@ export async function POST(request: Request) {
   // Resolve tenant (include name, phone, address, settings for notifications)
   const { data: tenant } = await svc
     .from('tenants')
-    .select('id, name, phone, address, settings')
+    .select('id, name, email, phone, address, settings')
     .eq('slug', slug)
     .single()
 
@@ -290,7 +290,7 @@ export async function PATCH(request: Request) {
 // Sends SMS + Email to the client AND the business owner right after booking.
 // Also creates 24h reminder rows for the existing cron to pick up.
 async function sendBookingConfirmations(opts: {
-  tenant: { id: string; name: string; phone: string | null; address: string | null; settings: Record<string, unknown> | null }
+  tenant: { id: string; name: string; email: string | null; phone: string | null; address: string | null; settings: Record<string, unknown> | null }
   appointment: { id: string; start_time: string; end_time: string }
   serviceName: string
   staffName: string
@@ -306,6 +306,13 @@ async function sendBookingConfirmations(opts: {
   const businessName = tenant.name || 'our salon'
   const businessAddress = (tenant.address as string) || ''
   const businessPhone = tenant.phone || ''
+  const businessEmail = tenant.email || ''
+
+  // Use tenant's own email as the "from" address so clients see the business identity.
+  // Falls back to Resend sandbox if the tenant has no email on file.
+  const fromEmail = businessEmail
+    ? `${businessName} <${businessEmail}>`
+    : `${businessName} <onboarding@resend.dev>`
 
   // Determine tenant timezone for display
   const tenantSettings = (tenant.settings || {}) as Record<string, unknown>
@@ -393,7 +400,7 @@ async function sendBookingConfirmations(opts: {
     if (resendClient) {
       try {
         await resendClient.emails.send({
-          from: `${businessName} <onboarding@resend.dev>`,
+          from: fromEmail,
           to: [clientEmail],
           subject: `✅ Booking Confirmed — ${serviceName} on ${dateStr}`,
           text: clientEmailBody,
@@ -435,8 +442,8 @@ async function sendBookingConfirmations(opts: {
   }
 
   // ── 4. Email to business owner ──
-  // Use tenant email from settings if available, else skip
-  const ownerEmail = (tenantSettings.owner_email as string) || (tenantSettings.email as string) || null
+  // Use tenant email column, or fall back to settings
+  const ownerEmail = businessEmail || (tenantSettings.owner_email as string) || (tenantSettings.email as string) || null
   if (ownerEmail) {
     const ownerEmailBody = [
       `New online booking received!`,

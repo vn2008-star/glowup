@@ -43,7 +43,7 @@ export async function GET(request: Request) {
   // Fetch all tenants with automation settings
   const { data: tenants } = await supabase
     .from('tenants')
-    .select('id, name, slug, settings')
+    .select('id, name, email, slug, settings')
 
   if (!tenants || tenants.length === 0) {
     return NextResponse.json({ message: 'No tenants found', processed: 0 })
@@ -80,6 +80,7 @@ export async function GET(request: Request) {
     const businessName = tenant.name || 'our salon'
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
     const bookingUrl = `${baseUrl}/book/${tenant.slug}`
+    const businessEmail = tenant.email || ''
 
     // ── Fill My Openings Auto-Blast ──
     if (automations.auto_fill_openings) {
@@ -230,6 +231,7 @@ export async function GET(request: Request) {
               client,
               message: personalizedMsg,
               businessName,
+              businessEmail,
               twilioClient,
               resendClient,
               channel: fmoChannel,
@@ -289,7 +291,7 @@ export async function GET(request: Request) {
           const clientName = `${client.first_name || ''}`.trim() || 'there'
           const message = `Happy Birthday, ${clientName}! 🎂 ${businessName} wants to celebrate YOU — enjoy 20% off any service this month! Book now → ${bookingUrl}`
 
-          await sendMessage({ client, message, businessName, twilioClient, resendClient, channel: 'both' })
+          await sendMessage({ client, message, businessName, businessEmail, twilioClient, resendClient, channel: 'both' })
           results.birthday++
         }
       }
@@ -316,7 +318,7 @@ export async function GET(request: Request) {
           const daysSince = Math.round((Date.now() - new Date(client.last_visit).getTime()) / (1000 * 60 * 60 * 24))
           const message = `Hey ${clientName}! It's been ${daysSince} days since your last visit to ${businessName}. Time for a refresh? Book now → ${bookingUrl}`
 
-          await sendMessage({ client, message, businessName, twilioClient, resendClient, channel: 'both' })
+          await sendMessage({ client, message, businessName, businessEmail, twilioClient, resendClient, channel: 'both' })
           results.rebooking++
 
           // Mark client as reminded to prevent duplicate sends
@@ -356,7 +358,7 @@ export async function GET(request: Request) {
           const clientName = `${client.first_name || ''}`.trim() || 'there'
           const message = `Hi ${clientName}, we missed you today at ${businessName}! 😊 Life happens — we'd love to help you rebook. Book your next visit → ${bookingUrl}`
 
-          await sendMessage({ client, message, businessName, twilioClient, resendClient, channel: 'both' })
+          await sendMessage({ client, message, businessName, businessEmail, twilioClient, resendClient, channel: 'both' })
           results.noshow++
 
           // Mark as followed up
@@ -401,7 +403,7 @@ export async function GET(request: Request) {
           }
 
           const reviewChannel = String(automations.auto_review_channel || 'sms') as 'sms' | 'email' | 'both'
-          await sendMessage({ client, message, businessName, twilioClient, resendClient, channel: reviewChannel })
+          await sendMessage({ client, message, businessName, businessEmail, twilioClient, resendClient, channel: reviewChannel })
           results.review++
 
           // Mark as requested
@@ -458,7 +460,7 @@ export async function GET(request: Request) {
             .replace(/\{booking_url\}/g, bookingUrl)
             .replace(/\{business_name\}/g, businessName)
 
-          await sendMessage({ client, message: personalizedMsg, businessName, twilioClient, resendClient, channel: 'both' })
+          await sendMessage({ client, message: personalizedMsg, businessName, businessEmail, twilioClient, resendClient, channel: 'both' })
           holidaySent++
         }
 
@@ -491,13 +493,14 @@ async function sendMessage(opts: {
   client: Record<string, unknown>
   message: string
   businessName: string
+  businessEmail: string
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   twilioClient: any
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   resendClient: any
   channel: 'sms' | 'email' | 'both'
 }) {
-  const { client, message, businessName, twilioClient, resendClient, channel } = opts
+  const { client, message, businessName, businessEmail, twilioClient, resendClient, channel } = opts
 
   // SMS
   if ((channel === 'sms' || channel === 'both') && client.phone && !client.sms_opt_out) {
@@ -521,7 +524,7 @@ async function sendMessage(opts: {
     if (resendClient) {
       try {
         await resendClient.emails.send({
-          from: `${businessName} <onboarding@resend.dev>`,
+          from: businessEmail ? `${businessName} <${businessEmail}>` : `${businessName} <onboarding@resend.dev>`,
           to: [client.email as string],
           subject: `${businessName} — We're thinking of you! ✨`,
           text: message,
