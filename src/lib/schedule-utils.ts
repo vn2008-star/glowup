@@ -1,13 +1,18 @@
 /**
- * Schedule utilities — shared logic for alternating weekends and day-off checks.
+ * Schedule utilities — shared logic for per-day alternating schedules.
  *
- * "Alternating weekends" means a staff member works Saturday one week and
- * Sunday the next (or vice-versa). The pattern is driven by ISO week number:
- *   - Even ISO weeks → works the `firstWeekendDay` (default "Saturday")
- *   - Odd  ISO weeks → works the other weekend day
+ * Each day in a staff schedule can independently be:
+ *   - Working every week  (off: false, alternating: undefined/false)
+ *   - Off every week       (off: true,  alternating: undefined/false)
+ *   - Every other week     (off: false, alternating: true)
+ *
+ * When `alternating` is true, the staff works on weeks whose ISO week
+ * number parity matches `alternatingPhase` (default "even").
+ *   - "even" → works on even ISO weeks, off on odd
+ *   - "odd"  → works on odd  ISO weeks, off on even
  */
 
-/** Return the ISO-8601 week number for a given date. */
+/** Return the ISO-8601 week number for a given date string (YYYY-MM-DD). */
 export function getISOWeekNumber(dateStr: string): number {
   const d = new Date(dateStr + 'T00:00:00')
   // Move to nearest Thursday (ISO weeks start Monday, week 1 contains Jan 4)
@@ -17,9 +22,17 @@ export function getISOWeekNumber(dateStr: string): number {
   return 1 + Math.round(((target.getTime() - jan4.getTime()) / 86400000 - 3 + ((jan4.getDay() + 6) % 7)) / 7)
 }
 
+interface DaySchedule {
+  off?: boolean
+  alternating?: boolean
+  alternatingPhase?: 'even' | 'odd'
+}
+
 /**
- * Check whether a staff member is off on a specific date, taking into account
- * the alternating-weekends schedule setting.
+ * Check whether a staff member is off on a specific date.
+ *
+ * Supports per-day alternating schedules: if `alternating` is set on a day,
+ * the staff works every other week based on ISO week parity.
  *
  * @param schedule  The full schedule object stored on the staff record.
  * @param dateStr   YYYY-MM-DD string of the date to check.
@@ -33,23 +46,18 @@ export function isStaffOffOnDate(
   const d = new Date(dateStr + 'T00:00:00')
   const dayName = d.toLocaleDateString('en-US', { weekday: 'long' })
 
-  const daySched = schedule[dayName] as { off?: boolean } | undefined
+  const daySched = schedule[dayName] as DaySchedule | undefined
+  if (!daySched) return false
 
-  // If alternating weekends is enabled and this is a weekend day, override the
-  // static `off` flag based on the ISO week number.
-  const altWeekends = schedule.alternatingWeekends as boolean | undefined
-  if (altWeekends && (dayName === 'Saturday' || dayName === 'Sunday')) {
-    // firstWeekendDay is the day worked on even weeks (default Saturday)
-    const firstDay = (schedule.firstWeekendDay as string) || 'Saturday'
-    const secondDay = firstDay === 'Saturday' ? 'Sunday' : 'Saturday'
+  // Per-day alternating: staff works every other week on this day
+  if (daySched.alternating && !daySched.off) {
     const weekNum = getISOWeekNumber(dateStr)
+    const phase = daySched.alternatingPhase || 'even'
     const isEvenWeek = weekNum % 2 === 0
-
-    // On even weeks: firstDay is working, secondDay is off
-    // On odd weeks:  secondDay is working, firstDay is off
-    if (dayName === firstDay) return !isEvenWeek  // off on odd weeks
-    if (dayName === secondDay) return isEvenWeek   // off on even weeks
+    // Work on matching weeks, off on non-matching
+    if (phase === 'even') return !isEvenWeek   // off on odd weeks
+    return isEvenWeek                           // off on even weeks
   }
 
-  return !!daySched?.off
+  return !!daySched.off
 }

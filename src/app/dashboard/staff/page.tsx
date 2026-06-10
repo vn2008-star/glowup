@@ -31,9 +31,7 @@ export default function StaffPage() {
 
   // Schedule editor state
   const [showScheduleModal, setShowScheduleModal] = useState(false);
-  const [scheduleData, setScheduleData] = useState<Record<string, { open: string; close: string; off: boolean; useSlots?: boolean; slots?: { start: string; end: string }[] }>>({}); 
-  const [alternatingWeekends, setAlternatingWeekends] = useState(false);
-  const [firstWeekendDay, setFirstWeekendDay] = useState<'Saturday' | 'Sunday'>('Saturday');
+  const [scheduleData, setScheduleData] = useState<Record<string, { open: string; close: string; off: boolean; alternating?: boolean; alternatingPhase?: 'even' | 'odd'; useSlots?: boolean; slots?: { start: string; end: string }[] }>>({}); 
 
   const [agreementStaff, setAgreementStaff] = useState<Staff | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
@@ -110,18 +108,15 @@ export default function StaffPage() {
 
   function openSchedule(s: Staff) {
     setSelectedStaff(s);
-    const rawSched = (s.schedule || {}) as Record<string, unknown>;
-    const sched = rawSched as Record<string, { open: string; close: string; off: boolean; useSlots?: boolean; slots?: { start: string; end: string }[] }>;
-    const filled: Record<string, { open: string; close: string; off: boolean; useSlots?: boolean; slots?: { start: string; end: string }[] }> = {};
+    const sched = (s.schedule || {}) as Record<string, { open: string; close: string; off: boolean; alternating?: boolean; alternatingPhase?: 'even' | 'odd'; useSlots?: boolean; slots?: { start: string; end: string }[] }>;
+    const filled: Record<string, { open: string; close: string; off: boolean; alternating?: boolean; alternatingPhase?: 'even' | 'odd'; useSlots?: boolean; slots?: { start: string; end: string }[] }> = {};
     DAYS.forEach((d) => {
       const existing = sched[d];
       filled[d] = existing
-        ? { open: existing.open || "09:00", close: existing.close || "18:00", off: !!existing.off, useSlots: !!existing.useSlots, slots: existing.slots || [] }
-        : { open: "09:00", close: "18:00", off: d === "Sunday", useSlots: false, slots: [] };
+        ? { open: existing.open || "09:00", close: existing.close || "18:00", off: !!existing.off, alternating: !!existing.alternating, alternatingPhase: existing.alternatingPhase || 'even', useSlots: !!existing.useSlots, slots: existing.slots || [] }
+        : { open: "09:00", close: "18:00", off: d === "Sunday", alternating: false, alternatingPhase: 'even', useSlots: false, slots: [] };
     });
     setScheduleData(filled);
-    setAlternatingWeekends(!!(rawSched.alternatingWeekends));
-    setFirstWeekendDay((rawSched.firstWeekendDay as 'Saturday' | 'Sunday') || 'Saturday');
     setShowScheduleModal(true);
   }
 
@@ -303,8 +298,6 @@ export default function StaffPage() {
       ...scheduleData,
       vacations: existingSchedule.vacations || [],
       service_durations: existingSchedule.service_durations || {},
-      alternatingWeekends,
-      firstWeekendDay,
     };
     const { data } = await queryData<Staff>("staff.update", { id: selectedStaff.id, schedule: merged });
     if (data) {
@@ -872,8 +865,16 @@ export default function StaffPage() {
                   {DAYS.map((day) => {
                     const dayData = scheduleData[day];
                     const isOff = dayData?.off;
+                    const isAlternating = dayData?.alternating;
+                    const isWeekend = day === 'Saturday' || day === 'Sunday';
+                    const effectivelyOff = isOff && !isAlternating; // fully off = off & not alternating
                     const useSlots = dayData?.useSlots;
                     const slots = dayData?.slots || [];
+
+                    // 3-state for weekends: 'every' | 'off' | 'alternate'
+                    const weekendMode = isWeekend
+                      ? (isAlternating ? 'alternate' : (isOff ? 'off' : 'every'))
+                      : undefined;
 
                     return (
                       <div key={day} className={styles.schedDayBlock}>
@@ -881,7 +882,7 @@ export default function StaffPage() {
                         <div className={styles.schedEditRow}>
                           <span className={styles.schedEditDay}>{day}</span>
                           <div className={styles.schedDayControls}>
-                            {!isOff && (
+                            {!effectivelyOff && (
                               <>
                                 <input className="input" type="time" value={dayData?.open || ""}
                                   onChange={(e) => setScheduleData((prev) => ({ ...prev, [day]: { ...prev[day], open: e.target.value } }))}
@@ -894,17 +895,80 @@ export default function StaffPage() {
                                 />
                               </>
                             )}
-                            <label className={styles.checkLabel}>
-                              <input type="checkbox" checked={isOff || false}
-                                onChange={() => setScheduleData((prev) => ({ ...prev, [day]: { ...prev[day], off: !prev[day].off } }))}
-                              />
-                              Off
-                            </label>
+                            {isWeekend ? (
+                              /* Weekend: 3-option pill selector */
+                              <div className={styles.altWeekendsBtns}>
+                                <button type="button"
+                                  className={`${styles.altWeekendDayBtn} ${weekendMode === 'every' ? styles.altWeekendDayBtnActive : ''}`}
+                                  onClick={() => setScheduleData(prev => ({ ...prev, [day]: { ...prev[day], off: false, alternating: false } }))}
+                                >Every Week</button>
+                                <button type="button"
+                                  className={`${styles.altWeekendDayBtn} ${weekendMode === 'alternate' ? styles.altWeekendDayBtnActive : ''}`}
+                                  onClick={() => setScheduleData(prev => ({ ...prev, [day]: { ...prev[day], off: false, alternating: true, alternatingPhase: prev[day].alternatingPhase || 'even' } }))}
+                                >🔄 Every Other</button>
+                                <button type="button"
+                                  className={`${styles.altWeekendDayBtn} ${weekendMode === 'off' ? styles.altWeekendDayBtnActive : ''}`}
+                                  style={weekendMode === 'off' ? { background: 'var(--text-tertiary)', borderColor: 'var(--text-tertiary)', color: 'var(--text-inverse)' } : undefined}
+                                  onClick={() => setScheduleData(prev => ({ ...prev, [day]: { ...prev[day], off: true, alternating: false } }))}
+                                >Off</button>
+                              </div>
+                            ) : (
+                              /* Weekday: simple Off checkbox */
+                              <label className={styles.checkLabel}>
+                                <input type="checkbox" checked={isOff || false}
+                                  onChange={() => setScheduleData((prev) => ({ ...prev, [day]: { ...prev[day], off: !prev[day].off } }))}
+                                />
+                                Off
+                              </label>
+                            )}
                           </div>
                         </div>
 
+                        {/* Alternating preview — which upcoming dates are on/off */}
+                        {isAlternating && !isOff && (
+                          <div className={styles.altWeekendsPreview} style={{ marginLeft: 100 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                              <span className={styles.altWeekendsLabel}>Upcoming {day}s:</span>
+                              <button type="button" className={styles.copyBtn}
+                                onClick={() => setScheduleData(prev => ({
+                                  ...prev,
+                                  [day]: { ...prev[day], alternatingPhase: prev[day].alternatingPhase === 'even' ? 'odd' : 'even' }
+                                }))}
+                                title="Flip which weeks are on/off"
+                              >🔄 Flip Weeks</button>
+                            </div>
+                            {(() => {
+                              const phase = dayData?.alternatingPhase || 'even';
+                              const dayOfWeek = day === 'Saturday' ? 6 : day === 'Sunday' ? 0 : 0;
+                              const today = new Date();
+                              const d = new Date(today);
+                              d.setDate(d.getDate() + ((dayOfWeek - d.getDay() + 7) % 7 || 7));
+                              const rows: { dateLabel: string; working: boolean }[] = [];
+                              for (let i = 0; i < 4; i++) {
+                                const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                                const weekNum = getISOWeekNumber(dateStr);
+                                const isEven = weekNum % 2 === 0;
+                                const working = phase === 'even' ? isEven : !isEven;
+                                rows.push({
+                                  dateLabel: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                                  working,
+                                });
+                                d.setDate(d.getDate() + 7);
+                              }
+                              return rows.map((r, i) => (
+                                <div key={i} className={styles.altWeekendsPreviewRow}>
+                                  <span style={{ width: 70 }}>{r.dateLabel}</span>
+                                  <span className={r.working ? styles.working : styles.offDay}>
+                                    {r.working ? '✓ Working' : '— Off'}
+                                  </span>
+                                </div>
+                              ));
+                            })()}
+                          </div>
+                        )}
+
                         {/* Slot mode toggle */}
-                        {!isOff && (
+                        {!effectivelyOff && (
                           <div className={styles.slotToggleRow}>
                             <button
                               type="button"
@@ -924,7 +988,7 @@ export default function StaffPage() {
                         )}
 
                         {/* Appointment Slots */}
-                        {!isOff && useSlots && (
+                        {!effectivelyOff && useSlots && (
                           <div className={styles.slotsContainer}>
                             {slots.length === 0 && (
                               <p className={styles.slotsEmpty}>No slots yet — add your first appointment block</p>
@@ -965,97 +1029,7 @@ export default function StaffPage() {
                   })}
                 </div>
 
-                {/* ── Alternating Weekends Toggle ── */}
-                <div className={styles.altWeekendsSection}>
-                  <div className={styles.altWeekendsHeader}>
-                    <div>
-                      <div className={styles.altWeekendsTitle}>
-                        <span>🔄</span> Alternating Weekends
-                      </div>
-                      <div className={styles.altWeekendsDesc}>
-                        Work Saturday one week, Sunday the next — automatically alternating.
-                      </div>
-                    </div>
-                    <label className={styles.toggleSwitch}>
-                      <input
-                        type="checkbox"
-                        checked={alternatingWeekends}
-                        onChange={(e) => {
-                          setAlternatingWeekends(e.target.checked);
-                          if (e.target.checked) {
-                            // When enabling, make sure neither Sat/Sun is marked as off
-                            setScheduleData(prev => ({
-                              ...prev,
-                              Saturday: { ...prev.Saturday, off: false },
-                              Sunday: { ...prev.Sunday, off: false },
-                            }));
-                          }
-                        }}
-                      />
-                      <span className={styles.toggleSlider} />
-                    </label>
-                  </div>
 
-                  {alternatingWeekends && (
-                    <>
-                      <div className={styles.altWeekendsPicker}>
-                        <span className={styles.altWeekendsLabel}>Even weeks start with:</span>
-                        <div className={styles.altWeekendsBtns}>
-                          <button
-                            type="button"
-                            className={`${styles.altWeekendDayBtn} ${firstWeekendDay === 'Saturday' ? styles.altWeekendDayBtnActive : ''}`}
-                            onClick={() => setFirstWeekendDay('Saturday')}
-                          >
-                            Saturday
-                          </button>
-                          <button
-                            type="button"
-                            className={`${styles.altWeekendDayBtn} ${firstWeekendDay === 'Sunday' ? styles.altWeekendDayBtnActive : ''}`}
-                            onClick={() => setFirstWeekendDay('Sunday')}
-                          >
-                            Sunday
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Preview upcoming 4 weekends */}
-                      <div className={styles.altWeekendsPreview}>
-                        {(() => {
-                          const rows: { label: string; satWorking: boolean; sunWorking: boolean }[] = [];
-                          const today = new Date();
-                          // Find the next 4 Saturdays
-                          const d = new Date(today);
-                          d.setDate(d.getDate() + ((6 - d.getDay() + 7) % 7 || 7)); // next Saturday
-                          for (let i = 0; i < 4; i++) {
-                            const satStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                            const weekNum = getISOWeekNumber(satStr);
-                            const isEven = weekNum % 2 === 0;
-                            const satWorking = firstWeekendDay === 'Saturday' ? isEven : !isEven;
-                            const sunWorking = !satWorking;
-                            const satDate = new Date(d);
-                            rows.push({
-                              label: satDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-                              satWorking,
-                              sunWorking,
-                            });
-                            d.setDate(d.getDate() + 7);
-                          }
-                          return rows.map((r, i) => (
-                            <div key={i} className={styles.altWeekendsPreviewRow}>
-                              <span style={{ width: 65 }}>{r.label}</span>
-                              <span className={r.satWorking ? styles.working : styles.offDay}>
-                                Sat: {r.satWorking ? '✓ Work' : '— Off'}
-                              </span>
-                              <span className={r.sunWorking ? styles.working : styles.offDay}>
-                                Sun: {r.sunWorking ? '✓ Work' : '— Off'}
-                              </span>
-                            </div>
-                          ));
-                        })()}
-                      </div>
-                    </>
-                  )}
-                </div>
 
                 {/* Copy to all days */}
                 <div className={styles.copySection}>
