@@ -5,6 +5,7 @@ import styles from './booking.module.css'
 import ChatWidget from './ChatWidget'
 import { formatPhone } from '@/lib/utils'
 import { localToUTC, todayInTz, nowInTz, DEFAULT_TZ } from '@/lib/tz'
+import { isStaffOffOnDate } from '@/lib/schedule-utils'
 
 /* ── Types ── */
 interface ServiceInfo { id: string; name: string; category: string; description: string | null; duration_minutes: number; price: number; sort_order: number; image_url: string | null }
@@ -111,7 +112,7 @@ export default function BookingClient({ slug }: { slug: string }) {
     const staffDaySched = selectedStaff?.schedule?.[dayName] as
       { open?: string; close?: string; off?: boolean; useSlots?: boolean; slots?: { start: string; end: string }[] } | undefined
 
-    if (staffDaySched?.off) return [] // Staff is off this day
+    if (selectedStaff && isStaffOffOnDate(selectedStaff.schedule as Record<string, unknown>, selectedDate)) return [] // Staff is off this day
 
     const slots: string[] = []
 
@@ -124,7 +125,7 @@ export default function BookingClient({ slug }: { slug: string }) {
             const sd = s.schedule?.[dayName] as typeof staffDaySched
             return { staff: s, sched: sd }
           })
-          .filter(x => x.sched?.useSlots && x.sched.slots && x.sched.slots.length > 0 && !x.sched.off)
+          .filter(x => x.sched?.useSlots && x.sched.slots && x.sched.slots.length > 0 && !isStaffOffOnDate(x.staff.schedule as Record<string, unknown>, selectedDate))
 
     if (staffWithSlots.length > 0) {
       // Use custom slots — collect unique start times across all matching staff
@@ -214,8 +215,7 @@ export default function BookingClient({ slug }: { slug: string }) {
       const dayName = d.toLocaleDateString('en-US', { weekday: 'long' })
       if (business?.hours?.[dayName]?.closed) return false
       if (selectedStaff) {
-        const staffDaySched = selectedStaff.schedule?.[dayName] as { off?: boolean } | undefined
-        if (staffDaySched?.off) return false
+        if (isStaffOffOnDate(selectedStaff.schedule as Record<string, unknown>, dateStr)) return false
       }
       return true
     }

@@ -8,6 +8,7 @@ import styles from "./staff.module.css";
 import type { Staff, Service } from "@/lib/types";
 import { PROFESSIONAL_TYPES, getProfessionalType } from "./staff-specialties";
 import StaffAgreement from "./StaffAgreement";
+import { getISOWeekNumber } from "@/lib/schedule-utils";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -31,6 +32,8 @@ export default function StaffPage() {
   // Schedule editor state
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [scheduleData, setScheduleData] = useState<Record<string, { open: string; close: string; off: boolean; useSlots?: boolean; slots?: { start: string; end: string }[] }>>({}); 
+  const [alternatingWeekends, setAlternatingWeekends] = useState(false);
+  const [firstWeekendDay, setFirstWeekendDay] = useState<'Saturday' | 'Sunday'>('Saturday');
 
   const [agreementStaff, setAgreementStaff] = useState<Staff | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
@@ -107,7 +110,8 @@ export default function StaffPage() {
 
   function openSchedule(s: Staff) {
     setSelectedStaff(s);
-    const sched = (s.schedule || {}) as Record<string, { open: string; close: string; off: boolean; useSlots?: boolean; slots?: { start: string; end: string }[] }>;
+    const rawSched = (s.schedule || {}) as Record<string, unknown>;
+    const sched = rawSched as Record<string, { open: string; close: string; off: boolean; useSlots?: boolean; slots?: { start: string; end: string }[] }>;
     const filled: Record<string, { open: string; close: string; off: boolean; useSlots?: boolean; slots?: { start: string; end: string }[] }> = {};
     DAYS.forEach((d) => {
       const existing = sched[d];
@@ -116,6 +120,8 @@ export default function StaffPage() {
         : { open: "09:00", close: "18:00", off: d === "Sunday", useSlots: false, slots: [] };
     });
     setScheduleData(filled);
+    setAlternatingWeekends(!!(rawSched.alternatingWeekends));
+    setFirstWeekendDay((rawSched.firstWeekendDay as 'Saturday' | 'Sunday') || 'Saturday');
     setShowScheduleModal(true);
   }
 
@@ -291,9 +297,15 @@ export default function StaffPage() {
   async function handleSaveSchedule(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedStaff) return;
-    // preserve existing vacations when saving schedule
+    // preserve existing vacations and service_durations when saving schedule
     const existingSchedule = (selectedStaff.schedule || {}) as Record<string, unknown>;
-    const merged = { ...scheduleData, vacations: existingSchedule.vacations || [] };
+    const merged: Record<string, unknown> = {
+      ...scheduleData,
+      vacations: existingSchedule.vacations || [],
+      service_durations: existingSchedule.service_durations || {},
+      alternatingWeekends,
+      firstWeekendDay,
+    };
     const { data } = await queryData<Staff>("staff.update", { id: selectedStaff.id, schedule: merged });
     if (data) {
       setStaffMembers((prev) => prev.map((s) => (s.id === data.id ? data : s)));
@@ -951,6 +963,98 @@ export default function StaffPage() {
                       </div>
                     );
                   })}
+                </div>
+
+                {/* ── Alternating Weekends Toggle ── */}
+                <div className={styles.altWeekendsSection}>
+                  <div className={styles.altWeekendsHeader}>
+                    <div>
+                      <div className={styles.altWeekendsTitle}>
+                        <span>🔄</span> Alternating Weekends
+                      </div>
+                      <div className={styles.altWeekendsDesc}>
+                        Work Saturday one week, Sunday the next — automatically alternating.
+                      </div>
+                    </div>
+                    <label className={styles.toggleSwitch}>
+                      <input
+                        type="checkbox"
+                        checked={alternatingWeekends}
+                        onChange={(e) => {
+                          setAlternatingWeekends(e.target.checked);
+                          if (e.target.checked) {
+                            // When enabling, make sure neither Sat/Sun is marked as off
+                            setScheduleData(prev => ({
+                              ...prev,
+                              Saturday: { ...prev.Saturday, off: false },
+                              Sunday: { ...prev.Sunday, off: false },
+                            }));
+                          }
+                        }}
+                      />
+                      <span className={styles.toggleSlider} />
+                    </label>
+                  </div>
+
+                  {alternatingWeekends && (
+                    <>
+                      <div className={styles.altWeekendsPicker}>
+                        <span className={styles.altWeekendsLabel}>Even weeks start with:</span>
+                        <div className={styles.altWeekendsBtns}>
+                          <button
+                            type="button"
+                            className={`${styles.altWeekendDayBtn} ${firstWeekendDay === 'Saturday' ? styles.altWeekendDayBtnActive : ''}`}
+                            onClick={() => setFirstWeekendDay('Saturday')}
+                          >
+                            Saturday
+                          </button>
+                          <button
+                            type="button"
+                            className={`${styles.altWeekendDayBtn} ${firstWeekendDay === 'Sunday' ? styles.altWeekendDayBtnActive : ''}`}
+                            onClick={() => setFirstWeekendDay('Sunday')}
+                          >
+                            Sunday
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Preview upcoming 4 weekends */}
+                      <div className={styles.altWeekendsPreview}>
+                        {(() => {
+                          const rows: { label: string; satWorking: boolean; sunWorking: boolean }[] = [];
+                          const today = new Date();
+                          // Find the next 4 Saturdays
+                          const d = new Date(today);
+                          d.setDate(d.getDate() + ((6 - d.getDay() + 7) % 7 || 7)); // next Saturday
+                          for (let i = 0; i < 4; i++) {
+                            const satStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                            const weekNum = getISOWeekNumber(satStr);
+                            const isEven = weekNum % 2 === 0;
+                            const satWorking = firstWeekendDay === 'Saturday' ? isEven : !isEven;
+                            const sunWorking = !satWorking;
+                            const satDate = new Date(d);
+                            rows.push({
+                              label: satDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                              satWorking,
+                              sunWorking,
+                            });
+                            d.setDate(d.getDate() + 7);
+                          }
+                          return rows.map((r, i) => (
+                            <div key={i} className={styles.altWeekendsPreviewRow}>
+                              <span style={{ width: 65 }}>{r.label}</span>
+                              <span className={r.satWorking ? styles.working : styles.offDay}>
+                                Sat: {r.satWorking ? '✓ Work' : '— Off'}
+                              </span>
+                              <span className={r.sunWorking ? styles.working : styles.offDay}>
+                                Sun: {r.sunWorking ? '✓ Work' : '— Off'}
+                              </span>
+                            </div>
+                          ));
+                        })()}
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {/* Copy to all days */}
