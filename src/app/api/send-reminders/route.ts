@@ -147,7 +147,8 @@ export async function GET(request: Request) {
           const { Resend } = await import('resend')
           const resend = new Resend(process.env.RESEND_API_KEY)
           await resend.emails.send({
-            from: tenant?.email ? `${businessName} <${tenant.email}>` : `${businessName} <onboarding@resend.dev>`,
+            from: `${businessName} <onboarding@resend.dev>`,
+            replyTo: tenant?.email || undefined,
             to: [client.email as string],
             subject: fillTemplate(emailSubject),
             text: fillTemplate(emailBody),

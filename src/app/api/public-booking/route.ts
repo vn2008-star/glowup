@@ -308,12 +308,6 @@ async function sendBookingConfirmations(opts: {
   const businessPhone = tenant.phone || ''
   const businessEmail = tenant.email || ''
 
-  // Use tenant's own email as the "from" address so clients see the business identity.
-  // Falls back to Resend sandbox if the tenant has no email on file.
-  const fromEmail = businessEmail
-    ? `${businessName} <${businessEmail}>`
-    : `${businessName} <onboarding@resend.dev>`
-
   // Determine tenant timezone for display
   const tenantSettings = (tenant.settings || {}) as Record<string, unknown>
   const tz = (tenantSettings.timezone as string) || 'America/Los_Angeles'
@@ -400,7 +394,8 @@ async function sendBookingConfirmations(opts: {
     if (resendClient) {
       try {
         await resendClient.emails.send({
-          from: fromEmail,
+          from: `${businessName} <onboarding@resend.dev>`,
+          replyTo: businessEmail || undefined,
           to: [clientEmail],
           subject: `✅ Booking Confirmed — ${serviceName} on ${dateStr}`,
           text: clientEmailBody,
@@ -462,6 +457,7 @@ async function sendBookingConfirmations(opts: {
       try {
         await resendClient.emails.send({
           from: `GlowUp <onboarding@resend.dev>`,
+          replyTo: businessEmail || undefined,
           to: [ownerEmail],
           subject: `🆕 New Booking: ${clientName} — ${serviceName} on ${dateStr}`,
           text: ownerEmailBody,

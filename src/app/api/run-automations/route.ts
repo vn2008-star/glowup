@@ -524,7 +524,8 @@ async function sendMessage(opts: {
     if (resendClient) {
       try {
         await resendClient.emails.send({
-          from: businessEmail ? `${businessName} <${businessEmail}>` : `${businessName} <onboarding@resend.dev>`,
+          from: `${businessName} <onboarding@resend.dev>`,
+          replyTo: businessEmail || undefined,
           to: [client.email as string],
           subject: `${businessName} — We're thinking of you! ✨`,
           text: message,
