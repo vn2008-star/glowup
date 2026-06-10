@@ -107,10 +107,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
-  // Resolve tenant
+  // Resolve tenant (include name, phone, address, settings for notifications)
   const { data: tenant } = await svc
     .from('tenants')
-    .select('id')
+    .select('id, name, phone, address, settings')
     .eq('slug', slug)
     .single()
 
@@ -197,12 +197,23 @@ export async function POST(request: Request) {
   }
 
   // Create the appointment
-  // Get service price
+  // Get service name + price
   const { data: service } = await svc
     .from('services')
-    .select('price')
+    .select('name, price')
     .eq('id', service_id)
     .single()
+
+  // Get staff name if assigned
+  let staffName = ''
+  if (staff_id) {
+    const { data: staffRow } = await svc
+      .from('staff')
+      .select('name')
+      .eq('id', staff_id)
+      .single()
+    staffName = staffRow?.name || ''
+  }
 
   const { data: appointment, error } = await svc
     .from('appointments')
@@ -223,6 +234,21 @@ export async function POST(request: Request) {
   if (error) {
     return NextResponse.json({ error: 'Failed to create booking' }, { status: 500 })
   }
+
+  // ── Send instant booking confirmation notifications ──
+  // Fire-and-forget: don't block the response on notification delivery
+  sendBookingConfirmations({
+    tenant,
+    appointment,
+    serviceName: service?.name || 'your appointment',
+    staffName,
+    clientName: client_name,
+    clientEmail: client_email || null,
+    clientPhone: client_phone || null,
+    clientId,
+    start,
+    end,
+  }).catch(err => console.error('[public-booking] notification error:', err))
 
   return NextResponse.json({ success: true, appointment })
 }
@@ -258,4 +284,220 @@ export async function PATCH(request: Request) {
   await query
 
   return NextResponse.json({ success: true })
+}
+
+// ─── Instant Booking Confirmation Notifications ───
+// Sends SMS + Email to the client AND the business owner right after booking.
+// Also creates 24h reminder rows for the existing cron to pick up.
+async function sendBookingConfirmations(opts: {
+  tenant: { id: string; name: string; phone: string | null; address: string | null; settings: Record<string, unknown> | null }
+  appointment: { id: string; start_time: string; end_time: string }
+  serviceName: string
+  staffName: string
+  clientName: string
+  clientEmail: string | null
+  clientPhone: string | null
+  clientId: string | null
+  start: Date
+  end: Date
+}) {
+  const { tenant, appointment, serviceName, staffName, clientName, clientEmail, clientPhone, clientId, start } = opts
+
+  const businessName = tenant.name || 'our salon'
+  const businessAddress = (tenant.address as string) || ''
+  const businessPhone = tenant.phone || ''
+
+  // Determine tenant timezone for display
+  const tenantSettings = (tenant.settings || {}) as Record<string, unknown>
+  const tz = (tenantSettings.timezone as string) || 'America/Los_Angeles'
+
+  // Format date/time in tenant timezone
+  let dateStr: string
+  let timeStr: string
+  try {
+    dateStr = start.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: tz })
+    timeStr = start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz })
+  } catch {
+    // Fallback if timezone is invalid
+    dateStr = start.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+    timeStr = start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+  }
+
+  const hasTwilio = process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER
+  const hasResend = !!process.env.RESEND_API_KEY
+
+  // Lazy-load SDKs
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let twilioClient: any = null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let resendClient: any = null
+
+  if (hasTwilio) {
+    const twilio = await import('twilio')
+    twilioClient = twilio.default(process.env.TWILIO_ACCOUNT_SID!, process.env.TWILIO_AUTH_TOKEN!)
+  }
+  if (hasResend) {
+    const { Resend } = await import('resend')
+    resendClient = new Resend(process.env.RESEND_API_KEY!)
+  }
+
+  // ── 1. SMS to client ──
+  if (clientPhone) {
+    const clientSms = [
+      `✅ Booking Confirmed!`,
+      ``,
+      `Hi ${clientName}, your appointment is booked:`,
+      `📋 ${serviceName}`,
+      `📅 ${dateStr} at ${timeStr}`,
+      staffName ? `💇 With: ${staffName}` : '',
+      businessAddress ? `📍 ${businessName}, ${businessAddress}` : `📍 ${businessName}`,
+      ``,
+      `Need to change? Contact us at ${businessPhone || 'the salon'}.`,
+    ].filter(Boolean).join('\n')
+
+    if (twilioClient) {
+      try {
+        await twilioClient.messages.create({
+          body: clientSms,
+          from: process.env.TWILIO_PHONE_NUMBER!,
+          to: clientPhone,
+        })
+        console.log(`[public-booking] ✅ Confirmation SMS sent to client ${clientPhone}`)
+      } catch (err) {
+        console.error(`[public-booking] SMS to client failed:`, err)
+      }
+    } else {
+      console.log(`[DRY RUN] Client SMS to ${clientPhone}: ${clientSms}`)
+    }
+  }
+
+  // ── 2. Email to client ──
+  if (clientEmail) {
+    const clientEmailBody = [
+      `Hi ${clientName},`,
+      ``,
+      `Your appointment has been confirmed! Here are the details:`,
+      ``,
+      `📋 Service: ${serviceName}`,
+      `📅 Date: ${dateStr}`,
+      `🕐 Time: ${timeStr}`,
+      staffName ? `💇 With: ${staffName}` : '',
+      `📍 Location: ${businessName}${businessAddress ? `, ${businessAddress}` : ''}`,
+      ``,
+      `Need to reschedule or cancel? Reply to this email or contact us at ${businessPhone || 'the salon'}.`,
+      ``,
+      `See you soon!`,
+      `— ${businessName}`,
+    ].filter(Boolean).join('\n')
+
+    if (resendClient) {
+      try {
+        await resendClient.emails.send({
+          from: `${businessName} <onboarding@resend.dev>`,
+          to: [clientEmail],
+          subject: `✅ Booking Confirmed — ${serviceName} on ${dateStr}`,
+          text: clientEmailBody,
+        })
+        console.log(`[public-booking] ✅ Confirmation email sent to client ${clientEmail}`)
+      } catch (err) {
+        console.error(`[public-booking] Email to client failed:`, err)
+      }
+    } else {
+      console.log(`[DRY RUN] Client email to ${clientEmail}: ${clientEmailBody}`)
+    }
+  }
+
+  // ── 3. SMS to business owner ──
+  if (businessPhone) {
+    const ownerSms = [
+      `🆕 New Online Booking!`,
+      ``,
+      `Client: ${clientName}${clientPhone ? ` (${clientPhone})` : ''}`,
+      `📋 ${serviceName}`,
+      `📅 ${dateStr} at ${timeStr}`,
+      staffName ? `💇 Staff: ${staffName}` : '',
+    ].filter(Boolean).join('\n')
+
+    if (twilioClient) {
+      try {
+        await twilioClient.messages.create({
+          body: ownerSms,
+          from: process.env.TWILIO_PHONE_NUMBER!,
+          to: businessPhone,
+        })
+        console.log(`[public-booking] ✅ Owner SMS sent to ${businessPhone}`)
+      } catch (err) {
+        console.error(`[public-booking] SMS to owner failed:`, err)
+      }
+    } else {
+      console.log(`[DRY RUN] Owner SMS to ${businessPhone}: ${ownerSms}`)
+    }
+  }
+
+  // ── 4. Email to business owner ──
+  // Use tenant email from settings if available, else skip
+  const ownerEmail = (tenantSettings.owner_email as string) || (tenantSettings.email as string) || null
+  if (ownerEmail) {
+    const ownerEmailBody = [
+      `New online booking received!`,
+      ``,
+      `Client: ${clientName}`,
+      `Phone: ${clientPhone || 'Not provided'}`,
+      `Email: ${clientEmail || 'Not provided'}`,
+      `Service: ${serviceName}`,
+      `Date: ${dateStr} at ${timeStr}`,
+      staffName ? `Staff: ${staffName}` : '',
+      ``,
+      `View your calendar in the GlowUp dashboard to manage this appointment.`,
+    ].filter(Boolean).join('\n')
+
+    if (resendClient) {
+      try {
+        await resendClient.emails.send({
+          from: `GlowUp <onboarding@resend.dev>`,
+          to: [ownerEmail],
+          subject: `🆕 New Booking: ${clientName} — ${serviceName} on ${dateStr}`,
+          text: ownerEmailBody,
+        })
+        console.log(`[public-booking] ✅ Owner email sent to ${ownerEmail}`)
+      } catch (err) {
+        console.error(`[public-booking] Email to owner failed:`, err)
+      }
+    } else {
+      console.log(`[DRY RUN] Owner email to ${ownerEmail}: ${ownerEmailBody}`)
+    }
+  }
+
+  // ── 5. Create 24h reminder rows for the existing reminder cron ──
+  if (clientId && appointment?.id) {
+    const reminderRows = []
+    if (clientPhone) {
+      reminderRows.push({
+        tenant_id: tenant.id,
+        appointment_id: appointment.id,
+        client_id: clientId,
+        type: '24h',
+        channel: 'sms',
+        status: 'pending',
+      })
+    }
+    if (clientEmail) {
+      reminderRows.push({
+        tenant_id: tenant.id,
+        appointment_id: appointment.id,
+        client_id: clientId,
+        type: '24h',
+        channel: 'email',
+        status: 'pending',
+      })
+    }
+    if (reminderRows.length > 0) {
+      const { error: reminderErr } = await svc.from('appointment_reminders').insert(reminderRows)
+      if (reminderErr) {
+        console.error('[public-booking] Failed to create reminders:', reminderErr)
+      } else {
+        console.log(`[public-booking] ✅ Created ${reminderRows.length} reminder(s) for appointment ${appointment.id}`)
+      }
+    }
+  }
 }
