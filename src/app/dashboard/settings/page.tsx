@@ -8,6 +8,8 @@ import Link from "next/link";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData } from "@/lib/api";
 import { US_TIMEZONES, timezoneFromAddress } from "@/lib/tz";
+import { CLOSED_DAY_HOLIDAYS } from "@/lib/schedule-utils";
+import type { CustomClosedDate } from "@/lib/schedule-utils";
 import styles from "./settings.module.css";
 import { formatPhone } from "@/lib/utils";
 
@@ -87,6 +89,12 @@ export default function SettingsPage() {
 
   const [paymentQr, setPaymentQr] = useState({ venmo_qr: "", zelle_qr: "" });
 
+  // Business Closed Days state
+  const [closedHolidays, setClosedHolidays] = useState<string[]>([]);
+  const [customClosedDates, setCustomClosedDates] = useState<CustomClosedDate[]>([]);
+  const [newClosedDate, setNewClosedDate] = useState("");
+  const [newClosedLabel, setNewClosedLabel] = useState("");
+
   // Load current settings from tenant
   const loadSettings = useCallback(() => {
     if (!tenant) return;
@@ -113,6 +121,8 @@ export default function SettingsPage() {
       if (s.reminder_templates) setReminderTemplates({ ...reminderTemplates, ...(s.reminder_templates as Record<string, string>) });
       if (s.staff_reminder_templates) setStaffReminderTemplates({ ...staffReminderTemplates, ...(s.staff_reminder_templates as Record<string, string>) });
       if (s.payment_qr) setPaymentQr({ venmo_qr: "", zelle_qr: "", ...(s.payment_qr as Record<string, string>) });
+      if (s.closed_holidays) setClosedHolidays(s.closed_holidays as string[]);
+      if (s.custom_closed_dates) setCustomClosedDates(s.custom_closed_dates as CustomClosedDate[]);
     }
 
     setLoading(false);
@@ -181,6 +191,8 @@ export default function SettingsPage() {
       reminder_templates: reminderTemplates,
       staff_reminder_templates: staffReminderTemplates,
       payment_qr: paymentQr,
+      closed_holidays: closedHolidays,
+      custom_closed_dates: customClosedDates,
     };
 
     const res = await fetch("/api/save-settings", {
@@ -406,6 +418,94 @@ export default function SettingsPage() {
               <option value="15">15 minutes</option>
               <option value="30">30 minutes</option>
             </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Business Closed Days */}
+      <div id="closed-days" className={`card ${styles.section}`}>
+        <h2>🏖️ Business Closed Days</h2>
+        <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginBottom: "var(--space-4)" }}>
+          Select holidays when your business is closed. These dates will be blocked on your public booking page for all staff.
+        </p>
+        <div className={styles.closedDaysGrid}>
+          {CLOSED_DAY_HOLIDAYS.map(h => {
+            const checked = closedHolidays.includes(h.name);
+            const dateLabel = new Date(2026, h.month, h.day).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            return (
+              <label key={h.name} className={`${styles.closedDayItem} ${checked ? styles.closedDayItemChecked : ''}`}>
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => {
+                    setClosedHolidays(prev =>
+                      prev.includes(h.name)
+                        ? prev.filter(n => n !== h.name)
+                        : [...prev, h.name]
+                    );
+                  }}
+                />
+                <span className={styles.closedDayEmoji}>{h.emoji}</span>
+                <span className={styles.closedDayName}>{h.name}</span>
+                <span className={styles.closedDayDate}>{dateLabel}</span>
+              </label>
+            );
+          })}
+        </div>
+
+        <div className={styles.customClosedSection}>
+          <h3>📌 Custom Closed Dates</h3>
+          <p style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)", marginBottom: "var(--space-3)" }}>
+            Add specific dates when your business will be closed (e.g., team retreat, remodeling).
+          </p>
+
+          {customClosedDates.length > 0 && (
+            <div className={styles.customClosedList}>
+              {customClosedDates.map((c, i) => (
+                <div key={i} className={styles.customClosedItem}>
+                  <span>{c.label || 'Closed'}</span>
+                  <span>{new Date(c.date + 'T00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                  <button
+                    type="button"
+                    className={styles.customClosedRemove}
+                    onClick={() => setCustomClosedDates(prev => prev.filter((_, j) => j !== i))}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className={styles.customClosedRow}>
+            <input
+              className="input"
+              type="date"
+              value={newClosedDate}
+              onChange={e => setNewClosedDate(e.target.value)}
+            />
+            <input
+              className="input"
+              type="text"
+              placeholder="Reason (optional)"
+              value={newClosedLabel}
+              onChange={e => setNewClosedLabel(e.target.value)}
+            />
+            <button
+              className="btn btn-secondary btn-sm"
+              disabled={!newClosedDate}
+              onClick={() => {
+                if (!newClosedDate) return;
+                setCustomClosedDates(prev => [
+                  ...prev,
+                  { date: newClosedDate, label: newClosedLabel || 'Closed' },
+                ].sort((a, b) => a.date.localeCompare(b.date)));
+                setNewClosedDate('');
+                setNewClosedLabel('');
+              }}
+            >
+              + Add
+            </button>
           </div>
         </div>
       </div>

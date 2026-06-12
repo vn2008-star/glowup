@@ -114,7 +114,7 @@ const ADMIN_EMAILS = ['joinglowup@gmail.com', 'vn2008@gmail.com'];
 function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { tenant, currentStaff, loading } = useTenant();
+  const { tenant, currentStaff, loading, isImpersonating, impersonatingTenantName } = useTenant();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const t = useTranslations('dashboard');
@@ -163,6 +163,52 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className={styles.layout}>
+      {/* Impersonation Banner */}
+      {isImpersonating && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 9999,
+          background: 'linear-gradient(135deg, #7c3aed 0%, #a855f7 100%)',
+          color: 'white',
+          padding: '8px 20px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '12px',
+          fontSize: '14px',
+          fontWeight: 600,
+          boxShadow: '0 2px 12px rgba(124, 58, 237, 0.4)',
+        }}>
+          <span>👁 Viewing as: <strong>{impersonatingTenantName || tenant?.name}</strong></span>
+          <span style={{ opacity: 0.5 }}>•</span>
+          <a href="/admin" style={{ color: 'rgba(255,255,255,0.9)', textDecoration: 'underline', fontSize: '13px' }}>Back to Admin</a>
+          <button
+            onClick={async () => {
+              await fetch('/api/admin/impersonate', { method: 'DELETE' });
+              clearTenantCache();
+              window.location.href = '/dashboard';
+            }}
+            style={{
+              background: 'rgba(255,255,255,0.2)',
+              border: '1px solid rgba(255,255,255,0.4)',
+              color: 'white',
+              padding: '4px 12px',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '12px',
+              fontWeight: 600,
+              transition: 'all 0.15s',
+            }}
+            onMouseOver={(e) => { (e.target as HTMLElement).style.background = 'rgba(255,255,255,0.35)' }}
+            onMouseOut={(e) => { (e.target as HTMLElement).style.background = 'rgba(255,255,255,0.2)' }}
+          >
+            ✕ Exit
+          </button>
+        </div>
+      )}
       {/* Mobile backdrop */}
       {mobileMenuOpen && (
         <div className={styles.mobileBackdrop} onClick={() => setMobileMenuOpen(false)} />
@@ -220,7 +266,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Main Content */}
-      <div className={styles.content}>
+      <div className={styles.content} style={isImpersonating ? { paddingTop: 40 } : undefined}>
         <header className={styles.topBar}>
           <button
             className={styles.hamburger}

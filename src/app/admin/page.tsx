@@ -1600,6 +1600,35 @@ export default function AdminPage() {
                               </button>
                             </>
                           )}
+                          <button
+                            className={styles.viewBtn}
+                            style={{ background: 'rgba(124, 58, 237, 0.1)', color: '#7c3aed', border: '1px solid rgba(124, 58, 237, 0.3)', fontSize: '11px', padding: '3px 8px', fontWeight: 600 }}
+                            disabled={actionLoading === t.id}
+                            onClick={async () => {
+                              setActionLoading(t.id);
+                              try {
+                                const res = await fetch('/api/admin/impersonate', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ tenant_id: t.id }),
+                                });
+                                if (res.ok) {
+                                  // Clear cached tenant data and redirect to dashboard
+                                  try { sessionStorage.removeItem('glowup_tenant_cache'); } catch {}
+                                  window.location.href = '/dashboard';
+                                } else {
+                                  const err = await res.json();
+                                  alert(err.error || 'Failed to impersonate');
+                                }
+                              } catch (e) {
+                                console.error(e);
+                                alert('Failed to impersonate');
+                              }
+                              setActionLoading(null);
+                            }}
+                          >
+                            👁 View As
+                          </button>
                         </div>
                       </td>
                     </tr>

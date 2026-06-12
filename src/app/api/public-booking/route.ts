@@ -77,6 +77,8 @@ export async function GET(request: Request) {
       timezone: tenant.timezone || timezoneFromAddress(tenant.address) || DEFAULT_TZ,
       hours: tenantSettings.business_hours || null,
       advanceBookingDays,
+      closedHolidays: (tenantSettings.closed_holidays || []) as string[],
+      customClosedDates: (tenantSettings.custom_closed_dates || []) as { date: string; label: string }[],
     },
     services: services || [],
     staff: (staff || []).map(s => {

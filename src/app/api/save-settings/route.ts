@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { getImpersonationOverride } from '@/lib/admin'
 
 export async function PUT(request: Request) {
   const supabase = await createClient()
@@ -22,7 +23,12 @@ export async function PUT(request: Request) {
     .eq('user_id', user.id)
     .single()
 
-  if (!staffRecord || !['owner', 'manager'].includes(staffRecord.role)) {
+  // ─── Admin impersonation override ───
+  const overrideTenantId = await getImpersonationOverride(user.id, user.email || '')
+  const effectiveTenantId = overrideTenantId || staffRecord?.tenant_id
+  const effectiveRole = overrideTenantId ? 'owner' : staffRecord?.role
+
+  if (!effectiveTenantId || !['owner', 'manager'].includes(effectiveRole || '')) {
     return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
   }
 
@@ -31,7 +37,7 @@ export async function PUT(request: Request) {
   const { error } = await svc
     .from('tenants')
     .update(body)
-    .eq('id', staffRecord.tenant_id)
+    .eq('id', effectiveTenantId)
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })

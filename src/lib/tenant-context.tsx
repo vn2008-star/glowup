@@ -9,6 +9,8 @@ interface TenantContextType {
   currentStaff: Staff | null
   loading: boolean
   error: string | null
+  isImpersonating: boolean
+  impersonatingTenantName: string | null
   refetch: () => Promise<void>
 }
 
@@ -17,6 +19,8 @@ const TenantContext = createContext<TenantContextType>({
   currentStaff: null,
   loading: true,
   error: null,
+  isImpersonating: false,
+  impersonatingTenantName: null,
   refetch: async () => {},
 })
 
@@ -57,6 +61,8 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   const [currentStaff, setCurrentStaff] = useState<Staff | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isImpersonating, setIsImpersonating] = useState(false)
+  const [impersonatingTenantName, setImpersonatingTenantName] = useState<string | null>(null)
   const setupFired = useRef(false)
 
   async function fetchTenant(skipCache = false) {
@@ -115,7 +121,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         return
       }
 
-      const { staff: staffRecord } = await res.json()
+      const { staff: staffRecord, isImpersonating: impersonating, impersonatingTenantName: impTenantName } = await res.json()
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const tenantData = (staffRecord as any).tenants as Tenant
@@ -123,7 +129,11 @@ export function TenantProvider({ children }: { children: ReactNode }) {
 
       setTenant(tenantData)
       setCurrentStaff(staffOnly as unknown as Staff)
-      setCachedTenant(tenantData, staffOnly as unknown as Staff)
+      setIsImpersonating(!!impersonating)
+      setImpersonatingTenantName(impTenantName || null)
+      if (!impersonating) {
+        setCachedTenant(tenantData, staffOnly as unknown as Staff)
+      }
     } catch (err) {
       if (updateLoading) {
         setError(err instanceof Error ? err.message : 'Failed to load business data')
@@ -139,7 +149,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <TenantContext.Provider value={{ tenant, currentStaff, loading, error, refetch: () => fetchTenant(true) }}>
+    <TenantContext.Provider value={{ tenant, currentStaff, loading, error, isImpersonating, impersonatingTenantName, refetch: () => fetchTenant(true) }}>
       {children}
     </TenantContext.Provider>
   )

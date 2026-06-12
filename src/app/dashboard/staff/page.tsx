@@ -8,7 +8,7 @@ import styles from "./staff.module.css";
 import type { Staff, Service } from "@/lib/types";
 import { PROFESSIONAL_TYPES, getProfessionalType } from "./staff-specialties";
 import StaffAgreement from "./StaffAgreement";
-import { getISOWeekNumber } from "@/lib/schedule-utils";
+import { getISOWeekNumber, CLOSED_DAY_HOLIDAYS } from "@/lib/schedule-utils";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -358,6 +358,27 @@ export default function StaffPage() {
     }
   }
 
+  // Per-staff holidays off
+  function getHolidaysOff(s: Staff): string[] {
+    const sched = (s.schedule || {}) as Record<string, unknown>;
+    return (sched.holidays_off || []) as string[];
+  }
+
+  async function handleToggleHolidayOff(holidayName: string) {
+    if (!vacationStaff) return;
+    const current = getHolidaysOff(vacationStaff);
+    const updated = current.includes(holidayName)
+      ? current.filter(n => n !== holidayName)
+      : [...current, holidayName];
+    const sched = { ...(vacationStaff.schedule || {}), holidays_off: updated } as Record<string, unknown>;
+    const { data } = await queryData<Staff>("staff.update", { id: vacationStaff.id, schedule: sched });
+    if (data) {
+      setStaffMembers(prev => prev.map(s => s.id === data.id ? data : s));
+      setVacationStaff(data);
+      if (selectedStaff?.id === data.id) setSelectedStaff(data);
+    }
+  }
+
   // Custom service durations
   function openDurations(s: Staff) {
     setDurationsStaff(s);
@@ -507,7 +528,7 @@ export default function StaffPage() {
                 })()}
                 <div className={styles.staffActions}>
                   <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); openSchedule(s); }}>📅 Schedule</button>
-                  <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); openVacation(s); }}>🏖️ Vacation</button>
+                  <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); openVacation(s); }}>🏖️ Vacation / Holidays</button>
                   <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); openDurations(s); }}>{getCustomDurationCount(s) > 0 ? `⏱️ Durations (${getCustomDurationCount(s)})` : '⏱️ Durations'}</button>
                   <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); setAgreementStaff(s); }}>{(s as any).agreement_signed_at ? '✅' : '📝'} Agreement</button>
                   <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); openEdit(s); }}>✏️ Edit</button>
@@ -651,7 +672,7 @@ export default function StaffPage() {
                 const upcoming = vacs.filter(v => v.end >= today);
                 return (
                   <div className={styles.drawerSection}>
-                    <h3>🏖️ Vacation Schedule</h3>
+                    <h3>🏖️ Vacation / Holidays</h3>
                     {upcoming.length === 0 ? (
                       <p style={{ color: 'var(--text-tertiary)', fontSize: 'var(--text-sm)' }}>No upcoming vacations</p>
                     ) : (
@@ -672,7 +693,7 @@ export default function StaffPage() {
                         })}
                       </div>
                     )}
-                    <button className="btn btn-ghost btn-sm" style={{ marginTop: 'var(--space-2)' }} onClick={() => openVacation(selectedStaff)}>+ Add Vacation</button>
+                    <button className="btn btn-ghost btn-sm" style={{ marginTop: 'var(--space-2)' }} onClick={() => openVacation(selectedStaff)}>+ Add Vacation / Holiday</button>
                   </div>
                 );
               })()}
@@ -689,7 +710,7 @@ export default function StaffPage() {
               <div className={styles.drawerActions}>
                 <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => openEdit(selectedStaff)}>✏️ Edit Profile</button>
                 <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => openSchedule(selectedStaff)}>📅 Schedule</button>
-                <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => openVacation(selectedStaff)}>🏖️ Vacation</button>
+                <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => openVacation(selectedStaff)}>🏖️ Vacation / Holidays</button>
                 <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => openDurations(selectedStaff)}>⏱️ Durations</button>
                 <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setAgreementStaff(selectedStaff)}>{(selectedStaff as any).agreement_signed_at ? '✅ Agreement' : '📝 Agreement'}</button>
                 <button className="btn btn-ghost" style={{ color: "var(--color-danger)" }} onClick={() => setDeleteConfirmId(selectedStaff.id)}>🗑️</button>
@@ -1067,9 +1088,50 @@ export default function StaffPage() {
         <div className={styles.modalOverlay} onClick={() => { setShowVacationModal(false); setVacationStaff(null); }}>
           <div className={`${styles.modal}`} onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
             <div className={styles.modalHeader}>
-              <h2>🏖️ Vacation — {vacationStaff.name}</h2>
+              <h2>🏖️ Vacation / Holidays — {vacationStaff.name}</h2>
             </div>
             <div className={styles.modalBody}>
+              {/* Per-staff holidays off */}
+              <div style={{ marginBottom: 'var(--space-5)' }}>
+                <h4 style={{ fontSize: 'var(--text-sm)', fontWeight: 600, marginBottom: 'var(--space-2)', color: 'var(--text-secondary)' }}>🎄 Holidays Off</h4>
+                <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', marginBottom: 'var(--space-3)' }}>
+                  Check holidays this staff member takes off (even if the business stays open).
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 'var(--space-2)' }}>
+                  {CLOSED_DAY_HOLIDAYS.map(h => {
+                    const checked = getHolidaysOff(vacationStaff).includes(h.name);
+                    const dateLabel = new Date(2026, h.month, h.day).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    return (
+                      <label
+                        key={h.name}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 'var(--space-2)',
+                          padding: 'var(--space-1) var(--space-2)',
+                          borderRadius: 'var(--radius-md)',
+                          border: `1px solid ${checked ? 'var(--color-primary)' : 'var(--border-subtle)'}`,
+                          background: checked ? 'rgba(139, 92, 246, 0.08)' : 'transparent',
+                          cursor: 'pointer',
+                          fontSize: 'var(--text-sm)',
+                          transition: 'all 0.15s',
+                          userSelect: 'none' as const,
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => handleToggleHolidayOff(h.name)}
+                          style={{ accentColor: 'var(--color-primary)', width: 14, height: 14 }}
+                        />
+                        <span>{h.emoji}</span>
+                        <span style={{ fontWeight: 500 }}>{h.name}</span>
+                        <span style={{ marginLeft: 'auto', fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>{dateLabel}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
               {/* Existing vacations */}
               {(() => {
                 const vacs = getVacations(vacationStaff);

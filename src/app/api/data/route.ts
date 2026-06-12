@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { getImpersonationOverride } from '@/lib/admin'
 
 // Unified data API — all dashboard queries go through here
 // Authenticates via session cookies, queries with service role to bypass RLS
@@ -41,8 +42,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'No tenant' }, { status: 404 })
   }
 
-  const tenantId = staffRecord.tenant_id
-  const staffRole = staffRecord.role
+  // ─── Admin impersonation override ───
+  const overrideTenantId = await getImpersonationOverride(user.id, user.email || '')
+  const tenantId = overrideTenantId || staffRecord.tenant_id
+  const staffRole = overrideTenantId ? 'owner' : staffRecord.role // Admin gets full owner access when impersonating
   const staffId = staffRecord.id
 
   // Helper: mask contact info for technicians when client protection is enabled

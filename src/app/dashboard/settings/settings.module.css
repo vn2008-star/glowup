@@ -601,6 +601,116 @@
   color: var(--color-danger);
   background: color-mix(in srgb, var(--color-danger) 10%, transparent);
 }
+/* ── Business Closed Days ── */
+.closedDaysGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+}
+.closedDayItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  cursor: pointer;
+  transition: all 0.15s;
+  font-size: var(--text-sm);
+  user-select: none;
+}
+.closedDayItem:hover {
+  border-color: var(--border-strong);
+  background: rgba(255,255,255,0.03);
+}
+.closedDayItemChecked {
+  border-color: var(--color-primary);
+  background: rgba(139, 92, 246, 0.08);
+}
+.closedDayItem input[type="checkbox"] {
+  accent-color: var(--color-primary);
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+.closedDayEmoji {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+.closedDayName {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.closedDayDate {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  margin-left: auto;
+  white-space: nowrap;
+}
+.customClosedSection {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: var(--space-4);
+}
+.customClosedSection h3 {
+  font-size: var(--text-sm) !important;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: var(--space-3) !important;
+  padding-bottom: 0 !important;
+  border-bottom: none !important;
+}
+.customClosedRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+.customClosedRow input {
+  width: 160px;
+}
+.customClosedRow input[type="text"] {
+  flex: 1;
+  min-width: 120px;
+}
+.customClosedList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+.customClosedItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  font-size: var(--text-sm);
+}
+.customClosedItem span:first-child {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.customClosedItem span:nth-child(2) {
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+}
+.customClosedRemove {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  transition: all 0.15s;
+}
+.customClosedRemove:hover {
+  color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+}
 
 @media (max-width: 768px) {
   .formGrid { grid-template-columns: 1fr; }
@@ -612,4 +722,5 @@
   .reminderSubHeader,
   .reminderUnifiedRow { font-size: var(--text-xs); }
   .dangerItem { flex-direction: column; }
+  .closedDaysGrid { grid-template-columns: 1fr; }
 }

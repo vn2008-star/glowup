@@ -1,5 +1,6 @@
 /**
- * Schedule utilities — shared logic for per-day alternating schedules.
+ * Schedule utilities — shared logic for per-day alternating schedules,
+ * business-wide closed days, and per-staff holiday preferences.
  *
  * Each day in a staff schedule can independently be:
  *   - Working every week  (off: false, alternating: undefined/false)
@@ -12,6 +13,33 @@
  *   - "odd"  → works on odd  ISO weeks, off on even
  */
 
+/* ─── Shared Holiday Definitions ─── */
+export interface ClosedDayHoliday {
+  name: string
+  emoji: string
+  month: number  // 0-indexed
+  day: number
+}
+
+/** Common US holidays — shared across Settings, Staff, and Booking pages. */
+export const CLOSED_DAY_HOLIDAYS: ClosedDayHoliday[] = [
+  { name: "New Year's Day", emoji: '🎆', month: 0, day: 1 },
+  { name: "MLK Day", emoji: '✊', month: 0, day: 20 },
+  { name: "Presidents' Day", emoji: '🇺🇸', month: 1, day: 17 },
+  { name: "Memorial Day", emoji: '🇺🇸', month: 4, day: 26 },
+  { name: "4th of July", emoji: '🎆', month: 6, day: 4 },
+  { name: "Labor Day", emoji: '💪', month: 8, day: 1 },
+  { name: "Thanksgiving", emoji: '🦃', month: 10, day: 27 },
+  { name: "Christmas Eve", emoji: '🎄', month: 11, day: 24 },
+  { name: "Christmas", emoji: '🎄', month: 11, day: 25 },
+  { name: "New Year's Eve", emoji: '🎉', month: 11, day: 31 },
+]
+
+export interface CustomClosedDate {
+  date: string   // YYYY-MM-DD
+  label: string
+}
+
 /** Return the ISO-8601 week number for a given date string (YYYY-MM-DD). */
 export function getISOWeekNumber(dateStr: string): number {
   const d = new Date(dateStr + 'T00:00:00')
@@ -20,6 +48,31 @@ export function getISOWeekNumber(dateStr: string): number {
   target.setDate(target.getDate() + 3 - ((target.getDay() + 6) % 7))
   const jan4 = new Date(target.getFullYear(), 0, 4)
   return 1 + Math.round(((target.getTime() - jan4.getTime()) / 86400000 - 3 + ((jan4.getDay() + 6) % 7)) / 7)
+}
+
+/**
+ * Check whether the business is closed on a specific date due to
+ * business-wide holiday closures or custom closed dates.
+ */
+export function isBusinessClosedOnDate(
+  closedHolidays: string[],
+  customClosedDates: CustomClosedDate[],
+  dateStr: string,
+): boolean {
+  // Check custom closed dates (exact match)
+  if (customClosedDates.some(c => c.date === dateStr)) return true
+
+  // Check holiday closures by month/day
+  const d = new Date(dateStr + 'T00:00:00')
+  const month = d.getMonth()
+  const day = d.getDate()
+
+  for (const holidayName of closedHolidays) {
+    const holiday = CLOSED_DAY_HOLIDAYS.find(h => h.name === holidayName)
+    if (holiday && holiday.month === month && holiday.day === day) return true
+  }
+
+  return false
 }
 
 interface DaySchedule {
@@ -31,8 +84,10 @@ interface DaySchedule {
 /**
  * Check whether a staff member is off on a specific date.
  *
- * Supports per-day alternating schedules: if `alternating` is set on a day,
- * the staff works every other week based on ISO week parity.
+ * Supports:
+ *   - Per-day alternating schedules (every other week)
+ *   - Per-staff holiday preferences (holidays_off[])
+ *   - Vacation date ranges
  *
  * @param schedule  The full schedule object stored on the staff record.
  * @param dateStr   YYYY-MM-DD string of the date to check.
@@ -43,8 +98,25 @@ export function isStaffOffOnDate(
   dateStr: string,
 ): boolean {
   if (!schedule) return false
-  const d = new Date(dateStr + 'T00:00:00')
-  const dayName = d.toLocaleDateString('en-US', { weekday: 'long' })
+
+  // Check per-staff holidays_off
+  const holidaysOff = (schedule.holidays_off || []) as string[]
+  if (holidaysOff.length > 0) {
+    const d = new Date(dateStr + 'T00:00:00')
+    const month = d.getMonth()
+    const day = d.getDate()
+    for (const holidayName of holidaysOff) {
+      const holiday = CLOSED_DAY_HOLIDAYS.find(h => h.name === holidayName)
+      if (holiday && holiday.month === month && holiday.day === day) return true
+    }
+  }
+
+  // Check vacations
+  const vacations = (schedule.vacations || []) as { start: string; end: string }[]
+  if (vacations.some(v => dateStr >= v.start && dateStr <= v.end)) return true
+
+  const d2 = new Date(dateStr + 'T00:00:00')
+  const dayName = d2.toLocaleDateString('en-US', { weekday: 'long' })
 
   const daySched = schedule[dayName] as DaySchedule | undefined
   if (!daySched) return false
