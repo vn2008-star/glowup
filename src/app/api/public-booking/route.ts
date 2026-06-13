@@ -283,18 +283,26 @@ export async function POST(request: Request) {
   // Use the first appointment for notification timing, but list all services
   const allServiceNames = windows.map(w => serviceMap[w.service_id]?.name || 'Service').join(', ')
   const allStaffNames = [...new Set(windows.map(w => w.staff_id ? staffNameMap[w.staff_id] : null).filter(Boolean))].join(', ')
-  sendBookingConfirmations({
-    tenant,
-    appointment: appointments[0],
-    serviceName: allServiceNames,
-    staffName: allStaffNames,
-    clientName: client_name,
-    clientEmail: client_email || null,
-    clientPhone: client_phone || null,
-    clientId,
-    start: overallStart,
-    end: overallEnd,
-  }).catch(err => console.error('[public-booking] notification error:', err))
+  let notificationResult = 'pending'
+  try {
+    await sendBookingConfirmations({
+      tenant,
+      appointment: appointments[0],
+      serviceName: allServiceNames,
+      staffName: allStaffNames,
+      clientName: client_name,
+      clientEmail: client_email || null,
+      clientPhone: client_phone || null,
+      clientId,
+      start: overallStart,
+      end: overallEnd,
+    })
+    notificationResult = 'sent'
+  } catch (err: unknown) {
+    const e = err as Error
+    notificationResult = `FAILED: ${e.message}`
+    console.error('[public-booking] notification error:', e.message, e.stack)
+  }
 
   // ── Create reminders for ALL appointments ──
   if (clientId) {
@@ -317,7 +325,7 @@ export async function POST(request: Request) {
     }
   }
 
-  return NextResponse.json({ success: true, appointments })
+  return NextResponse.json({ success: true, appointments, notifications: notificationResult })
 }
 
 // PATCH: Update client birthday after booking (post-confirmation prompt)
