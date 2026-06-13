@@ -34,7 +34,7 @@ export default function BookingClient({ slug }: { slug: string }) {
 
   // Selections
   const [selectedServices, setSelectedServices] = useState<ServiceInfo[]>([])
-  const [selectedStaff, setSelectedStaff] = useState<StaffInfo | null>(null)
+  const [staffByService, setStaffByService] = useState<Record<string, StaffInfo | null>>({})
   const [selectedDate, setSelectedDate] = useState<string>('')
   const [selectedTime, setSelectedTime] = useState<string>('')
   const [calendarMonth, setCalendarMonth] = useState(() => {
@@ -47,13 +47,30 @@ export default function BookingClient({ slug }: { slug: string }) {
   const [clientNotes, setClientNotes] = useState('')
   const [clientBirthday, setClientBirthday] = useState('')
 
+  // Helper: get staff assigned to a specific service (null = Any Available)
+  const getStaffForService = (serviceId: string): StaffInfo | null => staffByService[serviceId] ?? null
+
+  // Helper: are all services assigned to the same staff?
+  const allSameStaff = useMemo(() => {
+    if (selectedServices.length === 0) return true
+    const firstId = staffByService[selectedServices[0].id]?.id || null
+    return selectedServices.every(s => (staffByService[s.id]?.id || null) === firstId)
+  }, [selectedServices, staffByService])
+
+  // The "primary" staff for slot generation (used when all same staff)
+  const primaryStaff = useMemo(() => {
+    if (selectedServices.length === 0) return null
+    return staffByService[selectedServices[0].id] ?? null
+  }, [selectedServices, staffByService])
+
   // Computed cart totals
   const totalDuration = useMemo(() => {
     return selectedServices.reduce((sum, s) => {
-      if (selectedStaff?.service_durations?.[s.id]) return sum + selectedStaff.service_durations[s.id]
+      const st = staffByService[s.id]
+      if (st?.service_durations?.[s.id]) return sum + st.service_durations[s.id]
       return sum + s.duration_minutes
     }, 0)
-  }, [selectedServices, selectedStaff])
+  }, [selectedServices, staffByService])
 
   const totalPrice = useMemo(() => {
     return selectedServices.reduce((sum, s) => sum + s.price, 0)
@@ -61,6 +78,14 @@ export default function BookingClient({ slug }: { slug: string }) {
 
   // Effective duration used for time slot calculation (total of all services)
   const effectiveDuration = totalDuration
+
+  // Subtitle helper for staff display
+  const staffSubtitle = useMemo(() => {
+    if (selectedServices.length === 0) return ''
+    if (allSameStaff) return primaryStaff ? ` with ${primaryStaff.name}` : ''
+    const names = [...new Set(selectedServices.map(s => staffByService[s.id]?.name || 'Any').filter(Boolean))]
+    return ` with ${names.join(' & ')}`
+  }, [selectedServices, staffByService, allSameStaff, primaryStaff])
 
   // Fetch business data
   useEffect(() => {
@@ -116,91 +141,123 @@ export default function BookingClient({ slug }: { slug: string }) {
 
     if (hours?.closed) return []
 
-    const staffDaySched = selectedStaff?.schedule?.[dayName] as
-      { open?: string; close?: string; off?: boolean; useSlots?: boolean; slots?: { start: string; end: string }[] } | undefined
+    // Check if ANY assigned staff is off this day (if all same staff, check primary)
+    // For per-service staff, we check each individually below
+    const openStr = hours?.open || '09:00'
+    const closeStr = hours?.close || '18:00'
+    const [openH, openM] = openStr.split(':').map(Number)
+    const [closeH, closeM] = closeStr.split(':').map(Number)
+    const openMinutes = openH * 60 + openM
+    const closeMinutes = closeH * 60 + closeM
 
-    if (selectedStaff && isStaffOffOnDate(selectedStaff.schedule as Record<string, unknown>, selectedDate)) return [] // Staff is off this day
+    // Build per-service windows for a given start time (in minutes from midnight)
+    function buildWindows(startMinute: number) {
+      const wins: { service: ServiceInfo; staffMember: StaffInfo | null; startMin: number; endMin: number }[] = []
+      let cursor = startMinute
+      for (const svc of selectedServices) {
+        const st = staffByService[svc.id] ?? null
+        const dur = st?.service_durations?.[svc.id] || svc.duration_minutes
+        wins.push({ service: svc, staffMember: st, startMin: cursor, endMin: cursor + dur })
+        cursor += dur
+      }
+      return wins
+    }
+
+    // Check if a set of windows has no booking conflicts
+    function isAvailable(candidateStartMin: number) {
+      const windows = buildWindows(candidateStartMin)
+      const lastEnd = windows[windows.length - 1].endMin
+      if (lastEnd > closeMinutes) return false
+
+      for (const w of windows) {
+        // Check staff off day
+        if (w.staffMember && isStaffOffOnDate(w.staffMember.schedule as Record<string, unknown>, selectedDate)) return false
+
+        // Check staff schedule (custom open/close or off)
+        if (w.staffMember) {
+          const stSched = w.staffMember.schedule?.[dayName] as { off?: boolean; open?: string; close?: string } | undefined
+          if (stSched?.off) return false
+          // Check within staff open/close
+          if (stSched?.open) {
+            const [soH, soM] = stSched.open.split(':').map(Number)
+            if (w.startMin < soH * 60 + soM) return false
+          }
+          if (stSched?.close) {
+            const [scH, scM] = stSched.close.split(':').map(Number)
+            if (w.endMin > scH * 60 + scM) return false
+          }
+        }
+
+        // Check booked slot conflicts for this service's window
+        const wStartUTC = localToUTC(selectedDate, `${String(Math.floor(w.startMin / 60)).padStart(2, '0')}:${String(w.startMin % 60).padStart(2, '0')}`, salonTz).getTime()
+        const wEndUTC = localToUTC(selectedDate, `${String(Math.floor(w.endMin / 60)).padStart(2, '0')}:${String(w.endMin % 60).padStart(2, '0')}`, salonTz).getTime()
+
+        const hasConflict = bookedSlots.some(b => {
+          // Only check bookings for this specific staff member
+          if (w.staffMember && b.staff_id !== w.staffMember.id) return false
+          if (!w.staffMember) return false // "Any Available" — skip conflict check (simplified)
+          const bStartMs = new Date(b.start).getTime()
+          const bEndMs = new Date(b.end).getTime()
+          return wStartUTC < bEndMs && wEndUTC > bStartMs
+        })
+        if (hasConflict) return false
+      }
+      return true
+    }
 
     const slots: string[] = []
 
-    // Determine which staff schedule(s) to use for slot generation.
-    // When "Any Available" is selected, aggregate custom slots from all staff.
-    const staffWithSlots = selectedStaff
-      ? (staffDaySched?.useSlots && staffDaySched.slots?.length ? [{ staff: selectedStaff, sched: staffDaySched }] : [])
-      : staff
-          .map(s => {
-            const sd = s.schedule?.[dayName] as typeof staffDaySched
-            return { staff: s, sched: sd }
-          })
-          .filter(x => x.sched?.useSlots && x.sched.slots && x.sched.slots.length > 0 && !isStaffOffOnDate(x.staff.schedule as Record<string, unknown>, selectedDate))
+    // Determine candidate start times
+    // Use custom slots from the first service's staff if available, otherwise 30-min increments
+    const firstStaff = staffByService[selectedServices[0].id] ?? null
+    const firstStaffSched = firstStaff?.schedule?.[dayName] as
+      { open?: string; close?: string; useSlots?: boolean; slots?: { start: string; end: string }[] } | undefined
 
-    if (staffWithSlots.length > 0) {
-      // Use custom slots — collect unique start times across all matching staff.
-      // Determine the day's close time so multi-service bookings can span beyond a single slot window.
-      const dayCloseStr = staffDaySched?.close || hours?.close || '18:00'
-      const [dayCloseH, dayCloseM] = dayCloseStr.split(':').map(Number)
-      const dayCloseMin = dayCloseH * 60 + dayCloseM
+    const useCustomSlots = firstStaffSched?.useSlots && firstStaffSched.slots?.length
+    // Also gather custom slots from all staff if "Any Available" is selected for first service
+    const allCustomSlots: string[] = []
 
-      const seen = new Set<string>()
-      for (const { staff: st, sched } of staffWithSlots) {
-        for (const sl of sched!.slots!) {
-          const [sH, sM] = sl.start.split(':').map(Number)
-          const startMin = sH * 60 + sM
-
-          // Check that the appointment (start + totalDuration) fits within the day's close time
-          if (startMin + effectiveDuration > dayCloseMin) continue
-
-          const time = sl.start
-          if (seen.has(time)) continue
-
-          const slotStartUTC = localToUTC(selectedDate, time, salonTz).getTime()
-          const slotEndUTC = slotStartUTC + effectiveDuration * 60 * 1000
-
-          const isBooked = bookedSlots.some(b => {
-            if (selectedStaff && b.staff_id !== selectedStaff.id) return false
-            // For "Any Available", check if at least one staff member is free
-            if (!selectedStaff && b.staff_id === st.id) {
-              const bStartMs = new Date(b.start).getTime()
-              const bEndMs = new Date(b.end).getTime()
-              return slotStartUTC < bEndMs && slotEndUTC > bStartMs
-            }
-            if (!selectedStaff) return false
-            const bStartMs = new Date(b.start).getTime()
-            const bEndMs = new Date(b.end).getTime()
-            return slotStartUTC < bEndMs && slotEndUTC > bStartMs
-          })
-
-          if (!isBooked) { slots.push(time); seen.add(time) }
+    if (useCustomSlots) {
+      for (const sl of firstStaffSched!.slots!) {
+        allCustomSlots.push(sl.start)
+      }
+    } else if (!firstStaff) {
+      // "Any Available" for first service — gather all custom slot start times from all staff
+      for (const s of staff) {
+        if (isStaffOffOnDate(s.schedule as Record<string, unknown>, selectedDate)) continue
+        const sSched = s.schedule?.[dayName] as typeof firstStaffSched
+        if (sSched?.useSlots && sSched.slots?.length) {
+          for (const sl of sSched.slots) {
+            if (!allCustomSlots.includes(sl.start)) allCustomSlots.push(sl.start)
+          }
         }
+      }
+    }
+
+    if (allCustomSlots.length > 0) {
+      // Use custom slot start times as candidates
+      for (const time of allCustomSlots) {
+        const [h, m] = time.split(':').map(Number)
+        if (isAvailable(h * 60 + m)) slots.push(time)
       }
       slots.sort()
     } else {
-      // No custom slots — generate 30-min increment slots from business/staff hours
-      const openStr = staffDaySched?.open || hours?.open || '09:00'
-      const closeStr = staffDaySched?.close || hours?.close || '18:00'
-      const [openH, openM] = openStr.split(':').map(Number)
-      const [closeH, closeM] = closeStr.split(':').map(Number)
-      const openMinutes = openH * 60 + openM
-      const closeMinutes = closeH * 60 + closeM
+      // No custom slots — generate 30-min increment candidates
+      const effOpen = firstStaffSched?.open || openStr
+      const effClose = firstStaffSched?.close || closeStr
+      const [eOpenH, eOpenM] = effOpen.split(':').map(Number)
+      const [eCloseH, eCloseM] = effClose.split(':').map(Number)
+      const effOpenMin = eOpenH * 60 + eOpenM
+      const effCloseMin = eCloseH * 60 + eCloseM
 
-      for (let m = openMinutes; m + effectiveDuration <= closeMinutes; m += 30) {
+      for (let m = effOpenMin; m + effectiveDuration <= effCloseMin; m += 30) {
         const h = Math.floor(m / 60)
         const min = m % 60
         const time = `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`
-
-        const slotStartUTC = localToUTC(selectedDate, time, salonTz).getTime()
-        const slotEndUTC = slotStartUTC + effectiveDuration * 60 * 1000
-
-        const isBooked = bookedSlots.some(b => {
-          if (selectedStaff && b.staff_id !== selectedStaff.id) return false
-          const bStartMs = new Date(b.start).getTime()
-          const bEndMs = new Date(b.end).getTime()
-          return slotStartUTC < bEndMs && slotEndUTC > bStartMs
-        })
-
-        if (!isBooked) slots.push(time)
+        if (isAvailable(m)) slots.push(time)
       }
     }
+
     // Filter out past time slots if the selected date is today (in the salon's timezone)
     const salonNow = nowInTz(salonTz)
     const isToday = selectedDate === salonNow.dateStr
@@ -211,7 +268,7 @@ export default function BookingClient({ slug }: { slug: string }) {
         })
       : slots
     return filtered
-  }, [selectedDate, selectedServices, selectedStaff, bookedSlots, business, effectiveDuration, salonTz, staff])
+  }, [selectedDate, selectedServices, staffByService, bookedSlots, business, effectiveDuration, salonTz, staff])
 
   // Check if a specific date is available for booking
   const isDateAvailable = useMemo(() => {
@@ -233,12 +290,14 @@ export default function BookingClient({ slug }: { slug: string }) {
         business?.customClosedDates || [],
         dateStr,
       )) return false
-      if (selectedStaff) {
-        if (isStaffOffOnDate(selectedStaff.schedule as Record<string, unknown>, dateStr)) return false
+      // Check if any assigned staff is off on this day
+      for (const svc of selectedServices) {
+        const st = staffByService[svc.id]
+        if (st && isStaffOffOnDate(st.schedule as Record<string, unknown>, dateStr)) return false
       }
       return true
     }
-  }, [business, selectedStaff, salonTz])
+  }, [business, staffByService, selectedServices, salonTz])
 
   // Generate calendar grid for a given month
   const calendarDays = useMemo(() => {
@@ -267,11 +326,15 @@ export default function BookingClient({ slug }: { slug: string }) {
       // Convert salon-local date+time to UTC using the salon's timezone
       const utcStart = localToUTC(selectedDate, selectedTime, salonTz)
 
-      // Build per-service items with effective durations
-      const serviceItems = selectedServices.map(s => ({
-        service_id: s.id,
-        duration_minutes: selectedStaff?.service_durations?.[s.id] || s.duration_minutes,
-      }))
+      // Build per-service items with effective durations and per-service staff
+      const serviceItems = selectedServices.map(s => {
+        const st = staffByService[s.id] ?? null
+        return {
+          service_id: s.id,
+          staff_id: st?.id || null,
+          duration_minutes: st?.service_durations?.[s.id] || s.duration_minutes,
+        }
+      })
 
       const res = await fetch('/api/public-booking', {
         method: 'POST',
@@ -279,7 +342,6 @@ export default function BookingClient({ slug }: { slug: string }) {
         body: JSON.stringify({
           slug,
           services: serviceItems,
-          staff_id: selectedStaff?.id || null,
           start_time: utcStart.toISOString(),
           client_name: clientName,
           client_email: clientEmail,
@@ -355,30 +417,28 @@ export default function BookingClient({ slug }: { slug: string }) {
         <h2>Booking Confirmed!</h2>
         <p className={styles.successBusiness}>{business.name}</p>
         <div className={styles.successDetails}>
-          {selectedServices.map((s, i) => (
-            <div key={i} className={styles.successRow}>
-              <span>{selectedServices.length > 1 ? `Service ${i + 1}` : 'Service'}</span>
-              <strong>{s.name}</strong>
-            </div>
-          ))}
-          {selectedStaff && (
-            <div className={styles.successRow}>
-              <span>With</span>
-              <strong>{selectedStaff.name}</strong>
-            </div>
-          )}
+          {selectedServices.map((s, i) => {
+            const st = staffByService[s.id]
+            return (
+              <div key={i} className={styles.successRow}>
+                <span>{s.name}{st ? ` with ${st.name}` : ''}</span>
+                <strong>{(st?.service_durations?.[s.id] || s.duration_minutes) + ' min'}</strong>
+              </div>
+            )
+          })}
+
           <div className={styles.successRow}>
             <span>Date & Time</span>
             <strong>{bookedTime}</strong>
           </div>
           <div className={styles.successRow}>
             <span>Total Duration</span>
-            <strong>{effectiveDuration} minutes</strong>
+            <strong>{totalDuration} minutes</strong>
           </div>
           {selectedServices.length > 1 && (
             <div className={styles.successRow}>
               <span>Total</span>
-              <strong>${selectedServices.reduce((acc, s) => acc + s.price, 0)}</strong>
+              <strong>${totalPrice}</strong>
             </div>
           )}
         </div>
@@ -524,8 +584,13 @@ export default function BookingClient({ slug }: { slug: string }) {
                     <button
                       className={styles.cartContinue}
                       onClick={() => {
-                        if (staff.length === 1) { setSelectedStaff(staff[0]); setStep(2) }
-                        else { setStep(1) }
+                        if (staff.length === 1) {
+                          // Auto-assign single staff to all services
+                          const map: Record<string, StaffInfo | null> = {}
+                          selectedServices.forEach(s => { map[s.id] = staff[0] })
+                          setStaffByService(map)
+                          setStep(2)
+                        } else { setStep(1) }
                       }}
                     >
                       Continue →
@@ -539,32 +604,41 @@ export default function BookingClient({ slug }: { slug: string }) {
           {/* ── Step 1: Choose Staff ── */}
           {step === 1 && (
             <div className={styles.stepPanel}>
-              <h2 className={styles.stepTitle}>Choose a Stylist</h2>
-              <p className={styles.stepSubtitle}>Who would you like to see?</p>
-              <div className={styles.staffGrid}>
-                <button
-                  className={`${styles.staffCard} ${!selectedStaff ? styles.staffSelected : ''}`}
-                  onClick={() => { setSelectedStaff(null); setStep(2) }}
-                >
-                  <div className={styles.staffAvatar}>✨</div>
-                  <span className={styles.staffName}>Any Available</span>
-                  <span className={styles.staffSpecialty}>First available stylist</span>
-                </button>
-                {staff.map(s => (
-                  <button
-                    key={s.id}
-                    className={`${styles.staffCard} ${selectedStaff?.id === s.id ? styles.staffSelected : ''}`}
-                    onClick={() => { setSelectedStaff(s); setStep(2) }}
-                  >
-                    <div className={styles.staffAvatar}>{s.name.split(' ').map(n => n[0]).join('')}</div>
-                    <span className={styles.staffName}>{s.name}</span>
-                    {s.specialties?.length > 0 && (
-                      <span className={styles.staffSpecialty}>{[...new Set(s.specialties)].slice(0, 2).join(', ')}</span>
-                    )}
-                  </button>
-                ))}
+              <h2 className={styles.stepTitle}>Choose Your Stylists</h2>
+              <p className={styles.stepSubtitle}>Pick a stylist for each service</p>
+
+              {selectedServices.map(svc => {
+                const currentStaff = getStaffForService(svc.id)
+                return (
+                  <div key={svc.id} className={styles.staffSection}>
+                    <h3 className={styles.staffSectionTitle}>{svc.name} <span className={styles.staffSectionMeta}>{svc.duration_minutes} min</span></h3>
+                    <div className={styles.staffGrid}>
+                      <button
+                        className={`${styles.staffCard} ${!currentStaff ? styles.staffSelected : ''}`}
+                        onClick={() => setStaffByService(prev => ({ ...prev, [svc.id]: null }))}
+                      >
+                        <div className={styles.staffAvatar}>✨</div>
+                        <span className={styles.staffName}>Any Available</span>
+                      </button>
+                      {staff.map(s => (
+                        <button
+                          key={s.id}
+                          className={`${styles.staffCard} ${currentStaff?.id === s.id ? styles.staffSelected : ''}`}
+                          onClick={() => setStaffByService(prev => ({ ...prev, [svc.id]: s }))}
+                        >
+                          <div className={styles.staffAvatar}>{s.name.split(' ').map(n => n[0]).join('')}</div>
+                          <span className={styles.staffName}>{s.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+
+              <div className={styles.stepActions}>
+                <button className={styles.backBtn} onClick={() => setStep(0)}>← Back</button>
+                <button className={styles.nextBtn} onClick={() => setStep(2)}>Continue →</button>
               </div>
-              <button className={styles.backBtn} onClick={() => setStep(0)}>← Back</button>
             </div>
           )}
 
@@ -572,7 +646,7 @@ export default function BookingClient({ slug }: { slug: string }) {
           {step === 2 && (
             <div className={styles.stepPanel}>
               <h2 className={styles.stepTitle}>Pick a Date & Time</h2>
-              <p className={styles.stepSubtitle}>{selectedServices.map(s => s.name).join(', ')} • {totalDuration} min{selectedStaff ? ` with ${selectedStaff.name}` : ''}</p>
+              <p className={styles.stepSubtitle}>{selectedServices.map(s => s.name).join(', ')} • {totalDuration} min{staffSubtitle}</p>
 
               {/* Calendar */}
               <div className={styles.calendar}>
@@ -699,19 +773,18 @@ export default function BookingClient({ slug }: { slug: string }) {
               <p className={styles.stepSubtitle}>Please review your appointment details</p>
 
               <div className={styles.summaryCard}>
-                {/* Individual services */}
-                {selectedServices.map((s, i) => (
-                  <div key={i} className={styles.summaryRow}>
-                    <span className={styles.summaryLabel}>{s.name}</span>
-                    <span className={styles.summaryValue}>
-                      {selectedStaff?.service_durations?.[s.id] || s.duration_minutes} min · ${s.price}
-                    </span>
-                  </div>
-                ))}
-                <div className={styles.summaryRow}>
-                  <span className={styles.summaryLabel}>Stylist</span>
-                  <span className={styles.summaryValue}>{selectedStaff?.name || 'Any Available'}</span>
-                </div>
+                {/* Individual services with per-service staff */}
+                {selectedServices.map((s, i) => {
+                  const st = staffByService[s.id]
+                  return (
+                    <div key={i} className={styles.summaryRow}>
+                      <span className={styles.summaryLabel}>{s.name}{st ? ` · ${st.name}` : ''}</span>
+                      <span className={styles.summaryValue}>
+                        {st?.service_durations?.[s.id] || s.duration_minutes} min · ${s.price}
+                      </span>
+                    </div>
+                  )
+                })}
                 <div className={styles.summaryRow}>
                   <span className={styles.summaryLabel}>Date</span>
                   <span className={styles.summaryValue}>

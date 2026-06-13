@@ -379,6 +379,52 @@
   text-align: center;
 }
 
+/* Per-service staff sections */
+.staffSection {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid #2a2a3d;
+}
+.staffSection:last-of-type {
+  border-bottom: none;
+  margin-bottom: 0.5rem;
+}
+.staffSectionTitle {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #f0f0f5;
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.staffSectionMeta {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #8b8b9e;
+}
+.nextBtn {
+  padding: 0.75rem 1.5rem;
+  background: linear-gradient(135deg, #c37eda, #e8a87c);
+  border: none;
+  border-radius: 12px;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.nextBtn:hover {
+  box-shadow: 0 4px 20px rgba(195, 126, 218, 0.35);
+  transform: translateY(-1px);
+}
+.stepActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 1.5rem;
+}
+
 /* ── Step 2: Calendar ── */
 .calendar {
   background: #1a1a28;

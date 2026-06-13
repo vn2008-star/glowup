@@ -107,11 +107,11 @@ export async function POST(request: Request) {
   const { slug, staff_id, start_time, client_name, client_email, client_phone, notes, client_birthday } = body
 
   // Build the services array: either from new batch format or legacy single-service
-  let serviceItems: { service_id: string; duration_minutes: number }[]
+  let serviceItems: { service_id: string; staff_id?: string | null; duration_minutes: number }[]
   if (body.services && Array.isArray(body.services) && body.services.length > 0) {
     serviceItems = body.services
   } else if (body.service_id) {
-    serviceItems = [{ service_id: body.service_id, duration_minutes: body.duration_minutes || 60 }]
+    serviceItems = [{ service_id: body.service_id, staff_id: body.staff_id || null, duration_minutes: body.duration_minutes || 60 }]
   } else {
     return NextResponse.json({ error: 'Missing service(s)' }, { status: 400 })
   }
@@ -131,28 +131,40 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Business not found' }, { status: 404 })
   }
 
-  // ── Compute back-to-back time windows ──
+  // ── Compute back-to-back time windows (with per-service staff) ──
   const overallStart = new Date(start_time)
-  const windows: { service_id: string; start: Date; end: Date }[] = []
+  // Fall back to top-level staff_id for legacy single-service requests
+  const globalStaffId = body.staff_id || null
+  const windows: { service_id: string; staff_id: string | null; start: Date; end: Date }[] = []
   let cursor = overallStart.getTime()
   for (const item of serviceItems) {
     const s = new Date(cursor)
     const e = new Date(cursor + (item.duration_minutes || 60) * 60 * 1000)
-    windows.push({ service_id: item.service_id, start: s, end: e })
+    windows.push({ service_id: item.service_id, staff_id: item.staff_id || globalStaffId, start: s, end: e })
     cursor = e.getTime()
   }
   const overallEnd = new Date(cursor)
 
-  // ── Server-side double-booking prevention (check entire combined window) ──
-  if (staff_id) {
+  // ── Server-side double-booking prevention (per-staff conflict check) ──
+  // Group windows by staff_id and check each staff's appointments
+  const staffWindows = new Map<string, { start: Date; end: Date }[]>()
+  for (const w of windows) {
+    if (!w.staff_id) continue
+    if (!staffWindows.has(w.staff_id)) staffWindows.set(w.staff_id, [])
+    staffWindows.get(w.staff_id)!.push({ start: w.start, end: w.end })
+  }
+  for (const [sid, wins] of staffWindows) {
+    // Find the overall window for this staff member
+    const staffStart = wins.reduce((min, w) => w.start < min ? w.start : min, wins[0].start)
+    const staffEnd = wins.reduce((max, w) => w.end > max ? w.end : max, wins[0].end)
     const { data: conflicts } = await svc
       .from('appointments')
       .select('id')
       .eq('tenant_id', tenant.id)
-      .eq('staff_id', staff_id)
+      .eq('staff_id', sid)
       .in('status', ['pending', 'confirmed'])
-      .lt('start_time', overallEnd.toISOString())
-      .gt('end_time', overallStart.toISOString())
+      .lt('start_time', staffEnd.toISOString())
+      .gt('end_time', staffStart.toISOString())
       .limit(1)
 
     if (conflicts && conflicts.length > 0) {
@@ -231,23 +243,25 @@ export async function POST(request: Request) {
     serviceMap[sr.id] = { name: sr.name, price: sr.price }
   }
 
-  // Get staff name if assigned
-  let staffName = ''
-  if (staff_id) {
-    const { data: staffRow } = await svc
+  // Get staff names for all unique staff_ids
+  const uniqueStaffIds = [...new Set(windows.map(w => w.staff_id).filter(Boolean))] as string[]
+  const staffNameMap: Record<string, string> = {}
+  if (uniqueStaffIds.length > 0) {
+    const { data: staffRows } = await svc
       .from('staff')
-      .select('name')
-      .eq('id', staff_id)
-      .single()
-    staffName = staffRow?.name || ''
+      .select('id, name')
+      .in('id', uniqueStaffIds)
+    for (const sr of staffRows || []) {
+      staffNameMap[sr.id] = sr.name
+    }
   }
 
-  // Insert all appointments
+  // Insert all appointments (with per-service staff_id)
   const appointmentRows = windows.map(w => ({
     tenant_id: tenant.id,
     client_id: clientId,
     service_id: w.service_id,
-    staff_id: staff_id || null,
+    staff_id: w.staff_id || null,
     start_time: w.start.toISOString(),
     end_time: w.end.toISOString(),
     status: 'confirmed',
@@ -267,11 +281,12 @@ export async function POST(request: Request) {
   // ── Send instant booking confirmation notifications ──
   // Use the first appointment for notification timing, but list all services
   const allServiceNames = windows.map(w => serviceMap[w.service_id]?.name || 'Service').join(', ')
+  const allStaffNames = [...new Set(windows.map(w => w.staff_id ? staffNameMap[w.staff_id] : null).filter(Boolean))].join(', ')
   sendBookingConfirmations({
     tenant,
     appointment: appointments[0],
     serviceName: allServiceNames,
-    staffName,
+    staffName: allStaffNames,
     clientName: client_name,
     clientEmail: client_email || null,
     clientPhone: client_phone || null,
