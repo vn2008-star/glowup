@@ -374,15 +374,24 @@ async function sendBookingConfirmations(opts: {
   let ownerFallbackEmail = ''
   let ownerFallbackPhone = ''
   if (!tenant.email || !tenant.phone) {
-    const { data: ownerStaff } = await svc
-      .from('staff')
-      .select('email, phone')
-      .eq('tenant_id', tenant.id)
-      .eq('role', 'owner')
-      .single()
-    if (ownerStaff) {
-      ownerFallbackEmail = ownerStaff.email || ''
-      ownerFallbackPhone = ownerStaff.phone || ''
+    try {
+      const { createClient } = await import('@supabase/supabase-js')
+      const fallbackSvc = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      )
+      const { data: ownerStaff } = await fallbackSvc
+        .from('staff')
+        .select('email, phone')
+        .eq('tenant_id', tenant.id)
+        .eq('role', 'owner')
+        .single()
+      if (ownerStaff) {
+        ownerFallbackEmail = ownerStaff.email || ''
+        ownerFallbackPhone = ownerStaff.phone || ''
+      }
+    } catch (err) {
+      console.error('[public-booking] Owner fallback lookup failed:', err)
     }
   }
 
