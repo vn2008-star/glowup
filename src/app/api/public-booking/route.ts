@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { waitUntil } from '@vercel/functions'
 import { createClient } from '@supabase/supabase-js'
 import { timezoneFromAddress, DEFAULT_TZ } from '@/lib/tz'
 import { toE164 } from '@/lib/utils'
@@ -284,7 +285,8 @@ export async function POST(request: Request) {
   const allServiceNames = windows.map(w => serviceMap[w.service_id]?.name || 'Service').join(', ')
   const allStaffNames = [...new Set(windows.map(w => w.staff_id ? staffNameMap[w.staff_id] : null).filter(Boolean))].join(', ')
   // Fire-and-forget: send notifications in the background so the client sees confirmation instantly
-  sendBookingConfirmations({
+  // Use waitUntil so Vercel keeps the function alive until notifications complete
+  const notificationPromise = sendBookingConfirmations({
     tenant,
     appointment: appointments[0],
     serviceName: allServiceNames,
@@ -317,6 +319,9 @@ export async function POST(request: Request) {
       }
     }
   }
+
+  // Keep Vercel function alive until notifications finish
+  try { waitUntil(notificationPromise) } catch { /* local dev — no waitUntil */ }
 
   return NextResponse.json({ success: true, appointments })
 }
@@ -428,7 +433,8 @@ async function sendBookingConfirmations(opts: {
     const token = process.env.TWILIO_AUTH_TOKEN!
     const from = process.env.TWILIO_PHONE_NUMBER!
     const url = `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`
-    const auth = Buffer.from(`${sid}:${token}`).toString('base64')
+    const auth = btoa(`${sid}:${token}`)
+    console.log(`[public-booking] Sending SMS to ${to} from ${from}`)
     const res = await fetch(url, {
       method: 'POST',
       headers: {
@@ -442,6 +448,8 @@ async function sendBookingConfirmations(opts: {
       console.error(`[public-booking] Twilio API error (${res.status}): ${errBody}`)
       return false
     }
+    const result = await res.json()
+    console.log(`[public-booking] Twilio SMS queued: sid=${result.sid} status=${result.status}`)
     return true
   }
 
