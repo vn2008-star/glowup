@@ -396,7 +396,7 @@ export default function SettingsPage() {
           {/* Custom Slug Editor */}
           <div style={{ marginTop: "var(--space-4)", padding: "var(--space-4)", background: "rgba(255,255,255,0.03)", borderRadius: 10, border: "1px solid rgba(255,255,255,0.06)" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-2)" }}>
-              <label className="label" style={{ margin: 0 }}>Custom URL Slug</label>
+              <label className="label" style={{ margin: 0 }}>Custom URL</label>
               {!editingSlug && (
                 <button
                   className="btn btn-secondary"
@@ -423,8 +423,8 @@ export default function SettingsPage() {
                       setSlugDraft(val);
                       setSlugError('');
                       setSlugSaved(false);
-                      if (val.length < 3) setSlugError('Slug must be at least 3 characters');
-                      else if (val.length > 40) setSlugError('Slug must be 40 characters or less');
+                      if (val.length < 3) setSlugError('URL must be at least 3 characters');
+                      else if (val.length > 40) setSlugError('URL must be 40 characters or less');
                     }}
                     placeholder="your-custom-slug"
                     style={{ fontFamily: "var(--font-mono, monospace)", fontSize: "var(--text-sm)", flex: 1, minWidth: 160 }}
@@ -440,7 +440,7 @@ export default function SettingsPage() {
                 )}
                 {slugSaved && (
                   <p style={{ fontSize: "var(--text-xs)", color: "var(--color-success, #34d399)", marginTop: "var(--space-1)" }}>
-                    ✓ Slug updated! Your new booking link is active.
+                    ✓ URL updated! Your new booking link is active.
                   </p>
                 )}
                 <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-3)" }}>
@@ -460,9 +460,9 @@ export default function SettingsPage() {
                         if (!res.ok) {
                           const data = await res.json();
                           if (data?.error?.includes('unique') || data?.error?.includes('duplicate') || data?.error?.includes('slug')) {
-                            setSlugError('This slug is already taken. Try another one.');
+                            setSlugError('This URL is already taken. Try another one.');
                           } else {
-                            setSlugError(data?.error || 'Failed to update slug');
+                            setSlugError(data?.error || 'Failed to update URL');
                           }
                         } else {
                           setSlugSaved(true);
@@ -475,7 +475,7 @@ export default function SettingsPage() {
                       setSlugSaving(false);
                     }}
                   >
-                    {slugSaving ? "Saving..." : "Save Slug"}
+                    {slugSaving ? "Saving..." : "Save"}
                   </button>
                   <button
                     className="btn btn-secondary"
