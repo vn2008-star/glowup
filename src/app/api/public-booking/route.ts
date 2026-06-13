@@ -450,8 +450,9 @@ async function sendBookingConfirmations(opts: {
           to: clientE164,
         })
         console.log(`[public-booking] ✅ Confirmation SMS sent to client ${clientE164}`)
-      } catch (err) {
-        console.error(`[public-booking] SMS to client failed:`, err)
+      } catch (err: unknown) {
+        const e = err as { code?: number; moreInfo?: string; message?: string }
+        console.error(`[public-booking] SMS to client FAILED: code=${e.code} msg="${e.message}" info=${e.moreInfo}`)
       }
     } else if (!clientE164) {
       console.warn(`[public-booking] ⚠️ Could not normalize client phone: "${clientPhone}"`)
@@ -517,8 +518,9 @@ async function sendBookingConfirmations(opts: {
           to: ownerE164,
         })
         console.log(`[public-booking] ✅ Owner SMS sent to ${ownerE164}`)
-      } catch (err) {
-        console.error(`[public-booking] SMS to owner failed:`, err)
+      } catch (err: unknown) {
+        const e = err as { code?: number; moreInfo?: string; message?: string }
+        console.error(`[public-booking] SMS to owner FAILED: code=${e.code} msg="${e.message}" info=${e.moreInfo}`)
       }
     } else if (!ownerE164) {
       console.warn(`[public-booking] ⚠️ Could not normalize owner phone: "${businessPhone}"`)
