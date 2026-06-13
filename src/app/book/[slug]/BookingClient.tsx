@@ -135,14 +135,20 @@ export default function BookingClient({ slug }: { slug: string }) {
           .filter(x => x.sched?.useSlots && x.sched.slots && x.sched.slots.length > 0 && !isStaffOffOnDate(x.staff.schedule as Record<string, unknown>, selectedDate))
 
     if (staffWithSlots.length > 0) {
-      // Use custom slots — collect unique start times across all matching staff
+      // Use custom slots — collect unique start times across all matching staff.
+      // Determine the day's close time so multi-service bookings can span beyond a single slot window.
+      const dayCloseStr = staffDaySched?.close || hours?.close || '18:00'
+      const [dayCloseH, dayCloseM] = dayCloseStr.split(':').map(Number)
+      const dayCloseMin = dayCloseH * 60 + dayCloseM
+
       const seen = new Set<string>()
       for (const { staff: st, sched } of staffWithSlots) {
         for (const sl of sched!.slots!) {
           const [sH, sM] = sl.start.split(':').map(Number)
-          const [eH, eM] = sl.end.split(':').map(Number)
-          const slotDurationMin = (eH * 60 + eM) - (sH * 60 + sM)
-          if (slotDurationMin < effectiveDuration) continue
+          const startMin = sH * 60 + sM
+
+          // Check that the appointment (start + totalDuration) fits within the day's close time
+          if (startMin + effectiveDuration > dayCloseMin) continue
 
           const time = sl.start
           if (seen.has(time)) continue
