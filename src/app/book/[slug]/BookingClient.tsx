@@ -483,6 +483,21 @@ export default function BookingClient({ slug }: { slug: string }) {
         <p className={styles.successNote}>
           {business.phone ? `Questions? Call ${business.phone}` : 'We look forward to seeing you!'}
         </p>
+        <button
+          className={styles.bookAnotherBtn}
+          onClick={() => {
+            setBooked(false)
+            setSelectedServices([])
+            setStaffByService({})
+            setSelectedDate('')
+            setSelectedTime('')
+            setClientNotes('')
+            setBookedTime('')
+            setStep(0)
+          }}
+        >
+          📅 Book Another Appointment
+        </button>
 
         {/* Ambassador Nudge */}
         <a href="https://glowup-jade.vercel.app/auth/signup" className={styles.ambassadorCard} target="_blank" rel="noopener noreferrer">

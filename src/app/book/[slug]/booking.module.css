@@ -973,6 +973,26 @@
   text-align: center;
   margin: 1rem 0;
 }
+.bookAnotherBtn {
+  display: block;
+  width: 100%;
+  padding: 0.85rem 1.5rem;
+  background: transparent;
+  border: 2px solid rgba(195, 126, 218, 0.4);
+  border-radius: 12px;
+  color: #c37eda;
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin: 1rem 0;
+}
+.bookAnotherBtn:hover {
+  background: rgba(195, 126, 218, 0.08);
+  border-color: #c37eda;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(195, 126, 218, 0.2);
+}
 
 /* ── Responsive ── */
 @media (max-width: 480px) {
