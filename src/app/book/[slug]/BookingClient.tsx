@@ -550,6 +550,35 @@ export default function BookingClient({ slug }: { slug: string }) {
             <div className={styles.stepPanel}>
               <h2 className={styles.stepTitle}>Choose Your Services</h2>
               <p className={styles.stepSubtitle}>Select one or more services for your visit</p>
+
+              {/* Cart Bar (top) */}
+              {selectedServices.length > 0 && (
+                <div className={styles.cartBar}>
+                  <div className={styles.cartInfo}>
+                    <span className={styles.cartBadge}>{selectedServices.length}</span>
+                    <span className={styles.cartText}>
+                      {selectedServices.length === 1 ? '1 service' : `${selectedServices.length} services`} · {totalDuration} min
+                    </span>
+                  </div>
+                  <div className={styles.cartRight}>
+                    <span className={styles.cartTotal}>${totalPrice}</span>
+                    <button
+                      className={styles.cartContinue}
+                      onClick={() => {
+                        if (staff.length === 1) {
+                          const map: Record<string, StaffInfo | null> = {}
+                          selectedServices.forEach(s => { map[s.id] = staff[0] })
+                          setStaffByService(map)
+                          setStep(2)
+                        } else { setStep(1) }
+                      }}
+                    >
+                      Continue →
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {Object.entries(servicesByCategory).map(([category, svcs]) => (
                 <div key={category} className={styles.serviceCategory}>
                   <h3 className={styles.categoryName}>{category}</h3>
@@ -584,35 +613,6 @@ export default function BookingClient({ slug }: { slug: string }) {
                   </div>
                 </div>
               ))}
-
-              {/* Floating Cart Bar */}
-              {selectedServices.length > 0 && (
-                <div className={styles.cartBar}>
-                  <div className={styles.cartInfo}>
-                    <span className={styles.cartBadge}>{selectedServices.length}</span>
-                    <span className={styles.cartText}>
-                      {selectedServices.length === 1 ? '1 service' : `${selectedServices.length} services`} · {totalDuration} min
-                    </span>
-                  </div>
-                  <div className={styles.cartRight}>
-                    <span className={styles.cartTotal}>${totalPrice}</span>
-                    <button
-                      className={styles.cartContinue}
-                      onClick={() => {
-                        if (staff.length === 1) {
-                          // Auto-assign single staff to all services
-                          const map: Record<string, StaffInfo | null> = {}
-                          selectedServices.forEach(s => { map[s.id] = staff[0] })
-                          setStaffByService(map)
-                          setStep(2)
-                        } else { setStep(1) }
-                      }}
-                    >
-                      Continue →
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
           )}
 
