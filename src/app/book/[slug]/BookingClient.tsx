@@ -500,7 +500,7 @@ export default function BookingClient({ slug }: { slug: string }) {
         </button>
 
         {/* Ambassador Nudge */}
-        <a href="https://glowup-jade.vercel.app/auth/signup" className={styles.ambassadorCard} target="_blank" rel="noopener noreferrer">
+        <a href="https://glowup-jade.vercel.app" className={styles.ambassadorCard} target="_blank" rel="noopener noreferrer">
           <span className={styles.ambassadorIcon}>✨</span>
           <div>
             <strong>Love easy online booking?</strong>
@@ -838,7 +838,7 @@ export default function BookingClient({ slug }: { slug: string }) {
 
         {/* Footer */}
         <div className={styles.footer}>
-          <a href="https://glowup-jade.vercel.app/auth/signup" target="_blank" rel="noopener noreferrer" className={styles.footerCta}>
+          <a href="https://glowup-jade.vercel.app" target="_blank" rel="noopener noreferrer" className={styles.footerCta}>
             Powered by <strong>GlowUp</strong> — <span className={styles.footerCtaHighlight}>Get it free for your salon →</span>
           </a>
         </div>
