@@ -101,11 +101,22 @@ export async function GET(request: Request) {
 }
 
 // POST: Create a booking (public — no auth)
+// Supports both single-service (legacy) and multi-service (batch) mode.
 export async function POST(request: Request) {
   const body = await request.json()
-  const { slug, service_id, staff_id, start_time, duration_minutes, client_name, client_email, client_phone, notes, client_birthday } = body
+  const { slug, staff_id, start_time, client_name, client_email, client_phone, notes, client_birthday } = body
 
-  if (!slug || !service_id || !start_time || !client_name) {
+  // Build the services array: either from new batch format or legacy single-service
+  let serviceItems: { service_id: string; duration_minutes: number }[]
+  if (body.services && Array.isArray(body.services) && body.services.length > 0) {
+    serviceItems = body.services
+  } else if (body.service_id) {
+    serviceItems = [{ service_id: body.service_id, duration_minutes: body.duration_minutes || 60 }]
+  } else {
+    return NextResponse.json({ error: 'Missing service(s)' }, { status: 400 })
+  }
+
+  if (!slug || !start_time || !client_name) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
@@ -120,10 +131,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Business not found' }, { status: 404 })
   }
 
-  // ── Server-side double-booking prevention ──
-  const start = new Date(start_time)
-  const end = new Date(start.getTime() + (duration_minutes || 60) * 60 * 1000)
+  // ── Compute back-to-back time windows ──
+  const overallStart = new Date(start_time)
+  const windows: { service_id: string; start: Date; end: Date }[] = []
+  let cursor = overallStart.getTime()
+  for (const item of serviceItems) {
+    const s = new Date(cursor)
+    const e = new Date(cursor + (item.duration_minutes || 60) * 60 * 1000)
+    windows.push({ service_id: item.service_id, start: s, end: e })
+    cursor = e.getTime()
+  }
+  const overallEnd = new Date(cursor)
 
+  // ── Server-side double-booking prevention (check entire combined window) ──
   if (staff_id) {
     const { data: conflicts } = await svc
       .from('appointments')
@@ -131,8 +151,8 @@ export async function POST(request: Request) {
       .eq('tenant_id', tenant.id)
       .eq('staff_id', staff_id)
       .in('status', ['pending', 'confirmed'])
-      .lt('start_time', end.toISOString())
-      .gt('end_time', start.toISOString())
+      .lt('start_time', overallEnd.toISOString())
+      .gt('end_time', overallStart.toISOString())
       .limit(1)
 
     if (conflicts && conflicts.length > 0) {
@@ -198,13 +218,18 @@ export async function POST(request: Request) {
       .eq('id', clientId)
   }
 
-  // Create the appointment
-  // Get service name + price
-  const { data: service } = await svc
+  // ── Create appointments (one per service, back-to-back) ──
+  // Fetch service details for all service_ids at once
+  const serviceIds = windows.map(w => w.service_id)
+  const { data: serviceRows } = await svc
     .from('services')
-    .select('name, price')
-    .eq('id', service_id)
-    .single()
+    .select('id, name, price')
+    .in('id', serviceIds)
+
+  const serviceMap: Record<string, { name: string; price: number }> = {}
+  for (const sr of serviceRows || []) {
+    serviceMap[sr.id] = { name: sr.name, price: sr.price }
+  }
 
   // Get staff name if assigned
   let staffName = ''
@@ -217,42 +242,66 @@ export async function POST(request: Request) {
     staffName = staffRow?.name || ''
   }
 
-  const { data: appointment, error } = await svc
-    .from('appointments')
-    .insert({
-      tenant_id: tenant.id,
-      client_id: clientId,
-      service_id,
-      staff_id: staff_id || null,
-      start_time: start.toISOString(),
-      end_time: end.toISOString(),
-      status: 'confirmed',
-      total_price: service?.price || 0,
-      notes: notes || null,
-    })
-    .select('id, start_time, end_time')
-    .single()
+  // Insert all appointments
+  const appointmentRows = windows.map(w => ({
+    tenant_id: tenant.id,
+    client_id: clientId,
+    service_id: w.service_id,
+    staff_id: staff_id || null,
+    start_time: w.start.toISOString(),
+    end_time: w.end.toISOString(),
+    status: 'confirmed',
+    total_price: serviceMap[w.service_id]?.price || 0,
+    notes: notes || null,
+  }))
 
-  if (error) {
+  const { data: appointments, error } = await svc
+    .from('appointments')
+    .insert(appointmentRows)
+    .select('id, start_time, end_time')
+
+  if (error || !appointments || appointments.length === 0) {
     return NextResponse.json({ error: 'Failed to create booking' }, { status: 500 })
   }
 
   // ── Send instant booking confirmation notifications ──
-  // Fire-and-forget: don't block the response on notification delivery
+  // Use the first appointment for notification timing, but list all services
+  const allServiceNames = windows.map(w => serviceMap[w.service_id]?.name || 'Service').join(', ')
   sendBookingConfirmations({
     tenant,
-    appointment,
-    serviceName: service?.name || 'your appointment',
+    appointment: appointments[0],
+    serviceName: allServiceNames,
     staffName,
     clientName: client_name,
     clientEmail: client_email || null,
     clientPhone: client_phone || null,
     clientId,
-    start,
-    end,
+    start: overallStart,
+    end: overallEnd,
   }).catch(err => console.error('[public-booking] notification error:', err))
 
-  return NextResponse.json({ success: true, appointment })
+  // ── Create reminders for ALL appointments ──
+  if (clientId) {
+    const reminderRows: { tenant_id: string; appointment_id: string; client_id: string; type: string; channel: string; status: string }[] = []
+    for (const apt of appointments) {
+      if (client_phone) {
+        reminderRows.push({ tenant_id: tenant.id, appointment_id: apt.id, client_id: clientId, type: '24h', channel: 'sms', status: 'pending' })
+      }
+      if (client_email) {
+        reminderRows.push({ tenant_id: tenant.id, appointment_id: apt.id, client_id: clientId, type: '24h', channel: 'email', status: 'pending' })
+      }
+    }
+    if (reminderRows.length > 0) {
+      const { error: reminderErr } = await svc.from('appointment_reminders').insert(reminderRows)
+      if (reminderErr) {
+        console.error('[public-booking] Failed to create reminders:', reminderErr)
+      } else {
+        console.log(`[public-booking] ✅ Created ${reminderRows.length} reminder(s) for ${appointments.length} appointment(s)`)
+      }
+    }
+  }
+
+  return NextResponse.json({ success: true, appointments })
 }
 
 // PATCH: Update client birthday after booking (post-confirmation prompt)
@@ -470,39 +519,6 @@ async function sendBookingConfirmations(opts: {
       }
     } else {
       console.log(`[DRY RUN] Owner email to ${ownerEmail}: ${ownerEmailBody}`)
-    }
-  }
-
-  // ── 5. Create 24h reminder rows for the existing reminder cron ──
-  if (clientId && appointment?.id) {
-    const reminderRows = []
-    if (clientPhone) {
-      reminderRows.push({
-        tenant_id: tenant.id,
-        appointment_id: appointment.id,
-        client_id: clientId,
-        type: '24h',
-        channel: 'sms',
-        status: 'pending',
-      })
-    }
-    if (clientEmail) {
-      reminderRows.push({
-        tenant_id: tenant.id,
-        appointment_id: appointment.id,
-        client_id: clientId,
-        type: '24h',
-        channel: 'email',
-        status: 'pending',
-      })
-    }
-    if (reminderRows.length > 0) {
-      const { error: reminderErr } = await svc.from('appointment_reminders').insert(reminderRows)
-      if (reminderErr) {
-        console.error('[public-booking] Failed to create reminders:', reminderErr)
-      } else {
-        console.log(`[public-booking] ✅ Created ${reminderRows.length} reminder(s) for appointment ${appointment.id}`)
-      }
     }
   }
 }

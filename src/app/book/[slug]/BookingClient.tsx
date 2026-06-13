@@ -33,7 +33,7 @@ export default function BookingClient({ slug }: { slug: string }) {
   const [bookedSlots, setBookedSlots] = useState<BookedSlot[]>([])
 
   // Selections
-  const [selectedService, setSelectedService] = useState<ServiceInfo | null>(null)
+  const [selectedServices, setSelectedServices] = useState<ServiceInfo[]>([])
   const [selectedStaff, setSelectedStaff] = useState<StaffInfo | null>(null)
   const [selectedDate, setSelectedDate] = useState<string>('')
   const [selectedTime, setSelectedTime] = useState<string>('')
@@ -47,14 +47,20 @@ export default function BookingClient({ slug }: { slug: string }) {
   const [clientNotes, setClientNotes] = useState('')
   const [clientBirthday, setClientBirthday] = useState('')
 
-  // Effective duration: use staff-specific override if available, otherwise service default
-  const effectiveDuration = useMemo(() => {
-    if (!selectedService) return 0
-    if (selectedStaff?.service_durations?.[selectedService.id]) {
-      return selectedStaff.service_durations[selectedService.id]
-    }
-    return selectedService.duration_minutes
-  }, [selectedService, selectedStaff])
+  // Computed cart totals
+  const totalDuration = useMemo(() => {
+    return selectedServices.reduce((sum, s) => {
+      if (selectedStaff?.service_durations?.[s.id]) return sum + selectedStaff.service_durations[s.id]
+      return sum + s.duration_minutes
+    }, 0)
+  }, [selectedServices, selectedStaff])
+
+  const totalPrice = useMemo(() => {
+    return selectedServices.reduce((sum, s) => sum + s.price, 0)
+  }, [selectedServices])
+
+  // Effective duration used for time slot calculation (total of all services)
+  const effectiveDuration = totalDuration
 
   // Fetch business data
   useEffect(() => {
@@ -103,7 +109,7 @@ export default function BookingClient({ slug }: { slug: string }) {
   const salonTz = business?.timezone || DEFAULT_TZ
 
   const timeSlots = useMemo(() => {
-    if (!selectedDate || !selectedService || !effectiveDuration) return []
+    if (!selectedDate || selectedServices.length === 0 || !effectiveDuration) return []
     const date = new Date(selectedDate + 'T00:00:00')
     const dayName = date.toLocaleDateString('en-US', { weekday: 'long' })
     const hours = business?.hours?.[dayName]
@@ -199,7 +205,7 @@ export default function BookingClient({ slug }: { slug: string }) {
         })
       : slots
     return filtered
-  }, [selectedDate, selectedService, selectedStaff, bookedSlots, business, effectiveDuration, salonTz])
+  }, [selectedDate, selectedServices, selectedStaff, bookedSlots, business, effectiveDuration, salonTz, staff])
 
   // Check if a specific date is available for booking
   const isDateAvailable = useMemo(() => {
@@ -248,21 +254,27 @@ export default function BookingClient({ slug }: { slug: string }) {
 
   // Submit booking
   async function handleSubmit() {
-    if (!selectedService || !selectedDate || !selectedTime || !clientName || !clientPhone.trim()) return
+    if (selectedServices.length === 0 || !selectedDate || !selectedTime || !clientName || !clientPhone.trim()) return
     setSubmitting(true)
 
     try {
       // Convert salon-local date+time to UTC using the salon's timezone
       const utcStart = localToUTC(selectedDate, selectedTime, salonTz)
+
+      // Build per-service items with effective durations
+      const serviceItems = selectedServices.map(s => ({
+        service_id: s.id,
+        duration_minutes: selectedStaff?.service_durations?.[s.id] || s.duration_minutes,
+      }))
+
       const res = await fetch('/api/public-booking', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           slug,
-          service_id: selectedService.id,
+          services: serviceItems,
           staff_id: selectedStaff?.id || null,
           start_time: utcStart.toISOString(),
-          duration_minutes: effectiveDuration,
           client_name: clientName,
           client_email: clientEmail,
           client_phone: clientPhone,
@@ -337,10 +349,12 @@ export default function BookingClient({ slug }: { slug: string }) {
         <h2>Booking Confirmed!</h2>
         <p className={styles.successBusiness}>{business.name}</p>
         <div className={styles.successDetails}>
-          <div className={styles.successRow}>
-            <span>Service</span>
-            <strong>{selectedService?.name}</strong>
-          </div>
+          {selectedServices.map((s, i) => (
+            <div key={i} className={styles.successRow}>
+              <span>{selectedServices.length > 1 ? `Service ${i + 1}` : 'Service'}</span>
+              <strong>{s.name}</strong>
+            </div>
+          ))}
           {selectedStaff && (
             <div className={styles.successRow}>
               <span>With</span>
@@ -352,9 +366,15 @@ export default function BookingClient({ slug }: { slug: string }) {
             <strong>{bookedTime}</strong>
           </div>
           <div className={styles.successRow}>
-            <span>Duration</span>
+            <span>Total Duration</span>
             <strong>{effectiveDuration} minutes</strong>
           </div>
+          {selectedServices.length > 1 && (
+            <div className={styles.successRow}>
+              <span>Total</span>
+              <strong>${selectedServices.reduce((acc, s) => acc + s.price, 0)}</strong>
+            </div>
+          )}
         </div>
         {!birthdaySaved && (
           <div className={styles.birthdayPrompt}>
@@ -444,41 +464,69 @@ export default function BookingClient({ slug }: { slug: string }) {
         {/* Step Content */}
         <div className={styles.stepContent}>
 
-          {/* ── Step 0: Choose Service ── */}
+          {/* ── Step 0: Choose Service(s) ── */}
           {step === 0 && (
             <div className={styles.stepPanel}>
-              <h2 className={styles.stepTitle}>Choose a Service</h2>
-              <p className={styles.stepSubtitle}>What would you like done today?</p>
+              <h2 className={styles.stepTitle}>Choose Your Services</h2>
+              <p className={styles.stepSubtitle}>Select one or more services for your visit</p>
               {Object.entries(servicesByCategory).map(([category, svcs]) => (
                 <div key={category} className={styles.serviceCategory}>
                   <h3 className={styles.categoryName}>{category}</h3>
                   <div className={styles.serviceGrid}>
-                    {svcs.map(s => (
-                      <button
-                        key={s.id}
-                        className={`${styles.serviceCard} ${selectedService?.id === s.id ? styles.serviceSelected : ''} ${s.image_url ? styles.serviceWithImage : ''}`}
-                        onClick={() => {
-                          setSelectedService(s)
-                          if (staff.length === 1) { setSelectedStaff(staff[0]); setStep(2) }
-                          else { setStep(1) }
-                        }}
-                      >
-                        {s.image_url && (
-                          <div className={styles.serviceThumb}>
-                            <img src={s.image_url} alt={s.name} />
+                    {svcs.map(s => {
+                      const isInCart = selectedServices.some(sel => sel.id === s.id)
+                      return (
+                        <button
+                          key={s.id}
+                          className={`${styles.serviceCard} ${isInCart ? styles.serviceSelected : ''} ${s.image_url ? styles.serviceWithImage : ''}`}
+                          onClick={() => {
+                            setSelectedServices(prev =>
+                              isInCart ? prev.filter(sel => sel.id !== s.id) : [...prev, s]
+                            )
+                          }}
+                        >
+                          {isInCart && <span className={styles.serviceCheck}>✓</span>}
+                          {s.image_url && (
+                            <div className={styles.serviceThumb}>
+                              <img src={s.image_url} alt={s.name} />
+                            </div>
+                          )}
+                          <div className={styles.serviceInfo}>
+                            <span className={styles.serviceName}>{s.name}</span>
+                            {s.description && <span className={styles.serviceDesc}>{s.description}</span>}
+                            <span className={styles.serviceMeta}>{s.duration_minutes} min</span>
                           </div>
-                        )}
-                        <div className={styles.serviceInfo}>
-                          <span className={styles.serviceName}>{s.name}</span>
-                          {s.description && <span className={styles.serviceDesc}>{s.description}</span>}
-                          <span className={styles.serviceMeta}>{s.duration_minutes} min</span>
-                        </div>
-                        <span className={styles.servicePrice}>${s.price}</span>
-                      </button>
-                    ))}
+                          <span className={styles.servicePrice}>${s.price}</span>
+                        </button>
+                      )
+                    })}
                   </div>
                 </div>
               ))}
+
+              {/* Floating Cart Bar */}
+              {selectedServices.length > 0 && (
+                <div className={styles.cartBar}>
+                  <div className={styles.cartInfo}>
+                    <span className={styles.cartBadge}>{selectedServices.length}</span>
+                    <span className={styles.cartText}>
+                      {selectedServices.length === 1 ? '1 service' : `${selectedServices.length} services`} · {totalDuration} min
+                    </span>
+                  </div>
+                  <div className={styles.cartRight}>
+                    <span className={styles.cartTotal}>${totalPrice}</span>
+                    <button
+                      className={styles.cartContinue}
+                      onClick={() => {
+                        if (staff.length === 1) { setSelectedStaff(staff[0]); setStep(2) }
+                        else { setStep(1) }
+                      }}
+                    >
+                      Continue →
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -518,7 +566,7 @@ export default function BookingClient({ slug }: { slug: string }) {
           {step === 2 && (
             <div className={styles.stepPanel}>
               <h2 className={styles.stepTitle}>Pick a Date & Time</h2>
-              <p className={styles.stepSubtitle}>{selectedService?.name} • {effectiveDuration} min{selectedStaff ? ` with ${selectedStaff.name}` : ''}</p>
+              <p className={styles.stepSubtitle}>{selectedServices.map(s => s.name).join(', ')} • {totalDuration} min{selectedStaff ? ` with ${selectedStaff.name}` : ''}</p>
 
               {/* Calendar */}
               <div className={styles.calendar}>
@@ -645,10 +693,15 @@ export default function BookingClient({ slug }: { slug: string }) {
               <p className={styles.stepSubtitle}>Please review your appointment details</p>
 
               <div className={styles.summaryCard}>
-                <div className={styles.summaryRow}>
-                  <span className={styles.summaryLabel}>Service</span>
-                  <span className={styles.summaryValue}>{selectedService?.name}</span>
-                </div>
+                {/* Individual services */}
+                {selectedServices.map((s, i) => (
+                  <div key={i} className={styles.summaryRow}>
+                    <span className={styles.summaryLabel}>{s.name}</span>
+                    <span className={styles.summaryValue}>
+                      {selectedStaff?.service_durations?.[s.id] || s.duration_minutes} min · ${s.price}
+                    </span>
+                  </div>
+                ))}
                 <div className={styles.summaryRow}>
                   <span className={styles.summaryLabel}>Stylist</span>
                   <span className={styles.summaryValue}>{selectedStaff?.name || 'Any Available'}</span>
@@ -664,12 +717,12 @@ export default function BookingClient({ slug }: { slug: string }) {
                   <span className={styles.summaryValue}>{formatTime(selectedTime)}</span>
                 </div>
                 <div className={styles.summaryRow}>
-                  <span className={styles.summaryLabel}>Duration</span>
-                  <span className={styles.summaryValue}>{effectiveDuration} min</span>
+                  <span className={styles.summaryLabel}>Total Duration</span>
+                  <span className={styles.summaryValue}>{totalDuration} min</span>
                 </div>
                 <div className={`${styles.summaryRow} ${styles.summaryTotal}`}>
                   <span className={styles.summaryLabel}>Total</span>
-                  <span className={styles.summaryValue}>${selectedService?.price}</span>
+                  <span className={styles.summaryValue}>${totalPrice}</span>
                 </div>
               </div>
 

@@ -28,6 +28,8 @@ export default function CalendarPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState({ client_id: "", service_id: "", staff_id: "", start_time: "", notes: "" });
+  const [clientSearch, setClientSearch] = useState("");
+  const [clientDropdownOpen, setClientDropdownOpen] = useState(false);
   const [selectedApt, setSelectedApt] = useState<FullAppointment | null>(null);
   const [editingApt, setEditingApt] = useState<FullAppointment | null>(null);
   const [activeStaffFilter, setActiveStaffFilter] = useState<string[]>([]);
@@ -257,6 +259,8 @@ export default function CalendarPage() {
     if (data) {
       setAppointments(prev => [...prev, data]);
       setShowModal(false);
+      setClientSearch("");
+      setClientDropdownOpen(false);
       setFormData({ client_id: "", service_id: "", staff_id: "", start_time: "", notes: "" });
     }
   }
@@ -266,6 +270,8 @@ export default function CalendarPage() {
     const h = hour ?? 9;
     const dateStr = toDateStr(d);
     setFormData({ client_id: "", service_id: "", staff_id: "", start_time: `${dateStr}T${String(h).padStart(2, "0")}:00`, notes: "" });
+    setClientSearch("");
+    setClientDropdownOpen(false);
     setShowModal(true);
   }
 
@@ -384,6 +390,8 @@ export default function CalendarPage() {
                           const dateStr = toDateStr(selectedDate);
                           const h = Math.floor(slot.start);
                           setFormData({ client_id: "", service_id: "", staff_id: staff.id === "unassigned" ? "" : staff.id, start_time: `${dateStr}T${String(h).padStart(2, "0")}:00`, notes: "" });
+                          setClientSearch("");
+                          setClientDropdownOpen(false);
                           setShowModal(true);
                         }}
                         title={`Open: ${formatHour(slot.start)} – ${formatHour(slot.end)}`}
@@ -694,6 +702,8 @@ export default function CalendarPage() {
                     start_time: `${dateStr}T${timeStr}`,
                     notes: apt.notes || "",
                   });
+                  setClientSearch(apt.client ? `${apt.client.first_name} ${apt.client.last_name || ""}`.trim() : "");
+                  setClientDropdownOpen(false);
                   setSelectedApt(null);
                   setShowModal(true);
                 }}
@@ -748,15 +758,78 @@ export default function CalendarPage() {
               }
               setShowModal(false);
               setEditingApt(null);
+              setClientSearch("");
+              setClientDropdownOpen(false);
               setFormData({ client_id: "", service_id: "", staff_id: "", start_time: "", notes: "" });
             }}>
               <div className={styles.formGrid}>
                 <div className={styles.formGroup}>
                   <label className="label">Client</label>
-                  <select className="input" value={formData.client_id} onChange={(e) => setFormData({ ...formData, client_id: e.target.value })}>
-                    <option value="">{t("walkin")}</option>
-                    {clients.map(c => <option key={c.id} value={c.id}>{c.first_name} {c.last_name || ""}</option>)}
-                  </select>
+                  <div className={styles.clientCombobox}>
+                    <input
+                      className="input"
+                      type="text"
+                      placeholder={t("walkin")}
+                      value={clientSearch}
+                      onChange={(e) => {
+                        setClientSearch(e.target.value);
+                        setClientDropdownOpen(true);
+                        if (!e.target.value) setFormData({ ...formData, client_id: "" });
+                      }}
+                      onFocus={() => setClientDropdownOpen(true)}
+                      onBlur={() => setTimeout(() => setClientDropdownOpen(false), 150)}
+                      autoComplete="off"
+                    />
+                    {formData.client_id && (
+                      <button
+                        type="button"
+                        className={styles.clientClear}
+                        onClick={() => {
+                          setClientSearch("");
+                          setFormData({ ...formData, client_id: "" });
+                          setClientDropdownOpen(false);
+                        }}
+                        title="Clear"
+                      >
+                        ✕
+                      </button>
+                    )}
+                    {clientDropdownOpen && (
+                      <div className={styles.clientDropdown}>
+                        <div
+                          className={`${styles.clientOption} ${!formData.client_id ? styles.clientOptionActive : ""}`}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            setFormData({ ...formData, client_id: "" });
+                            setClientSearch("");
+                            setClientDropdownOpen(false);
+                          }}
+                        >
+                          {t("walkin")}
+                        </div>
+                        {clients
+                          .filter(c => {
+                            if (!clientSearch) return true;
+                            const full = `${c.first_name} ${c.last_name || ""}`.toLowerCase();
+                            return full.includes(clientSearch.toLowerCase());
+                          })
+                          .map(c => (
+                            <div
+                              key={c.id}
+                              className={`${styles.clientOption} ${formData.client_id === c.id ? styles.clientOptionActive : ""}`}
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                setFormData({ ...formData, client_id: c.id });
+                                setClientSearch(`${c.first_name} ${c.last_name || ""}`.trim());
+                                setClientDropdownOpen(false);
+                              }}
+                            >
+                              {c.first_name} {c.last_name || ""}
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className={styles.formGroup}>
                   <label className="label">Service *</label>

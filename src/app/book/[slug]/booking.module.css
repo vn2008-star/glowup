@@ -178,6 +178,7 @@
   transition: all 0.2s ease;
   text-align: left;
   width: 100%;
+  position: relative;
 }
 .serviceCard:hover {
   border-color: #c37eda;
@@ -231,6 +232,99 @@
   color: #e8a87c;
   white-space: nowrap;
   font-family: var(--font-display, 'Inter', sans-serif);
+}
+
+/* ── Service Selected Check ── */
+.serviceCheck {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #c37eda, #e8a87c);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(195, 126, 218, 0.4);
+  animation: popIn 0.2s ease-out;
+}
+@keyframes popIn {
+  from { transform: scale(0); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* ── Floating Cart Bar ── */
+.cartBar {
+  position: sticky;
+  bottom: -2rem;
+  margin: 1.5rem -2rem -2rem;
+  padding: 1rem 1.5rem;
+  background: linear-gradient(135deg, #1e1028, #1a1520);
+  border-top: 1px solid rgba(195, 126, 218, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  animation: slideUp 0.3s ease-out;
+  z-index: 10;
+}
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.cartInfo {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.cartBadge {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #c37eda, #e8a87c);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 10px rgba(195, 126, 218, 0.35);
+}
+.cartText {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #c0c0d8;
+}
+.cartRight {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.cartTotal {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #e8a87c;
+  font-family: var(--font-display, 'Inter', sans-serif);
+}
+.cartContinue {
+  padding: 0.65rem 1.5rem;
+  background: linear-gradient(135deg, #c37eda, #e8a87c);
+  border: none;
+  border-radius: 10px;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+.cartContinue:hover {
+  box-shadow: 0 4px 20px rgba(195, 126, 218, 0.35);
+  transform: translateY(-1px);
 }
 
 /* ── Step 1: Staff ── */
@@ -846,5 +940,9 @@
   .staffGrid { grid-template-columns: repeat(2, 1fr); }
   .ambassadorCard { flex-direction: column; text-align: center; gap: 0.5rem; }
   .ambassadorArrow { display: none; }
+  .cartBar { margin: 1rem -1.25rem -1.25rem; padding: 0.75rem 1rem; }
+  .cartText { font-size: 0.72rem; }
+  .cartTotal { font-size: 0.95rem; }
+  .cartContinue { padding: 0.55rem 1rem; font-size: 0.78rem; }
 }
 
