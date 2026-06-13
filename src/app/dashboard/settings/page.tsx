@@ -366,6 +366,142 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      {/* Booking Link */}
+      {tenant?.slug && (
+        <div id="booking-link" className={`card ${styles.section}`}>
+          <h2>🔗 Booking Link</h2>
+          <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginBottom: "var(--space-4)" }}>
+            Share this link with clients so they can book appointments online. Add it to your Instagram bio, website, or Google profile.
+          </p>
+          <div className={styles.bookingLinkRow}>
+            <input
+              className="input"
+              readOnly
+              value={`${typeof window !== 'undefined' ? window.location.origin : ''}/book/${tenant.slug}`}
+              onFocus={(e) => e.target.select()}
+              style={{ fontFamily: "var(--font-mono, monospace)", fontSize: "var(--text-sm)" }}
+            />
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                navigator.clipboard.writeText(`${window.location.origin}/book/${tenant.slug}`);
+                setLinkCopied(true);
+                setTimeout(() => setLinkCopied(false), 2000);
+              }}
+            >
+              {linkCopied ? "✓ Copied!" : "Copy Link"}
+            </button>
+          </div>
+
+          {/* Custom Slug Editor */}
+          <div style={{ marginTop: "var(--space-4)", padding: "var(--space-4)", background: "rgba(255,255,255,0.03)", borderRadius: 10, border: "1px solid rgba(255,255,255,0.06)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-2)" }}>
+              <label className="label" style={{ margin: 0 }}>Custom URL Slug</label>
+              {!editingSlug && (
+                <button
+                  className="btn btn-secondary"
+                  style={{ fontSize: "var(--text-xs)", padding: "4px 12px" }}
+                  onClick={() => { setSlugDraft(tenant.slug); setSlugError(''); setSlugSaved(false); setEditingSlug(true); }}
+                >
+                  ✏️ Edit
+                </button>
+              )}
+            </div>
+            {!editingSlug ? (
+              <p style={{ fontFamily: "var(--font-mono, monospace)", fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>
+                /book/<strong style={{ color: "var(--text-primary)" }}>{tenant.slug}</strong>
+              </p>
+            ) : (
+              <>
+                <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", flexWrap: "wrap" }}>
+                  <span style={{ fontFamily: "var(--font-mono, monospace)", fontSize: "var(--text-sm)", color: "var(--text-tertiary)" }}>/book/</span>
+                  <input
+                    className="input"
+                    value={slugDraft}
+                    onChange={(e) => {
+                      const val = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/--+/g, '-');
+                      setSlugDraft(val);
+                      setSlugError('');
+                      setSlugSaved(false);
+                      if (val.length < 3) setSlugError('Slug must be at least 3 characters');
+                      else if (val.length > 40) setSlugError('Slug must be 40 characters or less');
+                    }}
+                    placeholder="your-custom-slug"
+                    style={{ fontFamily: "var(--font-mono, monospace)", fontSize: "var(--text-sm)", flex: 1, minWidth: 160 }}
+                  />
+                </div>
+                <p style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)", marginTop: "var(--space-2)" }}>
+                  Only lowercase letters, numbers, and hyphens. This is your public booking URL.
+                </p>
+                {slugError && (
+                  <p style={{ fontSize: "var(--text-xs)", color: "var(--color-danger, #ff4d6a)", marginTop: "var(--space-1)" }}>
+                    {slugError}
+                  </p>
+                )}
+                {slugSaved && (
+                  <p style={{ fontSize: "var(--text-xs)", color: "var(--color-success, #34d399)", marginTop: "var(--space-1)" }}>
+                    ✓ Slug updated! Your new booking link is active.
+                  </p>
+                )}
+                <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-3)" }}>
+                  <button
+                    className="btn btn-primary"
+                    style={{ fontSize: "var(--text-sm)" }}
+                    disabled={slugSaving || !!slugError || slugDraft === tenant.slug || slugDraft.length < 3}
+                    onClick={async () => {
+                      setSlugSaving(true);
+                      setSlugError('');
+                      try {
+                        const res = await fetch("/api/save-settings", {
+                          method: "PUT",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ slug: slugDraft }),
+                        });
+                        if (!res.ok) {
+                          const data = await res.json();
+                          if (data?.error?.includes('unique') || data?.error?.includes('duplicate') || data?.error?.includes('slug')) {
+                            setSlugError('This slug is already taken. Try another one.');
+                          } else {
+                            setSlugError(data?.error || 'Failed to update slug');
+                          }
+                        } else {
+                          setSlugSaved(true);
+                          setEditingSlug(false);
+                          await refetch();
+                        }
+                      } catch {
+                        setSlugError('Network error. Please try again.');
+                      }
+                      setSlugSaving(false);
+                    }}
+                  >
+                    {slugSaving ? "Saving..." : "Save Slug"}
+                  </button>
+                  <button
+                    className="btn btn-secondary"
+                    style={{ fontSize: "var(--text-sm)" }}
+                    onClick={() => { setEditingSlug(false); setSlugError(''); }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+
+          <div style={{ marginTop: "var(--space-3)" }}>
+            <a
+              href={`/book/${tenant.slug}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ fontSize: "var(--text-sm)", color: "var(--color-primary)", fontWeight: 600 }}
+            >
+              Preview booking page →
+            </a>
+          </div>
+        </div>
+      )}
+
       {/* Booking Settings */}
       <div id="booking" className={`card ${styles.section}`}>
         <h2>Booking Settings</h2>
@@ -894,141 +1030,6 @@ export default function SettingsPage() {
         )}
       </div>
 
-      {/* Booking Link */}
-      {tenant?.slug && (
-        <div id="booking-link" className={`card ${styles.section}`}>
-          <h2>🔗 Booking Link</h2>
-          <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginBottom: "var(--space-4)" }}>
-            Share this link with clients so they can book appointments online. Add it to your Instagram bio, website, or Google profile.
-          </p>
-          <div className={styles.bookingLinkRow}>
-            <input
-              className="input"
-              readOnly
-              value={`${typeof window !== 'undefined' ? window.location.origin : ''}/book/${tenant.slug}`}
-              onFocus={(e) => e.target.select()}
-              style={{ fontFamily: "var(--font-mono, monospace)", fontSize: "var(--text-sm)" }}
-            />
-            <button
-              className="btn btn-primary"
-              onClick={() => {
-                navigator.clipboard.writeText(`${window.location.origin}/book/${tenant.slug}`);
-                setLinkCopied(true);
-                setTimeout(() => setLinkCopied(false), 2000);
-              }}
-            >
-              {linkCopied ? "✓ Copied!" : "Copy Link"}
-            </button>
-          </div>
-
-          {/* Custom Slug Editor */}
-          <div style={{ marginTop: "var(--space-4)", padding: "var(--space-4)", background: "rgba(255,255,255,0.03)", borderRadius: 10, border: "1px solid rgba(255,255,255,0.06)" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-2)" }}>
-              <label className="label" style={{ margin: 0 }}>Custom URL Slug</label>
-              {!editingSlug && (
-                <button
-                  className="btn btn-secondary"
-                  style={{ fontSize: "var(--text-xs)", padding: "4px 12px" }}
-                  onClick={() => { setSlugDraft(tenant.slug); setSlugError(''); setSlugSaved(false); setEditingSlug(true); }}
-                >
-                  ✏️ Edit
-                </button>
-              )}
-            </div>
-            {!editingSlug ? (
-              <p style={{ fontFamily: "var(--font-mono, monospace)", fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>
-                /book/<strong style={{ color: "var(--text-primary)" }}>{tenant.slug}</strong>
-              </p>
-            ) : (
-              <>
-                <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", flexWrap: "wrap" }}>
-                  <span style={{ fontFamily: "var(--font-mono, monospace)", fontSize: "var(--text-sm)", color: "var(--text-tertiary)" }}>/book/</span>
-                  <input
-                    className="input"
-                    value={slugDraft}
-                    onChange={(e) => {
-                      const val = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/--+/g, '-');
-                      setSlugDraft(val);
-                      setSlugError('');
-                      setSlugSaved(false);
-                      if (val.length < 3) setSlugError('Slug must be at least 3 characters');
-                      else if (val.length > 40) setSlugError('Slug must be 40 characters or less');
-                    }}
-                    placeholder="your-custom-slug"
-                    style={{ fontFamily: "var(--font-mono, monospace)", fontSize: "var(--text-sm)", flex: 1, minWidth: 160 }}
-                  />
-                </div>
-                <p style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)", marginTop: "var(--space-2)" }}>
-                  Only lowercase letters, numbers, and hyphens. This is your public booking URL.
-                </p>
-                {slugError && (
-                  <p style={{ fontSize: "var(--text-xs)", color: "var(--color-danger, #ff4d6a)", marginTop: "var(--space-1)" }}>
-                    {slugError}
-                  </p>
-                )}
-                {slugSaved && (
-                  <p style={{ fontSize: "var(--text-xs)", color: "var(--color-success, #34d399)", marginTop: "var(--space-1)" }}>
-                    ✓ Slug updated! Your new booking link is active.
-                  </p>
-                )}
-                <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-3)" }}>
-                  <button
-                    className="btn btn-primary"
-                    style={{ fontSize: "var(--text-sm)" }}
-                    disabled={slugSaving || !!slugError || slugDraft === tenant.slug || slugDraft.length < 3}
-                    onClick={async () => {
-                      setSlugSaving(true);
-                      setSlugError('');
-                      try {
-                        const res = await fetch("/api/save-settings", {
-                          method: "PUT",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ slug: slugDraft }),
-                        });
-                        if (!res.ok) {
-                          const data = await res.json();
-                          if (data?.error?.includes('unique') || data?.error?.includes('duplicate') || data?.error?.includes('slug')) {
-                            setSlugError('This slug is already taken. Try another one.');
-                          } else {
-                            setSlugError(data?.error || 'Failed to update slug');
-                          }
-                        } else {
-                          setSlugSaved(true);
-                          setEditingSlug(false);
-                          await refetch();
-                        }
-                      } catch {
-                        setSlugError('Network error. Please try again.');
-                      }
-                      setSlugSaving(false);
-                    }}
-                  >
-                    {slugSaving ? "Saving..." : "Save Slug"}
-                  </button>
-                  <button
-                    className="btn btn-secondary"
-                    style={{ fontSize: "var(--text-sm)" }}
-                    onClick={() => { setEditingSlug(false); setSlugError(''); }}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-
-          <div style={{ marginTop: "var(--space-3)" }}>
-            <a
-              href={`/book/${tenant.slug}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ fontSize: "var(--text-sm)", color: "var(--color-primary)", fontWeight: 600 }}
-            >
-              Preview booking page →
-            </a>
-          </div>
-        </div>
-      )}
 
       {/* Client Protection */}
       <div className={`card ${styles.section}`}>
