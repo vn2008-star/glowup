@@ -429,16 +429,31 @@ async function sendBookingConfirmations(opts: {
 
   console.log(`[public-booking] Notification channels: Twilio=${!!hasTwilio}, Resend=${!!hasResend} | Client: phone=${clientPhone || 'NONE'}, email=${clientEmail || 'NONE'} | Owner: phone=${businessPhone || 'NONE'}, email=${businessEmail || 'NONE'}`)
 
-  // Lazy-load SDKs
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let twilioClient: any = null
+  // Send SMS via Twilio REST API (no SDK — works in Edge/Serverless)
+  async function sendSms(to: string, body: string): Promise<boolean> {
+    const sid = process.env.TWILIO_ACCOUNT_SID!
+    const token = process.env.TWILIO_AUTH_TOKEN!
+    const from = process.env.TWILIO_PHONE_NUMBER!
+    const url = `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`
+    const auth = Buffer.from(`${sid}:${token}`).toString('base64')
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${auth}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({ To: to, From: from, Body: body }).toString(),
+    })
+    if (!res.ok) {
+      const errBody = await res.text()
+      console.error(`[public-booking] Twilio API error (${res.status}): ${errBody}`)
+      return false
+    }
+    return true
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let resendClient: any = null
-
-  if (hasTwilio) {
-    const twilio = await import('twilio')
-    twilioClient = twilio.default(process.env.TWILIO_ACCOUNT_SID!, process.env.TWILIO_AUTH_TOKEN!)
-  }
   if (hasResend) {
     const { Resend } = await import('resend')
     resendClient = new Resend(process.env.RESEND_API_KEY!)
@@ -459,17 +474,13 @@ async function sendBookingConfirmations(opts: {
     ].filter(Boolean).join('\n')
 
     const clientE164 = toE164(clientPhone)
-    if (twilioClient && clientE164) {
+    if (hasTwilio && clientE164) {
       try {
-        await twilioClient.messages.create({
-          body: clientSms,
-          from: process.env.TWILIO_PHONE_NUMBER!,
-          to: clientE164,
-        })
-        console.log(`[public-booking] ✅ Confirmation SMS sent to client ${clientE164}`)
+        const ok = await sendSms(clientE164, clientSms)
+        if (ok) console.log(`[public-booking] ✅ Confirmation SMS sent to client ${clientE164}`)
       } catch (err: unknown) {
-        const e = err as { code?: number; moreInfo?: string; message?: string }
-        console.error(`[public-booking] SMS to client FAILED: code=${e.code} msg="${e.message}" info=${e.moreInfo}`)
+        const e = err as { message?: string }
+        console.error(`[public-booking] SMS to client FAILED: ${e.message}`)
       }
     } else if (!clientE164) {
       console.warn(`[public-booking] ⚠️ Could not normalize client phone: "${clientPhone}"`)
@@ -527,17 +538,13 @@ async function sendBookingConfirmations(opts: {
     ].filter(Boolean).join('\n')
 
     const ownerE164 = toE164(businessPhone)
-    if (twilioClient && ownerE164) {
+    if (hasTwilio && ownerE164) {
       try {
-        await twilioClient.messages.create({
-          body: ownerSms,
-          from: process.env.TWILIO_PHONE_NUMBER!,
-          to: ownerE164,
-        })
-        console.log(`[public-booking] ✅ Owner SMS sent to ${ownerE164}`)
+        const ok = await sendSms(ownerE164, ownerSms)
+        if (ok) console.log(`[public-booking] ✅ Owner SMS sent to ${ownerE164}`)
       } catch (err: unknown) {
-        const e = err as { code?: number; moreInfo?: string; message?: string }
-        console.error(`[public-booking] SMS to owner FAILED: code=${e.code} msg="${e.message}" info=${e.moreInfo}`)
+        const e = err as { message?: string }
+        console.error(`[public-booking] SMS to owner FAILED: ${e.message}`)
       }
     } else if (!ownerE164) {
       console.warn(`[public-booking] ⚠️ Could not normalize owner phone: "${businessPhone}"`)
