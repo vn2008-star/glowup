@@ -45,6 +45,7 @@ export async function GET(request: Request) {
             .insert({
               name: businessName,
               slug,
+              email: user.email || null,
               business_type: 'nail_salon',
               plan: 'free',
             })

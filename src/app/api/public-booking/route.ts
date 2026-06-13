@@ -370,10 +370,26 @@ async function sendBookingConfirmations(opts: {
 }) {
   const { tenant, appointment, serviceName, staffName, clientName, clientEmail, clientPhone, clientId, start } = opts
 
+  // Fallback: if tenant doesn't have email/phone, look up the owner staff member
+  let ownerFallbackEmail = ''
+  let ownerFallbackPhone = ''
+  if (!tenant.email || !tenant.phone) {
+    const { data: ownerStaff } = await svc
+      .from('staff')
+      .select('email, phone')
+      .eq('tenant_id', tenant.id)
+      .eq('role', 'owner')
+      .single()
+    if (ownerStaff) {
+      ownerFallbackEmail = ownerStaff.email || ''
+      ownerFallbackPhone = ownerStaff.phone || ''
+    }
+  }
+
   const businessName = tenant.name || 'our salon'
   const businessAddress = (tenant.address as string) || ''
-  const businessPhone = tenant.phone || ''
-  const businessEmail = tenant.email || ''
+  const businessPhone = tenant.phone || ownerFallbackPhone
+  const businessEmail = tenant.email || ownerFallbackEmail
 
   // Determine tenant timezone for display
   const tenantSettings = (tenant.settings || {}) as Record<string, unknown>
