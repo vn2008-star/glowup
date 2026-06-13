@@ -1,52 +1,29 @@
 import { NextResponse } from 'next/server'
 
 export async function GET() {
-  const sid = process.env.TWILIO_ACCOUNT_SID
-  const token = process.env.TWILIO_AUTH_TOKEN
-  const from = process.env.TWILIO_PHONE_NUMBER
+  const sid = process.env.TWILIO_ACCOUNT_SID!
+  const token = process.env.TWILIO_AUTH_TOKEN!
+  const auth = btoa(`${sid}:${token}`)
 
-  if (!sid || !token || !from) {
-    return NextResponse.json({
-      error: 'Missing Twilio env vars',
-      hasSid: !!sid,
-      hasToken: !!token,
-      hasFrom: !!from,
-    }, { status: 500 })
-  }
+  // Check the last 5 messages sent
+  const url = `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json?PageSize=5`
+  const res = await fetch(url, {
+    headers: { 'Authorization': `Basic ${auth}` },
+  })
+  const data = await res.json()
 
-  // Send a test SMS to a known number
-  const to = '+15308481587' // test number
-  const body = '🧪 GlowUp test SMS — if you see this, Twilio is working!'
+  const messages = data.messages?.map((m: Record<string, string>) => ({
+    sid: m.sid,
+    to: m.to,
+    from: m.from,
+    status: m.status,
+    error_code: m.error_code,
+    error_message: m.error_message,
+    date_sent: m.date_sent,
+    date_created: m.date_created,
+    direction: m.direction,
+    body: m.body?.substring(0, 50),
+  })) || []
 
-  try {
-    const url = `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`
-    const auth = btoa(`${sid}:${token}`)
-
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Basic ${auth}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({ To: to, From: from, Body: body }).toString(),
-    })
-
-    const result = await res.json()
-
-    return NextResponse.json({
-      status: res.status,
-      ok: res.ok,
-      twilioResponse: result,
-      envCheck: {
-        sidPrefix: sid.substring(0, 4),
-        fromNumber: from,
-      }
-    })
-  } catch (err: unknown) {
-    const e = err as Error
-    return NextResponse.json({
-      error: e.message,
-      stack: e.stack,
-    }, { status: 500 })
-  }
+  return NextResponse.json({ messages })
 }
