@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { toE164 } from '@/lib/utils'
 
 // ─── Automation Engine (Cron-triggered) ───
 // Runs daily. Checks each tenant's automation settings and fires:
@@ -504,16 +505,19 @@ async function sendMessage(opts: {
 
   // SMS
   if ((channel === 'sms' || channel === 'both') && client.phone && !client.sms_opt_out) {
-    if (twilioClient) {
+    const phoneE164 = toE164(client.phone as string)
+    if (twilioClient && phoneE164) {
       try {
         await twilioClient.messages.create({
           body: message,
           from: process.env.TWILIO_PHONE_NUMBER!,
-          to: client.phone as string,
+          to: phoneE164,
         })
       } catch (err) {
         console.error(`SMS send failed for ${client.phone}:`, err)
       }
+    } else if (!phoneE164) {
+      console.warn(`[run-automations] ⚠️ Could not normalize phone: "${client.phone}"`)
     } else {
       console.log(`[DRY RUN] SMS to ${client.phone}: ${message}`)
     }

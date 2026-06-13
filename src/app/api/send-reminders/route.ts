@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { toE164 } from '@/lib/utils'
 
 // ─── Send Appointment Reminders (Cron-triggered) ───
 // Vercel Cron calls this once per day.
@@ -120,12 +121,19 @@ export async function GET(request: Request) {
 
         // Send SMS via Twilio
         if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER) {
+          const phoneE164 = toE164(client.phone as string)
+          if (!phoneE164) {
+            console.warn(`[send-reminders] ⚠️ Could not normalize phone: "${client.phone}"`)
+            await supabase.from('appointment_reminders').update({ status: 'skipped' }).eq('id', reminder.id)
+            skipCount++
+            continue
+          }
           const twilio = await import('twilio')
           const twilioClient = twilio.default(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
           await twilioClient.messages.create({
             body: fillTemplate(smsTemplate),
             from: process.env.TWILIO_PHONE_NUMBER,
-            to: client.phone as string,
+            to: phoneE164,
           })
         } else {
           console.log(`[DRY RUN] SMS to ${client.phone}: ${fillTemplate(smsTemplate)}`)

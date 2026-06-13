@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { toE164 } from '@/lib/utils'
 
 // ─── Send Campaign Blast (SMS + Email) ───
 // Called by the "Fill My Openings" and campaign blast features.
@@ -100,16 +101,20 @@ export async function POST(request: Request) {
     try {
       // Send SMS
       if ((channel === 'sms' || channel === 'both') && client.phone && !client.sms_opt_out) {
-        if (twilioClient) {
+        const phoneE164 = toE164(client.phone)
+        if (twilioClient && phoneE164) {
           await twilioClient.messages.create({
             body: personalizedMsg,
             from: process.env.TWILIO_PHONE_NUMBER!,
-            to: client.phone,
+            to: phoneE164,
           })
           sentCount++
+        } else if (!phoneE164) {
+          console.warn(`[send-campaign] ⚠️ Could not normalize phone: "${client.phone}"`)
+          skipCount++
         } else {
           console.log(`[DRY RUN] SMS to ${client.phone}: ${personalizedMsg}`)
-          sentCount++ // Count as "sent" in dry run for UX feedback
+          sentCount++
         }
       }
 

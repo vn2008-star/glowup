@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { timezoneFromAddress, DEFAULT_TZ } from '@/lib/tz'
+import { toE164 } from '@/lib/utils'
 
 // Public API — no auth required. Used by the /book/[slug] public booking page.
 if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -393,6 +394,8 @@ async function sendBookingConfirmations(opts: {
   const hasTwilio = process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER
   const hasResend = !!process.env.RESEND_API_KEY
 
+  console.log(`[public-booking] Notification channels: Twilio=${!!hasTwilio}, Resend=${!!hasResend} | Client: phone=${clientPhone || 'NONE'}, email=${clientEmail || 'NONE'} | Owner: phone=${businessPhone || 'NONE'}, email=${businessEmail || 'NONE'}`)
+
   // Lazy-load SDKs
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let twilioClient: any = null
@@ -422,17 +425,20 @@ async function sendBookingConfirmations(opts: {
       `Need to change? Contact us at ${businessPhone || 'the salon'}.`,
     ].filter(Boolean).join('\n')
 
-    if (twilioClient) {
+    const clientE164 = toE164(clientPhone)
+    if (twilioClient && clientE164) {
       try {
         await twilioClient.messages.create({
           body: clientSms,
           from: process.env.TWILIO_PHONE_NUMBER!,
-          to: clientPhone,
+          to: clientE164,
         })
-        console.log(`[public-booking] ✅ Confirmation SMS sent to client ${clientPhone}`)
+        console.log(`[public-booking] ✅ Confirmation SMS sent to client ${clientE164}`)
       } catch (err) {
         console.error(`[public-booking] SMS to client failed:`, err)
       }
+    } else if (!clientE164) {
+      console.warn(`[public-booking] ⚠️ Could not normalize client phone: "${clientPhone}"`)
     } else {
       console.log(`[DRY RUN] Client SMS to ${clientPhone}: ${clientSms}`)
     }
@@ -486,17 +492,20 @@ async function sendBookingConfirmations(opts: {
       staffName ? `💇 Staff: ${staffName}` : '',
     ].filter(Boolean).join('\n')
 
-    if (twilioClient) {
+    const ownerE164 = toE164(businessPhone)
+    if (twilioClient && ownerE164) {
       try {
         await twilioClient.messages.create({
           body: ownerSms,
           from: process.env.TWILIO_PHONE_NUMBER!,
-          to: businessPhone,
+          to: ownerE164,
         })
-        console.log(`[public-booking] ✅ Owner SMS sent to ${businessPhone}`)
+        console.log(`[public-booking] ✅ Owner SMS sent to ${ownerE164}`)
       } catch (err) {
         console.error(`[public-booking] SMS to owner failed:`, err)
       }
+    } else if (!ownerE164) {
+      console.warn(`[public-booking] ⚠️ Could not normalize owner phone: "${businessPhone}"`)
     } else {
       console.log(`[DRY RUN] Owner SMS to ${businessPhone}: ${ownerSms}`)
     }
