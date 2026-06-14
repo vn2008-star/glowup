@@ -30,20 +30,10 @@ CREATE INDEX IF NOT EXISTS idx_clients_tenant_phone
 CREATE INDEX IF NOT EXISTS idx_clients_tenant_last_visit 
   ON clients(tenant_id, last_visit) WHERE last_visit IS NOT NULL;
 
--- Reminder cron: find pending reminders efficiently
--- Used by: send-reminders → eq('status', 'pending').eq('type', '24h')
-CREATE INDEX IF NOT EXISTS idx_reminders_status_type 
-  ON appointment_reminders(status, type);
+-- Note: appointment_reminders(status, type) index already exists
+-- from 006_reminders.sql as a partial index (WHERE status = 'pending'),
+-- which is even more efficient than a full index.
 
--- Tenant lookup by slug (already UNIQUE constraint, but explicit index
--- ensures fast lookups on every public booking page load)
--- Skip if slug already has a unique index from the table definition
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_indexes 
-    WHERE tablename = 'tenants' AND indexdef LIKE '%slug%'
-  ) THEN
-    CREATE UNIQUE INDEX idx_tenants_slug ON tenants(slug);
-  END IF;
-END $$;
+-- Note: tenants(slug) already has a UNIQUE constraint from the
+-- table definition, so no additional index is needed.
+
