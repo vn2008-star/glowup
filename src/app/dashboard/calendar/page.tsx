@@ -36,6 +36,10 @@ export default function CalendarPage() {
   const [editingApt, setEditingApt] = useState<FullAppointment | null>(null);
   const [activeStaffFilter, setActiveStaffFilter] = useState<string[]>([]);
 
+  // ── Block Time state ──
+  const [showBlockModal, setShowBlockModal] = useState(false);
+  const [blockData, setBlockData] = useState({ staff_id: "", date: "", start_time: "09:00", end_time: "10:00", notes: "" });
+
   // ── Closed days / holidays / vacations from tenant settings ──
   const closedHolidays = useMemo(() => {
     const s = tenant?.settings as Record<string, unknown> | undefined;
@@ -314,8 +318,13 @@ export default function CalendarPage() {
       case "confirmed": return "var(--color-primary)";
       case "completed": return "var(--color-success)";
       case "cancelled": return "var(--color-danger)";
+      case "blocked": return "#6b7280";
       default: return "var(--color-warning)";
     }
+  }
+
+  function isBlocked(apt: FullAppointment) {
+    return apt.status === "blocked";
   }
 
   // ── Add appointment ──
@@ -345,6 +354,49 @@ export default function CalendarPage() {
       setClientSearch("");
       setClientDropdownOpen(false);
       setFormData({ client_id: "", service_id: "", staff_id: "", start_time: "", notes: "" });
+    }
+  }
+
+  // ── Block Time ──
+  function openBlockTimeModal(date?: Date, hour?: number) {
+    const d = date || selectedDate;
+    const h = hour ?? 9;
+    setBlockData({
+      staff_id: staffMembers.length === 1 ? staffMembers[0].id : "",
+      date: toDateStr(d),
+      start_time: `${String(h).padStart(2, "0")}:00`,
+      end_time: `${String(Math.min(h + 1, 23)).padStart(2, "0")}:00`,
+      notes: "",
+    });
+    setShowBlockModal(true);
+  }
+
+  async function handleBlockTime(e: React.FormEvent) {
+    e.preventDefault();
+    if (!blockData.staff_id || !blockData.date || !blockData.start_time || !blockData.end_time) return;
+    const start = new Date(`${blockData.date}T${blockData.start_time}:00`);
+    const end = new Date(`${blockData.date}T${blockData.end_time}:00`);
+    if (end <= start) {
+      alert("End time must be after start time");
+      return;
+    }
+    const { data, error } = await queryData<FullAppointment>("appointments.add", {
+      client_id: null,
+      service_id: null,
+      staff_id: blockData.staff_id,
+      start_time: start.toISOString(),
+      end_time: end.toISOString(),
+      status: "blocked",
+      total_price: 0,
+      notes: blockData.notes || "Personal time",
+    });
+    if (error) {
+      alert(`Failed to block time: ${error}`);
+      return;
+    }
+    if (data) {
+      setAppointments(prev => [...prev, data]);
+      setShowBlockModal(false);
     }
   }
 
@@ -393,6 +445,7 @@ export default function CalendarPage() {
               </button>
             ))}
           </div>
+          <button className={styles.blockTimeBtn} onClick={() => openBlockTimeModal()}>🚫 Block Time</button>
           <button className="btn btn-primary" onClick={() => openNewAppointment()}>{t("newAppointment")}</button>
         </div>
       </div>
@@ -512,9 +565,9 @@ export default function CalendarPage() {
                         onClick={() => setSelectedApt(apt)}
                       >
                         <span className={styles.aptClient}>
-                          {apt.client ? `${apt.client.first_name} ${apt.client.last_name || ""}` : t("walkin")}
+                          {isBlocked(apt) ? `🚫 ${apt.notes || "Blocked"}` : (apt.client ? `${apt.client.first_name} ${apt.client.last_name || ""}` : t("walkin"))}
                         </span>
-                        <span className={styles.aptService}>{apt.service?.name || "Service"}</span>
+                        {!isBlocked(apt) && <span className={styles.aptService}>{apt.service?.name || "Service"}</span>}
                         <span className={styles.aptTime}>
                           {new Date(apt.start_time).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
                         </span>
@@ -687,12 +740,12 @@ export default function CalendarPage() {
                           title={`${getStaffName(apt.staff_id)} • ${apt.client ? `${apt.client.first_name} ${apt.client.last_name || ""}`.trim() : "Walk-in"}`}
                         >
                           <span className={styles.weekAptClient}>
-                            {apt.client ? `${apt.client.first_name} ${apt.client.last_name || ""}`.trim() : "Walk-in"}
+                            {isBlocked(apt) ? `🚫 ${apt.notes || "Blocked"}` : (apt.client ? `${apt.client.first_name} ${apt.client.last_name || ""}`.trim() : "Walk-in")}
                           </span>
                           <span className={styles.weekAptTime}>
                             {startD.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
                           </span>
-                          {totalCols <= 3 && (
+                          {!isBlocked(apt) && totalCols <= 3 && (
                             <span className={styles.weekAptStaff} style={{ color: staffColor }}>
                               {getStaffName(apt.staff_id)}
                             </span>
@@ -785,20 +838,39 @@ export default function CalendarPage() {
               <button className={styles.detailClose} onClick={() => setSelectedApt(null)}>✕</button>
             </div>
             <div className={styles.detailBody}>
-              <div className={styles.detailRow}>
-                <span className={styles.detailLabel}>{t("client")}</span>
-                <span className={styles.detailValue}>
-                  {selectedApt.client ? `${selectedApt.client.first_name} ${selectedApt.client.last_name || ""}` : t("walkin")}
-                </span>
-              </div>
-              <div className={styles.detailRow}>
-                <span className={styles.detailLabel}>{t("service")}</span>
-                <span className={styles.detailValue}>{selectedApt.service?.name || "—"}</span>
-              </div>
-              <div className={styles.detailRow}>
-                <span className={styles.detailLabel}>{t("client")}</span>
-                <span className={styles.detailValue}>{selectedApt.staff_member?.name || t("unassigned")}</span>
-              </div>
+              {isBlocked(selectedApt) ? (
+                <>
+                  <div className={styles.detailRow}>
+                    <span className={styles.detailLabel}>Type</span>
+                    <span className={styles.detailValue}>🚫 Personal Time Block</span>
+                  </div>
+                  <div className={styles.detailRow}>
+                    <span className={styles.detailLabel}>Reason</span>
+                    <span className={styles.detailValue}>{selectedApt.notes || "Personal time"}</span>
+                  </div>
+                  <div className={styles.detailRow}>
+                    <span className={styles.detailLabel}>Staff</span>
+                    <span className={styles.detailValue}>{selectedApt.staff_member?.name || t("unassigned")}</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className={styles.detailRow}>
+                    <span className={styles.detailLabel}>{t("client")}</span>
+                    <span className={styles.detailValue}>
+                      {selectedApt.client ? `${selectedApt.client.first_name} ${selectedApt.client.last_name || ""}` : t("walkin")}
+                    </span>
+                  </div>
+                  <div className={styles.detailRow}>
+                    <span className={styles.detailLabel}>{t("service")}</span>
+                    <span className={styles.detailValue}>{selectedApt.service?.name || "—"}</span>
+                  </div>
+                  <div className={styles.detailRow}>
+                    <span className={styles.detailLabel}>Staff</span>
+                    <span className={styles.detailValue}>{selectedApt.staff_member?.name || t("unassigned")}</span>
+                  </div>
+                </>
+              )}
               <div className={styles.detailRow}>
                 <span className={styles.detailLabel}>{t("dateTime")}</span>
                 <span className={styles.detailValue}>
@@ -1008,6 +1080,75 @@ export default function CalendarPage() {
               <div className={styles.modalActions}>
                 <button type="button" className="btn btn-secondary" onClick={() => { setShowModal(false); setEditingApt(null); }}>{t("cancel")}</button>
                 <button type="submit" className="btn btn-primary">{editingApt ? t("updateAppointment") : t("bookAppointment")}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* ── Block Time Modal ── */}
+      {showBlockModal && (
+        <div className={styles.modalOverlay} onClick={() => setShowBlockModal(false)}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <h2>🚫 Block Time</h2>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: 'var(--space-4)' }}>Block off time for personal appointments. Clients won&apos;t be able to book during this time.</p>
+            <form onSubmit={handleBlockTime}>
+              <div className={styles.formGrid}>
+                <div className={styles.formGroup}>
+                  <label className="label">Staff *</label>
+                  <select className="input" value={blockData.staff_id} onChange={(e) => setBlockData({ ...blockData, staff_id: e.target.value })} required>
+                    <option value="">Select staff</option>
+                    {staffMembers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                </div>
+                <div className={styles.formGroup}>
+                  <label className="label">Date *</label>
+                  <input className="input" type="date" value={blockData.date} onChange={(e) => setBlockData({ ...blockData, date: e.target.value })} required />
+                </div>
+                <div className={styles.formGroup}>
+                  <label className="label">Start Time *</label>
+                  <input className="input" type="time" value={blockData.start_time} onChange={(e) => setBlockData({ ...blockData, start_time: e.target.value })} required />
+                </div>
+                <div className={styles.formGroup}>
+                  <label className="label">End Time *</label>
+                  <input className="input" type="time" value={blockData.end_time} onChange={(e) => setBlockData({ ...blockData, end_time: e.target.value })} required />
+                </div>
+              </div>
+              {/* Quick Presets */}
+              <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)', flexWrap: 'wrap' }}>
+                {[
+                  { label: '🍽 Lunch (1hr)', notes: 'Lunch break', hours: 1 },
+                  { label: '🏥 Doctor (2hr)', notes: 'Doctor appointment', hours: 2 },
+                  { label: '🦷 Dentist (1.5hr)', notes: 'Dentist appointment', hours: 1.5 },
+                  { label: '📋 Personal (2hr)', notes: 'Personal appointment', hours: 2 },
+                  { label: '🌴 Half Day (4hr)', notes: 'Half day off', hours: 4 },
+                ].map((preset) => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    className={styles.presetBtn}
+                    onClick={() => {
+                      const [startH, startM] = blockData.start_time.split(':').map(Number);
+                      const endMinutes = startH * 60 + (startM || 0) + preset.hours * 60;
+                      const endH = Math.min(Math.floor(endMinutes / 60), 23);
+                      const endM = endMinutes % 60;
+                      setBlockData({
+                        ...blockData,
+                        end_time: `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`,
+                        notes: preset.notes,
+                      });
+                    }}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+              <div className={styles.formGroup}>
+                <label className="label">Reason / Notes</label>
+                <input className="input" type="text" placeholder="e.g. Doctor appointment, Lunch break..." value={blockData.notes} onChange={(e) => setBlockData({ ...blockData, notes: e.target.value })} />
+              </div>
+              <div className={styles.modalActions}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowBlockModal(false)}>Cancel</button>
+                <button type="submit" className={styles.blockSubmitBtn}>🚫 Block Time</button>
               </div>
             </form>
           </div>

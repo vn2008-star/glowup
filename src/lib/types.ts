@@ -91,7 +91,7 @@ export interface Appointment {
   service_id: string | null
   start_time: string
   end_time: string
-  status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'no_show'
+  status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'no_show' | 'blocked'
   total_price: number | null
   notes: string | null
   payment_method: 'cash' | 'card' | 'mixed' | 'venmo' | 'zelle' | 'gift_card' | 'other' | null

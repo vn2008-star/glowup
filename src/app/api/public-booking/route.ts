@@ -67,7 +67,7 @@ export async function GET(request: Request) {
     .eq('tenant_id', tenant.id)
     .gt('end_time', now.toISOString())
     .lt('start_time', futureLimit.toISOString())
-    .in('status', ['pending', 'confirmed'])
+    .in('status', ['pending', 'confirmed', 'blocked'])
 
   return NextResponse.json({
     business: {
@@ -164,7 +164,7 @@ export async function POST(request: Request) {
       .select('id')
       .eq('tenant_id', tenant.id)
       .eq('staff_id', sid)
-      .in('status', ['pending', 'confirmed'])
+      .in('status', ['pending', 'confirmed', 'blocked'])
       .lt('start_time', staffEnd.toISOString())
       .gt('end_time', staffStart.toISOString())
       .limit(1)

@@ -984,7 +984,82 @@
 .deleteBtn:hover {
   background: #f44336;
   color: white;
-}/* ═══════════════════════════════════════════
+}
+
+/* ═══════════════════════════════════════════
+   BLOCK TIME
+   ═══════════════════════════════════════════ */
+
+/* Header button */
+.blockTimeBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  background: rgba(107, 114, 128, 0.10);
+  border: 1px solid rgba(107, 114, 128, 0.30);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.blockTimeBtn:hover {
+  background: rgba(107, 114, 128, 0.20);
+  border-color: rgba(107, 114, 128, 0.50);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+/* Quick preset pills */
+.presetBtn {
+  padding: 5px 12px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+.presetBtn:hover {
+  border-color: var(--color-primary);
+  background: var(--color-primary-50);
+  color: var(--color-primary);
+  transform: translateY(-1px);
+}
+
+/* Block submit button */
+.blockSubmitBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-6);
+  background: #6b7280;
+  border: none;
+  border-radius: var(--radius-md);
+  color: white;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.blockSubmitBtn:hover {
+  background: #4b5563;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(107, 114, 128, 0.3);
+}
+
+/* Blocked status badge */
+.status_blocked {
+  background: rgba(107, 114, 128, 0.12);
+  color: #6b7280;
+}
+
+/* ═══════════════════════════════════════════
    RESPONSIVE
    ═══════════════════════════════════════════ */
 @media (max-width: 768px) {
