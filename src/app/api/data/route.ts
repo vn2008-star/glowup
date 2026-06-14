@@ -49,14 +49,18 @@ export async function POST(request: Request) {
   const staffId = staffRecord.id
 
   // Helper: mask contact info for technicians when client protection is enabled
+  // Cached per-request to avoid re-querying tenant settings on every list call
+  let _maskContactsResult: boolean | null = null
   async function shouldMaskContacts(): Promise<boolean> {
     if (staffRole !== 'technician') return false
+    if (_maskContactsResult !== null) return _maskContactsResult
     const { data: tenant } = await svc
       .from('tenants')
       .select('settings')
       .eq('id', tenantId)
       .single()
-    return !!(tenant?.settings as Record<string, unknown>)?.client_protection
+    _maskContactsResult = !!(tenant?.settings as Record<string, unknown>)?.client_protection
+    return _maskContactsResult
   }
 
   function maskPhone(phone: string | null): string | null {

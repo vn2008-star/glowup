@@ -271,22 +271,14 @@ export async function GET(request: Request) {
 
       const { data: birthdayClients } = await supabase
         .from('clients')
-        .select('id, first_name, last_name, phone, email, sms_opt_out')
+        .select('id, first_name, last_name, phone, email, sms_opt_out, birthday')
         .eq('tenant_id', tenant.id)
         .not('birthday', 'is', null)
 
       if (birthdayClients) {
         for (const client of birthdayClients) {
-          // Check if birthday matches (we need to query raw since Supabase doesn't support EXTRACT)
-          // We'll check via the birthday string format
-          const { data: clientFull } = await supabase
-            .from('clients')
-            .select('birthday')
-            .eq('id', client.id)
-            .single()
-
-          if (!clientFull?.birthday) continue
-          const bday = new Date(clientFull.birthday)
+          if (!client.birthday) continue
+          const bday = new Date(client.birthday)
           if (bday.getMonth() + 1 !== targetMonth || bday.getDate() !== targetDay) continue
 
           const clientName = `${client.first_name || ''}`.trim() || 'there'
