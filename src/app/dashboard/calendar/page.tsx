@@ -684,10 +684,10 @@ export default function CalendarPage() {
                             cursor: "pointer",
                           }}
                           onClick={() => setSelectedApt(apt)}
-                          title={`${getStaffName(apt.staff_id)} • ${apt.client ? apt.client.first_name : "Walk-in"}`}
+                          title={`${getStaffName(apt.staff_id)} • ${apt.client ? `${apt.client.first_name} ${apt.client.last_name || ""}`.trim() : "Walk-in"}`}
                         >
                           <span className={styles.weekAptClient}>
-                            {apt.client ? apt.client.first_name : "Walk-in"}
+                            {apt.client ? `${apt.client.first_name} ${apt.client.last_name || ""}`.trim() : "Walk-in"}
                           </span>
                           <span className={styles.weekAptTime}>
                             {startD.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
@@ -758,9 +758,9 @@ export default function CalendarPage() {
                   {dayApts.length > 0 && (
                     <div className={styles.monthDots}>
                       {dayApts.slice(0, maxDots).map((apt, i) => (
-                        <div key={i} className={styles.monthDot} style={{ background: aptColor(apt.status) }} title={apt.client ? apt.client.first_name : "Walk-in"}>
+                        <div key={i} className={styles.monthDot} style={{ background: aptColor(apt.status) }} title={apt.client ? `${apt.client.first_name} ${apt.client.last_name || ""}`.trim() : "Walk-in"}>
                           <span className={styles.monthDotText}>
-                            {apt.client ? apt.client.first_name : "Walk-in"}
+                            {apt.client ? `${apt.client.first_name} ${apt.client.last_name || ""}`.trim() : "Walk-in"}
                           </span>
                         </div>
                       ))}
