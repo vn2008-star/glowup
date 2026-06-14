@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData } from "@/lib/api";
 import { localToUTC, todayInTz, DEFAULT_TZ } from "@/lib/tz";
+import { CLOSED_DAY_HOLIDAYS, isBusinessClosedOnDate, isStaffOffOnDate } from "@/lib/schedule-utils";
+import type { CustomClosedDate } from "@/lib/schedule-utils";
 import styles from "./calendar.module.css";
 import type { Appointment, Client, Service, Staff } from "@/lib/types";
 
@@ -33,6 +35,87 @@ export default function CalendarPage() {
   const [selectedApt, setSelectedApt] = useState<FullAppointment | null>(null);
   const [editingApt, setEditingApt] = useState<FullAppointment | null>(null);
   const [activeStaffFilter, setActiveStaffFilter] = useState<string[]>([]);
+
+  // ── Closed days / holidays / vacations from tenant settings ──
+  const closedHolidays = useMemo(() => {
+    const s = tenant?.settings as Record<string, unknown> | undefined;
+    return (s?.closed_holidays || []) as string[];
+  }, [tenant]);
+
+  const customClosedDates = useMemo(() => {
+    const s = tenant?.settings as Record<string, unknown> | undefined;
+    return (s?.custom_closed_dates || []) as CustomClosedDate[];
+  }, [tenant]);
+
+  /**
+   * For a given date, return all the "special day" markers to show.
+   * Each marker has a type, label, and color scheme.
+   */
+  type DayMarkerType = "holiday" | "closed" | "vacation" | "day-off";
+  interface DayMarker {
+    type: DayMarkerType;
+    label: string;
+    staffName?: string;
+  }
+
+  function getDayMarkers(dateStr: string): DayMarker[] {
+    const markers: DayMarker[] = [];
+    const d = new Date(dateStr + "T00:00:00");
+    const month = d.getMonth();
+    const day = d.getDate();
+
+    // 1) Business-wide holidays
+    for (const holidayName of closedHolidays) {
+      const h = CLOSED_DAY_HOLIDAYS.find(hd => hd.name === holidayName);
+      if (h && h.month === month && h.day === day) {
+        markers.push({ type: "holiday", label: `${h.emoji} ${h.name}` });
+      }
+    }
+
+    // 2) Custom closed dates
+    for (const c of customClosedDates) {
+      if (c.date === dateStr) {
+        markers.push({ type: "closed", label: `📌 ${c.label || "Closed"}` });
+      }
+    }
+
+    // 3) Per-staff vacations & days off
+    for (const staff of staffMembers) {
+      const sched = staff.schedule;
+      if (!sched) continue;
+
+      // Check vacations
+      const vacations = (sched.vacations || []) as { start: string; end: string; note?: string }[];
+      for (const v of vacations) {
+        if (dateStr >= v.start && dateStr <= v.end) {
+          markers.push({ type: "vacation", label: v.note || "Vacation", staffName: staff.name });
+          break; // one marker per staff is enough
+        }
+      }
+
+      // Check per-staff holidays_off (only if not already a business-wide holiday)
+      const holidaysOff = (sched.holidays_off || []) as string[];
+      for (const holidayName of holidaysOff) {
+        // Skip if this is already a business-wide holiday
+        if (closedHolidays.includes(holidayName)) continue;
+        const h = CLOSED_DAY_HOLIDAYS.find(hd => hd.name === holidayName);
+        if (h && h.month === month && h.day === day) {
+          markers.push({ type: "day-off", label: h.name, staffName: staff.name });
+        }
+      }
+
+      // Check regular day-off via alternating schedule
+      if (isStaffOffOnDate(sched, dateStr)) {
+        // Only add if we haven't already added a vacation or holiday marker for this staff
+        const alreadyMarked = markers.some(m => m.staffName === staff.name);
+        if (!alreadyMarked) {
+          markers.push({ type: "day-off", label: "Day Off", staffName: staff.name });
+        }
+      }
+    }
+
+    return markers;
+  }
 
   // ── Date helpers ──
   function toDateStr(d: Date) {
@@ -322,6 +405,22 @@ export default function CalendarPage() {
       ) : view === "day" ? (
         /* ════════════════ DAY VIEW ════════════════ */
         <div className={styles.dayView}>
+          {/* Day-level markers banner */}
+          {(() => {
+            const dayDateStr = toDateStr(selectedDate);
+            const dayMarkers = getDayMarkers(dayDateStr);
+            if (dayMarkers.length === 0) return null;
+            return (
+              <div className={styles.dayMarkersBanner}>
+                {dayMarkers.map((m, i) => (
+                  <div key={i} className={`${styles.dayMarkerTag} ${styles[`marker_${m.type}`]}`}>
+                    <span className={styles.dayMarkerLabel}>{m.label}</span>
+                    {m.staffName && <span className={styles.dayMarkerStaff}>{m.staffName}</span>}
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
           {/* Availability Summary */}
           <div className={styles.availSummary}>
             <h3 className={styles.availTitle}>
@@ -519,16 +618,36 @@ export default function CalendarPage() {
             {/* Day columns */}
             {weekDays.map((day) => {
               const isToday = isSameDay(day, today);
+              const dayDateStr = toDateStr(day);
+              const weekMarkers = getDayMarkers(dayDateStr);
+              const isBizClosed = isBusinessClosedOnDate(closedHolidays, customClosedDates, dayDateStr);
               const dayApts = visibleApts.filter(a => {
                 const d = new Date(a.start_time);
                 return d.getFullYear() === day.getFullYear() && d.getMonth() === day.getMonth() && d.getDate() === day.getDate();
               });
               const laid = layoutOverlaps(dayApts);
               return (
-                <div key={toDateStr(day)} className={`${styles.weekCol} ${isToday ? styles.weekColToday : ""}`}>
+                <div key={dayDateStr} className={`${styles.weekCol} ${isToday ? styles.weekColToday : ""} ${isBizClosed ? styles.weekColClosed : ""}`}>
                   <div className={`${styles.weekColHeader} ${isToday ? styles.weekColHeaderToday : ""}`}>
                     <span className={styles.weekDayName}>{day.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase()}</span>
                     <span className={`${styles.weekDayNum} ${isToday ? styles.weekDayNumToday : ""}`}>{day.getDate()}</span>
+                    {/* Compact markers in week header */}
+                    {weekMarkers.length > 0 && (
+                      <div className={styles.weekHeaderMarkers}>
+                        {weekMarkers.slice(0, 2).map((m, i) => (
+                          <span
+                            key={i}
+                            className={`${styles.weekHeaderMarker} ${styles[`marker_${m.type}`]}`}
+                            title={m.staffName ? `${m.staffName}: ${m.label}` : m.label}
+                          >
+                            {m.type === "holiday" ? "🏖" : m.type === "closed" ? "📌" : m.type === "vacation" ? "✈" : "💤"}
+                          </span>
+                        ))}
+                        {weekMarkers.length > 2 && (
+                          <span className={styles.weekHeaderMarkerMore}>+{weekMarkers.length - 2}</span>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div className={styles.weekColBody} style={{ height: HOURS.length * SLOT_HEIGHT }}>
                     {/* Hour lines */}
@@ -604,16 +723,38 @@ export default function CalendarPage() {
               const isCurrentMonth = day.getMonth() === selectedDate.getMonth();
               const isToday = isSameDay(day, today);
               const dayApts = aptsForDay(day);
+              const dayDateStr = toDateStr(day);
+              const markers = getDayMarkers(dayDateStr);
+              const isBizClosed = isBusinessClosedOnDate(closedHolidays, customClosedDates, dayDateStr);
               const maxDots = 3;
               return (
                 <div
-                  key={toDateStr(day)}
-                  className={`${styles.monthCell} ${!isCurrentMonth ? styles.monthCellOther : ""} ${isToday ? styles.monthCellToday : ""}`}
+                  key={dayDateStr}
+                  className={`${styles.monthCell} ${!isCurrentMonth ? styles.monthCellOther : ""} ${isToday ? styles.monthCellToday : ""} ${isBizClosed ? styles.monthCellClosed : ""}`}
                   onClick={() => { setSelectedDate(day); setView("day"); }}
                 >
                   <span className={`${styles.monthDayNum} ${isToday ? styles.monthDayNumToday : ""}`}>
                     {day.getDate()}
                   </span>
+                  {/* Day markers: holidays, closed, vacations, days off */}
+                  {markers.length > 0 && (
+                    <div className={styles.monthMarkers}>
+                      {markers.slice(0, 2).map((m, i) => (
+                        <div
+                          key={i}
+                          className={`${styles.monthMarker} ${styles[`marker_${m.type}`]}`}
+                          title={m.staffName ? `${m.staffName}: ${m.label}` : m.label}
+                        >
+                          <span className={styles.monthMarkerText}>
+                            {m.staffName ? `${m.staffName.split(" ")[0]}` : m.label}
+                          </span>
+                        </div>
+                      ))}
+                      {markers.length > 2 && (
+                        <span className={styles.monthMore}>+{markers.length - 2}</span>
+                      )}
+                    </div>
+                  )}
                   {dayApts.length > 0 && (
                     <div className={styles.monthDots}>
                       {dayApts.slice(0, maxDots).map((apt, i) => (

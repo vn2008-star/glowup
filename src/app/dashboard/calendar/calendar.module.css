@@ -636,6 +636,137 @@
   padding-left: 6px;
 }
 
+/* ── Closed day cell backgrounds ── */
+.monthCellClosed {
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 8px,
+    rgba(244, 67, 54, 0.03) 8px,
+    rgba(244, 67, 54, 0.03) 16px
+  );
+}
+.weekColClosed {
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 8px,
+    rgba(244, 67, 54, 0.03) 8px,
+    rgba(244, 67, 54, 0.03) 16px
+  );
+}
+
+/* ── Marker type colors ── */
+.marker_holiday {
+  --marker-bg: rgba(244, 67, 54, 0.10);
+  --marker-border: rgba(244, 67, 54, 0.30);
+  --marker-text: #e53935;
+}
+.marker_closed {
+  --marker-bg: rgba(255, 152, 0, 0.10);
+  --marker-border: rgba(255, 152, 0, 0.30);
+  --marker-text: #ef6c00;
+}
+.marker_vacation {
+  --marker-bg: rgba(0, 188, 212, 0.10);
+  --marker-border: rgba(0, 188, 212, 0.30);
+  --marker-text: #00838f;
+}
+.marker_day-off {
+  --marker-bg: rgba(120, 144, 156, 0.10);
+  --marker-border: rgba(120, 144, 156, 0.30);
+  --marker-text: #546e7a;
+}
+
+/* ── Month view markers ── */
+.monthMarkers {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.monthMarker {
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
+  border-left: 2px solid var(--marker-border);
+  background: var(--marker-bg);
+  font-size: 9px;
+  overflow: hidden;
+}
+.monthMarkerText {
+  color: var(--marker-text);
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+  letter-spacing: 0.01em;
+}
+
+/* ── Week view header markers ── */
+.weekHeaderMarkers {
+  display: flex;
+  gap: 3px;
+  margin-top: 2px;
+}
+.weekHeaderMarker {
+  font-size: 11px;
+  line-height: 1;
+  padding: 1px 3px;
+  border-radius: var(--radius-sm);
+  background: var(--marker-bg);
+  cursor: default;
+  transition: transform var(--transition-fast);
+}
+.weekHeaderMarker:hover {
+  transform: scale(1.2);
+}
+.weekHeaderMarkerMore {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  align-self: center;
+}
+
+/* ── Day view markers banner ── */
+.dayMarkersBanner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-subtle);
+}
+.dayMarkerTag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--marker-bg);
+  border: 1px solid var(--marker-border);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  transition: all var(--transition-fast);
+}
+.dayMarkerTag:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+.dayMarkerLabel {
+  color: var(--marker-text);
+}
+.dayMarkerStaff {
+  color: var(--marker-text);
+  opacity: 0.7;
+  font-weight: 600;
+  font-size: 10px;
+  padding-left: var(--space-1);
+  border-left: 1px solid var(--marker-border);
+}
+
+
 
 /* ═══════════════════════════════════════════
    MODAL
