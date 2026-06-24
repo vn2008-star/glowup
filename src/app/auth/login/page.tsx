@@ -12,12 +12,13 @@ function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirect = searchParams.get('redirect') || '/dashboard'
+  const urlError = searchParams.get('error_description') || searchParams.get('error')
   const supabase = createClient()
   const t = useTranslations('auth')
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
+  const [error, setError] = useState(urlError ? urlError.replace(/\+/g, ' ') : '')
   const [loading, setLoading] = useState(false)
 
   async function handleLogin(e: React.FormEvent) {
