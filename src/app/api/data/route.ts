@@ -1885,7 +1885,7 @@ export async function POST(request: Request) {
           (() => {
             let q = svc
               .from('appointments')
-              .select('id, start_time, end_time, status, staff_id, client_id, service_id, notes, total_price, client:clients(id, first_name, last_name, birthday), staff_member:staff!staff_id(id, name), service:services(id, name, duration_minutes)')
+              .select('*, client:clients(*), staff_member:staff!staff_id(*), service:services(*)')
               .eq('tenant_id', tenantId)
               .order('start_time', { ascending: true })
             if (payload?.startDate && payload?.endDate) {
