@@ -36,6 +36,9 @@ export default function CalendarPage() {
   const [editingApt, setEditingApt] = useState<FullAppointment | null>(null);
   const [activeStaffFilter, setActiveStaffFilter] = useState<string[]>([]);
 
+  // ── Birthday clients (loaded once for calendar birthday indicators) ──
+  const [birthdayClients, setBirthdayClients] = useState<Pick<Client, 'id' | 'first_name' | 'last_name' | 'birthday'>[]>([]);
+
   // ── Block Time state ──
   const [showBlockModal, setShowBlockModal] = useState(false);
   const [blockData, setBlockData] = useState({ staff_id: "", date: "", start_time: "09:00", end_time: "10:00", notes: "" });
@@ -239,12 +242,35 @@ export default function CalendarPage() {
 
   useEffect(() => { fetchCalendarData(); }, [fetchCalendarData]);
 
-  // Defer clients loading until booking modal opens
+  // Load birthday clients once on mount (lightweight — just name + birthday)
+  useEffect(() => {
+    if (!tenant || birthdayClients.length > 0) return;
+    queryData<Client[]>("clients.list").then(res => {
+      const withBirthday = (res.data || []).filter(c => c.birthday).map(c => ({
+        id: c.id, first_name: c.first_name, last_name: c.last_name, birthday: c.birthday,
+      }));
+      setBirthdayClients(withBirthday);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenant]);
+
+  // Defer full clients loading until booking modal opens
   const fetchClientsIfNeeded = useCallback(async () => {
     if (clients.length > 0) return; // already loaded
     const clientRes = await queryData<Client[]>("clients.list");
     setClients(clientRes.data || []);
   }, [clients.length]);
+
+  // Get clients with birthdays on a specific calendar date (month+day match)
+  function getBirthdayClientsForDate(date: Date) {
+    const m = date.getMonth() + 1;
+    const d = date.getDate();
+    return birthdayClients.filter(c => {
+      if (!c.birthday) return false;
+      const bd = new Date(c.birthday + 'T00:00:00');
+      return bd.getMonth() + 1 === m && bd.getDate() === d;
+    });
+  }
 
   // ── Navigation ──
   function changeDate(delta: number) {
@@ -491,6 +517,21 @@ export default function CalendarPage() {
               </div>
             );
           })()}
+          {/* Birthday banner — show clients with birthdays today */}
+          {(() => {
+            const bdClients = getBirthdayClientsForDate(selectedDate);
+            if (bdClients.length === 0) return null;
+            return (
+              <div className={styles.birthdayBanner}>
+                {bdClients.map(c => (
+                  <div key={c.id} className={styles.birthdayTag}>
+                    <span>🎂</span>
+                    <span>{c.first_name} {c.last_name || ''}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
           {/* Availability Summary */}
           <div className={styles.availSummary}>
             <h3 className={styles.availTitle}>
@@ -722,6 +763,21 @@ export default function CalendarPage() {
                         )}
                       </div>
                     )}
+                    {/* Birthday clients on this day */}
+                    {(() => {
+                      const bdClients = getBirthdayClientsForDate(day);
+                      if (bdClients.length === 0) return null;
+                      return (
+                        <div className={styles.weekHeaderBirthdays}>
+                          {bdClients.slice(0, 2).map(c => (
+                            <span key={c.id} className={styles.weekBirthdayTag} title={`${c.first_name} ${c.last_name || ''} — Birthday`}>
+                              🎂 {c.first_name} {c.last_name ? c.last_name[0] + '.' : ''}
+                            </span>
+                          ))}
+                          {bdClients.length > 2 && <span className={styles.weekBirthdayMore}>+{bdClients.length - 2}</span>}
+                        </div>
+                      );
+                    })()}
                   </div>
                   <div className={styles.weekColBody} style={{ height: HOURS.length * SLOT_HEIGHT }}>
                     {/* Hour lines */}
@@ -832,6 +888,21 @@ export default function CalendarPage() {
                       )}
                     </div>
                   )}
+                  {/* Birthday clients */}
+                  {(() => {
+                    const bdClients = getBirthdayClientsForDate(day);
+                    if (bdClients.length === 0) return null;
+                    return (
+                      <div className={styles.monthBirthdays}>
+                        {bdClients.slice(0, 2).map(c => (
+                          <span key={c.id} className={styles.monthBirthdayTag} title={`${c.first_name} ${c.last_name || ''} — Birthday`}>
+                            🎂 {c.first_name} {c.last_name ? c.last_name[0] + '.' : ''}
+                          </span>
+                        ))}
+                        {bdClients.length > 2 && <span className={styles.monthBirthdayMore}>+{bdClients.length - 2}</span>}
+                      </div>
+                    );
+                  })()}
                   {dayApts.length > 0 && (
                     <div className={styles.monthDots}>
                       {dayApts.slice(0, maxDots).map((apt, i) => (
