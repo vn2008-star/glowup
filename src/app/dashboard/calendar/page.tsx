@@ -565,8 +565,11 @@ export default function CalendarPage() {
                         onClick={() => setSelectedApt(apt)}
                       >
                         <span className={styles.aptClient}>
-                          {isBlocked(apt) ? `🚫 ${apt.notes || "Blocked"}` : (apt.client ? `${apt.client.first_name} ${apt.client.last_name || ""}` : t("walkin"))}
+                          {isBlocked(apt) ? `🚫 ${apt.notes || "Blocked"}` : (apt.client ? `${apt.client.first_name} ${apt.client.last_name || ""}`.trim() : t("walkin"))}
                         </span>
+                        {!isBlocked(apt) && apt.client?.birthday && (
+                          <span className={styles.aptBirthday}>🎂 {new Date(apt.client.birthday + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                        )}
                         {!isBlocked(apt) && <span className={styles.aptService}>{apt.service?.name || "Service"}</span>}
                         <span className={styles.aptTime}>
                           {new Date(apt.start_time).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
@@ -742,6 +745,9 @@ export default function CalendarPage() {
                           <span className={styles.weekAptClient}>
                             {isBlocked(apt) ? `🚫 ${apt.notes || "Blocked"}` : (apt.client ? `${apt.client.first_name} ${apt.client.last_name || ""}`.trim() : "Walk-in")}
                           </span>
+                          {!isBlocked(apt) && apt.client?.birthday && (
+                            <span className={styles.weekAptBirthday}>🎂 {new Date(apt.client.birthday + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                          )}
                           <span className={styles.weekAptTime}>
                             {startD.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
                           </span>

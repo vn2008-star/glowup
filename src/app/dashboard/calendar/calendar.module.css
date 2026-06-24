@@ -347,6 +347,14 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.aptBirthday {
+  font-size: 10px;
+  color: #e91e90;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .aptTime {
   font-size: 10px;
   font-weight: 600;
@@ -498,6 +506,15 @@
   text-overflow: ellipsis;
   display: block;
   opacity: 0.8;
+}
+.weekAptBirthday {
+  font-size: 9px;
+  color: #e91e90;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
 }
 
 /* Staff Filter Toggle */
