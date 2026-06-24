@@ -722,7 +722,7 @@ export default function CalendarPage() {
                       const startH = startD.getHours() + startD.getMinutes() / 60;
                       const endH = endD.getHours() + endD.getMinutes() / 60;
                       const top = (startH - WORK_START) * SLOT_HEIGHT;
-                      const height = Math.max((endH - startH) * SLOT_HEIGHT, 48);
+                      const height = Math.max((endH - startH) * SLOT_HEIGHT, 56);
                       const staffColor = getStaffColor(apt.staff_id);
                       const colWidth = 100 / totalCols;
                       const leftPct = col * colWidth;

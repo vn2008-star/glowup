@@ -472,7 +472,7 @@
   border-left: 3px solid var(--color-primary);
   border-radius: var(--radius-sm);
   padding: 2px 6px;
-  overflow: hidden;
+  overflow: visible;
   cursor: pointer;
   transition: all var(--transition-fast);
   z-index: 1;
