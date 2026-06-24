@@ -523,13 +523,14 @@ export default function CalendarPage() {
 
           {/* Staff Columns */}
           <div className={styles.techColumns} style={{ gridTemplateColumns: `repeat(${Math.max(staffMembers.length, 1)}, 1fr)` }}>
-            {(staffMembers.length > 0 ? staffMembers : [{ id: "unassigned", name: "Unassigned" } as Staff]).map((staff) => {
+            {(staffMembers.length > 0 ? staffMembers : [{ id: "unassigned", name: "Unassigned" } as Staff]).map((staff, staffIdx) => {
               const staffApts = appointments.filter(a =>
                 staff.id === "unassigned" ? !a.staff_id : a.staff_id === staff.id
               );
               const util = getUtilization(staff.id);
+              const isFirstCol = staffIdx === 0;
               return (
-                <div key={staff.id} className={styles.techColumn}>
+                <div key={staff.id} className={`${styles.techColumn} ${!isFirstCol ? styles.techColumnCompact : ''}`}>
                   <div className={styles.techHeader}>
                     <div className={styles.techAvatar}>{staff.name[0]}</div>
                     <div className={styles.techMeta}>
@@ -542,7 +543,7 @@ export default function CalendarPage() {
                   <div className={styles.timeGrid}>
                     {HOURS.map((h) => (
                       <div key={h} className={styles.timeSlot}>
-                        <span className={styles.timeLabel}>{formatHour(h)}</span>
+                        {isFirstCol && <span className={styles.timeLabel}>{formatHour(h)}</span>}
                         <div className={styles.slotLine} />
                       </div>
                     ))}
@@ -584,13 +585,13 @@ export default function CalendarPage() {
                         <span className={styles.aptClient}>
                           {isBlocked(apt) ? `🚫 ${apt.notes || "Blocked"}` : (apt.client ? `${apt.client.first_name} ${apt.client.last_name || ""}`.trim() : t("walkin"))}
                         </span>
+                        <span className={styles.aptTime}>
+                          {new Date(apt.start_time).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+                        </span>
                         {!isBlocked(apt) && apt.client?.birthday && (
                           <span className={styles.aptBirthday}>🎂 {new Date(apt.client.birthday + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                         )}
                         {!isBlocked(apt) && <span className={styles.aptService}>{apt.service?.name || "Service"}</span>}
-                        <span className={styles.aptTime}>
-                          {new Date(apt.start_time).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
-                        </span>
                       </div>
                     ))}
                   </div>
