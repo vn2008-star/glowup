@@ -62,10 +62,40 @@ export default function CalendarPage() {
     staffName?: string;
   }
 
+
+  // ── Date helpers ──
+  function toDateStr(d: Date) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+
+  function isSameDay(a: Date, b: Date) {
+    return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  }
+
+  const today = new Date();
+
+  // ── Computed ranges ──
+  const weekStart = new Date(selectedDate);
+  weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7)); // Monday
+  const weekDays = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(weekStart);
+    d.setDate(d.getDate() + i);
+    return d;
+  });
+
+  // Month grid (6 weeks)
+  const monthStart = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+  const monthGridStart = new Date(monthStart);
+  monthGridStart.setDate(monthGridStart.getDate() - ((monthGridStart.getDay() + 6) % 7)); // Mon before 1st
+  const monthDays = Array.from({ length: 42 }, (_, i) => {
+    const d = new Date(monthGridStart);
+    d.setDate(d.getDate() + i);
+    return d;
+  });
+
   // ── Memoized day markers: precompute for all visible dates ──
   const dayMarkersCache = useMemo(() => {
     const cache: Record<string, DayMarker[]> = {};
-    // Determine which dates are visible based on current view
     let datesToCheck: Date[];
     if (view === "day") {
       datesToCheck = [selectedDate];
@@ -77,13 +107,12 @@ export default function CalendarPage() {
 
     for (const day of datesToCheck) {
       const dateStr = toDateStr(day);
-      if (cache[dateStr]) continue; // skip duplicates
+      if (cache[dateStr]) continue;
       const markers: DayMarker[] = [];
       const d = new Date(dateStr + "T00:00:00");
       const month = d.getMonth();
       const dayNum = d.getDate();
 
-      // 1) Business-wide holidays
       for (const holidayName of closedHolidays) {
         const h = CLOSED_DAY_HOLIDAYS.find(hd => hd.name === holidayName);
         if (h && h.month === month && h.day === dayNum) {
@@ -91,14 +120,12 @@ export default function CalendarPage() {
         }
       }
 
-      // 2) Custom closed dates
       for (const c of customClosedDates) {
         if (c.date === dateStr) {
           markers.push({ type: "closed", label: `📌 ${c.label || "Closed"}` });
         }
       }
 
-      // 3) Per-staff vacations & days off
       for (const staff of staffMembers) {
         const sched = staff.schedule;
         if (!sched) continue;
@@ -137,36 +164,6 @@ export default function CalendarPage() {
   function getDayMarkers(dateStr: string): DayMarker[] {
     return dayMarkersCache[dateStr] || [];
   }
-
-  // ── Date helpers ──
-  function toDateStr(d: Date) {
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  }
-
-  function isSameDay(a: Date, b: Date) {
-    return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-  }
-
-  const today = new Date();
-
-  // ── Computed ranges ──
-  const weekStart = new Date(selectedDate);
-  weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7)); // Monday
-  const weekDays = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(weekStart);
-    d.setDate(d.getDate() + i);
-    return d;
-  });
-
-  // Month grid (6 weeks)
-  const monthStart = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
-  const monthGridStart = new Date(monthStart);
-  monthGridStart.setDate(monthGridStart.getDate() - ((monthGridStart.getDay() + 6) % 7)); // Mon before 1st
-  const monthDays = Array.from({ length: 42 }, (_, i) => {
-    const d = new Date(monthGridStart);
-    d.setDate(d.getDate() + i);
-    return d;
-  });
 
   // ── Dynamic time grid range (expand if appointments outside default hours) ──
   const { WORK_START, WORK_END, HOURS } = (() => {
