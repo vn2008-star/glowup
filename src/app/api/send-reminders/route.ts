@@ -34,7 +34,7 @@ export async function GET(request: Request) {
       appointments!inner (
         start_time, end_time, status, manage_token,
         services ( name ),
-        staff ( name )
+        staff!staff_id ( name )
       ),
       clients!inner (
         first_name, last_name, phone, email, sms_opt_out
@@ -86,6 +86,10 @@ export async function GET(request: Request) {
     const staff = appointment.staff as Record<string, string> | null
     const startTime = new Date(appointment.start_time as string)
     const clientName = `${client.first_name || ''}${client.last_name ? ' ' + client.last_name : ''}`.trim() || 'there'
+    // Greeting format: "Dear James D." instead of full name
+    const clientGreeting = client.last_name
+      ? `${client.first_name || 'there'} ${(client.last_name as string)[0]}.`
+      : (client.first_name as string || 'there')
     const serviceName = service?.name || 'your appointment'
     const staffName = staff?.name || ''
     const businessName = tenant?.name || 'our salon'
@@ -100,13 +104,14 @@ export async function GET(request: Request) {
     const manageLink = manageToken ? `${baseUrl}/manage/${manageToken}` : ''
 
     const customTemplates = (settings.reminder_templates || {}) as Record<string, string>
-    const smsTemplate = customTemplates.sms || `Hi {client_name}! This is a reminder that your {service} appointment at {business_name} is tomorrow, {date} at {time}.${businessAddress ? ' 📍 {address}' : ''}${manageLink ? '\nManage: {manage_link}' : '\nReply C to Confirm, M to Modify, X to Cancel. Reply STOP to opt out.'}`
+    const smsTemplate = customTemplates.sms || `Dear {client_greeting}! This is a reminder that your {service} appointment at {business_name} is tomorrow, {date} at {time}.${businessAddress ? ' 📍 {address}' : ''}${manageLink ? '\nManage: {manage_link}' : '\nReply C to Confirm, M to Modify, X to Cancel. Reply STOP to opt out.'}`
     const emailSubject = customTemplates.email_subject || `Appointment Reminder — {business_name}`
-    const emailBody = customTemplates.email || `Hi {client_name},\n\nThis is a friendly reminder about your upcoming appointment:\n\n📋 Service: {service}\n📅 Date: {date}\n🕐 Time: {time}\n${staffName ? `💇 With: {staff}\n` : ''}\n📍 At: {business_name}\n🏠 Address: {address}\n${manageLink ? `\nNeed to reschedule or cancel? Manage your appointment:\n{manage_link}\n` : '\nTo confirm, modify, or cancel your appointment, please reply to this email or contact us directly.\n'}\nSee you soon!\n— {business_name}`
+    const emailBody = customTemplates.email || `Dear {client_greeting},\n\nThis is a friendly reminder about your upcoming appointment:\n\n📋 Service: {service}\n📅 Date: {date}\n🕐 Time: {time}\n${staffName ? `💇 With: {staff}\n` : ''}\n📍 At: {business_name}\n🏠 Address: {address}\n${manageLink ? `\nNeed to reschedule or cancel? Manage your appointment:\n{manage_link}\n` : '\nTo confirm, modify, or cancel your appointment, please reply to this email or contact us directly.\n'}\nSee you soon!\n— {business_name}`
 
     function fillTemplate(template: string): string {
       return template
         .replace(/\{client_name\}/g, clientName)
+        .replace(/\{client_greeting\}/g, clientGreeting)
         .replace(/\{service\}/g, serviceName)
         .replace(/\{staff\}/g, staffName)
         .replace(/\{business_name\}/g, businessName)

@@ -376,6 +376,14 @@ async function sendBookingConfirmations(opts: {
 }) {
   const { tenant, appointment, serviceName, staffName, clientName, clientEmail, clientPhone, clientId, start } = opts
 
+  // Format greeting: "Dear James D." instead of full name
+  function greetingName(fullName: string): string {
+    const parts = fullName.trim().split(/\s+/)
+    if (parts.length <= 1) return parts[0] || 'there'
+    return `${parts[0]} ${parts[parts.length - 1][0]}.`
+  }
+  const greeting = greetingName(clientName)
+
   // Build manage link for self-service cancel/reschedule
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://glowup-jade.vercel.app'
   const manageLink = appointment.manage_token ? `${baseUrl}/manage/${appointment.manage_token}` : ''
@@ -469,7 +477,7 @@ async function sendBookingConfirmations(opts: {
     const clientSms = [
       `✅ Booking Confirmed!`,
       ``,
-      `Hi ${clientName}, your appointment is booked:`,
+      `Dear ${greeting}, your appointment is booked:`,
       `📋 ${serviceName}`,
       `📅 ${dateStr} at ${timeStr}`,
       staffName ? `💇 With: ${staffName}` : '',
@@ -497,7 +505,7 @@ async function sendBookingConfirmations(opts: {
   // ── 2. Email to client ──
   if (clientEmail) {
     const clientEmailBody = [
-      `Hi ${clientName},`,
+      `Dear ${greeting},`,
       ``,
       `Your appointment has been confirmed! Here are the details:`,
       ``,

@@ -22,7 +22,7 @@ export async function GET(request: Request) {
     .select(`
       id, tenant_id, start_time, end_time, status, notes, manage_token, service_id, staff_id,
       services ( id, name, duration_minutes, price ),
-      staff ( id, name ),
+      staff!staff_id ( id, name ),
       clients ( id, first_name, last_name, email, phone )
     `)
     .eq('manage_token', token)
@@ -79,7 +79,7 @@ export async function PATCH(request: Request) {
     .select(`
       id, tenant_id, start_time, end_time, status, service_id, staff_id, client_id,
       services ( name, duration_minutes ),
-      staff ( name ),
+      staff!staff_id ( name ),
       clients ( first_name, last_name, email, phone )
     `)
     .eq('manage_token', token)
@@ -108,6 +108,10 @@ export async function PATCH(request: Request) {
   const staff = apt.staff as unknown as { name: string } | null
   const client = apt.clients as unknown as { first_name: string; last_name: string; email: string | null; phone: string | null } | null
   const clientName = client ? `${client.first_name} ${client.last_name || ''}`.trim() : 'Client'
+  // Greeting format: "Dear James D." instead of full name
+  const clientGreeting = client
+    ? (client.last_name ? `${client.first_name} ${client.last_name[0]}.` : client.first_name)
+    : 'Client'
   const serviceName = service?.name || 'Service'
   const staffName = staff?.name || ''
   const businessName = tenant?.name || 'the salon'
@@ -359,7 +363,7 @@ async function notifyClient(opts: {
 
   // SMS
   if (client.phone && process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER) {
-    const smsBody = `🔄 Appointment Rescheduled!\n\nHi ${clientName}, your appointment has been updated:\n📋 ${serviceName}\n📅 ${dateStr} at ${timeStr}\n${staffName ? `💇 With: ${staffName}` : ''}\n\nNeed to change? Contact us at ${businessPhone || 'the salon'}.`
+    const smsBody = `🔄 Appointment Rescheduled!\n\nDear ${clientGreeting}, your appointment has been updated:\n📋 ${serviceName}\n📅 ${dateStr} at ${timeStr}\n${staffName ? `💇 With: ${staffName}` : ''}\n\nNeed to change? Contact us at ${businessPhone || 'the salon'}.`
     const clientE164 = toE164(client.phone)
     if (clientE164) {
       try {
@@ -388,7 +392,7 @@ async function notifyClient(opts: {
         from: `${businessName} <bookings@joinglowup.org>`,
         to: [client.email],
         subject: `🔄 Appointment Rescheduled — ${serviceName} on ${dateStr}`,
-        text: `Hi ${clientName},\n\nYour appointment has been rescheduled. Here are the updated details:\n\n📋 Service: ${serviceName}\n📅 Date: ${dateStr}\n🕐 Time: ${timeStr}\n${staffName ? `💇 With: ${staffName}\n` : ''}\nNeed to make changes? Contact us at ${businessPhone || 'the salon'}.\n\nSee you soon!\n— ${businessName}`,
+        text: `Dear ${clientGreeting},\n\nYour appointment has been rescheduled. Here are the updated details:\n\n📋 Service: ${serviceName}\n📅 Date: ${dateStr}\n🕐 Time: ${timeStr}\n${staffName ? `💇 With: ${staffName}\n` : ''}\nNeed to make changes? Contact us at ${businessPhone || 'the salon'}.\n\nSee you soon!\n— ${businessName}`,
       })
     } catch (err) {
       console.error(`[manage-appointment] Email to client failed:`, err)
