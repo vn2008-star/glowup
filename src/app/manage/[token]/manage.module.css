@@ -1,0 +1,534 @@
+/* ── Manage Appointment Page ── */
+/* Client-facing — matches the public booking page aesthetic */
+
+.page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0f0f14 0%, #1a1520 50%, #0f1419 100%);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 2rem 1rem;
+  font-family: var(--font-body, 'Inter', -apple-system, sans-serif);
+}
+
+.container {
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* ── Header / Brand ── */
+.header {
+  text-align: center;
+  padding: 1.5rem 0 0.5rem;
+}
+.businessBrand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+}
+.businessLogo {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  object-fit: cover;
+}
+.businessLogoFallback {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #c37eda, #e8a87c);
+  color: #fff;
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+.businessName {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #f0f0f5;
+  line-height: 1.2;
+}
+
+/* ── Card ── */
+.card {
+  background: #16161f;
+  border-radius: 16px;
+  border: 1px solid #2a2a3d;
+  padding: 2rem;
+  animation: fadeSlide 0.35s ease-out;
+}
+@keyframes fadeSlide {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.cardTitle {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #f0f0f5;
+  margin-bottom: 0.25rem;
+}
+.cardSubtitle {
+  font-size: 0.85rem;
+  color: #8b8b9e;
+  margin-bottom: 1.5rem;
+}
+
+/* ── Appointment Details ── */
+.details {
+  background: #1e1e2e;
+  border: 1px solid #2a2a3d;
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 1.5rem;
+}
+.detailRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 1.25rem;
+  border-bottom: 1px solid #23233a;
+}
+.detailRow:last-child { border-bottom: none; }
+.detailIcon {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  width: 24px;
+  text-align: center;
+}
+.detailLabel {
+  font-size: 0.78rem;
+  color: #8b8b9e;
+  min-width: 70px;
+}
+.detailValue {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #f0f0f5;
+}
+
+/* ── Status Badge ── */
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 14px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.statusConfirmed {
+  background: rgba(34, 197, 94, 0.12);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.25);
+}
+.statusCancelled {
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+.statusPending {
+  background: rgba(251, 191, 36, 0.12);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.25);
+}
+.statusCompleted {
+  background: rgba(96, 165, 250, 0.12);
+  color: #60a5fa;
+  border: 1px solid rgba(96, 165, 250, 0.25);
+}
+
+/* ── Action Buttons ── */
+.actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+.rescheduleBtn {
+  flex: 1;
+  padding: 0.85rem 1.5rem;
+  background: linear-gradient(135deg, #c37eda, #e8a87c);
+  border: none;
+  border-radius: 12px;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+.rescheduleBtn:hover {
+  box-shadow: 0 4px 20px rgba(195, 126, 218, 0.35);
+  transform: translateY(-1px);
+}
+.cancelBtn {
+  flex: 1;
+  padding: 0.85rem 1.5rem;
+  background: transparent;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  border-radius: 12px;
+  color: #f87171;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+.cancelBtn:hover {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.6);
+  transform: translateY(-1px);
+}
+
+/* ── Confirmation Dialog ── */
+.confirmDialog {
+  background: #1e1e2e;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 14px;
+  padding: 1.5rem;
+  margin-top: 1rem;
+  text-align: center;
+  animation: fadeSlide 0.25s ease-out;
+}
+.confirmDialog p {
+  font-size: 0.95rem;
+  color: #c0c0d8;
+  margin-bottom: 1.25rem;
+  line-height: 1.5;
+}
+.confirmDialog strong {
+  color: #f87171;
+}
+.confirmActions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+}
+.confirmYes {
+  padding: 0.7rem 1.5rem;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  border-radius: 10px;
+  color: #f87171;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.confirmYes:hover {
+  background: rgba(239, 68, 68, 0.25);
+}
+.confirmNo {
+  padding: 0.7rem 1.5rem;
+  background: #2a2a3d;
+  border: 1px solid #3a3a5d;
+  border-radius: 10px;
+  color: #c0c0d8;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.confirmNo:hover {
+  background: #3a3a4d;
+}
+
+/* ── Reschedule Panel ── */
+.reschedulePanel {
+  animation: fadeSlide 0.35s ease-out;
+}
+.rescheduleBack {
+  background: none;
+  border: none;
+  color: #8b8b9e;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: color 0.2s ease;
+}
+.rescheduleBack:hover { color: #f0f0f5; }
+
+/* ── Calendar (reused from booking page style) ── */
+.calendar {
+  background: #1a1a28;
+  border: 1px solid #2a2a3d;
+  border-radius: 14px;
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+.calendarHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+.calendarMonthLabel {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #f0f0f5;
+}
+.calendarNav {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #1e1e2e;
+  border: 1px solid #2a2a3d;
+  border-radius: 10px;
+  color: #c0c0d8;
+  font-size: 1.4rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  line-height: 1;
+}
+.calendarNav:hover:not(:disabled) {
+  border-color: #c37eda;
+  color: #f0f0f5;
+}
+.calendarNav:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+.calendarWeekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  margin-bottom: 6px;
+}
+.calendarWeekdays span {
+  text-align: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #5a5a7a;
+  padding: 4px 0;
+}
+.calendarGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+.calendarDay {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #c0c0d8;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+.calendarDay:hover:not(:disabled) {
+  background: rgba(195, 126, 218, 0.08);
+  border-color: #c37eda;
+  color: #f0f0f5;
+}
+.calendarDayToday {
+  border-color: #c37eda44;
+  color: #c37eda;
+  font-weight: 800;
+}
+.calendarDaySelected {
+  background: linear-gradient(135deg, #c37eda, #e8a87c) !important;
+  border-color: transparent !important;
+  color: #fff !important;
+  box-shadow: 0 4px 14px rgba(195, 126, 218, 0.35);
+  font-weight: 800;
+}
+.calendarDayDisabled {
+  color: #2e2e44;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ── Time Slots ── */
+.timeSectionTitle {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #8b8b9e;
+  margin-bottom: 0.75rem;
+}
+.timeGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(95px, 1fr));
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+.timeSlot {
+  padding: 0.6rem 0.5rem;
+  background: #1e1e2e;
+  border: 1px solid #2a2a3d;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #c0c0d8;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+.timeSlot:hover {
+  border-color: #c37eda;
+  color: #f0f0f5;
+}
+.timeSelected {
+  background: linear-gradient(135deg, #c37eda, #e8a87c);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(195, 126, 218, 0.3);
+}
+.noSlots {
+  color: #6b6b8a;
+  font-size: 0.85rem;
+  font-style: italic;
+  padding: 1rem 0;
+}
+.confirmReschedule {
+  width: 100%;
+  padding: 0.85rem 1.5rem;
+  background: linear-gradient(135deg, #c37eda, #e8a87c);
+  border: none;
+  border-radius: 12px;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.confirmReschedule:hover {
+  box-shadow: 0 4px 20px rgba(195, 126, 218, 0.35);
+  transform: translateY(-1px);
+}
+.confirmReschedule:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ── Success / Error States ── */
+.successCard {
+  text-align: center;
+  padding: 2.5rem 2rem;
+}
+.successIcon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+  animation: popIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes popIn {
+  from { transform: scale(0); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.successTitle {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: #f0f0f5;
+  margin-bottom: 0.5rem;
+}
+.successMessage {
+  font-size: 0.9rem;
+  color: #8b8b9e;
+  line-height: 1.6;
+  margin-bottom: 1.5rem;
+}
+.bookAgainBtn {
+  display: inline-block;
+  padding: 0.75rem 1.75rem;
+  background: linear-gradient(135deg, #c37eda, #e8a87c);
+  border: none;
+  border-radius: 10px;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+.bookAgainBtn:hover {
+  box-shadow: 0 4px 20px rgba(195, 126, 218, 0.35);
+  transform: translateY(-1px);
+}
+
+/* ── Loading ── */
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  gap: 1rem;
+  color: #8b8b9e;
+  font-size: 0.9rem;
+}
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #2a2a3d;
+  border-top-color: #c37eda;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.error {
+  text-align: center;
+  padding: 3rem 2rem;
+  color: #f87171;
+}
+.error h2 {
+  font-size: 1.25rem;
+  font-weight: 800;
+  margin-bottom: 0.5rem;
+}
+.error p {
+  font-size: 0.9rem;
+  color: #8b8b9e;
+}
+
+/* ── Footer ── */
+.footer {
+  text-align: center;
+  padding: 1rem 0;
+}
+.footerCta {
+  font-size: 0.72rem;
+  color: #6b6b8a;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+.footerCta:hover { color: #c37eda; }
+.footerCta strong { color: #c37eda; }
+
+/* ── Responsive ── */
+@media (max-width: 480px) {
+  .page { padding: 1rem 0.5rem; }
+  .card { padding: 1.5rem; }
+  .actions { flex-direction: column; }
+  .businessName { font-size: 1.25rem; }
+}

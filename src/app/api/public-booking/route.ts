@@ -274,7 +274,7 @@ export async function POST(request: Request) {
   const { data: appointments, error } = await svc
     .from('appointments')
     .insert(appointmentRows)
-    .select('id, start_time, end_time')
+    .select('id, start_time, end_time, manage_token')
 
   if (error || !appointments || appointments.length === 0) {
     return NextResponse.json({ error: 'Failed to create booking' }, { status: 500 })
@@ -364,7 +364,7 @@ export async function PATCH(request: Request) {
 // Also creates 24h reminder rows for the existing cron to pick up.
 async function sendBookingConfirmations(opts: {
   tenant: { id: string; name: string; email: string | null; phone: string | null; address: string | null; settings: Record<string, unknown> | null }
-  appointment: { id: string; start_time: string; end_time: string }
+  appointment: { id: string; start_time: string; end_time: string; manage_token?: string }
   serviceName: string
   staffName: string
   clientName: string
@@ -375,6 +375,10 @@ async function sendBookingConfirmations(opts: {
   end: Date
 }) {
   const { tenant, appointment, serviceName, staffName, clientName, clientEmail, clientPhone, clientId, start } = opts
+
+  // Build manage link for self-service cancel/reschedule
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://glowup-jade.vercel.app'
+  const manageLink = appointment.manage_token ? `${baseUrl}/manage/${appointment.manage_token}` : ''
 
   // Fallback: if tenant doesn't have email/phone, look up the owner staff member
   let ownerFallbackEmail = ''
@@ -471,7 +475,7 @@ async function sendBookingConfirmations(opts: {
       staffName ? `💇 With: ${staffName}` : '',
       businessAddress ? `📍 ${businessName}, ${businessAddress}` : `📍 ${businessName}`,
       ``,
-      `Need to change? Contact us at ${businessPhone || 'the salon'}.`,
+      manageLink ? `Manage your appointment: ${manageLink}` : `Need to change? Contact us at ${businessPhone || 'the salon'}.`,
     ].filter(Boolean).join('\n')
 
     const clientE164 = toE164(clientPhone)
@@ -503,7 +507,11 @@ async function sendBookingConfirmations(opts: {
       staffName ? `💇 With: ${staffName}` : '',
       `📍 Location: ${businessName}${businessAddress ? `, ${businessAddress}` : ''}`,
       ``,
-      `Need to reschedule or cancel? Reply to this email or contact us at ${businessPhone || 'the salon'}.`,
+      manageLink ? `Need to reschedule or cancel? Manage your appointment here:` : '',
+      manageLink ? manageLink : '',
+      manageLink ? '' : `Need to reschedule or cancel? Reply to this email or contact us at ${businessPhone || 'the salon'}.`,
+      '',
+      `Or contact us at ${businessPhone || 'the salon'}.`,
       ``,
       `See you soon!`,
       `— ${businessName}`,

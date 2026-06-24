@@ -32,7 +32,7 @@ export async function GET(request: Request) {
     .select(`
       id, type, channel, tenant_id, appointment_id, client_id,
       appointments!inner (
-        start_time, end_time, status,
+        start_time, end_time, status, manage_token,
         services ( name ),
         staff ( name )
       ),
@@ -94,10 +94,15 @@ export async function GET(request: Request) {
     const timeStr = startTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
 
     // Build message from template or default
+    // Build manage link
+    const manageToken = (appointment.manage_token as string) || ''
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://glowup-jade.vercel.app')
+    const manageLink = manageToken ? `${baseUrl}/manage/${manageToken}` : ''
+
     const customTemplates = (settings.reminder_templates || {}) as Record<string, string>
-    const smsTemplate = customTemplates.sms || `Hi {client_name}! This is a reminder that your {service} appointment at {business_name} is tomorrow, {date} at {time}.${businessAddress ? ' 📍 {address}' : ''}\n\nReply C to Confirm, M to Modify, X to Cancel. Reply STOP to opt out.`
+    const smsTemplate = customTemplates.sms || `Hi {client_name}! This is a reminder that your {service} appointment at {business_name} is tomorrow, {date} at {time}.${businessAddress ? ' 📍 {address}' : ''}${manageLink ? '\nManage: {manage_link}' : '\nReply C to Confirm, M to Modify, X to Cancel. Reply STOP to opt out.'}`
     const emailSubject = customTemplates.email_subject || `Appointment Reminder — {business_name}`
-    const emailBody = customTemplates.email || `Hi {client_name},\n\nThis is a friendly reminder about your upcoming appointment:\n\n📋 Service: {service}\n📅 Date: {date}\n🕐 Time: {time}\n${staffName ? `💇 With: {staff}\n` : ''}\n📍 At: {business_name}\n🏠 Address: {address}\n\nTo confirm, modify, or cancel your appointment, please reply to this email or contact us directly.\n\nSee you soon!\n— {business_name}`
+    const emailBody = customTemplates.email || `Hi {client_name},\n\nThis is a friendly reminder about your upcoming appointment:\n\n📋 Service: {service}\n📅 Date: {date}\n🕐 Time: {time}\n${staffName ? `💇 With: {staff}\n` : ''}\n📍 At: {business_name}\n🏠 Address: {address}\n${manageLink ? `\nNeed to reschedule or cancel? Manage your appointment:\n{manage_link}\n` : '\nTo confirm, modify, or cancel your appointment, please reply to this email or contact us directly.\n'}\nSee you soon!\n— {business_name}`
 
     function fillTemplate(template: string): string {
       return template
@@ -108,6 +113,7 @@ export async function GET(request: Request) {
         .replace(/\{address\}/g, businessAddress)
         .replace(/\{date\}/g, dateStr)
         .replace(/\{time\}/g, timeStr)
+        .replace(/\{manage_link\}/g, manageLink)
     }
 
     try {
