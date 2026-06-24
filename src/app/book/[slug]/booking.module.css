@@ -622,6 +622,35 @@
 }
 .formGroup textarea { resize: vertical; }
 
+/* ── SMS Consent ── */
+.consentLabel {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  padding: 0.75rem 1rem;
+  background: rgba(195, 126, 218, 0.04);
+  border: 1px solid #2a2a3d;
+  border-radius: 10px;
+  transition: border-color 0.2s ease;
+}
+.consentLabel:hover {
+  border-color: #c37eda44;
+}
+.consentCheckbox {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  flex-shrink: 0;
+  accent-color: #c37eda;
+  cursor: pointer;
+}
+.consentText {
+  font-size: 0.72rem;
+  color: #8b8b9e;
+  line-height: 1.5;
+}
+
 /* ── Step 4: Summary ── */
 .summaryCard {
   background: #1e1e2e;

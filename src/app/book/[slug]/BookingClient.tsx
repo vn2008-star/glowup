@@ -46,6 +46,7 @@ export default function BookingClient({ slug }: { slug: string }) {
   const [clientPhone, setClientPhone] = useState('')
   const [clientNotes, setClientNotes] = useState('')
   const [clientBirthday, setClientBirthday] = useState('')
+  const [smsConsent, setSmsConsent] = useState(true)
 
   // Helper: get staff assigned to a specific service (null = Any Available)
   const getStaffForService = (serviceId: string): StaffInfo | null => staffByService[serviceId] ?? null
@@ -770,6 +771,12 @@ export default function BookingClient({ slug }: { slug: string }) {
                   <label>Notes <span className={styles.optionalLabel}>(optional)</span></label>
                   <textarea value={clientNotes} onChange={e => setClientNotes(e.target.value)} rows={3} placeholder="Any special requests or notes for your stylist..." />
                 </div>
+                <label className={styles.consentLabel}>
+                  <input type="checkbox" checked={smsConsent} onChange={e => setSmsConsent(e.target.checked)} className={styles.consentCheckbox} />
+                  <span className={styles.consentText}>
+                    I agree to receive appointment confirmations, reminders, and updates via SMS to the phone number provided. Msg & data rates may apply. Reply STOP to opt out.
+                  </span>
+                </label>
               </div>
 
               <div className={styles.stepActions}>
