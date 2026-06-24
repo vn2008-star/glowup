@@ -225,8 +225,11 @@ export async function GET(request: Request) {
           const message = `Hey {name}! ⚡ We have ${totalOpenSlots} opening${totalOpenSlots !== 1 ? 's' : ''} on ${slotsText}. Book now before they're gone → ${bookingUrl}`
 
           for (const client of recipients) {
-            const clientName = `${client.first_name || ''}`.trim() || 'there'
-            const personalizedMsg = message.replace(/\{name\}/g, clientName)
+            const clientFirst = `${client.first_name || ''}`.trim() || 'there'
+            const clientGreeting = client.last_name
+              ? `${clientFirst} ${client.last_name[0]}.`
+              : clientFirst
+            const personalizedMsg = message.replace(/\{name\}/g, clientGreeting)
 
             await sendMessage({
               client,
@@ -281,8 +284,11 @@ export async function GET(request: Request) {
           const bday = new Date(client.birthday)
           if (bday.getMonth() + 1 !== targetMonth || bday.getDate() !== targetDay) continue
 
-          const clientName = `${client.first_name || ''}`.trim() || 'there'
-          const message = `Happy Birthday, ${clientName}! 🎂 ${businessName} wants to celebrate YOU — enjoy 20% off any service this month! Book now → ${bookingUrl}`
+          const clientFirst = `${client.first_name || ''}`.trim() || 'there'
+          const clientGreeting = client.last_name
+            ? `${clientFirst} ${(client.last_name as string)[0]}.`
+            : clientFirst
+          const message = `Happy Birthday, ${clientGreeting}! 🎂 ${businessName} wants to celebrate YOU — enjoy 20% off any service this month! Book now → ${bookingUrl}`
 
           await sendMessage({ client, message, businessName, businessEmail, twilioClient, resendClient, channel: 'both' })
           results.birthday++
@@ -307,9 +313,12 @@ export async function GET(request: Request) {
 
       if (staleClients) {
         for (const client of staleClients) {
-          const clientName = `${client.first_name || ''}`.trim() || 'there'
+          const clientFirst = `${client.first_name || ''}`.trim() || 'there'
+          const clientGreeting = client.last_name
+            ? `${clientFirst} ${(client.last_name as string)[0]}.`
+            : clientFirst
           const daysSince = Math.round((Date.now() - new Date(client.last_visit).getTime()) / (1000 * 60 * 60 * 24))
-          const message = `Hey ${clientName}! It's been ${daysSince} days since your last visit to ${businessName}. Time for a refresh? Book now → ${bookingUrl}`
+          const message = `Dear ${clientGreeting}, it's been ${daysSince} days since your last visit to ${businessName}. Time for a refresh? Book now → ${bookingUrl}`
 
           await sendMessage({ client, message, businessName, businessEmail, twilioClient, resendClient, channel: 'both' })
           results.rebooking++
@@ -348,8 +357,11 @@ export async function GET(request: Request) {
           // Skip if already followed up (check notes)
           if (apt.notes?.includes('[Auto] No-show follow-up sent')) continue
 
-          const clientName = `${client.first_name || ''}`.trim() || 'there'
-          const message = `Hi ${clientName}, we missed you today at ${businessName}! 😊 Life happens — we'd love to help you rebook. Book your next visit → ${bookingUrl}`
+          const clientFirst = `${client.first_name || ''}`.trim() || 'there'
+          const clientGreeting = client.last_name
+            ? `${clientFirst} ${(client.last_name as string)[0]}.`
+            : clientFirst
+          const message = `Dear ${clientGreeting}, we missed you today at ${businessName}! 😊 Life happens — we'd love to help you rebook. Book your next visit → ${bookingUrl}`
 
           await sendMessage({ client, message, businessName, businessEmail, twilioClient, resendClient, channel: 'both' })
           results.noshow++
@@ -388,9 +400,12 @@ export async function GET(request: Request) {
           // Skip if already requested
           if (apt.notes?.includes('[Auto] Review request sent')) continue
 
-          const clientName = `${client.first_name || ''}`.trim() || 'there'
+          const clientFirst = `${client.first_name || ''}`.trim() || 'there'
+          const clientGreeting = client.last_name
+            ? `${clientFirst} ${(client.last_name as string)[0]}.`
+            : clientFirst
           const googleReviewUrl = (settings.google_review_url as string) || ''
-          let message = `Thanks for visiting ${businessName} today, ${clientName}! 🌟 We'd love a quick review — it means the world to us ❤️`
+          let message = `Thanks for visiting ${businessName} today, ${clientGreeting}! 🌟 We'd love a quick review — it means the world to us ❤️`
           if (googleReviewUrl) {
             message += `\n\nLeave a review → ${googleReviewUrl}`
           }
@@ -447,9 +462,12 @@ export async function GET(request: Request) {
 
         let holidaySent = 0
         for (const client of holidayClients) {
-          const clientName = `${client.first_name || ''}`.trim() || 'there'
+          const clientFirst = `${client.first_name || ''}`.trim() || 'there'
+          const clientGreeting = client.last_name
+            ? `${clientFirst} ${(client.last_name as string)[0]}.`
+            : clientFirst
           const personalizedMsg = holiday.template
-            .replace(/\{name\}/g, clientName)
+            .replace(/\{name\}/g, clientGreeting)
             .replace(/\{booking_url\}/g, bookingUrl)
             .replace(/\{business_name\}/g, businessName)
 

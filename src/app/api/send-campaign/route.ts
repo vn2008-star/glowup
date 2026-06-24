@@ -91,10 +91,15 @@ export async function POST(request: Request) {
 
   for (const client of clients) {
     const clientName = `${client.first_name || ''}${client.last_name ? ' ' + client.last_name : ''}`.trim() || 'there'
+    // Greeting format: "Dear James D." instead of full name
+    const clientGreeting = client.last_name
+      ? `${client.first_name || 'there'} ${client.last_name[0]}.`
+      : (client.first_name || 'there')
 
     // Personalize message
     const personalizedMsg = message
       .replace(/\{name\}/g, clientName)
+      .replace(/\{greeting\}/g, clientGreeting)
       .replace(/\{business_name\}/g, businessName)
       .replace(/\{booking_url\}/g, bookingUrl)
 
