@@ -520,7 +520,7 @@ async function sendBookingConfirmations(opts: {
     if (resendClient) {
       try {
         await resendClient.emails.send({
-          from: `${businessName} <onboarding@resend.dev>`,
+          from: `${businessName} <bookings@joinglowup.org>`,
           replyTo: businessEmail || undefined,
           to: [clientEmail],
           subject: `✅ Booking Confirmed — ${serviceName} on ${dateStr}`,
@@ -582,7 +582,7 @@ async function sendBookingConfirmations(opts: {
     if (resendClient) {
       try {
         await resendClient.emails.send({
-          from: `GlowUp <onboarding@resend.dev>`,
+          from: `GlowUp <bookings@joinglowup.org>`,
           replyTo: businessEmail || undefined,
           to: [ownerEmail],
           subject: `🆕 New Booking: ${clientName} — ${serviceName} on ${dateStr}`,

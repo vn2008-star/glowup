@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
                   const { Resend } = await import('resend');
                   const resend = new Resend(process.env.RESEND_API_KEY);
                   await resend.emails.send({
-                    from: 'GlowUp <onboarding@resend.dev>',
+                    from: 'GlowUp <bookings@joinglowup.org>',
                     to: [ref.client_referrer_email],
                     subject: `\uD83C\uDF81 You earned a $${amount} GlowUp Credit!`,
                     html: `

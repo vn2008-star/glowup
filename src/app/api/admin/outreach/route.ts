@@ -335,8 +335,8 @@ async function handleBulkSend(body: {
           const resend = new Resend(process.env.RESEND_API_KEY)
 
           const fromLine = senderName
-            ? `${senderName} via GlowUp <onboarding@resend.dev>`
-            : 'GlowUp Team <onboarding@resend.dev>'
+            ? `${senderName} via GlowUp <bookings@joinglowup.org>`
+            : 'GlowUp Team <bookings@joinglowup.org>'
 
           await resend.emails.send({
             from: fromLine,
@@ -458,8 +458,8 @@ async function handleFollowUps(body: { senderName?: string; campaignIds?: string
 
           await resend.emails.send({
             from: senderName
-              ? `${senderName} via GlowUp <onboarding@resend.dev>`
-              : 'GlowUp Team <onboarding@resend.dev>',
+              ? `${senderName} via GlowUp <bookings@joinglowup.org>`
+              : 'GlowUp Team <bookings@joinglowup.org>',
             to: [campaign.owner_email],
             subject: template.subjectFn(campaign.salon_name),
             html: htmlContent,

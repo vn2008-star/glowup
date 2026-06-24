@@ -520,7 +520,7 @@ async function sendMessage(opts: {
     if (resendClient) {
       try {
         await resendClient.emails.send({
-          from: `${businessName} <onboarding@resend.dev>`,
+          from: `${businessName} <bookings@joinglowup.org>`,
           replyTo: businessEmail || undefined,
           to: [client.email as string],
           subject: `${businessName} — We're thinking of you! ✨`,

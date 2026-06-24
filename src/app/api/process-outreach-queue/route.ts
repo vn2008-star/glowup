@@ -91,8 +91,8 @@ export async function GET(request: Request) {
           const resend = new Resend(process.env.RESEND_API_KEY)
 
           const fromLine = senderName
-            ? `${senderName} via GlowUp <onboarding@resend.dev>`
-            : 'GlowUp Team <onboarding@resend.dev>'
+            ? `${senderName} via GlowUp <bookings@joinglowup.org>`
+            : 'GlowUp Team <bookings@joinglowup.org>'
 
           await resend.emails.send({
             from: fromLine,

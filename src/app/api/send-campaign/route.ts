@@ -122,7 +122,7 @@ export async function POST(request: Request) {
       if ((channel === 'email' || channel === 'both') && client.email) {
         if (resend) {
           await resend.emails.send({
-            from: `${businessName} <onboarding@resend.dev>`,
+            from: `${businessName} <bookings@joinglowup.org>`,
             replyTo: tenant?.email || undefined,
             to: [client.email],
             subject: `${businessName} — Special for You! ✨`,

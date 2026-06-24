@@ -264,7 +264,7 @@ async function sendReports(
     if (resend) {
       try {
         await resend.emails.send({
-          from: `${businessName} <onboarding@resend.dev>`,
+          from: `${businessName} <bookings@joinglowup.org>`,
           to: [staff.email],
           subject: `${businessName} — Your Revenue Report (${periodLabel})`,
           html,

@@ -322,7 +322,7 @@ async function notifyOwner(opts: {
         : `Appointment ${action} by client.\n\nClient: ${clientName}\nService: ${serviceName}\nOriginal: ${oldDateStr} at ${oldTimeStr}\nNew: ${dateStr} at ${timeStr}\n${staffName ? `Staff: ${staffName}` : ''}`
 
       await resend.emails.send({
-        from: `GlowUp <onboarding@resend.dev>`,
+        from: `GlowUp <bookings@joinglowup.org>`,
         to: [ownerEmail],
         subject: `${emoji} ${action}: ${clientName} — ${serviceName}`,
         text: emailBody,
@@ -385,7 +385,7 @@ async function notifyClient(opts: {
       const { Resend } = await import('resend')
       const resend = new Resend(process.env.RESEND_API_KEY)
       await resend.emails.send({
-        from: `${businessName} <onboarding@resend.dev>`,
+        from: `${businessName} <bookings@joinglowup.org>`,
         to: [client.email],
         subject: `🔄 Appointment Rescheduled — ${serviceName} on ${dateStr}`,
         text: `Hi ${clientName},\n\nYour appointment has been rescheduled. Here are the updated details:\n\n📋 Service: ${serviceName}\n📅 Date: ${dateStr}\n🕐 Time: ${timeStr}\n${staffName ? `💇 With: ${staffName}\n` : ''}\nNeed to make changes? Contact us at ${businessPhone || 'the salon'}.\n\nSee you soon!\n— ${businessName}`,
