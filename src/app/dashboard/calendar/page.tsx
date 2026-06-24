@@ -13,7 +13,7 @@ import type { Appointment, Client, Service, Staff } from "@/lib/types";
 type FullAppointment = Appointment & { client?: Client; service?: Service; staff_member?: Staff };
 
 
-const SLOT_HEIGHT = 60;
+const SLOT_HEIGHT = 80;
 const DEFAULT_WORK_START = 9;
 const DEFAULT_WORK_END = 18;
 
@@ -309,7 +309,7 @@ export default function CalendarPage() {
     const start = new Date(startTime);
     const end = new Date(endTime);
     const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-    return Math.max(hours * SLOT_HEIGHT, 48);
+    return Math.max(hours * SLOT_HEIGHT, 56);
   }
 
   function formatHour(h: number) {
