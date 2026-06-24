@@ -352,6 +352,11 @@ async function notifyClient(opts: {
   const { client, clientName, serviceName, staffName, startTime, businessName, businessPhone, tz } = opts
   if (!client) return
 
+  // Greeting format: "Dear James D." instead of full name
+  const clientGreeting = client.last_name
+    ? `${client.first_name} ${client.last_name[0]}.`
+    : client.first_name
+
   let dateStr: string, timeStr: string
   try {
     dateStr = startTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: tz })
