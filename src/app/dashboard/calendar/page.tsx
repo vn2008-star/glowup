@@ -62,63 +62,80 @@ export default function CalendarPage() {
     staffName?: string;
   }
 
-  function getDayMarkers(dateStr: string): DayMarker[] {
-    const markers: DayMarker[] = [];
-    const d = new Date(dateStr + "T00:00:00");
-    const month = d.getMonth();
-    const day = d.getDate();
-
-    // 1) Business-wide holidays
-    for (const holidayName of closedHolidays) {
-      const h = CLOSED_DAY_HOLIDAYS.find(hd => hd.name === holidayName);
-      if (h && h.month === month && h.day === day) {
-        markers.push({ type: "holiday", label: `${h.emoji} ${h.name}` });
-      }
+  // ── Memoized day markers: precompute for all visible dates ──
+  const dayMarkersCache = useMemo(() => {
+    const cache: Record<string, DayMarker[]> = {};
+    // Determine which dates are visible based on current view
+    let datesToCheck: Date[];
+    if (view === "day") {
+      datesToCheck = [selectedDate];
+    } else if (view === "week") {
+      datesToCheck = weekDays;
+    } else {
+      datesToCheck = monthDays;
     }
 
-    // 2) Custom closed dates
-    for (const c of customClosedDates) {
-      if (c.date === dateStr) {
-        markers.push({ type: "closed", label: `📌 ${c.label || "Closed"}` });
-      }
-    }
+    for (const day of datesToCheck) {
+      const dateStr = toDateStr(day);
+      if (cache[dateStr]) continue; // skip duplicates
+      const markers: DayMarker[] = [];
+      const d = new Date(dateStr + "T00:00:00");
+      const month = d.getMonth();
+      const dayNum = d.getDate();
 
-    // 3) Per-staff vacations & days off
-    for (const staff of staffMembers) {
-      const sched = staff.schedule;
-      if (!sched) continue;
-
-      // Check vacations
-      const vacations = (sched.vacations || []) as { start: string; end: string; note?: string }[];
-      for (const v of vacations) {
-        if (dateStr >= v.start && dateStr <= v.end) {
-          markers.push({ type: "vacation", label: v.note || "Vacation", staffName: staff.name });
-          break; // one marker per staff is enough
-        }
-      }
-
-      // Check per-staff holidays_off (only if not already a business-wide holiday)
-      const holidaysOff = (sched.holidays_off || []) as string[];
-      for (const holidayName of holidaysOff) {
-        // Skip if this is already a business-wide holiday
-        if (closedHolidays.includes(holidayName)) continue;
+      // 1) Business-wide holidays
+      for (const holidayName of closedHolidays) {
         const h = CLOSED_DAY_HOLIDAYS.find(hd => hd.name === holidayName);
-        if (h && h.month === month && h.day === day) {
-          markers.push({ type: "day-off", label: h.name, staffName: staff.name });
+        if (h && h.month === month && h.day === dayNum) {
+          markers.push({ type: "holiday", label: `${h.emoji} ${h.name}` });
         }
       }
 
-      // Check regular day-off via alternating schedule
-      if (isStaffOffOnDate(sched, dateStr)) {
-        // Only add if we haven't already added a vacation or holiday marker for this staff
-        const alreadyMarked = markers.some(m => m.staffName === staff.name);
-        if (!alreadyMarked) {
-          markers.push({ type: "day-off", label: "Day Off", staffName: staff.name });
+      // 2) Custom closed dates
+      for (const c of customClosedDates) {
+        if (c.date === dateStr) {
+          markers.push({ type: "closed", label: `📌 ${c.label || "Closed"}` });
         }
       }
+
+      // 3) Per-staff vacations & days off
+      for (const staff of staffMembers) {
+        const sched = staff.schedule;
+        if (!sched) continue;
+
+        const vacations = (sched.vacations || []) as { start: string; end: string; note?: string }[];
+        for (const v of vacations) {
+          if (dateStr >= v.start && dateStr <= v.end) {
+            markers.push({ type: "vacation", label: v.note || "Vacation", staffName: staff.name });
+            break;
+          }
+        }
+
+        const holidaysOff = (sched.holidays_off || []) as string[];
+        for (const holidayName of holidaysOff) {
+          if (closedHolidays.includes(holidayName)) continue;
+          const h = CLOSED_DAY_HOLIDAYS.find(hd => hd.name === holidayName);
+          if (h && h.month === month && h.day === dayNum) {
+            markers.push({ type: "day-off", label: h.name, staffName: staff.name });
+          }
+        }
+
+        if (isStaffOffOnDate(sched, dateStr)) {
+          const alreadyMarked = markers.some(m => m.staffName === staff.name);
+          if (!alreadyMarked) {
+            markers.push({ type: "day-off", label: "Day Off", staffName: staff.name });
+          }
+        }
+      }
+
+      cache[dateStr] = markers;
     }
+    return cache;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, selectedDate, closedHolidays, customClosedDates, staffMembers]);
 
-    return markers;
+  function getDayMarkers(dateStr: string): DayMarker[] {
+    return dayMarkersCache[dateStr] || [];
   }
 
   // ── Date helpers ──
@@ -172,22 +189,8 @@ export default function CalendarPage() {
     };
   })();
 
-  // ── Data fetching (optimized: staff/services/clients cached, only apts refresh) ──
+  // ── Data fetching (optimized: single batch API call) ──
   const [initialLoaded, setInitialLoaded] = useState(false);
-
-  // Fetch staff, services, clients once
-  useEffect(() => {
-    if (!tenant) return;
-    Promise.all([
-      queryData<Staff[]>("staff.list"),
-      queryData<Service[]>("services.list"),
-      queryData<Client[]>("clients.list"),
-    ]).then(([staffRes, svcRes, clientRes]) => {
-      setStaffMembers(staffRes.data || []);
-      setServices((svcRes.data || []).filter(s => s.is_active));
-      setClients(clientRes.data || []);
-    });
-  }, [tenant]);
 
   // Build timezone-aware ISO boundaries for a date in the salon's timezone
   function localDayStart(d: Date) {
@@ -199,8 +202,8 @@ export default function CalendarPage() {
     return localToUTC(dateStr, '23:59', salonTz).toISOString();
   }
 
-  // Fetch appointments on date/view change
-  const fetchAppointments = useCallback(async () => {
+  // Single batch fetch: staff + services + appointments in one API call
+  const fetchCalendarData = useCallback(async () => {
     if (!tenant) return;
     if (!initialLoaded) setLoading(true);
 
@@ -221,14 +224,30 @@ export default function CalendarPage() {
       endISO = localDayEnd(monthDays[41]);
     }
 
-    const aptsRes = await queryData<FullAppointment[]>("appointments.list", { startDate: startISO, endDate: endISO });
-    setAppointments(aptsRes.data || []);
+    const res = await queryData<{
+      staff: Staff[];
+      services: Service[];
+      appointments: FullAppointment[];
+    }>("calendar.load", { startDate: startISO, endDate: endISO });
+
+    if (res.data) {
+      setStaffMembers(res.data.staff);
+      setServices(res.data.services);
+      setAppointments(res.data.appointments);
+    }
     setLoading(false);
     setInitialLoaded(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenant, selectedDate, view]);
 
-  useEffect(() => { fetchAppointments(); }, [fetchAppointments]);
+  useEffect(() => { fetchCalendarData(); }, [fetchCalendarData]);
+
+  // Defer clients loading until booking modal opens
+  const fetchClientsIfNeeded = useCallback(async () => {
+    if (clients.length > 0) return; // already loaded
+    const clientRes = await queryData<Client[]>("clients.list");
+    setClients(clientRes.data || []);
+  }, [clients.length]);
 
   // ── Navigation ──
   function changeDate(delta: number) {
@@ -407,6 +426,7 @@ export default function CalendarPage() {
     setFormData({ client_id: "", service_id: "", staff_id: "", start_time: `${dateStr}T${String(h).padStart(2, "0")}:00`, notes: "" });
     setClientSearch("");
     setClientDropdownOpen(false);
+    fetchClientsIfNeeded(); // lazy-load clients on first modal open
     setShowModal(true);
   }
 

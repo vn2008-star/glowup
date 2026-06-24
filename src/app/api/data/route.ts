@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
-import { getImpersonationOverride } from '@/lib/admin'
+import { getImpersonationOverride, isAdminEmail } from '@/lib/admin'
 
 // Unified data API — all dashboard queries go through here
 // Authenticates via session cookies, queries with service role to bypass RLS
@@ -42,8 +42,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'No tenant' }, { status: 404 })
   }
 
-  // ─── Admin impersonation override ───
-  const overrideTenantId = await getImpersonationOverride(user.id, user.email || '')
+  // ─── Admin impersonation override (skip DB query for non-admins) ───
+  const userEmail = user.email || ''
+  const overrideTenantId = isAdminEmail(userEmail)
+    ? await getImpersonationOverride(user.id, userEmail)
+    : null
   const tenantId = overrideTenantId || staffRecord.tenant_id
   const staffRole = overrideTenantId ? 'owner' : staffRecord.role // Admin gets full owner access when impersonating
   const staffId = staffRecord.id
@@ -1872,6 +1875,46 @@ export async function POST(request: Request) {
 
         if (fbUpErr) return NextResponse.json({ error: fbUpErr.message }, { status: 500 })
         return NextResponse.json({ data: fbUp })
+      }
+
+      // ─── CALENDAR BATCH LOAD (single round-trip for calendar page) ───
+      case 'calendar.load': {
+        const [staffRes, svcRes, aptsQuery] = await Promise.all([
+          svc.from('staff').select('*').eq('tenant_id', tenantId),
+          svc.from('services').select('*').eq('tenant_id', tenantId).order('sort_order', { ascending: true }),
+          (() => {
+            let q = svc
+              .from('appointments')
+              .select('id, start_time, end_time, status, staff_id, client_id, service_id, notes, total_price, client:clients(id, first_name, last_name, birthday), staff_member:staff!staff_id(id, name), service:services(id, name, duration_minutes)')
+              .eq('tenant_id', tenantId)
+              .order('start_time', { ascending: true })
+            if (payload?.startDate && payload?.endDate) {
+              q = q.gte('start_time', payload.startDate).lte('start_time', payload.endDate)
+            }
+            return q.limit(payload?.limit || 500)
+          })(),
+        ])
+
+        // Filter staff: hide Admin records, sort by role
+        const visible = (staffRes.data || []).filter((s: { name: string }) => s.name !== 'Admin')
+        const rolePriority: Record<string, number> = { owner: 0, manager: 1, technician: 2 }
+        const sortedStaff = visible.sort((a: { role: string; name: string }, b: { role: string; name: string }) => {
+          const ra = rolePriority[a.role] ?? 3
+          const rb = rolePriority[b.role] ?? 3
+          if (ra !== rb) return ra - rb
+          return a.name.localeCompare(b.name)
+        })
+
+        const activeServices = (svcRes.data || []).filter((s: { is_active: boolean }) => s.is_active)
+
+        return NextResponse.json({
+          data: {
+            staff: sortedStaff,
+            services: activeServices,
+            appointments: aptsQuery.data || [],
+          },
+          error: staffRes.error?.message || svcRes.error?.message || aptsQuery.error?.message || null,
+        })
       }
 
       default:
