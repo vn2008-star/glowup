@@ -224,6 +224,10 @@
   border-radius: var(--radius-full);
   white-space: nowrap;
 }
+.birthdayTagUpcoming {
+  color: #a855f7;
+  background: rgba(168, 85, 247, 0.08);
+}
 
 /* Staff Columns */
 .techColumns {
@@ -231,7 +235,7 @@
   gap: var(--space-6);
   min-width: 600px;
 }
-.techColumn { position: relative; min-width: 0; overflow: hidden; }
+.techColumn { position: relative; min-width: 0; }
 .techColumnCompact .aptBlock { left: 8px; }
 .techColumnCompact .openSlot { left: 8px; }
 .techHeader {

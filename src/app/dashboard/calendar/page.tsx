@@ -309,7 +309,7 @@ export default function CalendarPage() {
     const start = new Date(startTime);
     const end = new Date(endTime);
     const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-    return Math.max(hours * SLOT_HEIGHT, 28);
+    return Math.max(hours * SLOT_HEIGHT, 48);
   }
 
   function formatHour(h: number) {
@@ -517,16 +517,31 @@ export default function CalendarPage() {
               </div>
             );
           })()}
-          {/* Birthday banner — show clients with birthdays today */}
+          {/* Birthday banner — show clients with birthdays today + upcoming 7 days */}
           {(() => {
-            const bdClients = getBirthdayClientsForDate(selectedDate);
-            if (bdClients.length === 0) return null;
+            const bdToday = getBirthdayClientsForDate(selectedDate);
+            // Also show upcoming birthdays in next 7 days
+            const upcoming: { client: typeof birthdayClients[0]; date: Date; daysAway: number }[] = [];
+            for (let i = 1; i <= 7; i++) {
+              const futureDate = new Date(selectedDate);
+              futureDate.setDate(futureDate.getDate() + i);
+              getBirthdayClientsForDate(futureDate).forEach(c => {
+                upcoming.push({ client: c, date: futureDate, daysAway: i });
+              });
+            }
+            if (bdToday.length === 0 && upcoming.length === 0) return null;
             return (
               <div className={styles.birthdayBanner}>
-                {bdClients.map(c => (
+                {bdToday.map(c => (
                   <div key={c.id} className={styles.birthdayTag}>
                     <span>🎂</span>
-                    <span>{c.first_name} {c.last_name || ''}</span>
+                    <span>{c.first_name} {c.last_name || ''} — Today!</span>
+                  </div>
+                ))}
+                {upcoming.map(({ client: c, date, daysAway }) => (
+                  <div key={c.id} className={`${styles.birthdayTag} ${styles.birthdayTagUpcoming}`}>
+                    <span>🎂</span>
+                    <span>{c.first_name} {c.last_name || ''} — {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ({daysAway}d)</span>
                   </div>
                 ))}
               </div>
