@@ -817,9 +817,10 @@ export default function CalendarPage() {
                   {dayApts.length > 0 && (
                     <div className={styles.monthDots}>
                       {dayApts.slice(0, maxDots).map((apt, i) => (
-                        <div key={i} className={styles.monthDot} style={{ background: aptColor(apt.status) }} title={apt.client ? `${apt.client.first_name} ${apt.client.last_name || ""}`.trim() : "Walk-in"}>
+                        <div key={i} className={styles.monthDot} style={{ background: aptColor(apt.status) }} title={apt.client ? `${apt.client.first_name} ${apt.client.last_name || ""}`.trim() + (apt.client.birthday ? ` 🎂 ${new Date(apt.client.birthday + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : '') : "Walk-in"}>
                           <span className={styles.monthDotText}>
                             {apt.client ? `${apt.client.first_name} ${apt.client.last_name || ""}`.trim() : "Walk-in"}
+                            {apt.client?.birthday && <span className={styles.monthDotBirthday}> 🎂 {new Date(apt.client.birthday + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>}
                           </span>
                         </div>
                       ))}

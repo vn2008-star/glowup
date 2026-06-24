@@ -647,6 +647,11 @@
   text-overflow: ellipsis;
   display: block;
 }
+.monthDotBirthday {
+  font-size: 9px;
+  color: #f9a8d4;
+  font-weight: 500;
+}
 .monthMore {
   font-size: 10px;
   color: var(--text-tertiary);
