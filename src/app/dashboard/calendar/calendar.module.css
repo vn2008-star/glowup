@@ -499,13 +499,14 @@
   font-weight: 600;
 }
 .weekAptStaff {
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   display: block;
-  opacity: 0.8;
+  opacity: 1;
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
 }
 .weekAptBirthday {
   font-size: 9px;
