@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
 import { useTenant } from '@/lib/tenant-context';
 import { queryData, mutateData } from '@/lib/api';
+import { localeDateStr } from '@/lib/utils';
 import styles from './FeedbackWidget.module.css';
 
 type FeedbackType = 'bug' | 'feature' | 'enhancement' | 'feedback';
@@ -162,7 +163,7 @@ export function FeedbackWidget() {
     if (hrs < 24) return `${hrs}h ago`;
     const days = Math.floor(hrs / 24);
     if (days < 30) return `${days}d ago`;
-    return new Date(dateStr).toLocaleDateString();
+    return localeDateStr(new Date(dateStr), { month: 'short', day: 'numeric' });
   };
 
   const getPageLabel = (page: string) => PAGE_LABELS[page] || page.replace('/dashboard/', '').replace(/-/g, ' ');

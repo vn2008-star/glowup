@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import styles from './booking.module.css'
 import ChatWidget from './ChatWidget'
-import { formatPhone } from '@/lib/utils'
+import { formatPhone, localeDateStr } from '@/lib/utils'
 import { localToUTC, todayInTz, nowInTz, DEFAULT_TZ } from '@/lib/tz'
 import { isStaffOffOnDate, isBusinessClosedOnDate } from '@/lib/schedule-utils'
 import type { CustomClosedDate } from '@/lib/schedule-utils'
@@ -137,7 +137,7 @@ export default function BookingClient({ slug }: { slug: string }) {
   const timeSlots = useMemo(() => {
     if (!selectedDate || selectedServices.length === 0 || !effectiveDuration) return []
     const date = new Date(selectedDate + 'T00:00:00')
-    const dayName = date.toLocaleDateString('en-US', { weekday: 'long' })
+    const dayName = localeDateStr(date, { weekday: 'long' })
     const hours = business?.hours?.[dayName]
 
     if (hours?.closed) return []
@@ -283,7 +283,7 @@ export default function BookingClient({ slug }: { slug: string }) {
     return (dateStr: string) => {
       const d = new Date(dateStr + 'T00:00:00')
       if (d < todayDate || d > maxDate) return false
-      const dayName = d.toLocaleDateString('en-US', { weekday: 'long' })
+      const dayName = localeDateStr(d, { weekday: 'long' })
       if (business?.hours?.[dayName]?.closed) return false
       // Business-wide closed days (holidays + custom dates)
       if (isBusinessClosedOnDate(
@@ -355,7 +355,7 @@ export default function BookingClient({ slug }: { slug: string }) {
       if (res.ok) {
         // Display confirmation in the salon's timezone so the client sees the correct local time
         const confirmDate = new Date(selectedDate + 'T12:00:00') // just for the date portion
-        const dateDisplay = confirmDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+        const dateDisplay = localeDateStr(confirmDate, { weekday: 'long', month: 'long', day: 'numeric' })
         const [h, m] = selectedTime.split(':').map(Number)
         const ampm = h >= 12 ? 'PM' : 'AM'
         const h12 = h > 12 ? h - 12 : h === 0 ? 12 : h
@@ -678,7 +678,7 @@ export default function BookingClient({ slug }: { slug: string }) {
                     ‹
                   </button>
                   <span className={styles.calendarMonthLabel}>
-                    {new Date(calendarMonth.year, calendarMonth.month).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                    {localeDateStr(new Date(calendarMonth.year, calendarMonth.month), { month: 'long', year: 'numeric' })}
                   </span>
                   <button
                     className={styles.calendarNav}
@@ -701,7 +701,7 @@ export default function BookingClient({ slug }: { slug: string }) {
                     const day = new Date(dateStr + 'T00:00:00').getDate()
                     const available = isDateAvailable(dateStr)
                     const isSelected = selectedDate === dateStr
-                    const isToday = dateStr === new Date().toLocaleDateString('en-CA') // YYYY-MM-DD
+                    const isToday = dateStr === todayInTz(salonTz) // YYYY-MM-DD
                     return (
                       <button
                         key={dateStr}
@@ -810,7 +810,7 @@ export default function BookingClient({ slug }: { slug: string }) {
                 <div className={styles.summaryRow}>
                   <span className={styles.summaryLabel}>Date</span>
                   <span className={styles.summaryValue}>
-                    {new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                    {localeDateStr(new Date(selectedDate + 'T00:00:00'), { weekday: 'long', month: 'long', day: 'numeric' })}
                   </span>
                 </div>
                 <div className={styles.summaryRow}>

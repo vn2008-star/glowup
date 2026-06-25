@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData } from "@/lib/api";
 import styles from "./social.module.css";
+import { localeDateStr } from "@/lib/utils";
 import type { SocialPost } from "@/lib/types";
 
 const PLATFORMS = [
@@ -223,8 +224,8 @@ export default function SocialPage() {
                   {p.template_type && <span className="badge badge-primary">{p.template_type.replace("_", " ")}</span>}
                   <span className={styles.postDate}>
                     {p.scheduled_at
-                      ? `Scheduled: ${new Date(p.scheduled_at).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`
-                      : `Created: ${new Date(p.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}
+                      ? `Scheduled: ${localeDateStr(new Date(p.scheduled_at), { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`
+                      : `Created: ${localeDateStr(new Date(p.created_at), { month: "short", day: "numeric" })}`}
                   </span>
                 </div>
                 {p.status === "published" && p.metrics && (
@@ -246,7 +247,7 @@ export default function SocialPage() {
               if (calendarMonth === 0) { setCalendarMonth(11); setCalendarYear((y) => y - 1); }
               else setCalendarMonth((m) => m - 1);
             }}>← Prev</button>
-            <h3>{new Date(calendarYear, calendarMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}</h3>
+            <h3>{localeDateStr(new Date(calendarYear, calendarMonth), { month: "long", year: "numeric" })}</h3>
             <button className="btn btn-ghost btn-sm" onClick={() => {
               if (calendarMonth === 11) { setCalendarMonth(0); setCalendarYear((y) => y + 1); }
               else setCalendarMonth((m) => m + 1);

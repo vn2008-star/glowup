@@ -13,6 +13,8 @@
  *   - "odd"  → works on odd  ISO weeks, off on even
  */
 
+import { localeDateStr } from '@/lib/utils'
+
 /* ─── Shared Holiday Definitions ─── */
 export interface ClosedDayHoliday {
   name: string
@@ -116,7 +118,7 @@ export function isStaffOffOnDate(
   if (vacations.some(v => dateStr >= v.start && dateStr <= v.end)) return true
 
   const d2 = new Date(dateStr + 'T00:00:00')
-  const dayName = d2.toLocaleDateString('en-US', { weekday: 'long' })
+  const dayName = localeDateStr(d2, { weekday: 'long' })
 
   const daySched = schedule[dayName] as DaySchedule | undefined
   if (!daySched) return false

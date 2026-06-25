@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData } from "@/lib/api";
+import { localeDateStr } from "@/lib/utils";
 import styles from "./campaigns.module.css";
 import type { Campaign } from "@/lib/types";
 
@@ -214,7 +215,7 @@ export default function HolidaysPage() {
                     <div>
                       <h3 className={styles.holidayName}>{h.name}</h3>
                       <span className={styles.holidayDate}>
-                        {h.date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
+                        {localeDateStr(h.date, { month: 'long', day: 'numeric' })}
                         {h.daysUntil <= 30 && (
                           <span className={styles.holidayCountdown}> · ⏰ {h.daysUntil} days!</span>
                         )}

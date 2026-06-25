@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { localeDateStr } from "@/lib/utils";
 import styles from "./referrals.module.css";
 
 interface ReferralCode {
@@ -241,7 +242,7 @@ export default function ReferralsPage() {
                 <tr key={entry.id}>
                   <td>{entry.referred_tenant?.name || "Unknown"}</td>
                   <td>
-                    {new Date(entry.created_at).toLocaleDateString("en-US", {
+                    {localeDateStr(new Date(entry.created_at), {
                       month: "short",
                       day: "numeric",
                       year: "numeric",

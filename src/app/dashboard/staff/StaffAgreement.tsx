@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData } from "@/lib/api";
 import type { Staff } from "@/lib/types";
+import { localeDateStr } from "@/lib/utils";
 import styles from "./agreement.module.css";
 
 interface Props {
@@ -116,7 +117,7 @@ export default function StaffAgreement({ staff, onClose, onSigned }: Props) {
             <div className={styles.docSubtitle}>{businessName}</div>
 
             <p className={styles.docIntro}>
-              This Employee Agreement (&ldquo;Agreement&rdquo;) is entered into between <strong>{businessName}</strong> and <strong>{staff.name}</strong> (&ldquo;Employee&rdquo;) as of <strong>{new Date(signDate).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</strong>.
+              This Employee Agreement (&ldquo;Agreement&rdquo;) is entered into between <strong>{businessName}</strong> and <strong>{staff.name}</strong> (&ldquo;Employee&rdquo;) as of <strong>{localeDateStr(new Date(signDate + 'T00:00:00'), { month: "long", day: "numeric", year: "numeric" })}</strong>.
             </p>
 
             {/* Section 1 */}
@@ -194,7 +195,7 @@ export default function StaffAgreement({ staff, onClose, onSigned }: Props) {
                     <img src={agreement.signature} alt="Signature" />
                   )}
                   <div className={styles.signedDate}>
-                    Signed on {new Date(agreement.signed_at).toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+                    Signed on {localeDateStr(new Date(agreement.signed_at), { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
                   </div>
                 </div>
               ) : (

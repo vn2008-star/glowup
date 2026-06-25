@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData, mutateData } from "@/lib/api";
+import { localeDateStr } from "@/lib/utils";
 import styles from "./packages.module.css";
 
 interface ServiceOption { id: string; name: string; price: number; category: string; is_active?: boolean }
@@ -254,8 +255,8 @@ export default function PackagesPage() {
                       {gc.recipient_name && <span>🎀 To: {gc.recipient_name}</span>}
                       {gc.purchaser_name && <span>🛍️ From: {gc.purchaser_name}</span>}
                       {gc.message && <span>💬 &quot;{gc.message}&quot;</span>}
-                      <span>📅 Created: {new Date(gc.created_at).toLocaleDateString()}</span>
-                      {gc.expires_at && <span>⏰ Expires: {new Date(gc.expires_at).toLocaleDateString()}</span>}
+                      <span>📅 Created: {localeDateStr(new Date(gc.created_at), { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                      {gc.expires_at && <span>⏰ Expires: {localeDateStr(new Date(gc.expires_at), { month: 'short', day: 'numeric', year: 'numeric' })}</span>}
                     </div>
                     <span className={`${styles.gcStatus} ${gc.status === 'active' ? styles.gcActive : styles.gcRedeemed}`}>
                       {gc.status === 'active' ? '● Active' : gc.status === 'redeemed' ? '✓ Fully Redeemed' : gc.status}

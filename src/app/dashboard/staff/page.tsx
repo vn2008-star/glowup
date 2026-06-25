@@ -12,7 +12,7 @@ import { getISOWeekNumber, CLOSED_DAY_HOLIDAYS } from "@/lib/schedule-utils";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
-import { formatPhone } from "@/lib/utils";
+import { formatPhone, localeDateStr } from "@/lib/utils";
 
 export default function StaffPage() {
   const { tenant } = useTenant();
@@ -522,7 +522,7 @@ export default function StaffPage() {
                   const isOnVacation = v.start <= today && v.end >= today;
                   return (
                     <div className={styles.vacationBadge} style={isOnVacation ? { background: 'rgba(251,191,36,0.15)', color: '#f59e0b', borderColor: 'rgba(251,191,36,0.3)' } : undefined}>
-                      🏖️ {isOnVacation ? 'On Vacation' : 'Upcoming'}: {new Date(v.start + 'T00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – {new Date(v.end + 'T00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      🏖️ {isOnVacation ? 'On Vacation' : 'Upcoming'}: {localeDateStr(new Date(v.start + 'T00:00'), { month: 'short', day: 'numeric' })} – {localeDateStr(new Date(v.end + 'T00:00'), { month: 'short', day: 'numeric' })}
                     </div>
                   );
                 })()}
@@ -683,7 +683,7 @@ export default function StaffPage() {
                             <div key={i} className={styles.vacationItem} style={isOnVacation ? { borderColor: 'rgba(251,191,36,0.4)', background: 'rgba(251,191,36,0.06)' } : undefined}>
                               <div>
                                 <span className={styles.vacationDates}>
-                                  {new Date(v.start + 'T00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} – {new Date(v.end + 'T00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                  {localeDateStr(new Date(v.start + 'T00:00'), { month: 'short', day: 'numeric', year: 'numeric' })} – {localeDateStr(new Date(v.end + 'T00:00'), { month: 'short', day: 'numeric', year: 'numeric' })}
                                 </span>
                                 {isOnVacation && <span className={styles.onVacationTag}>Currently Away</span>}
                                 {v.note && <div className={styles.vacationNote}>{v.note}</div>}
@@ -971,7 +971,7 @@ export default function StaffPage() {
                                 const isEven = weekNum % 2 === 0;
                                 const working = phase === 'even' ? isEven : !isEven;
                                 rows.push({
-                                  dateLabel: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                                  dateLabel: localeDateStr(d, { month: 'short', day: 'numeric' }),
                                   working,
                                 });
                                 d.setDate(d.getDate() + 7);
@@ -1100,7 +1100,7 @@ export default function StaffPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 'var(--space-2)' }}>
                   {CLOSED_DAY_HOLIDAYS.map(h => {
                     const checked = getHolidaysOff(vacationStaff).includes(h.name);
-                    const dateLabel = new Date(2026, h.month, h.day).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    const dateLabel = localeDateStr(new Date(2026, h.month, h.day), { month: 'short', day: 'numeric' });
                     return (
                       <label
                         key={h.name}
@@ -1148,9 +1148,9 @@ export default function StaffPage() {
                         }>
                           <div style={{ flex: 1 }}>
                             <span className={styles.vacationDates}>
-                              {new Date(v.start + 'T00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                              {localeDateStr(new Date(v.start + 'T00:00'), { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
                               {' '}–{' '}
-                              {new Date(v.end + 'T00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                              {localeDateStr(new Date(v.end + 'T00:00'), { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
                             </span>
                             {isOnVacation && <span className={styles.onVacationTag}>Currently Away</span>}
                             {isPast && <span className={styles.pastVacationTag}>Past</span>}

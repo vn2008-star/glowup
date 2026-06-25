@@ -6,6 +6,7 @@ import { useTenant } from "@/lib/tenant-context";
 import { queryData } from "@/lib/api";
 import { todayInTz, DEFAULT_TZ } from "@/lib/tz";
 import { GlowUpLogo } from "@/components/GlowUpLogo";
+import { localeDateStr } from "@/lib/utils";
 import styles from "./checkout.module.css";
 import { useRouter } from "next/navigation";
 import type { Appointment, Service, AppointmentCharge, Staff } from "@/lib/types";
@@ -289,7 +290,7 @@ export default function CheckoutPage() {
 
   function formatDate(dateStr: string) {
     const d = new Date(dateStr + "T12:00:00");
-    return d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+    return localeDateStr(d, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
   }
 
   function changeDate(delta: number) {

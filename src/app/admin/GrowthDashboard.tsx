@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { localeDateStr } from "@/lib/utils";
 import styles from "./admin.module.css";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -273,7 +274,7 @@ export default function GrowthDashboard() {
                       <td style={{ fontSize: '12px' }}>{c.referrer_name || '—'}</td>
                       <td style={{ fontSize: '12px' }}>{c.referred_salon_name || '—'}</td>
                       <td>{c.uses || 0}</td>
-                      <td className={styles.dateCell}>{new Date(c.created_at).toLocaleDateString()}</td>
+                      <td className={styles.dateCell}>{localeDateStr(new Date(c.created_at), { month: 'short', day: 'numeric', year: 'numeric' })}</td>
                     </tr>
                   ))
                 )}
@@ -329,8 +330,8 @@ export default function GrowthDashboard() {
                           {c.status}
                         </span>
                       </td>
-                      <td className={styles.dateCell}>{c.expires_at ? new Date(c.expires_at).toLocaleDateString() : '—'}</td>
-                      <td className={styles.dateCell}>{new Date(c.created_at).toLocaleDateString()}</td>
+                      <td className={styles.dateCell}>{c.expires_at ? localeDateStr(new Date(c.expires_at), { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</td>
+                      <td className={styles.dateCell}>{localeDateStr(new Date(c.created_at), { month: 'short', day: 'numeric', year: 'numeric' })}</td>
                     </tr>
                   ))
                 )}
@@ -358,7 +359,7 @@ export default function GrowthDashboard() {
                         <td style={{ fontFamily: 'monospace', fontSize: '12px' }}>{r.credit_code || '—'}</td>
                         <td style={{ fontWeight: 700, color: 'var(--color-success)' }}>${Number(r.amount || 0).toFixed(2)}</td>
                         <td style={{ fontSize: '12px' }}>{r.tenant_id?.substring(0, 8) || '—'}</td>
-                        <td className={styles.dateCell}>{r.redeemed_at ? new Date(r.redeemed_at).toLocaleDateString() : '—'}</td>
+                        <td className={styles.dateCell}>{r.redeemed_at ? localeDateStr(new Date(r.redeemed_at), { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</td>
                       </tr>
                     ))}
                   </tbody>

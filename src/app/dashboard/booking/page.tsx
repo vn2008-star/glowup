@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData } from "@/lib/api";
+import { localeDateStr } from "@/lib/utils";
 import styles from "./booking.module.css";
 import type { Campaign, Staff, Appointment, Client } from "@/lib/types";
 
@@ -242,7 +243,7 @@ export default function BookingPage() {
     if (selected.length === 0) return "";
     const grouped = new Map<string, OpenSlot[]>();
     selected.forEach(s => {
-      const key = s.date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+      const key = localeDateStr(s.date, { weekday: "short", month: "short", day: "numeric" });
       if (!grouped.has(key)) grouped.set(key, []);
       grouped.get(key)!.push(s);
     });
@@ -265,7 +266,7 @@ export default function BookingPage() {
 
     const recipientCount = getAudienceCount(fillAudience);
     const payload = {
-      name: `Fill My Openings — ${new Date().toLocaleDateString()}`,
+      name: `Fill My Openings — ${localeDateStr(new Date(), { month: 'short', day: 'numeric', year: 'numeric' })}`,
       type: "fill_openings",
       template: { message: fillMessage, discount: fillDiscount, slots: slotsText, audience: fillAudience },
       status: "sending",
@@ -435,7 +436,7 @@ export default function BookingPage() {
                             // Group this staff's slots by date
                             const byDate = new Map<string, OpenSlot[]>();
                             slots.forEach(slot => {
-                              const dateKey = slot.date.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
+                              const dateKey = localeDateStr(slot.date, { weekday: "long", month: "short", day: "numeric" });
                               if (!byDate.has(dateKey)) byDate.set(dateKey, []);
                               byDate.get(dateKey)!.push(slot);
                             });
@@ -880,7 +881,7 @@ export default function BookingPage() {
                         byStaff.forEach((slots, name) => {
                           const byDate = new Map<string, OpenSlot[]>();
                           slots.forEach(s => {
-                            const dk = s.date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+                            const dk = localeDateStr(s.date, { weekday: "short", month: "short", day: "numeric" });
                             if (!byDate.has(dk)) byDate.set(dk, []);
                             byDate.get(dk)!.push(s);
                           });
@@ -942,7 +943,7 @@ export default function BookingPage() {
                                 // Group slots by date
                                 const byDate = new Map<string, OpenSlot[]>();
                                 slots.forEach(s => {
-                                  const dk = s.date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+                                  const dk = localeDateStr(s.date, { weekday: "short", month: "short", day: "numeric" });
                                   if (!byDate.has(dk)) byDate.set(dk, []);
                                   byDate.get(dk)!.push(s);
                                 });

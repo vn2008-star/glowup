@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData } from "@/lib/api";
+import { localeDateStr } from "@/lib/utils";
 import styles from "./gallery.module.css";
 
 interface GalleryItem {
@@ -179,7 +180,7 @@ export default function GalleryPage() {
                 <div className={styles.cardMeta}>
                   <span>👤 {item.client?.first_name} {item.client?.last_name || ''}</span>
                   <span>✂️ {item.staff_member?.name || 'Staff'}</span>
-                  <span>📅 {new Date(item.date).toLocaleDateString()}</span>
+                  <span>📅 {localeDateStr(new Date(item.date), { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                   {item.satisfaction && <span>⭐ {item.satisfaction}/5</span>}
                 </div>
               </div>
@@ -238,7 +239,7 @@ export default function GalleryPage() {
                 </div>
                 <div className={styles.modalDetail}>
                   <div className={styles.modalDetailLabel}>Date</div>
-                  <div className={styles.modalDetailValue}>{new Date(selected.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
+                  <div className={styles.modalDetailValue}>{localeDateStr(new Date(selected.date), { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
                 </div>
                 <div className={styles.modalDetail}>
                   <div className={styles.modalDetailLabel}>Category</div>

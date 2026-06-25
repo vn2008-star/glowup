@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { localeDateStr } from '@/lib/utils';
 import styles from './FeedbackCenter.module.css';
 
 /* ═══ Types ═══ */
@@ -170,7 +171,7 @@ export default function FeedbackCenter() {
     if (hrs < 24) return `${hrs}h ago`;
     const days = Math.floor(hrs / 24);
     if (days < 30) return `${days}d ago`;
-    return new Date(dateStr).toLocaleDateString();
+    return localeDateStr(new Date(dateStr), { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
   return (

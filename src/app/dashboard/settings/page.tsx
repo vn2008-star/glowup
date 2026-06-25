@@ -11,7 +11,7 @@ import { US_TIMEZONES, timezoneFromAddress } from "@/lib/tz";
 import { CLOSED_DAY_HOLIDAYS } from "@/lib/schedule-utils";
 import type { CustomClosedDate } from "@/lib/schedule-utils";
 import styles from "./settings.module.css";
-import { formatPhone } from "@/lib/utils";
+import { formatPhone, localeDateStr } from "@/lib/utils";
 
 interface BusinessHours {
   [day: string]: { open: string; close: string; closed: boolean };
@@ -567,7 +567,7 @@ export default function SettingsPage() {
         <div className={styles.closedDaysGrid}>
           {CLOSED_DAY_HOLIDAYS.map(h => {
             const checked = closedHolidays.includes(h.name);
-            const dateLabel = new Date(2026, h.month, h.day).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            const dateLabel = localeDateStr(new Date(2026, h.month, h.day), { month: 'short', day: 'numeric' });
             return (
               <label key={h.name} className={`${styles.closedDayItem} ${checked ? styles.closedDayItemChecked : ''}`}>
                 <input
@@ -600,7 +600,7 @@ export default function SettingsPage() {
               {customClosedDates.map((c, i) => (
                 <div key={i} className={styles.customClosedItem}>
                   <span>{c.label || 'Closed'}</span>
-                  <span>{new Date(c.date + 'T00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                  <span>{localeDateStr(new Date(c.date + 'T00:00'), { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</span>
                   <button
                     type="button"
                     className={styles.customClosedRemove}
@@ -1216,7 +1216,7 @@ export default function SettingsPage() {
             </div>
             {tenant?.subscription_status === 'trialing' && tenant?.trial_ends_at && (
               <p className={styles.billingDetail}>
-                ⏰ Trial ends: <strong>{new Date(tenant.trial_ends_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</strong>
+                ⏰ Trial ends: <strong>{localeDateStr(new Date(tenant.trial_ends_at), { month: 'long', day: 'numeric', year: 'numeric' })}</strong>
                 {(() => {
                   const days = Math.ceil((new Date(tenant.trial_ends_at).getTime() - Date.now()) / (1000*60*60*24));
                   return days > 0 ? ` (${days} days left)` : ' (expired)';
@@ -1225,7 +1225,7 @@ export default function SettingsPage() {
             )}
             {tenant?.subscription_status === 'active' && tenant?.current_period_end && (
               <p className={styles.billingDetail}>
-                Next billing: <strong>{new Date(tenant.current_period_end).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</strong>
+                Next billing: <strong>{localeDateStr(new Date(tenant.current_period_end), { month: 'long', day: 'numeric', year: 'numeric' })}</strong>
               </p>
             )}
             {tenant?.subscription_status === 'past_due' && (
@@ -1387,7 +1387,7 @@ export default function SettingsPage() {
           <div className={styles.deletionBanner}>
             <div>
               <strong>🗑️ Account scheduled for deletion</strong>
-              <p>Your account and all data will be permanently deleted on <strong>{new Date(tenant.deletion_scheduled_at as string).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</strong>.</p>
+              <p>Your account and all data will be permanently deleted on <strong>{localeDateStr(new Date(tenant.deletion_scheduled_at as string), { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</strong>.</p>
             </div>
             <button
               className="btn btn-primary btn-sm"
@@ -1427,7 +1427,7 @@ export default function SettingsPage() {
               const d = await res.json();
               if (res.ok) {
                 await refetch();
-                alert(`Account scheduled for deletion on ${new Date(d.deletion_date).toLocaleDateString()}. You have 30 days to cancel.`);
+                alert(`Account scheduled for deletion on ${localeDateStr(new Date(d.deletion_date), { month: 'long', day: 'numeric', year: 'numeric' })}. You have 30 days to cancel.`);
               } else {
                 alert(d.error || 'Deletion failed');
               }

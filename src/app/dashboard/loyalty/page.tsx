@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData } from "@/lib/api";
+import { localeDateStr } from "@/lib/utils";
 import styles from "./loyalty.module.css";
 
 interface LoyaltyTier {
@@ -185,7 +186,7 @@ export default function LoyaltyPage() {
                   <span className={styles.activityClient}>{clientName}</span>
                   <span className={styles.activityAction}>Earned {points} pts (${r.total_price} service)</span>
                   <span className={`${styles.activityPoints} ${styles.positive}`}>+{points}</span>
-                  <span className={styles.activityDate}>{new Date(r.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                  <span className={styles.activityDate}>{localeDateStr(new Date(r.created_at), { month: "short", day: "numeric" })}</span>
                 </div>
               );
             })}

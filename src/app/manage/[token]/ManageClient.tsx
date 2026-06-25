@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { localeDateStr } from "@/lib/utils";
 import styles from "./manage.module.css";
 
 interface AppointmentData {
@@ -121,7 +122,7 @@ export default function ManageClient({ token }: { token: string }) {
   // Format date/time
   function formatDate(iso: string) {
     const d = new Date(iso);
-    return d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+    return localeDateStr(d, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
   }
   function formatTime(iso: string) {
     const d = new Date(iso);
@@ -143,7 +144,7 @@ export default function ManageClient({ token }: { token: string }) {
   // Generate available time slots for a date
   const generateTimeSlots = useCallback((dateStr: string) => {
     if (!business?.hours) return [];
-    const dayOfWeek = new Date(dateStr + "T12:00:00").toLocaleDateString("en-US", { weekday: "long" }).toLowerCase();
+    const dayOfWeek = localeDateStr(new Date(dateStr + "T12:00:00"), { weekday: "long" }).toLowerCase();
     const dayHours = business.hours[dayOfWeek] as { open: string; close: string } | undefined;
     if (!dayHours || !dayHours.open || !dayHours.close) return [];
 
@@ -307,7 +308,7 @@ export default function ManageClient({ token }: { token: string }) {
                   <button className={styles.calendarNav} onClick={() => setCalMonth(new Date(calMonth.getFullYear(), calMonth.getMonth() - 1, 1))}
                     disabled={calMonth.getMonth() === today.getMonth() && calMonth.getFullYear() === today.getFullYear()}>‹</button>
                   <span className={styles.calendarMonthLabel}>
-                    {calMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                    {localeDateStr(calMonth, { month: "long", year: "numeric" })}
                   </span>
                   <button className={styles.calendarNav} onClick={() => setCalMonth(new Date(calMonth.getFullYear(), calMonth.getMonth() + 1, 1))}>›</button>
                 </div>
@@ -331,7 +332,7 @@ export default function ManageClient({ token }: { token: string }) {
                     const isSelected = selectedDate === dateStr;
 
                     // Check if day has business hours
-                    const dayName = dateObj.toLocaleDateString("en-US", { weekday: "long" }).toLowerCase();
+                    const dayName = localeDateStr(dateObj, { weekday: "long" }).toLowerCase();
                     const hasHours = business?.hours && business.hours[dayName] && (business.hours[dayName] as { open: string; close: string }).open;
 
                     return (
@@ -377,7 +378,7 @@ export default function ManageClient({ token }: { token: string }) {
                   onClick={handleReschedule}
                   disabled={actionLoading}
                 >
-                  {actionLoading ? "Rescheduling..." : `Confirm — ${formatTimeSlot(selectedTime)} on ${new Date(selectedDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}
+                  {actionLoading ? "Rescheduling..." : `Confirm — ${formatTimeSlot(selectedTime)} on ${localeDateStr(new Date(selectedDate + "T12:00:00"), { month: "short", day: "numeric" })}`}
                 </button>
               )}
             </div>

@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+import { localeDateStr } from "@/lib/utils";
 import styles from "./admin.module.css";
 import GrowthDashboard from "./GrowthDashboard";
 import FeedbackCenter from "./FeedbackCenter";
@@ -247,7 +248,7 @@ export default function AdminPage() {
     });
     if (res.ok) {
       const d = await res.json();
-      const newDate = new Date(d.new_trial_ends_at).toLocaleDateString();
+      const newDate = localeDateStr(new Date(d.new_trial_ends_at), { month: 'short', day: 'numeric', year: 'numeric' });
       alert(`✅ Trial extended by ${months} months. New trial end: ${newDate}`);
       await fetchTenants();
     } else {
@@ -1208,7 +1209,7 @@ export default function AdminPage() {
                             <td><strong>{c.salon_name}</strong></td>
                             <td>{c.owner_name}</td>
                             <td style={{ fontSize: '12px' }}>{c.owner_email}</td>
-                            <td className={styles.dateCell}>{c.sent_at ? new Date(c.sent_at).toLocaleDateString() : '—'}</td>
+                            <td className={styles.dateCell}>{c.sent_at ? localeDateStr(new Date(c.sent_at), { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</td>
                             <td style={{ textAlign: 'center' }}>{(c as any).follow_up_count || 0}/2</td>
                             <td style={{ fontSize: '12px' }}>{nextTemplate}</td>
                           </tr>
@@ -1344,7 +1345,7 @@ export default function AdminPage() {
                               </span>
                             </td>
                             <td style={{ textAlign: 'center', fontSize: '12px' }}>{(c as any).follow_up_count || 0}</td>
-                            <td className={styles.dateCell}>{c.sent_at ? new Date(c.sent_at).toLocaleDateString() : '—'}</td>
+                            <td className={styles.dateCell}>{c.sent_at ? localeDateStr(new Date(c.sent_at), { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -1457,8 +1458,8 @@ export default function AdminPage() {
                               fontWeight: trialDaysLeft <= 7 || trialDaysLeft > 30 ? 600 : 400,
                             }}>
                               {trialDaysLeft > 30
-                                ? `✅ Extended → ${trialEnd.toLocaleDateString()}`
-                                : `${trialDaysLeft}d left → ${trialEnd.toLocaleDateString()}`}
+                                ? `✅ Extended → ${localeDateStr(trialEnd, { month: 'short', day: 'numeric' })}`
+                                : `${trialDaysLeft}d left → ${localeDateStr(trialEnd, { month: 'short', day: 'numeric' })}`}
                             </span>
                           )}
                         </div>
@@ -1468,7 +1469,7 @@ export default function AdminPage() {
                           {subStatus === 'active' && periodEnd ? (
                             <>
                               <span style={{ fontSize: '11px', color: 'var(--text-primary)', fontWeight: 600 }}>
-                                Next: {periodEnd.toLocaleDateString()}
+                                Next: {localeDateStr(periodEnd, { month: 'short', day: 'numeric' })}
                               </span>
                               {t.stripe_customer_id && (
                                 <a
@@ -1505,7 +1506,7 @@ export default function AdminPage() {
                         {status === "suspended" && <span className={`${styles.statusBadge} ${styles.statusSuspended}`}>Suspended</span>}
                         {status === "deletion" && (
                           <span className={`${styles.statusBadge} ${styles.statusDeletion}`}>
-                            Deletes {new Date(t.deletion_scheduled_at!).toLocaleDateString()}
+                            Deletes {localeDateStr(new Date(t.deletion_scheduled_at!), { month: 'short', day: 'numeric' })}
                           </span>
                         )}
                       </td>
@@ -1532,7 +1533,7 @@ export default function AdminPage() {
                         })()}
                       </td>
                       <td className={styles.dateCell}>
-                        {new Date(t.created_at).toLocaleDateString()}
+                        {localeDateStr(new Date(t.created_at), { month: 'short', day: 'numeric', year: 'numeric' })}
                       </td>
                       <td>
                         <div className={styles.actionBtns}>
@@ -1671,7 +1672,7 @@ export default function AdminPage() {
                                       ['Plan', detailData[t.id].tenant.plan as string],
                                       ['Subscription', detailData[t.id].tenant.subscription_status as string],
                                       ['Slug', `/${detailData[t.id].tenant.slug as string}`],
-                                      ['Created', new Date(detailData[t.id].tenant.created_at as string).toLocaleDateString()],
+                                      ['Created', localeDateStr(new Date(detailData[t.id].tenant.created_at as string), { month: 'short', day: 'numeric', year: 'numeric' })],
                                     ].map(([label, value]) => (
                                       <div key={label} className={styles.infoField}>
                                         <span className={styles.infoLabel}>{label}</span>
@@ -1685,8 +1686,8 @@ export default function AdminPage() {
                                     <h4>💳 Billing</h4>
                                     {[['Stripe Customer', detailData[t.id].tenant.stripe_customer_id as string],
                                       ['Stripe Sub', detailData[t.id].tenant.stripe_subscription_id as string],
-                                      ['Trial Ends', detailData[t.id].tenant.trial_ends_at ? new Date(detailData[t.id].tenant.trial_ends_at as string).toLocaleDateString() : null],
-                                      ['Period End', detailData[t.id].tenant.current_period_end ? new Date(detailData[t.id].tenant.current_period_end as string).toLocaleDateString() : null],
+                                      ['Trial Ends', detailData[t.id].tenant.trial_ends_at ? localeDateStr(new Date(detailData[t.id].tenant.trial_ends_at as string), { month: 'short', day: 'numeric', year: 'numeric' }) : null],
+                                      ['Period End', detailData[t.id].tenant.current_period_end ? localeDateStr(new Date(detailData[t.id].tenant.current_period_end as string), { month: 'short', day: 'numeric', year: 'numeric' }) : null],
                                     ].map(([label, value]) => (
                                       <div key={label as string} className={styles.infoField}>
                                         <span className={styles.infoLabel}>{label as string}</span>
@@ -1704,7 +1705,7 @@ export default function AdminPage() {
                                       detailData[t.id].appointments.slice(0, 5).map((apt) => (
                                         <div key={apt.id} className={styles.infoField}>
                                           <span className={styles.infoLabel}>
-                                            {new Date(apt.start_time).toLocaleDateString()} · {apt.staff?.name || '?'}
+                                            {localeDateStr(new Date(apt.start_time), { month: 'short', day: 'numeric' })} · {apt.staff?.name || '?'}
                                           </span>
                                           <span className={styles.infoValue} style={{ fontSize: '12px' }}>
                                             {apt.client ? `${apt.client.first_name} ${apt.client.last_name || ''}`.trim() : '—'}
@@ -1812,7 +1813,7 @@ export default function AdminPage() {
                                                 <td style={{ fontSize: '12px' }}>{c.email || <span className={styles.infoEmpty}>—</span>}</td>
                                                 <td style={{ textAlign: 'center' }}>{c.visit_count}</td>
                                                 <td style={{ fontWeight: 600 }}>${Number(c.lifetime_spend || 0).toFixed(2)}</td>
-                                                <td className={styles.dateCell}>{c.last_visit ? new Date(c.last_visit).toLocaleDateString() : '—'}</td>
+                                                <td className={styles.dateCell}>{c.last_visit ? localeDateStr(new Date(c.last_visit), { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</td>
                                                 <td style={{ textAlign: 'center' }}>{c.loyalty_points}</td>
                                                 <td>
                                                   <span className={c.status === 'active' ? styles.clientActive : styles.clientInactive}>
