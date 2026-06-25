@@ -6,6 +6,7 @@ import { useTenant } from "@/lib/tenant-context";
 import { queryData } from "@/lib/api";
 import styles from "./overview.module.css";
 import type { Appointment, Client } from "@/lib/types";
+import { localeDateStr } from "@/lib/utils";
 
 export default function DashboardOverview() {
   const { tenant, currentStaff } = useTenant();
@@ -67,8 +68,8 @@ export default function DashboardOverview() {
     ? (tenant?.name?.split(' ')[0] || 'there')
     : (currentStaff?.name?.split(" ")[0] || "there");
 
-  const dayName = now.toLocaleDateString("en-US", { weekday: "long" });
-  const dateStr = now.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  const dayName = localeDateStr(now, { weekday: "long" });
+  const dateStr = localeDateStr(now, { month: "long", day: "numeric", year: "numeric" });
 
   return (
     <div className={styles.overview}>
@@ -198,7 +199,7 @@ export default function DashboardOverview() {
                     <div className={styles.clientInfo}>
                       <span className={styles.clientName}>{c.first_name} {c.last_name || ""}</span>
                       <span className={styles.clientMeta}>
-                        {t("lastVisit")}: {c.last_visit ? new Date(c.last_visit).toLocaleDateString() : t("never")}
+                        {t("lastVisit")}: {c.last_visit ? localeDateStr(new Date(c.last_visit), { month: 'short', day: 'numeric' }) : t("never")}
                       </span>
                     </div>
                   </div>

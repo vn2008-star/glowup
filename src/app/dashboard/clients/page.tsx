@@ -6,7 +6,7 @@ import { useTenant } from "@/lib/tenant-context";
 import { queryData } from "@/lib/api";
 import styles from "./clients.module.css";
 import type { Client, Service, Staff } from "@/lib/types";
-import { formatPhone } from "@/lib/utils";
+import { formatPhone, fmtDate, localeDateStr } from "@/lib/utils";
 
 /* ── Masking helpers (mirrors API logic for "View as Technician" preview) ── */
 function maskPhone(phone: string | null): string | null {
@@ -334,7 +334,7 @@ export default function ClientsPage() {
 
     if (data && !error) {
       setShowBookModal(false);
-      alert(`✅ Appointment booked for ${selectedClient.first_name} on ${start.toLocaleDateString()} at ${start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
+      alert(`✅ Appointment booked for ${selectedClient.first_name} on ${localeDateStr(start)} at ${start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
     } else {
       alert("Failed to book appointment. Please try again.");
     }
@@ -358,10 +358,8 @@ export default function ClientsPage() {
     reader.readAsDataURL(file);
   }
 
-  function formatDate(dateStr: string | null) {
-    if (!dateStr) return null;
-    return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-  }
+  // Use the centralized Gregorian-safe formatter from utils
+  const formatDate = fmtDate;
 
   return (
     <div className={styles.page}>
@@ -564,7 +562,7 @@ export default function ClientsPage() {
                   <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600 }}>{c.visit_count}</td>
                   <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600 }}>${c.lifetime_spend}</td>
                   <td style={{ padding: '10px 12px', textAlign: 'right', color: 'var(--color-primary)', fontWeight: 600 }}>{c.loyalty_points}</td>
-                  <td style={{ padding: '10px 12px', fontSize: '12px', color: 'var(--text-tertiary)' }}>{c.last_visit ? new Date(c.last_visit).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}</td>
+                  <td style={{ padding: '10px 12px', fontSize: '12px', color: 'var(--text-tertiary)' }}>{c.last_visit ? localeDateStr(new Date(c.last_visit), { month: 'short', day: 'numeric' }) : '—'}</td>
                 </tr>
               ))}
             </tbody>

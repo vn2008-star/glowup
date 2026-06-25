@@ -7,6 +7,7 @@ import { queryData } from "@/lib/api";
 import { localToUTC, todayInTz, DEFAULT_TZ } from "@/lib/tz";
 import { CLOSED_DAY_HOLIDAYS, isBusinessClosedOnDate, isStaffOffOnDate } from "@/lib/schedule-utils";
 import type { CustomClosedDate } from "@/lib/schedule-utils";
+import { localeDateStr } from "@/lib/utils";
 import styles from "./calendar.module.css";
 import type { Appointment, Client, Service, Staff } from "@/lib/types";
 
@@ -287,15 +288,15 @@ export default function CalendarPage() {
 
   const dateLabel = (() => {
     if (view === "month") {
-      return selectedDate.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+      return localeDateStr(selectedDate, { month: "long", year: "numeric" });
     }
     if (view === "week") {
       const we = new Date(weekStart);
       we.setDate(we.getDate() + 6);
-      const fmt = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      const fmt = (d: Date) => localeDateStr(d, { month: "short", day: "numeric" });
       return `${fmt(weekStart)} – ${fmt(we)}, ${we.getFullYear()}`;
     }
-    return selectedDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+    return localeDateStr(selectedDate, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
   })();
 
   // ── Day view helpers ──
@@ -541,7 +542,7 @@ export default function CalendarPage() {
                 {upcoming.map(({ client: c, date, daysAway }) => (
                   <div key={c.id} className={`${styles.birthdayTag} ${styles.birthdayTagUpcoming}`}>
                     <span>🎂</span>
-                    <span>{c.first_name} {c.last_name || ''} — {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ({daysAway}d)</span>
+                    <span>{c.first_name} {c.last_name || ''} — {localeDateStr(date, { month: 'short', day: 'numeric' })} ({daysAway}d)</span>
                   </div>
                 ))}
               </div>
@@ -645,7 +646,7 @@ export default function CalendarPage() {
                           {new Date(apt.start_time).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
                         </span>
                         {!isBlocked(apt) && apt.client?.birthday && (
-                          <span className={styles.aptBirthday}>🎂 {new Date(apt.client.birthday + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                          <span className={styles.aptBirthday}>🎂 {localeDateStr(new Date(apt.client.birthday + 'T00:00:00'), { month: 'short', day: 'numeric' })}</span>
                         )}
                         {!isBlocked(apt) && <span className={styles.aptService}>{apt.service?.name || "Service"}</span>}
                       </div>
@@ -759,7 +760,7 @@ export default function CalendarPage() {
               return (
                 <div key={dayDateStr} className={`${styles.weekCol} ${isToday ? styles.weekColToday : ""} ${isBizClosed ? styles.weekColClosed : ""}`}>
                   <div className={`${styles.weekColHeader} ${isToday ? styles.weekColHeaderToday : ""}`}>
-                    <span className={styles.weekDayName}>{day.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase()}</span>
+                    <span className={styles.weekDayName}>{localeDateStr(day, { weekday: "short" }).toUpperCase()}</span>
                     <span className={`${styles.weekDayNum} ${isToday ? styles.weekDayNumToday : ""}`}>{day.getDate()}</span>
                     {/* Compact markers in week header */}
                     {weekMarkers.length > 0 && (
@@ -835,7 +836,7 @@ export default function CalendarPage() {
                             {isBlocked(apt) ? `🚫 ${apt.notes || "Blocked"}` : (apt.client ? `${apt.client.first_name} ${apt.client.last_name || ""}`.trim() : "Walk-in")}
                           </span>
                           {!isBlocked(apt) && apt.client?.birthday && (
-                            <span className={styles.weekAptBirthday}>🎂 {new Date(apt.client.birthday + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                            <span className={styles.weekAptBirthday}>🎂 {localeDateStr(new Date(apt.client.birthday + 'T00:00:00'), { month: 'short', day: 'numeric' })}</span>
                           )}
                           <span className={styles.weekAptTime}>
                             {startD.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
@@ -921,10 +922,10 @@ export default function CalendarPage() {
                   {dayApts.length > 0 && (
                     <div className={styles.monthDots}>
                       {dayApts.slice(0, maxDots).map((apt, i) => (
-                        <div key={i} className={styles.monthDot} style={{ background: aptColor(apt.status) }} title={apt.client ? `${apt.client.first_name} ${apt.client.last_name || ""}`.trim() + (apt.client.birthday ? ` 🎂 ${new Date(apt.client.birthday + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : '') : "Walk-in"}>
+                        <div key={i} className={styles.monthDot} style={{ background: aptColor(apt.status) }} title={apt.client ? `${apt.client.first_name} ${apt.client.last_name || ""}`.trim() + (apt.client.birthday ? ` 🎂 ${localeDateStr(new Date(apt.client.birthday + 'T00:00:00'), { month: 'short', day: 'numeric' })}` : '') : "Walk-in"}>
                           <span className={styles.monthDotText}>
                             {apt.client ? `${apt.client.first_name} ${apt.client.last_name || ""}`.trim() : "Walk-in"}
-                            {apt.client?.birthday && <span className={styles.monthDotBirthday}> 🎂 {new Date(apt.client.birthday + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>}
+                            {apt.client?.birthday && <span className={styles.monthDotBirthday}> 🎂 {localeDateStr(new Date(apt.client.birthday + 'T00:00:00'), { month: 'short', day: 'numeric' })}</span>}
                           </span>
                         </div>
                       ))}
@@ -985,7 +986,7 @@ export default function CalendarPage() {
               <div className={styles.detailRow}>
                 <span className={styles.detailLabel}>{t("dateTime")}</span>
                 <span className={styles.detailValue}>
-                  {new Date(selectedApt.start_time).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}{" "}
+                  {localeDateStr(new Date(selectedApt.start_time), { weekday: "short", month: "short", day: "numeric" })}{" "}
                   {new Date(selectedApt.start_time).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
                   {" – "}
                   {new Date(selectedApt.end_time).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
