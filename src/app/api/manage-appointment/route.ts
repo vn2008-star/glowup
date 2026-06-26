@@ -42,6 +42,34 @@ export async function GET(request: Request) {
 
   const service = apt.services as unknown as { id: string; name: string; duration_minutes: number; price: number } | null
 
+  // Fetch the assigned staff member's full schedule for the reschedule calendar
+  let staffSchedule: Record<string, unknown> | null = null
+  if (apt.staff_id) {
+    const { data: staffRow } = await svc
+      .from('staff')
+      .select('schedule')
+      .eq('id', apt.staff_id)
+      .single()
+    staffSchedule = (staffRow?.schedule || null) as Record<string, unknown> | null
+  }
+
+  // Fetch the staff's existing booked appointments (next 30 days) for conflict display
+  const now = new Date()
+  const futureLimit = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
+  let bookedSlots: { start: string; end: string }[] = []
+  if (apt.staff_id) {
+    const { data: existingApts } = await svc
+      .from('appointments')
+      .select('start_time, end_time')
+      .eq('tenant_id', apt.tenant_id)
+      .eq('staff_id', apt.staff_id)
+      .neq('id', apt.id) // exclude the current appointment being rescheduled
+      .in('status', ['pending', 'confirmed', 'blocked'])
+      .gt('end_time', now.toISOString())
+      .lt('start_time', futureLimit.toISOString())
+    bookedSlots = (existingApts || []).map(a => ({ start: a.start_time, end: a.end_time }))
+  }
+
   return NextResponse.json({
     appointment: {
       id: apt.id,
@@ -62,6 +90,8 @@ export async function GET(request: Request) {
       timezone: tenant.timezone,
       hours: (tenant.settings as Record<string, unknown>)?.business_hours || null,
     } : null,
+    staffSchedule,
+    bookedSlots,
   })
 }
 

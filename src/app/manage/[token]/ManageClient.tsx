@@ -35,6 +35,10 @@ export default function ManageClient({ token }: { token: string }) {
   const [view, setView] = useState<ViewState>("details");
   const [actionLoading, setActionLoading] = useState(false);
 
+  // Staff schedule & booked slots for reschedule calendar
+  const [staffSchedule, setStaffSchedule] = useState<Record<string, unknown> | null>(null);
+  const [bookedSlots, setBookedSlots] = useState<{ start: string; end: string }[]>([]);
+
   // Reschedule state
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
@@ -53,6 +57,8 @@ export default function ManageClient({ token }: { token: string }) {
         const data = await res.json();
         setAppointment(data.appointment);
         setBusiness(data.business);
+        if (data.staffSchedule) setStaffSchedule(data.staffSchedule);
+        if (data.bookedSlots) setBookedSlots(data.bookedSlots);
 
         // If already cancelled, show that state
         if (data.appointment?.status === "cancelled") {
@@ -141,7 +147,8 @@ export default function ManageClient({ token }: { token: string }) {
     return new Date(year, month, 1).getDay();
   }
 
-  // Default business hours if none configured (Mon-Sat 9am-7pm)
+  // ── Build effective hours: staff schedule (1st priority) → business hours (fallback) ──
+  // Default business hours if nothing is configured
   const DEFAULT_HOURS: Record<string, { open: string; close: string }> = {
     monday: { open: "09:00", close: "19:00" },
     tuesday: { open: "09:00", close: "19:00" },
@@ -151,20 +158,57 @@ export default function ManageClient({ token }: { token: string }) {
     saturday: { open: "09:00", close: "19:00" },
     sunday: { open: "10:00", close: "16:00" },
   };
-  // Normalize keys to lowercase (settings saves "Monday", calendar looks up "monday")
-  // Also respect the `closed` flag from settings — if closed, exclude that day
-  const effectiveHours: Record<string, { open: string; close: string }> = (() => {
-    const raw = business?.hours || DEFAULT_HOURS;
+
+  // Normalize a schedule object: lowercase keys, skip closed/off days
+  function normalizeSchedule(raw: Record<string, unknown>): Record<string, { open: string; close: string }> {
     const normalized: Record<string, { open: string; close: string }> = {};
     for (const [key, val] of Object.entries(raw)) {
-      const entry = val as { open?: string; close?: string; closed?: boolean };
-      if (entry.closed) continue; // skip closed days
+      // Skip non-day keys (vacations, service_durations, holidays_off, etc.)
+      const dayNames = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+      if (!dayNames.includes(key.toLowerCase())) continue;
+      const entry = val as { open?: string; close?: string; closed?: boolean; off?: boolean };
+      if (entry.closed || entry.off) continue;
       if (entry.open && entry.close) {
         normalized[key.toLowerCase()] = { open: entry.open, close: entry.close };
       }
     }
     return normalized;
+  }
+
+  // Priority: staff schedule → business hours → defaults
+  const effectiveHours: Record<string, { open: string; close: string }> = (() => {
+    if (staffSchedule) return normalizeSchedule(staffSchedule as Record<string, unknown>);
+    if (business?.hours) return normalizeSchedule(business.hours as Record<string, unknown>);
+    return DEFAULT_HOURS;
   })();
+
+  // Staff vacations (date ranges when staff is unavailable)
+  const staffVacations: { start: string; end: string }[] =
+    (staffSchedule as Record<string, unknown>)?.vacations as { start: string; end: string }[] || [];
+
+  // Staff holidays off
+  const staffHolidaysOff: string[] =
+    (staffSchedule as Record<string, unknown>)?.holidays_off as string[] || [];
+
+  // Check if a specific date falls within a staff vacation
+  function isOnVacation(dateStr: string): boolean {
+    for (const v of staffVacations) {
+      if (dateStr >= v.start && dateStr <= v.end) return true;
+    }
+    return false;
+  }
+
+  // Check if a time slot conflicts with existing booked appointments
+  function isSlotBooked(dateStr: string, timeStr: string, durationMin: number): boolean {
+    const slotStart = new Date(`${dateStr}T${timeStr}:00`).getTime();
+    const slotEnd = slotStart + durationMin * 60 * 1000;
+    for (const b of bookedSlots) {
+      const bStart = new Date(b.start).getTime();
+      const bEnd = new Date(b.end).getTime();
+      if (slotStart < bEnd && slotEnd > bStart) return true; // overlap
+    }
+    return false;
+  }
 
   // Generate available time slots for a date
   const generateTimeSlots = useCallback((dateStr: string) => {
@@ -190,10 +234,14 @@ export default function ManageClient({ token }: { token: string }) {
         if (h < now.getHours() || (h === now.getHours() && min <= now.getMinutes())) continue;
       }
 
+      // Skip slots that conflict with existing booked appointments
+      if (isSlotBooked(dateStr, timeStr, duration)) continue;
+
       slots.push(timeStr);
     }
     return slots;
-  }, [effectiveHours, appointment]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveHours, appointment, bookedSlots]);
 
   function toDateStr(d: Date) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -355,17 +403,20 @@ export default function ManageClient({ token }: { token: string }) {
                     const isToday = toDateStr(new Date()) === dateStr;
                     const isSelected = selectedDate === dateStr;
 
-                    // Check if day has business hours
+                    // Check if day has working hours + not on vacation
                     const dayName = localeDateStr(dateObj, { weekday: "long" }).toLowerCase();
                     const dayHoursEntry = effectiveHours[dayName];
                     const hasHours = !!dayHoursEntry?.open;
+                    const onVacation = isOnVacation(dateStr);
+                    const isDisabled = isPastDay || !hasHours || onVacation;
 
                     return (
                       <button
                         key={day}
-                        className={`${styles.calendarDay} ${isToday ? styles.calendarDayToday : ""} ${isSelected ? styles.calendarDaySelected : ""} ${isPastDay || !hasHours ? styles.calendarDayDisabled : ""}`}
-                        disabled={isPastDay || !hasHours}
+                        className={`${styles.calendarDay} ${isToday ? styles.calendarDayToday : ""} ${isSelected ? styles.calendarDaySelected : ""} ${isDisabled ? styles.calendarDayDisabled : ""}`}
+                        disabled={isDisabled}
                         onClick={() => { setSelectedDate(dateStr); setSelectedTime(null); }}
+                        title={onVacation ? "Staff on vacation" : !hasHours ? "Closed" : ""}
                       >
                         {day}
                       </button>
