@@ -172,8 +172,9 @@ export function rescheduleConfirmationHtml(opts: {
   staffName: string
   businessName: string
   businessPhone: string
+  manageLink: string
 }): string {
-  const { greeting, serviceName, dateStr, timeStr, staffName, businessName, businessPhone } = opts
+  const { greeting, serviceName, dateStr, timeStr, staffName, businessName, businessPhone, manageLink } = opts
 
   const detailRows = [
     detailRow('📋', 'Service', serviceName),
@@ -182,8 +183,13 @@ export function rescheduleConfirmationHtml(opts: {
     staffName ? detailRow('💇', 'With', staffName) : '',
   ].filter(Boolean).join('\n')
 
+  const manageSection = manageLink
+    ? `<p style="margin:24px 0 16px;color:#a0a0c0;font-size:14px;text-align:center;">Need to reschedule again or cancel?</p>
+       ${emailButton('Manage Appointment', manageLink)}`
+    : ''
+
   const contactLine = businessPhone
-    ? `<p style="margin:16px 0 0;color:#6b6b8d;font-size:13px;text-align:center;">Need to make changes? Contact us at <a href="tel:${businessPhone}" style="color:#a855f7;text-decoration:none;">${businessPhone}</a></p>`
+    ? `<p style="margin:16px 0 0;color:#6b6b8d;font-size:13px;text-align:center;">Or contact us at <a href="tel:${businessPhone}" style="color:#a855f7;text-decoration:none;">${businessPhone}</a></p>`
     : ''
 
   const body = `
@@ -199,6 +205,7 @@ export function rescheduleConfirmationHtml(opts: {
       </td></tr>
     </table>
 
+    ${manageSection}
     ${contactLine}
 
     <p style="margin:24px 0 0;color:#a0a0c0;font-size:14px;">See you soon! 💜</p>

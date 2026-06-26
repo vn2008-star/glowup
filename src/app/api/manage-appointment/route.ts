@@ -424,6 +424,12 @@ async function notifyClient(opts: {
     try {
       const { Resend } = await import('resend')
       const resend = new Resend(process.env.RESEND_API_KEY)
+      const baseUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
+        ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+        : process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
+          : 'https://glowup-jade.vercel.app'
+      const manageLink = `${baseUrl}/manage/${token}`
       const rescheduleHtml = rescheduleConfirmationHtml({
         greeting: clientGreeting,
         serviceName,
@@ -432,6 +438,7 @@ async function notifyClient(opts: {
         staffName,
         businessName,
         businessPhone,
+        manageLink,
       })
       await resend.emails.send({
         from: `${businessName} <bookings@joinglowup.org>`,
