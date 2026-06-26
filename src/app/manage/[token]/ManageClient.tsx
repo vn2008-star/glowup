@@ -141,11 +141,21 @@ export default function ManageClient({ token }: { token: string }) {
     return new Date(year, month, 1).getDay();
   }
 
+  // Default business hours if none configured (Mon-Sat 9am-7pm)
+  const DEFAULT_HOURS: Record<string, { open: string; close: string }> = {
+    monday: { open: "09:00", close: "19:00" },
+    tuesday: { open: "09:00", close: "19:00" },
+    wednesday: { open: "09:00", close: "19:00" },
+    thursday: { open: "09:00", close: "19:00" },
+    friday: { open: "09:00", close: "19:00" },
+    saturday: { open: "09:00", close: "19:00" },
+  };
+  const effectiveHours = (business?.hours || DEFAULT_HOURS) as Record<string, { open: string; close: string }>;
+
   // Generate available time slots for a date
   const generateTimeSlots = useCallback((dateStr: string) => {
-    if (!business?.hours) return [];
     const dayOfWeek = localeDateStr(new Date(dateStr + "T12:00:00"), { weekday: "long" }).toLowerCase();
-    const dayHours = business.hours[dayOfWeek] as { open: string; close: string } | undefined;
+    const dayHours = effectiveHours[dayOfWeek];
     if (!dayHours || !dayHours.open || !dayHours.close) return [];
 
     const [openH, openM] = dayHours.open.split(":").map(Number);
@@ -169,7 +179,7 @@ export default function ManageClient({ token }: { token: string }) {
       slots.push(timeStr);
     }
     return slots;
-  }, [business, appointment]);
+  }, [effectiveHours, appointment]);
 
   function toDateStr(d: Date) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -333,7 +343,8 @@ export default function ManageClient({ token }: { token: string }) {
 
                     // Check if day has business hours
                     const dayName = localeDateStr(dateObj, { weekday: "long" }).toLowerCase();
-                    const hasHours = business?.hours && business.hours[dayName] && (business.hours[dayName] as { open: string; close: string }).open;
+                    const dayHoursEntry = effectiveHours[dayName];
+                    const hasHours = !!dayHoursEntry?.open;
 
                     return (
                       <button
