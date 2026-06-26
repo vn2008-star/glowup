@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { localeDateStr } from "@/lib/utils";
+import { localToUTC, DEFAULT_TZ } from "@/lib/tz";
 import styles from "./manage.module.css";
 
 interface AppointmentData {
@@ -99,7 +100,9 @@ export default function ManageClient({ token }: { token: string }) {
     if (!selectedDate || !selectedTime) return;
     setActionLoading(true);
     try {
-      const newStartTime = `${selectedDate}T${selectedTime}:00`;
+      const salonTz = business?.timezone || DEFAULT_TZ;
+      const utcStart = localToUTC(selectedDate, selectedTime, salonTz);
+      const newStartTime = utcStart.toISOString();
       const res = await fetch("/api/manage-appointment", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
