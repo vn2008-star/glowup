@@ -268,6 +268,7 @@ export async function PATCH(request: Request) {
       startTime: newStart,
       businessName,
       businessPhone,
+      manageToken: token,
       tz,
     })
 
@@ -378,9 +379,10 @@ async function notifyClient(opts: {
   startTime: Date
   businessName: string
   businessPhone: string
+  manageToken: string
   tz: string
 }) {
-  const { client, clientName, serviceName, staffName, startTime, businessName, businessPhone, tz } = opts
+  const { client, clientName, serviceName, staffName, startTime, businessName, businessPhone, manageToken, tz } = opts
   if (!client) return
 
   // Greeting format: "Dear James D." instead of full name
@@ -404,10 +406,10 @@ async function notifyClient(opts: {
     if (clientE164) {
       try {
         const sid = process.env.TWILIO_ACCOUNT_SID!
-        const token = process.env.TWILIO_AUTH_TOKEN!
+        const twilioToken = process.env.TWILIO_AUTH_TOKEN!
         const from = process.env.TWILIO_PHONE_NUMBER!
         const url = `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`
-        const auth = btoa(`${sid}:${token}`)
+        const auth = btoa(`${sid}:${twilioToken}`)
         await fetch(url, {
           method: 'POST',
           headers: { 'Authorization': `Basic ${auth}`, 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -429,7 +431,7 @@ async function notifyClient(opts: {
         : process.env.VERCEL_URL
           ? `https://${process.env.VERCEL_URL}`
           : 'https://glowup-jade.vercel.app'
-      const manageLink = `${baseUrl}/manage/${token}`
+      const manageLink = `${baseUrl}/manage/${manageToken}`
       const rescheduleHtml = rescheduleConfirmationHtml({
         greeting: clientGreeting,
         serviceName,
