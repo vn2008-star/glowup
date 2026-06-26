@@ -149,8 +149,22 @@ export default function ManageClient({ token }: { token: string }) {
     thursday: { open: "09:00", close: "19:00" },
     friday: { open: "09:00", close: "19:00" },
     saturday: { open: "09:00", close: "19:00" },
+    sunday: { open: "10:00", close: "16:00" },
   };
-  const effectiveHours = (business?.hours || DEFAULT_HOURS) as Record<string, { open: string; close: string }>;
+  // Normalize keys to lowercase (settings saves "Monday", calendar looks up "monday")
+  // Also respect the `closed` flag from settings — if closed, exclude that day
+  const effectiveHours: Record<string, { open: string; close: string }> = (() => {
+    const raw = business?.hours || DEFAULT_HOURS;
+    const normalized: Record<string, { open: string; close: string }> = {};
+    for (const [key, val] of Object.entries(raw)) {
+      const entry = val as { open?: string; close?: string; closed?: boolean };
+      if (entry.closed) continue; // skip closed days
+      if (entry.open && entry.close) {
+        normalized[key.toLowerCase()] = { open: entry.open, close: entry.close };
+      }
+    }
+    return normalized;
+  })();
 
   // Generate available time slots for a date
   const generateTimeSlots = useCallback((dateStr: string) => {
