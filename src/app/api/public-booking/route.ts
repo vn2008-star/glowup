@@ -385,7 +385,11 @@ async function sendBookingConfirmations(opts: {
   const greeting = greetingName(clientName)
 
   // Build manage link for self-service cancel/reschedule
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://glowup-jade.vercel.app'
+  // IMPORTANT: Use production URL, NOT VERCEL_URL (which gives deployment-specific URLs
+  // that require Vercel Authentication and block clients from accessing the page)
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL
+    || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null)
+    || 'https://glowup-jade.vercel.app'
   const manageLink = appointment.manage_token ? `${baseUrl}/manage/${appointment.manage_token}` : ''
 
   // Fallback: if tenant doesn't have email/phone, look up the owner staff member

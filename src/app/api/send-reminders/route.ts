@@ -100,7 +100,9 @@ export async function GET(request: Request) {
     // Build message from template or default
     // Build manage link
     const manageToken = (appointment.manage_token as string) || ''
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://glowup-jade.vercel.app')
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL
+      || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null)
+      || 'https://glowup-jade.vercel.app'
     const manageLink = manageToken ? `${baseUrl}/manage/${manageToken}` : ''
 
     const customTemplates = (settings.reminder_templates || {}) as Record<string, string>
