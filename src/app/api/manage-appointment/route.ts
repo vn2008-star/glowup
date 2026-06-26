@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { toE164 } from '@/lib/utils'
-import { rescheduleConfirmationHtml } from '@/lib/email-templates'
+import { rescheduleConfirmationHtml, cancellationConfirmationHtml, staffCancellationNotificationHtml } from '@/lib/email-templates'
 
 // Public API — token-based auth (no login required)
 const svc = createClient(
@@ -110,7 +110,7 @@ export async function PATCH(request: Request) {
     .select(`
       id, tenant_id, start_time, end_time, status, service_id, staff_id, client_id,
       services ( name, duration_minutes ),
-      staff!staff_id ( name ),
+      staff!staff_id ( name, email ),
       clients ( first_name, last_name, email, phone )
     `)
     .eq('manage_token', token)
@@ -136,7 +136,7 @@ export async function PATCH(request: Request) {
     .single()
 
   const service = apt.services as unknown as { name: string; duration_minutes: number } | null
-  const staff = apt.staff as unknown as { name: string } | null
+  const staff = apt.staff as unknown as { name: string; email: string | null } | null
   const client = apt.clients as unknown as { first_name: string; last_name: string; email: string | null; phone: string | null } | null
   const clientName = client ? `${client.first_name} ${client.last_name || ''}`.trim() : 'Client'
   // Greeting format: "Dear James D." instead of full name
@@ -179,6 +179,94 @@ export async function PATCH(request: Request) {
       startTime: new Date(apt.start_time),
       tz,
     })
+
+    // Send cancellation confirmation to client
+    if (client?.email && process.env.RESEND_API_KEY) {
+      try {
+        const { Resend } = await import('resend')
+        const resend = new Resend(process.env.RESEND_API_KEY)
+
+        let dateStr: string, timeStr: string
+        try {
+          const startTime = new Date(apt.start_time)
+          dateStr = startTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: tz })
+          timeStr = startTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz })
+        } catch {
+          const startTime = new Date(apt.start_time)
+          dateStr = startTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+          timeStr = startTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+        }
+
+        const baseUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
+          ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+          : process.env.VERCEL_URL
+            ? `https://${process.env.VERCEL_URL}`
+            : 'https://glowup-jade.vercel.app'
+
+        // Get tenant slug for booking link
+        const { data: tenantSlug } = await svc
+          .from('tenants')
+          .select('slug')
+          .eq('id', apt.tenant_id)
+          .single()
+        const bookingLink = tenantSlug?.slug ? `${baseUrl}/book/${tenantSlug.slug}` : ''
+
+        const cancelHtml = cancellationConfirmationHtml({
+          greeting: clientGreeting,
+          serviceName,
+          dateStr,
+          timeStr,
+          staffName,
+          businessName,
+          businessPhone,
+          bookingLink,
+        })
+        await resend.emails.send({
+          from: `${businessName} <bookings@joinglowup.org>`,
+          to: [client.email],
+          subject: `❌ Appointment Cancelled — ${serviceName} on ${dateStr}`,
+          html: cancelHtml,
+        })
+      } catch (err) {
+        console.error(`[manage-appointment] Cancel email to client failed:`, err)
+      }
+    }
+
+    // Send cancellation notification to staff
+    if (staff?.email && process.env.RESEND_API_KEY) {
+      try {
+        const { Resend } = await import('resend')
+        const resend = new Resend(process.env.RESEND_API_KEY)
+
+        let dateStr: string, timeStr: string
+        try {
+          const startTime = new Date(apt.start_time)
+          dateStr = startTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: tz })
+          timeStr = startTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz })
+        } catch {
+          const startTime = new Date(apt.start_time)
+          dateStr = startTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+          timeStr = startTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+        }
+
+        const staffCancelHtml = staffCancellationNotificationHtml({
+          staffName,
+          clientName,
+          serviceName,
+          dateStr,
+          timeStr,
+          businessName,
+        })
+        await resend.emails.send({
+          from: `${businessName} <bookings@joinglowup.org>`,
+          to: [staff.email],
+          subject: `❌ Cancelled: ${clientName} — ${serviceName}`,
+          html: staffCancelHtml,
+        })
+      } catch (err) {
+        console.error(`[manage-appointment] Cancel email to staff failed:`, err)
+      }
+    }
 
     return NextResponse.json({ success: true, message: 'Appointment cancelled' })
 

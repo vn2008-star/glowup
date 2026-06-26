@@ -214,3 +214,93 @@ export function rescheduleConfirmationHtml(opts: {
 
   return emailShell(businessName, body)
 }
+
+// ─── Cancellation Confirmation Email (to Client) ───
+export function cancellationConfirmationHtml(opts: {
+  greeting: string
+  serviceName: string
+  dateStr: string
+  timeStr: string
+  staffName: string
+  businessName: string
+  businessPhone: string
+  bookingLink: string
+}): string {
+  const { greeting, serviceName, dateStr, timeStr, staffName, businessName, businessPhone, bookingLink } = opts
+
+  const detailRows = [
+    detailRow('📋', 'Service', serviceName),
+    detailRow('📅', 'Date', `<s>${dateStr}</s>`),
+    detailRow('🕐', 'Time', `<s>${timeStr}</s>`),
+    staffName ? detailRow('💇', 'With', staffName) : '',
+  ].filter(Boolean).join('\n')
+
+  const rebookSection = bookingLink
+    ? `<p style="margin:24px 0 16px;color:#a0a0c0;font-size:14px;text-align:center;">Want to book a new appointment?</p>
+       ${emailButton('Book Again', bookingLink, '#6c5ce7')}`
+    : ''
+
+  const contactLine = businessPhone
+    ? `<p style="margin:16px 0 0;color:#6b6b8d;font-size:13px;text-align:center;">Questions? Contact us at <a href="tel:${businessPhone}" style="color:#a855f7;text-decoration:none;">${businessPhone}</a></p>`
+    : ''
+
+  const body = `
+    <p style="margin:0 0 4px;color:#e8e8f0;font-size:16px;">Dear ${greeting},</p>
+    <p style="margin:0 0 24px;color:#a0a0c0;font-size:14px;">Your appointment has been cancelled. ❌</p>
+
+    <!-- Cancelled appointment card -->
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#1e1e3a;border-radius:12px;padding:0;margin-bottom:8px;">
+      <tr><td style="padding:20px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+          ${detailRows}
+        </table>
+      </td></tr>
+    </table>
+
+    ${rebookSection}
+    ${contactLine}
+
+    <p style="margin:24px 0 0;color:#a0a0c0;font-size:14px;">We hope to see you again soon! 💜</p>
+    <p style="margin:4px 0 0;color:#a0a0c0;font-size:14px;">— ${businessName}</p>
+  `
+
+  return emailShell(businessName, body)
+}
+
+// ─── Staff Cancellation Notification Email ───
+export function staffCancellationNotificationHtml(opts: {
+  staffName: string
+  clientName: string
+  serviceName: string
+  dateStr: string
+  timeStr: string
+  businessName: string
+}): string {
+  const { staffName, clientName, serviceName, dateStr, timeStr, businessName } = opts
+
+  const detailRows = [
+    detailRow('👤', 'Client', clientName),
+    detailRow('📋', 'Service', serviceName),
+    detailRow('📅', 'Date', `<s>${dateStr}</s>`),
+    detailRow('🕐', 'Time', `<s>${timeStr}</s>`),
+  ].join('\n')
+
+  const body = `
+    <p style="margin:0 0 4px;color:#e8e8f0;font-size:16px;">Hi ${staffName},</p>
+    <p style="margin:0 0 24px;color:#a0a0c0;font-size:14px;">The following appointment has been cancelled by the client. ❌</p>
+
+    <!-- Cancelled appointment card -->
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#1e1e3a;border-radius:12px;padding:0;margin-bottom:8px;">
+      <tr><td style="padding:20px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+          ${detailRows}
+        </table>
+      </td></tr>
+    </table>
+
+    <p style="margin:24px 0 0;color:#a0a0c0;font-size:14px;">This time slot is now open for other bookings.</p>
+    <p style="margin:4px 0 0;color:#a0a0c0;font-size:14px;">— ${businessName}</p>
+  `
+
+  return emailShell(businessName, body)
+}
