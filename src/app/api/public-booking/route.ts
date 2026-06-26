@@ -3,6 +3,7 @@ import { waitUntil } from '@vercel/functions'
 import { createClient } from '@supabase/supabase-js'
 import { timezoneFromAddress, DEFAULT_TZ } from '@/lib/tz'
 import { toE164 } from '@/lib/utils'
+import { bookingConfirmationHtml } from '@/lib/email-templates'
 
 // Public API — no auth required. Used by the /book/[slug] public booking page.
 if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -508,26 +509,17 @@ async function sendBookingConfirmations(opts: {
 
   // ── 2. Email to client ──
   if (clientEmail) {
-    const clientEmailBody = [
-      `Dear ${greeting},`,
-      ``,
-      `Your appointment has been confirmed! Here are the details:`,
-      ``,
-      `📋 Service: ${serviceName}`,
-      `📅 Date: ${dateStr}`,
-      `🕐 Time: ${timeStr}`,
-      staffName ? `💇 With: ${staffName}` : '',
-      `📍 Location: ${businessName}${businessAddress ? `, ${businessAddress}` : ''}`,
-      ``,
-      manageLink ? `Need to reschedule or cancel? Manage your appointment here:` : '',
-      manageLink ? manageLink : '',
-      manageLink ? '' : `Need to reschedule or cancel? Reply to this email or contact us at ${businessPhone || 'the salon'}.`,
-      '',
-      `Or contact us at ${businessPhone || 'the salon'}.`,
-      ``,
-      `See you soon!`,
-      `— ${businessName}`,
-    ].filter(Boolean).join('\n')
+    const clientEmailHtml = bookingConfirmationHtml({
+      greeting,
+      serviceName,
+      dateStr,
+      timeStr,
+      staffName,
+      businessName,
+      businessAddress,
+      businessPhone,
+      manageLink,
+    })
 
     if (resendClient) {
       try {
@@ -536,14 +528,14 @@ async function sendBookingConfirmations(opts: {
           replyTo: businessEmail || undefined,
           to: [clientEmail],
           subject: `✅ Booking Confirmed — ${serviceName} on ${dateStr}`,
-          text: clientEmailBody,
+          html: clientEmailHtml,
         })
         console.log(`[public-booking] ✅ Confirmation email sent to client ${clientEmail}`)
       } catch (err) {
         console.error(`[public-booking] Email to client failed:`, err)
       }
     } else {
-      console.log(`[DRY RUN] Client email to ${clientEmail}: ${clientEmailBody}`)
+      console.log(`[DRY RUN] Client email to ${clientEmail}`)
     }
   }
 

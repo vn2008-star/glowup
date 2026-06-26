@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { toE164 } from '@/lib/utils'
+import { rescheduleConfirmationHtml } from '@/lib/email-templates'
 
 // Public API — token-based auth (no login required)
 const svc = createClient(
@@ -393,11 +394,20 @@ async function notifyClient(opts: {
     try {
       const { Resend } = await import('resend')
       const resend = new Resend(process.env.RESEND_API_KEY)
+      const rescheduleHtml = rescheduleConfirmationHtml({
+        greeting: clientGreeting,
+        serviceName,
+        dateStr,
+        timeStr,
+        staffName,
+        businessName,
+        businessPhone,
+      })
       await resend.emails.send({
         from: `${businessName} <bookings@joinglowup.org>`,
         to: [client.email],
         subject: `🔄 Appointment Rescheduled — ${serviceName} on ${dateStr}`,
-        text: `Dear ${clientGreeting},\n\nYour appointment has been rescheduled. Here are the updated details:\n\n📋 Service: ${serviceName}\n📅 Date: ${dateStr}\n🕐 Time: ${timeStr}\n${staffName ? `💇 With: ${staffName}\n` : ''}\nNeed to make changes? Contact us at ${businessPhone || 'the salon'}.\n\nSee you soon!\n— ${businessName}`,
+        html: rescheduleHtml,
       })
     } catch (err) {
       console.error(`[manage-appointment] Email to client failed:`, err)

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { toE164 } from '@/lib/utils'
+import { appointmentReminderHtml } from '@/lib/email-templates'
 
 // ─── Send Appointment Reminders (Cron-triggered) ───
 // Vercel Cron calls this once per day.
@@ -167,13 +168,35 @@ export async function GET(request: Request) {
         if (process.env.RESEND_API_KEY) {
           const { Resend } = await import('resend')
           const resend = new Resend(process.env.RESEND_API_KEY)
-          await resend.emails.send({
-            from: `${businessName} <bookings@joinglowup.org>`,
-            replyTo: tenant?.email || undefined,
-            to: [client.email as string],
-            subject: fillTemplate(emailSubject),
-            text: fillTemplate(emailBody),
-          })
+          // Use HTML template if no custom template is set, otherwise fall back to text
+          const hasCustomTemplate = !!customTemplates.email
+          if (hasCustomTemplate) {
+            await resend.emails.send({
+              from: `${businessName} <bookings@joinglowup.org>`,
+              replyTo: tenant?.email || undefined,
+              to: [client.email as string],
+              subject: fillTemplate(emailSubject),
+              text: fillTemplate(emailBody),
+            })
+          } else {
+            const reminderHtml = appointmentReminderHtml({
+              greeting: clientGreeting,
+              serviceName,
+              dateStr,
+              timeStr,
+              staffName,
+              businessName,
+              businessAddress,
+              manageLink,
+            })
+            await resend.emails.send({
+              from: `${businessName} <bookings@joinglowup.org>`,
+              replyTo: tenant?.email || undefined,
+              to: [client.email as string],
+              subject: fillTemplate(emailSubject),
+              html: reminderHtml,
+            })
+          }
         } else {
           console.log(`[DRY RUN] Email to ${client.email}: ${fillTemplate(emailSubject)}`)
         }
