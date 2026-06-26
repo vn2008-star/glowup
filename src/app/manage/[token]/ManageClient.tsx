@@ -160,16 +160,22 @@ export default function ManageClient({ token }: { token: string }) {
   };
 
   // Normalize a schedule object: lowercase keys, skip closed/off days
+  // Handles both formats: business hours {open, close} and staff schedule {start, end}
   function normalizeSchedule(raw: Record<string, unknown>): Record<string, { open: string; close: string }> {
     const normalized: Record<string, { open: string; close: string }> = {};
     for (const [key, val] of Object.entries(raw)) {
       // Skip non-day keys (vacations, service_durations, holidays_off, etc.)
       const dayNames = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
       if (!dayNames.includes(key.toLowerCase())) continue;
-      const entry = val as { open?: string; close?: string; closed?: boolean; off?: boolean };
+      // Skip null entries (staff day off)
+      if (!val || typeof val !== "object") continue;
+      const entry = val as { open?: string; close?: string; start?: string; end?: string; closed?: boolean; off?: boolean };
       if (entry.closed || entry.off) continue;
-      if (entry.open && entry.close) {
-        normalized[key.toLowerCase()] = { open: entry.open, close: entry.close };
+      // Staff schedule uses start/end, business hours uses open/close
+      const openTime = entry.open || entry.start;
+      const closeTime = entry.close || entry.end;
+      if (openTime && closeTime) {
+        normalized[key.toLowerCase()] = { open: openTime, close: closeTime };
       }
     }
     return normalized;
