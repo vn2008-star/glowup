@@ -327,45 +327,6 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* Business Hours */}
-      <div id="hours" className={`card ${styles.section}`}>
-        <h2>Business Hours</h2>
-        <div className={styles.hoursList}>
-          {DAYS.map((day) => (
-            <div key={day} className={styles.hoursRow}>
-              <span className={styles.dayName}>{day}</span>
-              <div className={styles.hoursInputs}>
-                <input
-                  className="input"
-                  type="time"
-                  value={hours[day]?.open || ""}
-                  onChange={(e) => updateHour(day, "open", e.target.value)}
-                  disabled={hours[day]?.closed}
-                  style={{ width: 160 }}
-                />
-                <span>to</span>
-                <input
-                  className="input"
-                  type="time"
-                  value={hours[day]?.close || ""}
-                  onChange={(e) => updateHour(day, "close", e.target.value)}
-                  disabled={hours[day]?.closed}
-                  style={{ width: 160 }}
-                />
-              </div>
-              <label className={styles.closedToggle}>
-                <input
-                  type="checkbox"
-                  checked={hours[day]?.closed || false}
-                  onChange={() => toggleClosed(day)}
-                />
-                Closed
-              </label>
-            </div>
-          ))}
-        </div>
-      </div>
-
       {/* Booking Link */}
       {tenant?.slug && (
         <div id="booking-link" className={`card ${styles.section}`}>
@@ -555,6 +516,45 @@ export default function SettingsPage() {
               <option value="30">30 minutes</option>
             </select>
           </div>
+        </div>
+      </div>
+
+      {/* Business Hours */}
+      <div id="hours" className={`card ${styles.section}`}>
+        <h2>Business Hours</h2>
+        <div className={styles.hoursList}>
+          {DAYS.map((day) => (
+            <div key={day} className={styles.hoursRow}>
+              <span className={styles.dayName}>{day}</span>
+              <div className={styles.hoursInputs}>
+                <input
+                  className="input"
+                  type="time"
+                  value={hours[day]?.open || ""}
+                  onChange={(e) => updateHour(day, "open", e.target.value)}
+                  disabled={hours[day]?.closed}
+                  style={{ width: 160 }}
+                />
+                <span>to</span>
+                <input
+                  className="input"
+                  type="time"
+                  value={hours[day]?.close || ""}
+                  onChange={(e) => updateHour(day, "close", e.target.value)}
+                  disabled={hours[day]?.closed}
+                  style={{ width: 160 }}
+                />
+              </div>
+              <label className={styles.closedToggle}>
+                <input
+                  type="checkbox"
+                  checked={hours[day]?.closed || false}
+                  onChange={() => toggleClosed(day)}
+                />
+                Closed
+              </label>
+            </div>
+          ))}
         </div>
       </div>
 
