@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { toE164 } from '@/lib/utils'
-import { rescheduleConfirmationHtml, cancellationConfirmationHtml, staffCancellationNotificationHtml } from '@/lib/email-templates'
+import { rescheduleConfirmationHtml, cancellationConfirmationHtml, staffCancellationNotificationHtml, staffRescheduleNotificationHtml, ownerNotificationHtml } from '@/lib/email-templates'
 
 // Public API — token-based auth (no login required)
 const svc = createClient(
@@ -360,6 +360,47 @@ export async function PATCH(request: Request) {
       tz,
     })
 
+    // Send reschedule notification to staff
+    if (staff?.email && process.env.RESEND_API_KEY) {
+      try {
+        const { Resend } = await import('resend')
+        const resend = new Resend(process.env.RESEND_API_KEY)
+        const oldStart = new Date(apt.start_time)
+
+        let oldDateStr: string, oldTimeStr: string, newDateStr: string, newTimeStr: string
+        try {
+          oldDateStr = oldStart.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: tz })
+          oldTimeStr = oldStart.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz })
+          newDateStr = newStart.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: tz })
+          newTimeStr = newStart.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz })
+        } catch {
+          oldDateStr = oldStart.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+          oldTimeStr = oldStart.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+          newDateStr = newStart.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+          newTimeStr = newStart.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+        }
+
+        const staffHtml = staffRescheduleNotificationHtml({
+          staffName,
+          clientName,
+          serviceName,
+          oldDateStr,
+          oldTimeStr,
+          newDateStr,
+          newTimeStr,
+          businessName,
+        })
+        await resend.emails.send({
+          from: `${businessName} <bookings@joinglowup.org>`,
+          to: [staff.email],
+          subject: `🔄 Rescheduled: ${clientName} — ${serviceName}`,
+          html: staffHtml,
+        })
+      } catch (err) {
+        console.error(`[manage-appointment] Reschedule email to staff failed:`, err)
+      }
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Appointment rescheduled',
@@ -435,21 +476,29 @@ async function notifyOwner(opts: {
     }
   }
 
-  // Email to owner
+  // Email to owner (styled HTML)
   const ownerEmail = tenant.email || ((tenant.settings || {}) as Record<string, unknown>).owner_email as string || null
   if (ownerEmail && process.env.RESEND_API_KEY) {
     try {
       const { Resend } = await import('resend')
       const resend = new Resend(process.env.RESEND_API_KEY)
-      const emailBody = type === 'cancel'
-        ? `Appointment ${action} by client.\n\nClient: ${clientName}\nService: ${serviceName}\nWas scheduled: ${dateStr} at ${timeStr}\n${staffName ? `Staff: ${staffName}` : ''}`
-        : `Appointment ${action} by client.\n\nClient: ${clientName}\nService: ${serviceName}\nOriginal: ${oldDateStr} at ${oldTimeStr}\nNew: ${dateStr} at ${timeStr}\n${staffName ? `Staff: ${staffName}` : ''}`
+      const ownerHtml = ownerNotificationHtml({
+        type,
+        clientName,
+        serviceName,
+        staffName,
+        dateStr,
+        timeStr,
+        oldDateStr: oldDateStr || undefined,
+        oldTimeStr: oldTimeStr || undefined,
+        businessName: tenant.name,
+      })
 
       await resend.emails.send({
         from: `GlowUp <bookings@joinglowup.org>`,
         to: [ownerEmail],
         subject: `${emoji} ${action}: ${clientName} — ${serviceName}`,
-        text: emailBody,
+        html: ownerHtml,
       })
     } catch (err) {
       console.error(`[manage-appointment] Email to owner failed:`, err)

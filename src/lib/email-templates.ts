@@ -304,3 +304,93 @@ export function staffCancellationNotificationHtml(opts: {
 
   return emailShell(businessName, body)
 }
+
+// ─── Staff Reschedule Notification Email ───
+export function staffRescheduleNotificationHtml(opts: {
+  staffName: string
+  clientName: string
+  serviceName: string
+  oldDateStr: string
+  oldTimeStr: string
+  newDateStr: string
+  newTimeStr: string
+  businessName: string
+}): string {
+  const { staffName, clientName, serviceName, oldDateStr, oldTimeStr, newDateStr, newTimeStr, businessName } = opts
+
+  const detailRows = [
+    detailRow('👤', 'Client', clientName),
+    detailRow('📋', 'Service', serviceName),
+    detailRow('📅', 'Was', `<s>${oldDateStr} at ${oldTimeStr}</s>`),
+    detailRow('📅', 'New', `<strong>${newDateStr} at ${newTimeStr}</strong>`),
+  ].join('\n')
+
+  const body = `
+    <p style="margin:0 0 4px;color:#e8e8f0;font-size:16px;">Hi ${staffName},</p>
+    <p style="margin:0 0 24px;color:#a0a0c0;font-size:14px;">A client has rescheduled their appointment. 🔄</p>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#1e1e3a;border-radius:12px;padding:0;margin-bottom:8px;">
+      <tr><td style="padding:20px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+          ${detailRows}
+        </table>
+      </td></tr>
+    </table>
+
+    <p style="margin:24px 0 0;color:#a0a0c0;font-size:14px;">Your schedule has been updated automatically.</p>
+    <p style="margin:4px 0 0;color:#a0a0c0;font-size:14px;">— ${businessName}</p>
+  `
+
+  return emailShell(businessName, body)
+}
+
+// ─── Owner Notification Email (Cancel or Reschedule) ───
+export function ownerNotificationHtml(opts: {
+  type: 'cancel' | 'reschedule'
+  clientName: string
+  serviceName: string
+  staffName: string
+  dateStr: string
+  timeStr: string
+  oldDateStr?: string
+  oldTimeStr?: string
+  businessName: string
+}): string {
+  const { type, clientName, serviceName, staffName, dateStr, timeStr, oldDateStr, oldTimeStr, businessName } = opts
+
+  const isCancel = type === 'cancel'
+  const emoji = isCancel ? '❌' : '🔄'
+  const action = isCancel ? 'cancelled' : 'rescheduled'
+
+  const detailRows = [
+    detailRow('👤', 'Client', clientName),
+    detailRow('📋', 'Service', serviceName),
+    staffName ? detailRow('💇', 'Staff', staffName) : '',
+    ...(isCancel
+      ? [
+          detailRow('📅', 'Date', `<s>${dateStr}</s>`),
+          detailRow('🕐', 'Time', `<s>${timeStr}</s>`),
+        ]
+      : [
+          detailRow('📅', 'Was', `<s>${oldDateStr || dateStr} at ${oldTimeStr || timeStr}</s>`),
+          detailRow('📅', 'New', `<strong>${dateStr} at ${timeStr}</strong>`),
+        ]),
+  ].filter(Boolean).join('\n')
+
+  const body = `
+    <p style="margin:0 0 4px;color:#e8e8f0;font-size:16px;">${emoji} Appointment ${action}</p>
+    <p style="margin:0 0 24px;color:#a0a0c0;font-size:14px;">A client has ${action} their appointment.</p>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#1e1e3a;border-radius:12px;padding:0;margin-bottom:8px;">
+      <tr><td style="padding:20px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+          ${detailRows}
+        </table>
+      </td></tr>
+    </table>
+
+    <p style="margin:24px 0 0;color:#a0a0c0;font-size:14px;">— ${businessName}</p>
+  `
+
+  return emailShell(businessName, body)
+}
