@@ -89,7 +89,7 @@ export async function POST(request: Request) {
       case 'clients.list': {
         const { data, error } = await svc
           .from('clients')
-          .select('*')
+          .select('id, tenant_id, first_name, last_name, phone, email, birthday, notes, photo_url, loyalty_points, tags, lifetime_spend, visit_count, last_visit, status, created_at, preferences, allergies')
           .eq('tenant_id', tenantId)
           .order('created_at', { ascending: false })
           .limit(payload?.limit || 200)
@@ -141,7 +141,7 @@ export async function POST(request: Request) {
       case 'services.list': {
         const { data, error } = await svc
           .from('services')
-          .select('*')
+          .select('id, tenant_id, name, category, description, duration_minutes, price, price_addons, commission_rate, image_url, is_active, sort_order')
           .eq('tenant_id', tenantId)
           .order('sort_order', { ascending: true })
         return NextResponse.json({ data, error: error?.message })
@@ -193,7 +193,7 @@ export async function POST(request: Request) {
         // Re-fetch full list in new order
         const { data, error } = await svc
           .from('services')
-          .select('*')
+          .select('id, tenant_id, name, category, description, duration_minutes, price, price_addons, commission_rate, image_url, is_active, sort_order')
           .eq('tenant_id', tenantId)
           .order('sort_order', { ascending: true })
         return NextResponse.json({ data, error: error?.message })
@@ -203,7 +203,7 @@ export async function POST(request: Request) {
       case 'appointments.list': {
         let query = svc
           .from('appointments')
-          .select('*, client:clients(*), staff_member:staff!staff_id(*), service:services(*)')
+          .select('id, tenant_id, client_id, staff_id, service_id, start_time, end_time, status, total_price, notes, payment_method, tip_amount, checked_out_at, checked_in_at, created_at, client:clients(id, first_name, last_name, phone, email, photo_url), staff_member:staff!staff_id(id, name, photo_url, role), service:services(id, name, category, duration_minutes, price, commission_rate)')
           .eq('tenant_id', tenantId)
           .order('start_time', { ascending: true })
 
@@ -232,7 +232,7 @@ export async function POST(request: Request) {
         const { data, error } = await svc
           .from('appointments')
           .insert({ ...payload, tenant_id: tenantId })
-          .select('*, client:clients(*), staff_member:staff!staff_id(*), service:services(*)')
+          .select('id, tenant_id, client_id, staff_id, service_id, start_time, end_time, status, total_price, notes, payment_method, tip_amount, checked_out_at, checked_in_at, created_at, client:clients(id, first_name, last_name, phone, email, photo_url), staff_member:staff!staff_id(id, name, photo_url, role), service:services(id, name, category, duration_minutes, price, commission_rate)')
           .single()
         return NextResponse.json({ data, error: error?.message })
       }
@@ -244,7 +244,7 @@ export async function POST(request: Request) {
           .update(fields)
           .eq('id', id)
           .eq('tenant_id', tenantId)
-          .select('*, client:clients(*), staff_member:staff!staff_id(*), service:services(*)')
+          .select('id, tenant_id, client_id, staff_id, service_id, start_time, end_time, status, total_price, notes, payment_method, tip_amount, checked_out_at, checked_in_at, created_at, client:clients(id, first_name, last_name, phone, email, photo_url), staff_member:staff!staff_id(id, name, photo_url, role), service:services(id, name, category, duration_minutes, price, commission_rate)')
           .single()
         return NextResponse.json({ data, error: error?.message })
       }
@@ -262,7 +262,7 @@ export async function POST(request: Request) {
       case 'staff.list': {
         const { data, error } = await svc
           .from('staff')
-          .select('*')
+          .select('id, tenant_id, user_id, name, role, email, phone, photo_url, specialties, schedule, commission_rate, is_active')
           .eq('tenant_id', tenantId)
         // Hide system "Admin" records used only for tenant-user linking
         const visible = (data || []).filter((s: { name: string }) => s.name !== 'Admin')
@@ -336,7 +336,7 @@ export async function POST(request: Request) {
       case 'campaigns.list': {
         const { data, error } = await svc
           .from('campaigns')
-          .select('*')
+          .select('id, tenant_id, name, type, template, audience, status, metrics, last_sent, created_at')
           .eq('tenant_id', tenantId)
           .order('created_at', { ascending: false })
         return NextResponse.json({ data, error: error?.message })
@@ -413,7 +413,7 @@ export async function POST(request: Request) {
       case 'social.list': {
         let query = svc
           .from('social_posts')
-          .select('*')
+          .select('id, tenant_id, content, image_urls, platforms, status, scheduled_at, published_at, template_type, metrics, created_at')
           .eq('tenant_id', tenantId)
           .order('created_at', { ascending: false })
 
@@ -502,7 +502,7 @@ export async function POST(request: Request) {
       case 'messages.list': {
         const { data, error } = await svc
           .from('messages')
-          .select('*')
+          .select('id, conversation_id, tenant_id, sender_type, sender_name, content, created_at')
           .eq('conversation_id', payload.conversation_id)
           .eq('tenant_id', tenantId)
           .order('created_at', { ascending: true })
@@ -613,7 +613,7 @@ export async function POST(request: Request) {
           unreadConvosRes,
         ] = await Promise.all([
           svc.from('appointments')
-            .select('*, client:clients(*), service:services(*), staff_member:staff!staff_id(*)')
+            .select('id, client_id, staff_id, service_id, start_time, end_time, status, total_price, notes, payment_method, tip_amount, checked_in_at, client:clients(id, first_name, last_name, phone, email), service:services(id, name, price), staff_member:staff!staff_id(id, name, photo_url)')
             .eq('tenant_id', tenantId)
             .gte('start_time', `${todayStr}T00:00:00`)
             .lte('start_time', `${todayStr}T23:59:59`)
@@ -626,12 +626,12 @@ export async function POST(request: Request) {
             .eq('tenant_id', tenantId)
             .gte('created_at', weekAgo.toISOString()),
           svc.from('clients')
-            .select('*')
+            .select('id, first_name, last_name, phone, email, created_at')
             .eq('tenant_id', tenantId)
             .order('created_at', { ascending: false })
             .limit(5),
           svc.from('clients')
-            .select('*')
+            .select('id, first_name, last_name, phone, last_visit, visit_count')
             .eq('tenant_id', tenantId)
             .eq('status', 'at_risk')
             .limit(5),
@@ -824,7 +824,7 @@ export async function POST(request: Request) {
       case 'packages.list': {
         const { data, error } = await svc
           .from('packages')
-          .select('*')
+          .select('id, tenant_id, name, description, type, services, price, original_price, validity_days, max_redemptions, times_sold, revenue_generated, is_active, created_at')
           .eq('tenant_id', tenantId)
           .order('created_at', { ascending: false })
         return NextResponse.json({ data, error: error?.message })
@@ -864,7 +864,7 @@ export async function POST(request: Request) {
       case 'giftcards.list': {
         const { data, error } = await svc
           .from('gift_cards')
-          .select('*')
+          .select('id, tenant_id, code, initial_amount, balance, purchaser_name, recipient_name, status, expires_at, created_at')
           .eq('tenant_id', tenantId)
           .order('created_at', { ascending: false })
         return NextResponse.json({ data, error: error?.message })
@@ -1094,7 +1094,7 @@ export async function POST(request: Request) {
         const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString()
 
         const [aptsRes, staffRes] = await Promise.all([
-          svc.from('appointments').select('*').eq('tenant_id', tenantId)
+          svc.from('appointments').select('id, staff_id, client_id, status, total_price').eq('tenant_id', tenantId)
             .gte('start_time', monthStart).lte('start_time', monthEnd),
           svc.from('staff').select('id, name, schedule, commission_rate, is_active, specialties').eq('tenant_id', tenantId).neq('name', 'Admin')
         ])
@@ -1183,7 +1183,7 @@ export async function POST(request: Request) {
         }
 
         const [aptsRes, staffRes] = await Promise.all([
-          svc.from('appointments').select('*').eq('tenant_id', tenantId)
+          svc.from('appointments').select('id, staff_id, client_id, total_price, tip_amount').eq('tenant_id', tenantId)
             .gte('start_time', periodStart.toISOString())
             .lte('start_time', periodEnd.toISOString())
             .eq('status', 'completed'),
@@ -1385,7 +1385,7 @@ export async function POST(request: Request) {
       case 'charges.list': {
         const { data, error } = await svc
           .from('appointment_charges')
-          .select('*, service:services(*)')
+          .select('id, appointment_id, staff_id, service_id, description, amount, is_upsell, created_at, service:services(id, name, price, commission_rate)')
           .eq('appointment_id', payload.appointment_id)
           .eq('tenant_id', tenantId)
           .order('created_at', { ascending: true })
@@ -1396,7 +1396,7 @@ export async function POST(request: Request) {
         const { data, error } = await svc
           .from('appointment_charges')
           .insert({ ...payload, tenant_id: tenantId })
-          .select('*, service:services(*)')
+          .select('id, appointment_id, staff_id, service_id, description, amount, is_upsell, created_at, service:services(id, name, price, commission_rate)')
           .single()
         return NextResponse.json({ data, error: error?.message })
       }
@@ -1425,7 +1425,7 @@ export async function POST(request: Request) {
           })
           .eq('id', id)
           .eq('tenant_id', tenantId)
-          .select('*, client:clients(*), staff_member:staff!staff_id(*), service:services(*)')
+          .select('id, tenant_id, client_id, staff_id, service_id, start_time, end_time, status, total_price, notes, payment_method, tip_amount, checked_out_at, checked_in_at, created_at, client:clients(id, first_name, last_name, phone, email, loyalty_points, visit_count, lifetime_spend, last_visit), staff_member:staff!staff_id(id, name), service:services(id, name, price, commission_rate)')
           .single()
 
         // Award loyalty points & update client stats ($5 = 1 point)
@@ -1463,7 +1463,7 @@ export async function POST(request: Request) {
         // Get all completed/checked-out appointments for the day
         const { data: apts } = await svc
           .from('appointments')
-          .select('*, client:clients(*), staff_member:staff!staff_id(*), service:services(*)')
+          .select('id, staff_id, client_id, service_id, start_time, status, total_price, payment_method, tip_amount, notes, client:clients(id, first_name, last_name), staff_member:staff!staff_id(id, name, role, commission_rate), service:services(id, name, price, commission_rate)')
           .eq('tenant_id', tenantId)
           .gte('start_time', dayStart)
           .lte('start_time', dayEnd)
@@ -1476,7 +1476,7 @@ export async function POST(request: Request) {
         if (aptIds.length > 0) {
           const { data: ch } = await svc
             .from('appointment_charges')
-            .select('*, service:services(*)')
+            .select('id, appointment_id, staff_id, service_id, description, amount, is_upsell, service:services(id, name, commission_rate)')
             .eq('tenant_id', tenantId)
             .in('appointment_id', aptIds)
           charges = ch || []
@@ -1485,7 +1485,7 @@ export async function POST(request: Request) {
         // Get all staff for the tenant
         const { data: allStaff } = await svc
           .from('staff')
-          .select('*')
+          .select('id, name, role, commission_rate, is_active')
           .eq('tenant_id', tenantId)
           .eq('is_active', true)
 
@@ -1531,11 +1531,13 @@ export async function POST(request: Request) {
           entry.tips_total += Number(apt.tip_amount || 0)
 
           // Add base service price to services_total
-          const servicePrice = Number(apt.service?.price || apt.total_price || 0)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const aptService = apt.service as any
+          const servicePrice = Number(aptService?.price || apt.total_price || 0)
           entry.services_total += servicePrice
 
           // Commission on base service: use per-service rate if set, else staff default
-          const baseServiceRate = apt.service?.commission_rate
+          const baseServiceRate = aptService?.commission_rate
           const baseEffectiveRate = baseServiceRate != null ? baseServiceRate : entry.commission_rate
           entry.commission_earned += servicePrice * (baseEffectiveRate / 100)
 
@@ -1549,15 +1551,17 @@ export async function POST(request: Request) {
             }))
 
           // Client name
-          const clientName = apt.client
-            ? `${apt.client.first_name}${apt.client.last_name ? ' ' + apt.client.last_name : ''}`
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const aptClient = apt.client as any
+          const clientName = aptClient
+            ? `${aptClient.first_name}${aptClient.last_name ? ' ' + aptClient.last_name : ''}`
             : (apt.notes || 'Walk-in')
 
           // Add detail row
           entry.details.push({
             appointment_id: apt.id,
             client_name: clientName,
-            service_name: apt.service?.name || 'Service',
+            service_name: aptService?.name || 'Service',
             service_price: servicePrice,
             add_ons: addOns,
             tip: Number(apt.tip_amount || 0),
@@ -1640,7 +1644,7 @@ export async function POST(request: Request) {
         // Get service details for duration & price
         const { data: svcData } = await svc
           .from('services')
-          .select('*')
+          .select('id, name, duration_minutes, price')
           .eq('id', service_id)
           .single()
 
@@ -1709,7 +1713,7 @@ export async function POST(request: Request) {
             status: 'confirmed',
             notes: clientId ? null : 'Walk-in',
           })
-          .select('*, client:clients(*), staff_member:staff!staff_id(*), service:services(*)')
+          .select('id, tenant_id, client_id, staff_id, service_id, start_time, end_time, status, total_price, notes, payment_method, tip_amount, checked_in_at, created_at, client:clients(id, first_name, last_name, phone, email, photo_url), staff_member:staff!staff_id(id, name, photo_url, role), service:services(id, name, category, duration_minutes, price, commission_rate)')
           .single()
 
         if (aptErr) {
@@ -1803,7 +1807,7 @@ export async function POST(request: Request) {
             notes: 'Walk-in (claimed from waitlist)',
             checked_in_at: now.toISOString(),
           })
-          .select('*, client:clients(*), staff_member:staff!staff_id(*), service:services(*)')
+          .select('id, tenant_id, client_id, staff_id, service_id, start_time, end_time, status, total_price, notes, payment_method, tip_amount, checked_in_at, created_at, client:clients(id, first_name, last_name, phone, email, photo_url), staff_member:staff!staff_id(id, name, photo_url, role), service:services(id, name, category, duration_minutes, price, commission_rate)')
           .single()
 
         if (aptCreateErr) {
@@ -1880,12 +1884,12 @@ export async function POST(request: Request) {
       // ─── CALENDAR BATCH LOAD (single round-trip for calendar page) ───
       case 'calendar.load': {
         const [staffRes, svcRes, aptsQuery] = await Promise.all([
-          svc.from('staff').select('*').eq('tenant_id', tenantId),
-          svc.from('services').select('*').eq('tenant_id', tenantId).order('sort_order', { ascending: true }),
+          svc.from('staff').select('id, tenant_id, user_id, name, role, email, phone, photo_url, specialties, schedule, commission_rate, is_active').eq('tenant_id', tenantId),
+          svc.from('services').select('id, tenant_id, name, category, description, duration_minutes, price, price_addons, commission_rate, image_url, is_active, sort_order').eq('tenant_id', tenantId).order('sort_order', { ascending: true }),
           (() => {
             let q = svc
               .from('appointments')
-              .select('*, client:clients(*), staff_member:staff!staff_id(*), service:services(*)')
+              .select('id, tenant_id, client_id, staff_id, service_id, start_time, end_time, status, total_price, notes, payment_method, tip_amount, checked_out_at, checked_in_at, created_at, client:clients(id, first_name, last_name, phone, email, photo_url), staff_member:staff!staff_id(id, name, photo_url, role), service:services(id, name, category, duration_minutes, price, commission_rate)')
               .eq('tenant_id', tenantId)
               .order('start_time', { ascending: true })
             if (payload?.startDate && payload?.endDate) {
