@@ -221,6 +221,10 @@ export default async function LandingPage() {
               <Link href="/about">{t('footerAbout')}</Link>
               <Link href="/contact">{t('footerContact')}</Link>
             </div>
+            <div>
+              <h4>Legal</h4>
+              <Link href="/sms-consent">SMS Terms</Link>
+            </div>
           </div>
           <p className={styles.copyright}>{t('copyright')}</p>
         </div>
