@@ -172,16 +172,19 @@ export function rescheduleConfirmationHtml(opts: {
   timeStr: string
   staffName: string
   businessName: string
+  businessAddress: string
   businessPhone: string
   manageLink: string
 }): string {
-  const { greeting, serviceName, dateStr, timeStr, staffName, businessName, businessPhone, manageLink } = opts
+  const { greeting, serviceName, dateStr, timeStr, staffName, businessName, businessAddress, businessPhone, manageLink } = opts
 
   const detailRows = [
     detailRow('📋', 'Service', serviceName),
     detailRow('📅', 'New Date', dateStr),
     detailRow('🕐', 'New Time', timeStr),
     staffName ? detailRow('💇', 'With', staffName) : '',
+    detailRow('📍', 'Location', businessAddress ? `${businessName}, ${businessAddress}` : businessName),
+    businessPhone ? detailRow('📞', 'Phone', `<a href="tel:${businessPhone}" style="color:#a855f7;text-decoration:none;">${businessPhone}</a>`) : '',
   ].filter(Boolean).join('\n')
 
   const manageSection = manageLink
@@ -224,16 +227,19 @@ export function cancellationConfirmationHtml(opts: {
   timeStr: string
   staffName: string
   businessName: string
+  businessAddress: string
   businessPhone: string
   bookingLink: string
 }): string {
-  const { greeting, serviceName, dateStr, timeStr, staffName, businessName, businessPhone, bookingLink } = opts
+  const { greeting, serviceName, dateStr, timeStr, staffName, businessName, businessAddress, businessPhone, bookingLink } = opts
 
   const detailRows = [
     detailRow('📋', 'Service', serviceName),
     detailRow('📅', 'Date', `<s>${dateStr}</s>`),
     detailRow('🕐', 'Time', `<s>${timeStr}</s>`),
     staffName ? detailRow('💇', 'With', staffName) : '',
+    detailRow('📍', 'Location', businessAddress ? `${businessName}, ${businessAddress}` : businessName),
+    businessPhone ? detailRow('📞', 'Phone', `<a href="tel:${businessPhone}" style="color:#a855f7;text-decoration:none;">${businessPhone}</a>`) : '',
   ].filter(Boolean).join('\n')
 
   const rebookSection = bookingLink

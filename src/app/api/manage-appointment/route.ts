@@ -147,6 +147,7 @@ export async function PATCH(request: Request) {
   const staffName = staff?.name || ''
   const businessName = tenant?.name || 'the salon'
   const businessPhone = tenant?.phone || ''
+  const businessAddress = (tenant?.address as string) || ''
 
   const tenantSettings = (tenant?.settings || {}) as Record<string, unknown>
   const tz = (tenantSettings.timezone as string) || (tenant as { timezone?: string })?.timezone || 'America/Los_Angeles'
@@ -218,6 +219,7 @@ export async function PATCH(request: Request) {
           timeStr,
           staffName,
           businessName,
+          businessAddress,
           businessPhone,
           bookingLink,
         })
@@ -355,6 +357,7 @@ export async function PATCH(request: Request) {
       staffName,
       startTime: newStart,
       businessName,
+      businessAddress,
       businessPhone,
       manageToken: token,
       tz,
@@ -515,11 +518,12 @@ async function notifyClient(opts: {
   staffName: string
   startTime: Date
   businessName: string
+  businessAddress: string
   businessPhone: string
   manageToken: string
   tz: string
 }) {
-  const { client, clientName, serviceName, staffName, startTime, businessName, businessPhone, manageToken, tz } = opts
+  const { client, clientName, serviceName, staffName, startTime, businessName, businessAddress, businessPhone, manageToken, tz } = opts
   if (!client) return
 
   // Greeting format: "Dear James D." instead of full name
@@ -538,7 +542,18 @@ async function notifyClient(opts: {
 
   // SMS
   if (client.phone && process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER) {
-    const smsBody = `🔄 Appointment Rescheduled!\n\nDear ${clientGreeting}, your appointment has been updated:\n📋 ${serviceName}\n📅 ${dateStr} at ${timeStr}\n${staffName ? `💇 With: ${staffName}` : ''}\n\nNeed to change? Contact us at ${businessPhone || 'the salon'}.`
+    const smsBody = [
+      `🔄 Appointment Rescheduled!`,
+      ``,
+      `Dear ${clientGreeting}, your appointment has been updated:`,
+      `📋 ${serviceName}`,
+      `📅 ${dateStr} at ${timeStr}`,
+      staffName ? `💇 With: ${staffName}` : '',
+      businessAddress ? `📍 ${businessName}, ${businessAddress}` : `📍 ${businessName}`,
+      businessPhone ? `📞 ${businessPhone}` : '',
+      ``,
+      `Need to change? Contact us at ${businessPhone || 'the salon'}.`,
+    ].filter(Boolean).join('\n')
     const clientE164 = toE164(client.phone)
     if (clientE164) {
       try {
@@ -576,6 +591,7 @@ async function notifyClient(opts: {
         timeStr,
         staffName,
         businessName,
+        businessAddress,
         businessPhone,
         manageLink,
       })
