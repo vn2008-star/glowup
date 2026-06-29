@@ -6,8 +6,8 @@ import { LandingHeader } from "../LandingHeader";
 const LogoIcon = () => <GlowUpLogo size={28} />;
 
 export const metadata = {
-  title: "About GlowUp — Our Story",
-  description: "Learn about GlowUp, the modern salon management platform built to empower beauty professionals with smart tools for scheduling, payments, and client engagement.",
+  title: "About GlowUp — Our Story | James Doan, Founder",
+  description: "Learn about GlowUp, founded by James Doan. A modern salon management platform built to empower beauty professionals with smart tools for scheduling, payments, and client engagement.",
 };
 
 export default function AboutPage() {
@@ -89,6 +89,40 @@ export default function AboutPage() {
               From solo nail technicians to multi-chair salons, GlowUp adapts
               to your workflow — not the other way around.
             </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Team / Founder */}
+      <section className={styles.section}>
+        <div className={`container ${styles.founderSection}`}>
+          <h2 className={styles.sectionTitle}>
+            Meet Our <span className={styles.gradient}>Founder</span>
+          </h2>
+          <div className={styles.founderCard}>
+            <div className={styles.founderAvatar}>
+              <span className={styles.founderInitial}>JD</span>
+            </div>
+            <div className={styles.founderInfo}>
+              <h3>James Doan</h3>
+              <span className={styles.founderRole}>Founder &amp; CEO</span>
+              <p>
+                James founded GlowUp with a clear mission: to give beauty
+                professionals the same caliber of business tools that enterprise
+                companies enjoy — at a price point that works for independent
+                stylists and growing salons alike.
+              </p>
+              <p>
+                With a background in software engineering and a passion for the
+                beauty industry, James leads product development, engineering,
+                and company strategy at GlowUp.
+              </p>
+              <div className={styles.founderContact}>
+                <a href="mailto:JoinGlowUp@gmail.com" className={styles.founderLink}>
+                  📧 JoinGlowUp@gmail.com
+                </a>
+              </div>
+            </div>
           </div>
         </div>
       </section>
