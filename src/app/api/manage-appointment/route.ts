@@ -180,8 +180,51 @@ export async function PATCH(request: Request) {
       startTime: new Date(apt.start_time),
       tz,
     })
+    // Send cancellation SMS to client
+    if (client?.phone && process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER) {
+      const startTime = new Date(apt.start_time)
+      let smsDateStr: string, smsTimeStr: string
+      try {
+        smsDateStr = startTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: tz })
+        smsTimeStr = startTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz })
+      } catch {
+        smsDateStr = startTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+        smsTimeStr = startTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+      }
+      const cancelSms = [
+        `❌ Appointment Cancelled`,
+        ``,
+        `Dear ${clientGreeting}, your appointment has been cancelled:`,
+        `📋 ${serviceName}`,
+        `📅 ${smsDateStr} at ${smsTimeStr}`,
+        staffName ? `💇 With: ${staffName}` : '',
+        businessAddress ? `📍 ${businessName}, ${businessAddress}` : `📍 ${businessName}`,
+        businessPhone ? `📞 ${businessPhone}` : '',
+        ``,
+        `Want to rebook? Contact us at ${businessPhone || 'the salon'}.`,
+      ].filter(Boolean).join('\n')
 
-    // Send cancellation confirmation to client
+      const clientE164 = toE164(client.phone)
+      if (clientE164) {
+        try {
+          const sid = process.env.TWILIO_ACCOUNT_SID!
+          const token = process.env.TWILIO_AUTH_TOKEN!
+          const from = process.env.TWILIO_PHONE_NUMBER!
+          const url = `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`
+          const auth = btoa(`${sid}:${token}`)
+          await fetch(url, {
+            method: 'POST',
+            headers: { 'Authorization': `Basic ${auth}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ To: clientE164, From: from, Body: cancelSms }).toString(),
+          })
+          console.log(`[manage-appointment] ✅ Cancellation SMS sent to client ${clientE164}`)
+        } catch (err) {
+          console.error(`[manage-appointment] Cancel SMS to client failed:`, err)
+        }
+      }
+    }
+
+    // Send cancellation confirmation email to client
     if (client?.email && process.env.RESEND_API_KEY) {
       try {
         const { Resend } = await import('resend')
