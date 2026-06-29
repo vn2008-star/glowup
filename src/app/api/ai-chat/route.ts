@@ -124,8 +124,8 @@ export async function POST(request: Request) {
 
     // Load business data in parallel
     const [servicesRes, staffRes, appointmentsRes] = await Promise.all([
-      svc.from('services').select('name, category, duration_minutes, price').eq('tenant_id', tenantId).eq('is_active', true),
-      svc.from('staff').select('name, specialties').eq('tenant_id', tenantId).eq('is_active', true),
+      svc.from('services').select('id, name, category, duration_minutes, price').eq('tenant_id', tenantId).eq('is_active', true),
+      svc.from('staff').select('id, name, specialties').eq('tenant_id', tenantId).eq('is_active', true),
       svc.from('appointments').select('start_time, end_time, staff_id')
         .eq('tenant_id', tenantId)
         .gte('start_time', new Date().toISOString().split('T')[0] + 'T00:00:00')
@@ -246,8 +246,8 @@ export async function POST(request: Request) {
             .from('appointments')
             .insert({
               tenant_id: tenantId,
-              service_id: null, // We'd need the service ID
-              staff_id: staffMember ? null : null, // We'd need staff IDs
+              service_id: service.id,
+              staff_id: staffMember?.id || null,
               start_time: startTime.toISOString(),
               end_time: endTime.toISOString(),
               status: 'confirmed',
