@@ -487,6 +487,7 @@ async function sendBookingConfirmations(opts: {
       `📅 ${dateStr} at ${timeStr}`,
       staffName ? `💇 With: ${staffName}` : '',
       businessAddress ? `📍 ${businessName}, ${businessAddress}` : `📍 ${businessName}`,
+      businessPhone ? `📞 ${businessPhone}` : '',
       ``,
       manageLink ? `Manage your appointment: ${manageLink}` : `Need to change? Contact us at ${businessPhone || 'the salon'}.`,
     ].filter(Boolean).join('\n')
