@@ -80,7 +80,8 @@ export function bookingConfirmationHtml(opts: {
     detailRow('📅', 'Date', dateStr),
     detailRow('🕐', 'Time', timeStr),
     staffName ? detailRow('💇', 'With', staffName) : '',
-    detailRow('📍', 'Location', `${businessName}${businessAddress ? `, ${businessAddress}` : ''}`),
+    detailRow('📍', 'Location', businessAddress ? `${businessName}, ${businessAddress}` : businessName),
+    businessPhone ? detailRow('📞', 'Phone', `<a href="tel:${businessPhone}" style="color:#a855f7;text-decoration:none;">${businessPhone}</a>`) : '',
   ].filter(Boolean).join('\n')
 
   const manageSection = manageLink
