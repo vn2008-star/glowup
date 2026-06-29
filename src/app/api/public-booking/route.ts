@@ -304,11 +304,26 @@ export async function POST(request: Request) {
   if (clientId) {
     const reminderRows: { tenant_id: string; appointment_id: string; client_id: string; type: string; channel: string; status: string }[] = []
     for (const apt of appointments) {
+      // 24h reminders
       if (client_phone) {
         reminderRows.push({ tenant_id: tenant.id, appointment_id: apt.id, client_id: clientId, type: '24h', channel: 'sms', status: 'pending' })
       }
       if (client_email) {
         reminderRows.push({ tenant_id: tenant.id, appointment_id: apt.id, client_id: clientId, type: '24h', channel: 'email', status: 'pending' })
+      }
+      // 2h reminders
+      if (client_phone) {
+        reminderRows.push({ tenant_id: tenant.id, appointment_id: apt.id, client_id: clientId, type: '2h', channel: 'sms', status: 'pending' })
+      }
+      if (client_email) {
+        reminderRows.push({ tenant_id: tenant.id, appointment_id: apt.id, client_id: clientId, type: '2h', channel: 'email', status: 'pending' })
+      }
+      // 1h reminders
+      if (client_phone) {
+        reminderRows.push({ tenant_id: tenant.id, appointment_id: apt.id, client_id: clientId, type: '1h', channel: 'sms', status: 'pending' })
+      }
+      if (client_email) {
+        reminderRows.push({ tenant_id: tenant.id, appointment_id: apt.id, client_id: clientId, type: '1h', channel: 'email', status: 'pending' })
       }
     }
     if (reminderRows.length > 0) {
