@@ -1,12 +1,8 @@
 {
   "crons": [
     {
-      "path": "/api/keep-warm",
-      "schedule": "*/5 * * * *"
-    },
-    {
       "path": "/api/send-reminders",
-      "schedule": "0 * * * *"
+      "schedule": "0 8 * * *"
     },
     {
       "path": "/api/run-automations",
