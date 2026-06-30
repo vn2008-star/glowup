@@ -6,6 +6,7 @@ import { useState, Suspense } from 'react'
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { GlowUpLogo } from '@/components/GlowUpLogo'
+import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import styles from './auth.module.css'
 
 function LoginForm() {
@@ -56,6 +57,15 @@ function LoginForm() {
 
   return (
     <div className={styles.authPage}>
+      {/* Language switcher — top-right corner for non-English speakers */}
+      <div style={{
+        position: 'fixed',
+        top: '16px',
+        right: '16px',
+        zIndex: 100,
+      }}>
+        <LanguageSwitcher variant="header" />
+      </div>
       <div className={styles.authCard}>
         <div className={styles.authHeader}>
           <Link href="/" className={styles.logoLink}>

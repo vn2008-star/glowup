@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData } from "@/lib/api";
@@ -11,6 +12,7 @@ import { localeDateStr } from "@/lib/utils";
 export default function DashboardOverview() {
   const { tenant, currentStaff } = useTenant();
   const t = useTranslations("overviewPage");
+  const router = useRouter();
 
   const [todayAppointments, setTodayAppointments] = useState<(Appointment & { client?: Client })[]>([]);
   const [metrics, setMetrics] = useState({
@@ -60,6 +62,26 @@ export default function DashboardOverview() {
   useEffect(() => {
     fetchDashboardData();
   }, [fetchDashboardData]);
+
+  // Redirect new subscribers to Quick Start until essential setup is done
+  useEffect(() => {
+    if (!tenant || loading) return;
+    const settings = (tenant.settings || {}) as Record<string, unknown>;
+    const hasHours = !!settings.business_hours;
+    // Check if basic setup is missing: no hours, no staff, no services
+    if (!hasHours && metrics.todayAppointments === 0 && metrics.totalClients === 0) {
+      // Likely a new subscriber — check staff/services count
+      queryData<{ id: string }[]>("staff.list").then(({ data: staffData }) => {
+        queryData<{ id: string }[]>("services.list").then(({ data: serviceData }) => {
+          const staffCount = staffData?.length || 0;
+          const serviceCount = serviceData?.length || 0;
+          if (staffCount === 0 || serviceCount === 0 || !hasHours) {
+            router.replace("/dashboard/quick-start");
+          }
+        });
+      });
+    }
+  }, [tenant, loading, metrics, router]);
 
   const now = new Date();
   const hour = now.getHours();

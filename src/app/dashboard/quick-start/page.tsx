@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useLocale } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData } from "@/lib/api";
+import { locales, localeNames, localeFlags, type Locale } from "@/i18n/config";
 import styles from "./quickstart.module.css";
 
 /* ─── Step Definitions ─── */
@@ -64,7 +66,7 @@ const ESSENTIAL_STEPS: Step[] = [
     id: "booking",
     number: 4,
     title: "Share Your Booking Link",
-    description: "Share your booking link so clients can book and enter their contact info automatically. Any remaining contacts can be imported or added manually in the next step.",
+    description: "Share your booking link so clients can book and enter their contact info automatically — your client list builds itself over time.",
     href: "/dashboard/settings?section=booking-link",
     checkComplete: (ctx) => {
       if (!ctx.tenant) return false;
@@ -72,16 +74,8 @@ const ESSENTIAL_STEPS: Step[] = [
     },
   },
   {
-    id: "clients",
-    number: 5,
-    title: "Import or Add Clients",
-    description: "Add your existing clients manually or import via CSV to get started right away.",
-    href: "/dashboard/clients",
-    checkComplete: (ctx) => ctx.clientCount > 0,
-  },
-  {
     id: "reminders",
-    number: 6,
+    number: 5,
     title: "Set Up Reminders",
     description: "Enable SMS and email reminders for both clients and staff to reduce no-shows.",
     href: "/dashboard/settings?section=reminders",
@@ -94,7 +88,7 @@ const ESSENTIAL_STEPS: Step[] = [
   },
   {
     id: "frontdesk",
-    number: 7,
+    number: 6,
     title: "Try the Front Desk",
     description: "Open the full-screen POS mode to check in walk-ins, process payments, and manage your day.",
     href: "/dashboard/checkout",
@@ -120,6 +114,12 @@ const ADVANCED_FEATURES: AdvancedFeature[] = [
     title: "Packages & Bundles",
     description: "Create multi-service packages and gift bundles that increase average ticket value.",
     href: "/dashboard/packages",
+  },
+  {
+    icon: "📇",
+    title: "Import or Add Clients",
+    description: "Bulk import existing clients via CSV or add them manually. Optional — your client list also builds automatically as clients book online.",
+    href: "/dashboard/clients",
   },
   {
     icon: "📸",
@@ -161,6 +161,7 @@ const ADVANCED_FEATURES: AdvancedFeature[] = [
 
 export default function QuickStartPage() {
   const { tenant } = useTenant();
+  const currentLocale = useLocale() as Locale;
   const [setupCtx, setSetupCtx] = useState<SetupContext>({
     tenant: null,
     staffCount: 0,
@@ -206,6 +207,58 @@ export default function QuickStartPage() {
           Get your salon up and running in minutes. Complete these essential steps in order,
           then explore advanced features to grow your business.
         </p>
+      </div>
+
+      {/* Language Selection Banner */}
+      <div style={{
+        background: 'linear-gradient(135deg, rgba(195, 126, 218, 0.12), rgba(155, 89, 182, 0.08))',
+        border: '1px solid rgba(195, 126, 218, 0.25)',
+        borderRadius: 'var(--radius-lg)',
+        padding: '16px 20px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '16px',
+        flexWrap: 'wrap',
+        marginBottom: 'var(--space-4)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '140px' }}>
+          <span style={{ fontSize: '20px' }}>🌐</span>
+          <span style={{ fontWeight: 600, fontSize: 'var(--text-sm)', color: 'var(--text-primary)' }}>
+            Choose your language:
+          </span>
+        </div>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          {locales.map((locale) => (
+            <button
+              key={locale}
+              onClick={() => {
+                document.cookie = `NEXT_LOCALE=${locale};path=/;max-age=31536000`;
+                window.location.reload();
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 14px',
+                borderRadius: 'var(--radius-md)',
+                border: currentLocale === locale
+                  ? '2px solid var(--color-primary)'
+                  : '1px solid var(--border-default)',
+                background: currentLocale === locale
+                  ? 'var(--color-primary-200)'
+                  : 'var(--bg-card)',
+                color: 'var(--text-primary)',
+                fontWeight: currentLocale === locale ? 700 : 500,
+                fontSize: 'var(--text-sm)',
+                cursor: 'pointer',
+                transition: 'all 0.15s',
+              }}
+            >
+              <span style={{ fontSize: '18px' }}>{localeFlags[locale]}</span>
+              {localeNames[locale]}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Progress */}

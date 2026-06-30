@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useState, Suspense } from 'react'
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
+import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import styles from '../login/auth.module.css'
 
 function SignupForm() {
@@ -111,6 +112,15 @@ function SignupForm() {
 
   return (
     <div className={styles.authPage}>
+      {/* Language switcher — top-right corner for non-English speakers */}
+      <div style={{
+        position: 'fixed',
+        top: '16px',
+        right: '16px',
+        zIndex: 100,
+      }}>
+        <LanguageSwitcher variant="header" />
+      </div>
       <div className={styles.authCard}>
         <div className={styles.authHeader}>
           <Link href="/" className={styles.logoLink}>

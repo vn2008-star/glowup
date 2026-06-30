@@ -12,6 +12,7 @@ import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { FeedbackWidget } from "@/components/FeedbackWidget";
 import { useTheme } from "@/lib/theme-context";
 import { useTranslations } from "next-intl";
+import { WelcomeLanguageModal } from "@/components/WelcomeLanguageModal";
 
 /* ─── Icons ─── */
 const GlowUpIcon = () => <GlowUpLogo size={24} />;
@@ -287,6 +288,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       </div>
+      <WelcomeLanguageModal />
       <FeedbackWidget />
     </div>
   );
