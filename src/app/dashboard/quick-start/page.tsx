@@ -104,22 +104,22 @@ const ESSENTIAL_STEPS: Step[] = [
 
 const ADVANCED_FEATURES: AdvancedFeature[] = [
   {
-    icon: "🤖",
-    title: "AI Receptionist",
-    description: "24/7 virtual front desk that answers questions, suggests times, and books appointments automatically.",
-    href: "/dashboard/inbox",
+    icon: "🖥️",
+    title: "Front Desk / Checkout",
+    description: "Full-screen POS mode for walk-ins and checkout — designed for shared tablets at the front desk.",
+    href: "/dashboard/checkout",
   },
   {
-    icon: "📣",
-    title: "Campaigns & Marketing",
-    description: "Send targeted SMS/email blasts to fill openings, promote specials, or re-engage inactive clients.",
-    href: "/dashboard/campaigns",
+    icon: "💰",
+    title: "Staff Revenue Reports",
+    description: "Auto-generate biweekly or monthly itemized revenue statements and email them directly to each staff member.",
+    href: "/dashboard/reports",
   },
   {
-    icon: "💜",
-    title: "Loyalty Program",
-    description: "Reward repeat visits with points, punch cards, or tiered VIP perks to increase retention.",
-    href: "/dashboard/loyalty",
+    icon: "🎁",
+    title: "Packages & Bundles",
+    description: "Create multi-service packages and gift bundles that increase average ticket value.",
+    href: "/dashboard/packages",
   },
   {
     icon: "📸",
@@ -134,10 +134,10 @@ const ADVANCED_FEATURES: AdvancedFeature[] = [
     href: "/dashboard/reports",
   },
   {
-    icon: "💰",
-    title: "Staff Revenue Reports",
-    description: "Auto-generate biweekly or monthly itemized revenue statements and email them directly to each staff member.",
-    href: "/dashboard/reports",
+    icon: "📣",
+    title: "Campaigns & Marketing",
+    description: "Send targeted SMS/email blasts to fill openings, promote specials, or re-engage inactive clients.",
+    href: "/dashboard/campaigns",
   },
   {
     icon: "📱",
@@ -146,16 +146,16 @@ const ADVANCED_FEATURES: AdvancedFeature[] = [
     href: "/dashboard/social",
   },
   {
-    icon: "🎁",
-    title: "Packages & Bundles",
-    description: "Create multi-service packages and gift bundles that increase average ticket value.",
-    href: "/dashboard/packages",
+    icon: "💜",
+    title: "Loyalty Program",
+    description: "Reward repeat visits with points, punch cards, or tiered VIP perks to increase retention.",
+    href: "/dashboard/loyalty",
   },
   {
-    icon: "🖥️",
-    title: "Front Desk / Checkout",
-    description: "Full-screen POS mode for walk-ins and checkout — designed for shared tablets at the front desk.",
-    href: "/dashboard/checkout",
+    icon: "🤖",
+    title: "AI Receptionist",
+    description: "24/7 virtual front desk that answers questions, suggests times, and books appointments automatically.",
+    href: "/dashboard/inbox",
   },
 ];
 
