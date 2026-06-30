@@ -6,6 +6,7 @@ import { useLocale } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData } from "@/lib/api";
 import { locales, localeNames, localeFlags, type Locale } from "@/i18n/config";
+import { SERVICE_CATEGORIES } from "@/app/dashboard/services/service-catalog";
 import styles from "./quickstart.module.css";
 
 /* ─── Step Definitions ─── */
@@ -50,7 +51,7 @@ const ESSENTIAL_STEPS: Step[] = [
     id: "staff",
     number: 2,
     title: "Add Staff Members",
-    description: "Add your stylists and technicians with their roles, specialties, and contact info.",
+    description: "Add your stylists and technicians — or tap \"I Work Alone\" if you're a solo artist.",
     href: "/dashboard/staff",
     checkComplete: (ctx) => ctx.staffCount > 0,
   },
@@ -58,7 +59,7 @@ const ESSENTIAL_STEPS: Step[] = [
     id: "services",
     number: 3,
     title: "Create Services",
-    description: "Add your service menu — cuts, colors, treatments, etc. — with pricing and duration.",
+    description: "Pick your salon type below to auto-load services, or add them manually.",
     href: "/dashboard/services",
     checkComplete: (ctx) => ctx.serviceCount > 0,
   },
@@ -66,7 +67,7 @@ const ESSENTIAL_STEPS: Step[] = [
     id: "booking",
     number: 4,
     title: "Share Your Booking Link",
-    description: "Share your booking link so clients can book and enter their contact info automatically — your client list builds itself over time.",
+    description: "Share your booking link with clients — 🎉 You're live! Clients can start booking immediately and your client list builds itself.",
     href: "/dashboard/settings?section=booking-link",
     checkComplete: (ctx) => {
       if (!ctx.tenant) return false;
@@ -170,6 +171,12 @@ export default function QuickStartPage() {
   });
   const [loading, setLoading] = useState(true);
 
+  // Inline action states
+  const [soloLoading, setSoloLoading] = useState(false);
+  const [soloDone, setSoloDone] = useState(false);
+  const [bulkLoading, setBulkLoading] = useState<string | null>(null);
+  const [addedCategories, setAddedCategories] = useState<Set<string>>(new Set());
+
   const fetchCounts = useCallback(async () => {
     if (!tenant) return;
     setLoading(true);
@@ -192,6 +199,49 @@ export default function QuickStartPage() {
   useEffect(() => {
     fetchCounts();
   }, [fetchCounts]);
+
+  // "I Work Alone" — create owner as sole staff member
+  async function handleSoloArtist(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (soloLoading || soloDone || setupCtx.staffCount > 0) return;
+    setSoloLoading(true);
+    const ownerName = (tenant as unknown as Record<string, unknown>)?.owner_name as string || 'Owner';
+    const { error } = await queryData("staff.add", {
+      name: ownerName,
+      role: "owner",
+      is_active: true,
+      commission_rate: 100,
+    });
+    setSoloLoading(false);
+    if (!error) {
+      setSoloDone(true);
+      fetchCounts();
+    }
+  }
+
+  // Bulk-add services from a category template
+  async function handleBulkServices(categoryId: string, e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (bulkLoading) return;
+    const cat = SERVICE_CATEGORIES.find((c) => c.id === categoryId);
+    if (!cat) return;
+    setBulkLoading(categoryId);
+    const services = cat.templates.map((t) => ({
+      name: t.name,
+      category: t.category,
+      duration_minutes: t.duration_minutes,
+      price: t.price,
+      description: t.description,
+    }));
+    const { error } = await queryData("services.bulkAdd", { services });
+    setBulkLoading(null);
+    if (!error) {
+      setAddedCategories((prev) => new Set([...prev, categoryId]));
+      fetchCounts();
+    }
+  }
 
   const completedSteps = ESSENTIAL_STEPS.filter((s) => s.checkComplete(setupCtx));
   const totalSteps = ESSENTIAL_STEPS.length;
@@ -310,6 +360,71 @@ export default function QuickStartPage() {
                 <div className={styles.stepContent}>
                   <div className={styles.stepTitle}>{step.title}</div>
                   <div className={styles.stepDesc}>{step.description}</div>
+
+                  {/* ── Inline: "I Work Alone" button ── */}
+                  {step.id === "staff" && !done && !loading && (
+                    <div style={{ marginTop: '10px' }} onClick={(e) => e.preventDefault()}>
+                      <button
+                        onClick={handleSoloArtist}
+                        disabled={soloLoading || soloDone}
+                        style={{
+                          padding: '8px 18px',
+                          borderRadius: 'var(--radius-md)',
+                          border: 'none',
+                          background: soloDone
+                            ? 'var(--color-success)'
+                            : 'linear-gradient(135deg, #c37eda, #9b59b6)',
+                          color: '#fff',
+                          fontWeight: 600,
+                          fontSize: 'var(--text-xs)',
+                          cursor: soloLoading ? 'wait' : 'pointer',
+                          transition: 'all 0.2s',
+                        }}
+                      >
+                        {soloLoading ? '⏳ Adding...' : soloDone ? '✅ Added!' : '🙋 I Work Alone'}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* ── Inline: Salon Type Picker ── */}
+                  {step.id === "services" && !done && !loading && (
+                    <div style={{ marginTop: '10px', display: 'flex', flexWrap: 'wrap', gap: '6px' }} onClick={(e) => e.preventDefault()}>
+                      {SERVICE_CATEGORIES.map((cat) => {
+                        const isAdded = addedCategories.has(cat.id);
+                        const isLoading = bulkLoading === cat.id;
+                        return (
+                          <button
+                            key={cat.id}
+                            onClick={(e) => handleBulkServices(cat.id, e)}
+                            disabled={isAdded || isLoading || !!bulkLoading}
+                            style={{
+                              padding: '6px 12px',
+                              borderRadius: 'var(--radius-md)',
+                              border: isAdded
+                                ? '1px solid var(--color-success)'
+                                : `1px solid ${cat.color}40`,
+                              background: isAdded
+                                ? 'rgba(34, 197, 94, 0.1)'
+                                : isLoading
+                                  ? `${cat.color}30`
+                                  : `${cat.color}15`,
+                              color: isAdded ? 'var(--color-success)' : 'var(--text-primary)',
+                              fontWeight: 600,
+                              fontSize: 'var(--text-xs)',
+                              cursor: isAdded || isLoading ? 'default' : 'pointer',
+                              transition: 'all 0.2s',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                            }}
+                          >
+                            <span>{cat.icon}</span>
+                            {isLoading ? 'Adding...' : isAdded ? `${cat.label} ✓` : cat.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
                 <div className={styles.stepStatus}>
                   <span className={`${styles.stepBadge} ${done ? styles.stepBadgeDone : ""}`}>

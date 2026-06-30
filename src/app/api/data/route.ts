@@ -156,6 +156,19 @@ export async function POST(request: Request) {
         return NextResponse.json({ data, error: error?.message })
       }
 
+      case 'services.bulkAdd': {
+        const services = payload.services as Record<string, unknown>[]
+        if (!Array.isArray(services) || services.length === 0) {
+          return NextResponse.json({ error: 'services array required' }, { status: 400 })
+        }
+        const rows = services.map((s, i) => ({ ...s, tenant_id: tenantId, sort_order: i, is_active: true }))
+        const { data, error } = await svc
+          .from('services')
+          .insert(rows)
+          .select()
+        return NextResponse.json({ data, error: error?.message })
+      }
+
       case 'services.update': {
         const { id, ...fields } = payload
         const { data, error } = await svc
