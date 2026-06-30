@@ -1,5 +1,5 @@
 .page { animation: fadeIn 0.4s ease-out; }
-.pageHeader { margin-bottom: var(--space-8); }
+.pageHeader { margin-bottom: var(--space-8); display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); }
 .pageHeader h1 { font-size: var(--text-2xl); font-weight: 800; margin-bottom: var(--space-1); }
 .pageHeader p { font-size: var(--text-sm); color: var(--text-secondary); }
 

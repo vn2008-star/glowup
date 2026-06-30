@@ -233,8 +233,13 @@ export default function SettingsPage() {
   return (
     <div className={styles.page}>
       <div className={styles.pageHeader}>
-        <h1>{t("title")}</h1>
-        <p>Manage your salon profile, business hours, and preferences</p>
+        <div>
+          <h1>{t("title")}</h1>
+          <p>Manage your salon profile, business hours, and preferences</p>
+        </div>
+        <button className="btn btn-primary" onClick={handleSave} disabled={saving} style={{ whiteSpace: 'nowrap' }}>
+          {saving ? "Saving..." : saved ? "✓ Saved!" : "Save Settings"}
+        </button>
       </div>
 
       {/* Business Profile */}
