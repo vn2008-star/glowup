@@ -3,7 +3,7 @@ import { waitUntil } from '@vercel/functions'
 import { createClient } from '@supabase/supabase-js'
 import { timezoneFromAddress, DEFAULT_TZ } from '@/lib/tz'
 import { toE164 } from '@/lib/utils'
-import { bookingConfirmationHtml } from '@/lib/email-templates'
+import { bookingConfirmationHtml, googleCalendarUrl } from '@/lib/email-templates'
 
 // Public API — no auth required. Used by the /book/[slug] public booking page.
 if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -494,6 +494,10 @@ async function sendBookingConfirmations(opts: {
 
   // ── 1. SMS to client ──
   if (clientPhone) {
+    const calTitle = `${serviceName} — ${businessName}`
+    const calLocation = businessAddress ? `${businessName}, ${businessAddress}` : businessName
+    const gcalLink = googleCalendarUrl({ title: calTitle, startISO: start.toISOString(), endISO: opts.end.toISOString(), location: calLocation })
+
     const clientSms = [
       `✅ Booking Confirmed!`,
       ``,
@@ -503,6 +507,8 @@ async function sendBookingConfirmations(opts: {
       staffName ? `💇 With: ${staffName}` : '',
       businessAddress ? `📍 ${businessName}, ${businessAddress}` : `📍 ${businessName}`,
       businessPhone ? `📞 ${businessPhone}` : '',
+      ``,
+      `📅 Add to Calendar: ${gcalLink}`,
       ``,
       manageLink ? `Manage your appointment: ${manageLink}` : `Need to change? Contact us at ${businessPhone || 'the salon'}.`,
     ].filter(Boolean).join('\n')
@@ -535,6 +541,8 @@ async function sendBookingConfirmations(opts: {
       businessAddress,
       businessPhone,
       manageLink,
+      startISO: start.toISOString(),
+      endISO: opts.end.toISOString(),
     })
 
     if (resendClient) {

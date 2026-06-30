@@ -61,6 +61,87 @@ function detailRow(emoji: string, label: string, value: string): string {
 </tr>`
 }
 
+// ─── Calendar Helpers ───
+
+/** Format ISO date for Google Calendar (YYYYMMDDTHHmmssZ) */
+function toGCalDate(isoStr: string): string {
+  return isoStr.replace(/[-:]/g, '').replace(/\.\d{3}/, '')
+}
+
+/** Generate a Google Calendar URL from appointment details */
+export function googleCalendarUrl(opts: {
+  title: string
+  startISO: string
+  endISO: string
+  location: string
+  description?: string
+}): string {
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: opts.title,
+    dates: `${toGCalDate(opts.startISO)}/${toGCalDate(opts.endISO)}`,
+    location: opts.location,
+    details: opts.description || '',
+  })
+  return `https://calendar.google.com/calendar/render?${params.toString()}`
+}
+
+/** Generate an ICS data URI for Apple Calendar / Outlook */
+function icsDataUri(opts: {
+  title: string
+  startISO: string
+  endISO: string
+  location: string
+  description?: string
+}): string {
+  const uid = `${Date.now()}@joinglowup.org`
+  const now = toGCalDate(new Date().toISOString())
+  const ics = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//GlowUp//Booking//EN',
+    'BEGIN:VEVENT',
+    `UID:${uid}`,
+    `DTSTAMP:${now}`,
+    `DTSTART:${toGCalDate(opts.startISO)}`,
+    `DTEND:${toGCalDate(opts.endISO)}`,
+    `SUMMARY:${opts.title}`,
+    `LOCATION:${opts.location}`,
+    opts.description ? `DESCRIPTION:${opts.description.replace(/\n/g, '\\n')}` : '',
+    'STATUS:CONFIRMED',
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].filter(Boolean).join('\r\n')
+  return `data:text/calendar;charset=utf-8,${encodeURIComponent(ics)}`
+}
+
+/** Render inline "Add to Calendar" buttons for email templates */
+function calendarButtonsHtml(opts: {
+  serviceName: string
+  startISO: string
+  endISO: string
+  businessName: string
+  businessAddress: string
+}): string {
+  const title = `${opts.serviceName} — ${opts.businessName}`
+  const location = opts.businessAddress ? `${opts.businessName}, ${opts.businessAddress}` : opts.businessName
+  const gcalUrl = googleCalendarUrl({ title, startISO: opts.startISO, endISO: opts.endISO, location })
+  const icsUrl = icsDataUri({ title, startISO: opts.startISO, endISO: opts.endISO, location })
+
+  return `
+    <p style="margin:20px 0 10px;color:#a0a0c0;font-size:13px;text-align:center;">Add to your calendar</p>
+    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;">
+      <tr>
+        <td style="padding-right:8px;">
+          <a href="${gcalUrl}" target="_blank" style="display:inline-block;padding:10px 20px;color:#ffffff;font-size:13px;font-weight:600;text-decoration:none;border-radius:8px;background-color:#4285f4;">📅 Google Calendar</a>
+        </td>
+        <td>
+          <a href="${icsUrl}" download="appointment.ics" style="display:inline-block;padding:10px 20px;color:#ffffff;font-size:13px;font-weight:600;text-decoration:none;border-radius:8px;background-color:#555577;">📅 Apple / Outlook</a>
+        </td>
+      </tr>
+    </table>`
+}
+
 // ─── Booking Confirmation Email ───
 export function bookingConfirmationHtml(opts: {
   greeting: string
@@ -72,8 +153,10 @@ export function bookingConfirmationHtml(opts: {
   businessAddress: string
   businessPhone: string
   manageLink: string
+  startISO?: string
+  endISO?: string
 }): string {
-  const { greeting, serviceName, dateStr, timeStr, staffName, businessName, businessAddress, businessPhone, manageLink } = opts
+  const { greeting, serviceName, dateStr, timeStr, staffName, businessName, businessAddress, businessPhone, manageLink, startISO, endISO } = opts
 
   const detailRows = [
     detailRow('📋', 'Service', serviceName),
@@ -83,6 +166,10 @@ export function bookingConfirmationHtml(opts: {
     detailRow('📍', 'Location', businessAddress ? `${businessName}, ${businessAddress}` : businessName),
     businessPhone ? detailRow('📞', 'Phone', `<a href="tel:${businessPhone}" style="color:#a855f7;text-decoration:none;">${businessPhone}</a>`) : '',
   ].filter(Boolean).join('\n')
+
+  const calendarSection = (startISO && endISO)
+    ? calendarButtonsHtml({ serviceName, startISO, endISO, businessName, businessAddress })
+    : ''
 
   const manageSection = manageLink
     ? `<p style="margin:24px 0 16px;color:#a0a0c0;font-size:14px;text-align:center;">Need to reschedule or cancel?</p>
@@ -106,6 +193,7 @@ export function bookingConfirmationHtml(opts: {
       </td></tr>
     </table>
 
+    ${calendarSection}
     ${manageSection}
     ${contactLine}
 
@@ -126,8 +214,10 @@ export function appointmentReminderHtml(opts: {
   businessName: string
   businessAddress: string
   manageLink: string
+  startISO?: string
+  endISO?: string
 }): string {
-  const { greeting, serviceName, dateStr, timeStr, staffName, businessName, businessAddress, manageLink } = opts
+  const { greeting, serviceName, dateStr, timeStr, staffName, businessName, businessAddress, manageLink, startISO, endISO } = opts
 
   const detailRows = [
     detailRow('📋', 'Service', serviceName),
@@ -136,6 +226,10 @@ export function appointmentReminderHtml(opts: {
     staffName ? detailRow('💇', 'With', staffName) : '',
     detailRow('📍', 'At', `${businessName}${businessAddress ? `, ${businessAddress}` : ''}`),
   ].filter(Boolean).join('\n')
+
+  const calendarSection = (startISO && endISO)
+    ? calendarButtonsHtml({ serviceName, startISO, endISO, businessName, businessAddress })
+    : ''
 
   const manageSection = manageLink
     ? `<p style="margin:24px 0 16px;color:#a0a0c0;font-size:14px;text-align:center;">Need to reschedule or cancel?</p>
@@ -155,6 +249,7 @@ export function appointmentReminderHtml(opts: {
       </td></tr>
     </table>
 
+    ${calendarSection}
     ${manageSection}
 
     <p style="margin:24px 0 0;color:#a0a0c0;font-size:14px;">See you soon! 💜</p>
@@ -175,8 +270,10 @@ export function rescheduleConfirmationHtml(opts: {
   businessAddress: string
   businessPhone: string
   manageLink: string
+  startISO?: string
+  endISO?: string
 }): string {
-  const { greeting, serviceName, dateStr, timeStr, staffName, businessName, businessAddress, businessPhone, manageLink } = opts
+  const { greeting, serviceName, dateStr, timeStr, staffName, businessName, businessAddress, businessPhone, manageLink, startISO, endISO } = opts
 
   const detailRows = [
     detailRow('📋', 'Service', serviceName),
@@ -186,6 +283,10 @@ export function rescheduleConfirmationHtml(opts: {
     detailRow('📍', 'Location', businessAddress ? `${businessName}, ${businessAddress}` : businessName),
     businessPhone ? detailRow('📞', 'Phone', `<a href="tel:${businessPhone}" style="color:#a855f7;text-decoration:none;">${businessPhone}</a>`) : '',
   ].filter(Boolean).join('\n')
+
+  const calendarSection = (startISO && endISO)
+    ? calendarButtonsHtml({ serviceName, startISO, endISO, businessName, businessAddress })
+    : ''
 
   const manageSection = manageLink
     ? `<p style="margin:24px 0 16px;color:#a0a0c0;font-size:14px;text-align:center;">Need to reschedule again or cancel?</p>
@@ -209,6 +310,7 @@ export function rescheduleConfirmationHtml(opts: {
       </td></tr>
     </table>
 
+    ${calendarSection}
     ${manageSection}
     ${contactLine}
 

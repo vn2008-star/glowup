@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { toE164 } from '@/lib/utils'
-import { appointmentReminderHtml } from '@/lib/email-templates'
+import { appointmentReminderHtml, googleCalendarUrl } from '@/lib/email-templates'
 
 // ─── Send Appointment Reminders (Cron-triggered) ───
 // Vercel Cron calls this hourly.
@@ -143,10 +143,16 @@ export async function GET(request: Request) {
       const urgencyLabel = win.type === '1h' ? 'in about 1 hour' : win.type === '2h' ? 'in about 2 hours' : 'tomorrow'
       const subjectPrefix = isShortNotice ? '⏰ Coming Up Soon' : '🔔 Appointment Reminder'
 
+      const calTitle = `${serviceName} — ${businessName}`
+      const calLocation = businessAddress ? `${businessName}, ${businessAddress}` : businessName
+      const startISO = (appointment.start_time as string)
+      const endISO = (appointment.end_time as string)
+      const gcalLink = googleCalendarUrl({ title: calTitle, startISO, endISO, location: calLocation })
+
       const customTemplates = (settings.reminder_templates || {}) as Record<string, string>
       const smsTemplate = isShortNotice
-        ? `⏰ ${clientGreeting}, your ${serviceName} appointment is ${urgencyLabel}!\n📅 ${dateStr} at ${timeStr}\n${staffName ? `💇 With: ${staffName}\n` : ''}${businessAddress ? `📍 ${businessName}, ${businessAddress}` : `📍 ${businessName}`}\n${businessPhone ? `📞 ${businessPhone}\n` : ''}${manageLink ? `Manage: ${manageLink}` : ''}`
-        : customTemplates.sms || `Dear ${clientGreeting}! This is a reminder that your ${serviceName} appointment at ${businessName} is ${urgencyLabel}, ${dateStr} at ${timeStr}.\n${staffName ? `💇 With: ${staffName}\n` : ''}${businessAddress ? `📍 ${businessAddress}` : ''}${businessPhone ? `\n📞 ${businessPhone}` : ''}${manageLink ? `\nManage: ${manageLink}` : '\nReply C to Confirm, M to Modify, X to Cancel. Reply STOP to opt out.'}`
+        ? `⏰ ${clientGreeting}, your ${serviceName} appointment is ${urgencyLabel}!\n📅 ${dateStr} at ${timeStr}\n${staffName ? `💇 With: ${staffName}\n` : ''}${businessAddress ? `📍 ${businessName}, ${businessAddress}` : `📍 ${businessName}`}\n${businessPhone ? `📞 ${businessPhone}\n` : ''}📅 Add to Calendar: ${gcalLink}\n${manageLink ? `Manage: ${manageLink}` : ''}`
+        : customTemplates.sms || `Dear ${clientGreeting}! This is a reminder that your ${serviceName} appointment at ${businessName} is ${urgencyLabel}, ${dateStr} at ${timeStr}.\n${staffName ? `💇 With: ${staffName}\n` : ''}${businessAddress ? `📍 ${businessAddress}` : ''}${businessPhone ? `\n📞 ${businessPhone}` : ''}\n📅 Add to Calendar: ${gcalLink}${manageLink ? `\nManage: ${manageLink}` : '\nReply C to Confirm, M to Modify, X to Cancel. Reply STOP to opt out.'}`
 
       const emailSubject = customTemplates.email_subject || `${subjectPrefix} — ${businessName}`
 
@@ -212,6 +218,8 @@ export async function GET(request: Request) {
               businessName,
               businessAddress,
               manageLink,
+              startISO,
+              endISO,
             })
             await resend.emails.send({
               from: `${businessName} <bookings@joinglowup.org>`,

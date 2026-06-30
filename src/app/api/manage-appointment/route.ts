@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { toE164 } from '@/lib/utils'
-import { rescheduleConfirmationHtml, cancellationConfirmationHtml, staffCancellationNotificationHtml, staffRescheduleNotificationHtml, ownerNotificationHtml } from '@/lib/email-templates'
+import { rescheduleConfirmationHtml, cancellationConfirmationHtml, staffCancellationNotificationHtml, staffRescheduleNotificationHtml, ownerNotificationHtml, googleCalendarUrl } from '@/lib/email-templates'
 
 // Public API — token-based auth (no login required)
 const svc = createClient(
@@ -414,6 +414,7 @@ export async function PATCH(request: Request) {
       serviceName,
       staffName,
       startTime: newStart,
+      endTime: newEnd,
       businessName,
       businessAddress,
       businessPhone,
@@ -575,13 +576,14 @@ async function notifyClient(opts: {
   serviceName: string
   staffName: string
   startTime: Date
+  endTime: Date
   businessName: string
   businessAddress: string
   businessPhone: string
   manageToken: string
   tz: string
 }) {
-  const { client, clientName, serviceName, staffName, startTime, businessName, businessAddress, businessPhone, manageToken, tz } = opts
+  const { client, clientName, serviceName, staffName, startTime, endTime, businessName, businessAddress, businessPhone, manageToken, tz } = opts
   if (!client) return
 
   // Greeting format: "Dear James D." instead of full name
@@ -598,6 +600,12 @@ async function notifyClient(opts: {
     timeStr = startTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
   }
 
+  const calTitle = `${serviceName} — ${businessName}`
+  const calLocation = businessAddress ? `${businessName}, ${businessAddress}` : businessName
+  const startISO = startTime.toISOString()
+  const endISO = endTime.toISOString()
+  const gcalLink = googleCalendarUrl({ title: calTitle, startISO, endISO, location: calLocation })
+
   // SMS
   if (client.phone && process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER) {
     const smsBody = [
@@ -609,6 +617,8 @@ async function notifyClient(opts: {
       staffName ? `💇 With: ${staffName}` : '',
       businessAddress ? `📍 ${businessName}, ${businessAddress}` : `📍 ${businessName}`,
       businessPhone ? `📞 ${businessPhone}` : '',
+      ``,
+      `📅 Add to Calendar: ${gcalLink}`,
       ``,
       `Need to change? Contact us at ${businessPhone || 'the salon'}.`,
     ].filter(Boolean).join('\n')
@@ -652,6 +662,8 @@ async function notifyClient(opts: {
         businessAddress,
         businessPhone,
         manageLink,
+        startISO,
+        endISO,
       })
       await resend.emails.send({
         from: `${businessName} <bookings@joinglowup.org>`,
