@@ -106,6 +106,41 @@ export default async function LandingPage() {
         </div>
       </section>
 
+      {/* ── Trust Highlights ── */}
+      <section className={styles.trustHighlights}>
+        <div className="container">
+          <div className={styles.trustGrid}>
+            <div className={styles.trustItem}>
+              <div className={styles.trustIcon}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><polyline points="9 12 11 14 15 10" /></svg>
+              </div>
+              <div>
+                <strong>Client Info Protected</strong>
+                <p>Your client data stays private and secure. Each salon&apos;s data is fully isolated — no one else can see your clients.</p>
+              </div>
+            </div>
+            <div className={styles.trustItem}>
+              <div className={styles.trustIcon}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+              </div>
+              <div>
+                <strong>Auto-Calculate Service Fees</strong>
+                <p>Prices auto-fill at checkout based on your service menu. No manual math — just confirm and collect.</p>
+              </div>
+            </div>
+            <div className={styles.trustItem}>
+              <div className={styles.trustIcon}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></svg>
+              </div>
+              <div>
+                <strong>🇻🇳 🇨🇳 🇰🇷 🇪🇸 Multi-Language</strong>
+                <p>Full support for Vietnamese, Chinese, Korean, Spanish &amp; English — built for salon owners who prefer their native language.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ── Features ── */}
       <section id="features" className={styles.features}>
         <div className="container">
