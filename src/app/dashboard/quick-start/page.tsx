@@ -176,6 +176,7 @@ export default function QuickStartPage() {
   const [soloDone, setSoloDone] = useState(false);
   const [bulkLoading, setBulkLoading] = useState<string | null>(null);
   const [addedCategories, setAddedCategories] = useState<Set<string>>(new Set());
+  const [demoMode, setDemoMode] = useState(false);
 
   const fetchCounts = useCallback(async () => {
     if (!tenant) return;
@@ -257,6 +258,22 @@ export default function QuickStartPage() {
           Get your salon up and running in minutes. Complete these essential steps in order,
           then explore advanced features to grow your business.
         </p>
+        <button
+          onClick={() => setDemoMode((d) => !d)}
+          style={{
+            marginTop: '8px',
+            padding: '4px 12px',
+            borderRadius: 'var(--radius-md)',
+            border: demoMode ? '1px solid var(--color-primary)' : '1px solid var(--border-default)',
+            background: demoMode ? 'rgba(195, 126, 218, 0.12)' : 'transparent',
+            color: 'var(--text-secondary)',
+            fontSize: 'var(--text-xs)',
+            cursor: 'pointer',
+            transition: 'all 0.15s',
+          }}
+        >
+          {demoMode ? '✦ Preview Mode ON' : '👁️ Preview Setup Shortcuts'}
+        </button>
       </div>
 
       {/* Language Selection Banner */}
@@ -362,7 +379,7 @@ export default function QuickStartPage() {
                   <div className={styles.stepDesc}>{step.description}</div>
 
                   {/* ── Inline: "I Work Alone" button ── */}
-                  {step.id === "staff" && !done && !loading && (
+                  {step.id === "staff" && (!done || demoMode) && !loading && (
                     <div style={{ marginTop: '10px' }} onClick={(e) => e.preventDefault()}>
                       <button
                         onClick={handleSoloArtist}
@@ -387,7 +404,7 @@ export default function QuickStartPage() {
                   )}
 
                   {/* ── Inline: Salon Type Picker ── */}
-                  {step.id === "services" && !done && !loading && (
+                  {step.id === "services" && (!done || demoMode) && !loading && (
                     <div style={{ marginTop: '10px', display: 'flex', flexWrap: 'wrap', gap: '6px' }} onClick={(e) => e.preventDefault()}>
                       {SERVICE_CATEGORIES.map((cat) => {
                         const isAdded = addedCategories.has(cat.id);
