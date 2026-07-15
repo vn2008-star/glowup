@@ -46,7 +46,9 @@ export default function BookingClient({ slug }: { slug: string }) {
   const [clientPhone, setClientPhone] = useState('')
   const [clientNotes, setClientNotes] = useState('')
   const [clientBirthday, setClientBirthday] = useState('')
-  const [smsConsent, setSmsConsent] = useState(true)
+  // Default UNCHECKED — the client must actively opt in (Twilio/CTIA best
+  // practice). Booking still works if left unchecked; we just won't text them.
+  const [smsConsent, setSmsConsent] = useState(false)
 
   // Helper: get staff assigned to a specific service (null = Any Available)
   const getStaffForService = (serviceId: string): StaffInfo | null => staffByService[serviceId] ?? null
@@ -349,6 +351,7 @@ export default function BookingClient({ slug }: { slug: string }) {
           client_phone: clientPhone,
           notes: clientNotes,
           client_birthday: clientBirthday || null,
+          sms_consent: smsConsent,
         }),
       })
 

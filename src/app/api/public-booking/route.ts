@@ -108,6 +108,9 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const body = await request.json()
   const { slug, staff_id, start_time, client_name, client_email, client_phone, notes, client_birthday } = body
+  // SMS consent from the booking form's checkbox. Default true for any legacy
+  // caller that doesn't send the field; false only when explicitly unchecked.
+  const smsConsent = body.sms_consent !== false
 
   // Build the services array: either from new batch format or legacy single-service
   let serviceItems: { service_id: string; staff_id?: string | null; duration_minutes: number }[]
@@ -220,6 +223,7 @@ export async function POST(request: Request) {
         phone: client_phone || null,
         birthday: client_birthday || null,
         status: 'new',
+        sms_opt_out: !smsConsent,
       })
       .select('id')
       .single()
@@ -298,32 +302,22 @@ export async function POST(request: Request) {
     clientId,
     start: overallStart,
     end: overallEnd,
+    smsConsent,
   }).catch(err => console.error('[public-booking] notification error:', err))
 
   // ── Create reminders for ALL appointments ──
   if (clientId) {
     const reminderRows: { tenant_id: string; appointment_id: string; client_id: string; type: string; channel: string; status: string }[] = []
+    // Only schedule SMS reminders when the client opted in; email always.
+    const smsOk = smsConsent && !!client_phone
     for (const apt of appointments) {
-      // 24h reminders
-      if (client_phone) {
-        reminderRows.push({ tenant_id: tenant.id, appointment_id: apt.id, client_id: clientId, type: '24h', channel: 'sms', status: 'pending' })
-      }
-      if (client_email) {
-        reminderRows.push({ tenant_id: tenant.id, appointment_id: apt.id, client_id: clientId, type: '24h', channel: 'email', status: 'pending' })
-      }
-      // 2h reminders
-      if (client_phone) {
-        reminderRows.push({ tenant_id: tenant.id, appointment_id: apt.id, client_id: clientId, type: '2h', channel: 'sms', status: 'pending' })
-      }
-      if (client_email) {
-        reminderRows.push({ tenant_id: tenant.id, appointment_id: apt.id, client_id: clientId, type: '2h', channel: 'email', status: 'pending' })
-      }
-      // 1h reminders
-      if (client_phone) {
-        reminderRows.push({ tenant_id: tenant.id, appointment_id: apt.id, client_id: clientId, type: '1h', channel: 'sms', status: 'pending' })
-      }
-      if (client_email) {
-        reminderRows.push({ tenant_id: tenant.id, appointment_id: apt.id, client_id: clientId, type: '1h', channel: 'email', status: 'pending' })
+      for (const type of ['24h', '2h', '1h']) {
+        if (smsOk) {
+          reminderRows.push({ tenant_id: tenant.id, appointment_id: apt.id, client_id: clientId, type, channel: 'sms', status: 'pending' })
+        }
+        if (client_email) {
+          reminderRows.push({ tenant_id: tenant.id, appointment_id: apt.id, client_id: clientId, type, channel: 'email', status: 'pending' })
+        }
       }
     }
     if (reminderRows.length > 0) {
@@ -389,6 +383,7 @@ async function sendBookingConfirmations(opts: {
   clientId: string | null
   start: Date
   end: Date
+  smsConsent: boolean
 }) {
   const { tenant, appointment, serviceName, staffName, clientName, clientEmail, clientPhone, clientId, start } = opts
 
@@ -492,8 +487,8 @@ async function sendBookingConfirmations(opts: {
     resendClient = new Resend(process.env.RESEND_API_KEY!)
   }
 
-  // ── 1. SMS to client ──
-  if (clientPhone) {
+  // ── 1. SMS to client (only if they opted in) ──
+  if (clientPhone && opts.smsConsent) {
     const calTitle = `${serviceName} — ${businessName}`
     const calLocation = businessAddress ? `${businessName}, ${businessAddress}` : businessName
     const gcalLink = googleCalendarUrl({ title: calTitle, startISO: start.toISOString(), endISO: opts.end.toISOString(), location: calLocation })

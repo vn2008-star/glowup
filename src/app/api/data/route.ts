@@ -251,7 +251,7 @@ export async function POST(request: Request) {
         const { data, error } = await svc
           .from('appointments')
           .insert({ ...payload, tenant_id: tenantId })
-          .select('id, tenant_id, client_id, staff_id, service_id, start_time, end_time, status, total_price, notes, payment_method, tip_amount, checked_out_at, checked_in_at, created_at, manage_token, client:clients(id, first_name, last_name, phone, email, photo_url), staff_member:staff!staff_id(id, name, photo_url, role), service:services(id, name, category, duration_minutes, price, commission_rate)')
+          .select('id, tenant_id, client_id, staff_id, service_id, start_time, end_time, status, total_price, notes, payment_method, tip_amount, checked_out_at, checked_in_at, created_at, manage_token, client:clients(id, first_name, last_name, phone, email, photo_url, sms_opt_out), staff_member:staff!staff_id(id, name, photo_url, role), service:services(id, name, category, duration_minutes, price, commission_rate)')
           .single()
 
         // Notify the client + schedule reminders — same as the public booking
@@ -262,7 +262,7 @@ export async function POST(request: Request) {
           const apt = data as unknown as {
             id: string; client_id: string | null; status: string
             start_time: string; end_time: string; manage_token: string | null
-            client: { first_name?: string; last_name?: string; phone?: string | null; email?: string | null } | null
+            client: { first_name?: string; last_name?: string; phone?: string | null; email?: string | null; sms_opt_out?: boolean } | null
             service: { name?: string } | null
             staff_member: { name?: string } | null
           }
@@ -300,12 +300,14 @@ export async function POST(request: Request) {
                   || 'https://glowup-jade.vercel.app'
                 const manageLink = apt.manage_token ? `${baseUrl}/manage/${apt.manage_token}` : ''
                 const clientName = `${apt.client!.first_name || ''}${apt.client!.last_name ? ' ' + apt.client!.last_name : ''}`.trim()
+                // Respect SMS opt-out (client replied STOP) — email still sends.
+                const smsPhone = apt.client!.sms_opt_out ? null : (apt.client!.phone || null)
 
                 await scheduleClientReminders(svc, {
                   tenantId,
                   appointmentId: apt.id,
                   clientId: apt.client_id!,
-                  clientPhone: apt.client!.phone || null,
+                  clientPhone: smsPhone,
                   clientEmail: apt.client!.email || null,
                 })
 
@@ -318,7 +320,7 @@ export async function POST(request: Request) {
                   staffName: apt.staff_member?.name || '',
                   clientName,
                   clientEmail: apt.client!.email || null,
-                  clientPhone: apt.client!.phone || null,
+                  clientPhone: smsPhone,
                   manageLink,
                   start: new Date(apt.start_time),
                   end: new Date(apt.end_time),
