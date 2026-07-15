@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server'
+import { waitUntil } from '@vercel/functions'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { getImpersonationOverride, isAdminEmail } from '@/lib/admin'
+import { scheduleClientReminders, sendClientBookingConfirmation } from '@/lib/notifications'
 
 // Unified data API — all dashboard queries go through here
 // Authenticates via session cookies, queries with service role to bypass RLS
@@ -249,8 +251,87 @@ export async function POST(request: Request) {
         const { data, error } = await svc
           .from('appointments')
           .insert({ ...payload, tenant_id: tenantId })
-          .select('id, tenant_id, client_id, staff_id, service_id, start_time, end_time, status, total_price, notes, payment_method, tip_amount, checked_out_at, checked_in_at, created_at, client:clients(id, first_name, last_name, phone, email, photo_url), staff_member:staff!staff_id(id, name, photo_url, role), service:services(id, name, category, duration_minutes, price, commission_rate)')
+          .select('id, tenant_id, client_id, staff_id, service_id, start_time, end_time, status, total_price, notes, payment_method, tip_amount, checked_out_at, checked_in_at, created_at, manage_token, client:clients(id, first_name, last_name, phone, email, photo_url), staff_member:staff!staff_id(id, name, photo_url, role), service:services(id, name, category, duration_minutes, price, commission_rate)')
           .single()
+
+        // Notify the client + schedule reminders — same as the public booking
+        // flow. Only for future appointments that have a client attached; skips
+        // time-blocks (no client) and past/checkout entries. The owner isn't
+        // messaged here since they're the one creating the appointment.
+        if (data) {
+          const apt = data as unknown as {
+            id: string; client_id: string | null; status: string
+            start_time: string; end_time: string; manage_token: string | null
+            client: { first_name?: string; last_name?: string; phone?: string | null; email?: string | null } | null
+            service: { name?: string } | null
+            staff_member: { name?: string } | null
+          }
+          const isFuture = new Date(apt.start_time).getTime() > Date.now()
+          const hasContact = !!(apt.client?.phone || apt.client?.email)
+          if (apt.client_id && apt.client && hasContact && isFuture &&
+              (apt.status === 'pending' || apt.status === 'confirmed')) {
+            const notify = (async () => {
+              try {
+                const { data: t } = await svc
+                  .from('tenants')
+                  .select('name, email, phone, address, settings')
+                  .eq('id', tenantId)
+                  .single()
+
+                // Fall back to the owner staff record for missing contact info
+                let ownerEmail = t?.email || ''
+                let ownerPhone = t?.phone || ''
+                if (!ownerEmail || !ownerPhone) {
+                  const { data: owner } = await svc
+                    .from('staff')
+                    .select('email, phone')
+                    .eq('tenant_id', tenantId)
+                    .eq('role', 'owner')
+                    .limit(1)
+                    .single()
+                  ownerEmail = ownerEmail || owner?.email || ''
+                  ownerPhone = ownerPhone || owner?.phone || ''
+                }
+
+                const settings = (t?.settings || {}) as Record<string, unknown>
+                const tz = (settings.timezone as string) || 'America/Los_Angeles'
+                const baseUrl = process.env.NEXT_PUBLIC_SITE_URL
+                  || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null)
+                  || 'https://glowup-jade.vercel.app'
+                const manageLink = apt.manage_token ? `${baseUrl}/manage/${apt.manage_token}` : ''
+                const clientName = `${apt.client!.first_name || ''}${apt.client!.last_name ? ' ' + apt.client!.last_name : ''}`.trim()
+
+                await scheduleClientReminders(svc, {
+                  tenantId,
+                  appointmentId: apt.id,
+                  clientId: apt.client_id!,
+                  clientPhone: apt.client!.phone || null,
+                  clientEmail: apt.client!.email || null,
+                })
+
+                await sendClientBookingConfirmation({
+                  businessName: t?.name || 'our salon',
+                  businessAddress: (t?.address as string) || '',
+                  businessPhone: ownerPhone,
+                  businessEmail: ownerEmail || null,
+                  serviceName: apt.service?.name || 'your appointment',
+                  staffName: apt.staff_member?.name || '',
+                  clientName,
+                  clientEmail: apt.client!.email || null,
+                  clientPhone: apt.client!.phone || null,
+                  manageLink,
+                  start: new Date(apt.start_time),
+                  end: new Date(apt.end_time),
+                  timezone: tz,
+                })
+              } catch (err) {
+                console.error('[appointments.add] notification error:', err)
+              }
+            })()
+            try { waitUntil(notify) } catch { /* local dev — no waitUntil */ }
+          }
+        }
+
         return NextResponse.json({ data, error: error?.message })
       }
 
