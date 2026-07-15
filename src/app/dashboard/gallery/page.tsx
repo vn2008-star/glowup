@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
-import { queryData } from "@/lib/api";
+import { queryData, uploadImage } from "@/lib/api";
 import { localeDateStr } from "@/lib/utils";
 import styles from "./gallery.module.css";
 
@@ -77,13 +77,15 @@ export default function GalleryPage() {
   }, [showAdd, tenant]);
 
   function handleFileRead(setter: (v: string | null) => void) {
-    return (e: React.ChangeEvent<HTMLInputElement>) => {
+    return async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
       if (file.size > 2 * 1024 * 1024) { alert("Image must be under 2 MB"); return; }
-      const r = new FileReader();
-      r.onload = () => setter(r.result as string);
-      r.readAsDataURL(file);
+      // Instant local preview, then upload to Storage and keep the URL (not base64).
+      setter(URL.createObjectURL(file));
+      const { url, error } = await uploadImage(file, "gallery");
+      if (error || !url) { alert(`Upload failed: ${error || "unknown error"}`); return; }
+      setter(url);
     };
   }
 

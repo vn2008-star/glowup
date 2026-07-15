@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
-import { queryData } from "@/lib/api";
+import { queryData, uploadImage } from "@/lib/api";
 import { todayInTz, DEFAULT_TZ } from "@/lib/tz";
 import { GlowUpLogo } from "@/components/GlowUpLogo";
 import { localeDateStr } from "@/lib/utils";
@@ -1598,13 +1598,14 @@ export default function CheckoutPage() {
                       <div className={styles.photoSectionTitle}>📸 Before & After</div>
                       <div className={styles.photoUploads}>
                         <label className={styles.photoSlot}>
-                          <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => {
+                          <input type="file" accept="image/*" style={{ display: "none" }} onChange={async (e) => {
                             const file = e.target.files?.[0];
                             if (!file) return;
                             if (file.size > 2 * 1024 * 1024) { alert("Max 2 MB"); return; }
-                            const r = new FileReader();
-                            r.onload = () => setBeforePhoto(r.result as string);
-                            r.readAsDataURL(file);
+                            setBeforePhoto(URL.createObjectURL(file));
+                            const { url, error } = await uploadImage(file, "gallery");
+                            if (error || !url) { alert(`Upload failed: ${error || "unknown error"}`); return; }
+                            setBeforePhoto(url);
                           }} />
                           {beforePhoto ? (
                             <div className={styles.photoThumb}>
@@ -1620,13 +1621,14 @@ export default function CheckoutPage() {
                           )}
                         </label>
                         <label className={styles.photoSlot}>
-                          <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => {
+                          <input type="file" accept="image/*" style={{ display: "none" }} onChange={async (e) => {
                             const file = e.target.files?.[0];
                             if (!file) return;
                             if (file.size > 2 * 1024 * 1024) { alert("Max 2 MB"); return; }
-                            const r = new FileReader();
-                            r.onload = () => setAfterPhoto(r.result as string);
-                            r.readAsDataURL(file);
+                            setAfterPhoto(URL.createObjectURL(file));
+                            const { url, error } = await uploadImage(file, "gallery");
+                            if (error || !url) { alert(`Upload failed: ${error || "unknown error"}`); return; }
+                            setAfterPhoto(url);
                           }} />
                           {afterPhoto ? (
                             <div className={styles.photoThumb}>

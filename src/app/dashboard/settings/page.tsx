@@ -672,13 +672,14 @@ export default function SettingsPage() {
                   type="file"
                   accept="image/*"
                   style={{ display: "none" }}
-                  onChange={(e) => {
+                  onChange={async (e) => {
                     const file = e.target.files?.[0];
                     if (!file) return;
                     if (file.size > 2 * 1024 * 1024) { alert("Max 2 MB"); return; }
-                    const reader = new FileReader();
-                    reader.onload = () => setPaymentQr(prev => ({ ...prev, venmo_qr: reader.result as string }));
-                    reader.readAsDataURL(file);
+                    setPaymentQr(prev => ({ ...prev, venmo_qr: URL.createObjectURL(file) }));
+                    const { url, error } = await uploadImage(file, "qr");
+                    if (error || !url) { alert(`Upload failed: ${error || "unknown error"}`); return; }
+                    setPaymentQr(prev => ({ ...prev, venmo_qr: url }));
                   }}
                 />
                 {paymentQr.venmo_qr ? (
@@ -717,13 +718,14 @@ export default function SettingsPage() {
                   type="file"
                   accept="image/*"
                   style={{ display: "none" }}
-                  onChange={(e) => {
+                  onChange={async (e) => {
                     const file = e.target.files?.[0];
                     if (!file) return;
                     if (file.size > 2 * 1024 * 1024) { alert("Max 2 MB"); return; }
-                    const reader = new FileReader();
-                    reader.onload = () => setPaymentQr(prev => ({ ...prev, zelle_qr: reader.result as string }));
-                    reader.readAsDataURL(file);
+                    setPaymentQr(prev => ({ ...prev, zelle_qr: URL.createObjectURL(file) }));
+                    const { url, error } = await uploadImage(file, "qr");
+                    if (error || !url) { alert(`Upload failed: ${error || "unknown error"}`); return; }
+                    setPaymentQr(prev => ({ ...prev, zelle_qr: url }));
                   }}
                 />
                 {paymentQr.zelle_qr ? (

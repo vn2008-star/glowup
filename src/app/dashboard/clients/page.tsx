@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
-import { queryData } from "@/lib/api";
+import { queryData, uploadImage } from "@/lib/api";
 import styles from "./clients.module.css";
 import type { Client, Service, Staff } from "@/lib/types";
 import { formatPhone, fmtDate, localeDateStr } from "@/lib/utils";
@@ -340,22 +340,22 @@ export default function ClientsPage() {
     }
   }
 
-  function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>, mode: 'add' | 'edit') {
+  async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>, mode: 'add' | 'edit') {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) { alert('Photo must be under 5MB'); return; }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      if (mode === 'add') {
-        setPhotoPreview(result);
-        setFormData(prev => ({ ...prev, photo_url: result }));
-      } else {
-        setEditPhotoPreview(result);
-        setEditData(prev => ({ ...prev, photo_url: result }));
-      }
-    };
-    reader.readAsDataURL(file);
+    // Instant local preview, then upload to Storage and save the URL (not base64).
+    const localPreview = URL.createObjectURL(file);
+    if (mode === 'add') setPhotoPreview(localPreview); else setEditPhotoPreview(localPreview);
+    const { url, error } = await uploadImage(file, 'clients');
+    if (error || !url) { alert(`Photo upload failed: ${error || 'unknown error'}`); return; }
+    if (mode === 'add') {
+      setPhotoPreview(url);
+      setFormData(prev => ({ ...prev, photo_url: url }));
+    } else {
+      setEditPhotoPreview(url);
+      setEditData(prev => ({ ...prev, photo_url: url }));
+    }
   }
 
   // Use the centralized Gregorian-safe formatter from utils
