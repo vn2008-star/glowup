@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
-import { queryData } from "@/lib/api";
+import { queryData, uploadImage } from "@/lib/api";
 import styles from "./staff.module.css";
 import type { Staff, Service } from "@/lib/types";
 import { PROFESSIONAL_TYPES, getProfessionalType } from "./staff-specialties";
@@ -174,17 +174,17 @@ export default function StaffPage() {
     });
   }
 
-  function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) { alert('Photo must be under 5MB'); return; }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      setPhotoPreview(result);
-      setFormData(prev => ({ ...prev, photo_url: result }));
-    };
-    reader.readAsDataURL(file);
+    // Show an instant local preview, then upload to Storage and save the URL
+    // (never store the base64 in the DB — it bloats staff.list on every query).
+    setPhotoPreview(URL.createObjectURL(file));
+    const { url, error } = await uploadImage(file, 'staff');
+    if (error || !url) { alert(`Photo upload failed: ${error || 'unknown error'}`); return; }
+    setPhotoPreview(url);
+    setFormData(prev => ({ ...prev, photo_url: url }));
   }
 
   function toggleSpecialty(sp: string) {

@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 import { useTenant } from "@/lib/tenant-context";
-import { queryData } from "@/lib/api";
+import { queryData, uploadImage } from "@/lib/api";
 import { US_TIMEZONES, timezoneFromAddress } from "@/lib/tz";
 import { CLOSED_DAY_HOLIDAYS } from "@/lib/schedule-utils";
 import type { CustomClosedDate } from "@/lib/schedule-utils";
@@ -253,16 +253,19 @@ export default function SettingsPage() {
               type="file"
               accept="image/*"
               style={{ display: "none" }}
-              onChange={(e) => {
+              onChange={async (e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
                 if (file.size > 2 * 1024 * 1024) {
                   alert("Image must be under 2 MB");
                   return;
                 }
-                const reader = new FileReader();
-                reader.onload = () => setLogoUrl(reader.result as string);
-                reader.readAsDataURL(file);
+                // Instant local preview, then upload to Storage and store the URL
+                // (not a base64 data URI, which bloats the tenants row).
+                setLogoUrl(URL.createObjectURL(file));
+                const { url, error } = await uploadImage(file, "logos");
+                if (error || !url) { alert(`Logo upload failed: ${error || "unknown error"}`); return; }
+                setLogoUrl(url);
               }}
             />
             {logoUrl ? (

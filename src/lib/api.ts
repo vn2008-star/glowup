@@ -16,3 +16,22 @@ export async function queryData<T = unknown>(action: string, payload?: Record<st
 
 // Semantic alias for write operations (same underlying POST)
 export const mutateData = queryData;
+
+// Upload an image to Supabase Storage via /api/upload and get back a public URL.
+// Use this instead of FileReader/readAsDataURL — storing base64 data URIs in the
+// database bloats rows and slows every query that selects the column.
+export async function uploadImage(
+  file: File,
+  folder = 'uploads'
+): Promise<{ url: string | null; error: string | null }> {
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('folder', folder);
+  const res = await fetch('/api/upload', { method: 'POST', body: fd });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Upload failed' }));
+    return { url: null, error: err.error || `HTTP ${res.status}` };
+  }
+  const { url } = await res.json();
+  return { url, error: null };
+}
