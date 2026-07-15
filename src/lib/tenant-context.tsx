@@ -11,6 +11,7 @@ interface TenantContextType {
   error: string | null
   isImpersonating: boolean
   impersonatingTenantName: string | null
+  isPlatformAdmin: boolean
   refetch: () => Promise<void>
 }
 
@@ -21,6 +22,7 @@ const TenantContext = createContext<TenantContextType>({
   error: null,
   isImpersonating: false,
   impersonatingTenantName: null,
+  isPlatformAdmin: false,
   refetch: async () => {},
 })
 
@@ -63,6 +65,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null)
   const [isImpersonating, setIsImpersonating] = useState(false)
   const [impersonatingTenantName, setImpersonatingTenantName] = useState<string | null>(null)
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false)
   const setupFired = useRef(false)
 
   async function fetchTenant(skipCache = false) {
@@ -88,11 +91,21 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   async function fetchFromServer(updateLoading: boolean) {
     try {
       const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
+      // Verify the JWT locally (no Auth-server round-trip). claims.sub is the
+      // user id; email / user_metadata are carried in the token payload.
+      const { data: claimsData } = await supabase.auth.getClaims()
+      const claims = claimsData?.claims as
+        | { sub: string; email?: string; user_metadata?: Record<string, unknown> }
+        | undefined
 
-      if (!user) {
+      if (!claims?.sub) {
         if (updateLoading) setLoading(false)
         return
+      }
+      const user = {
+        id: claims.sub,
+        email: claims.email,
+        user_metadata: claims.user_metadata || {},
       }
 
       // Fire setup-tenant once per session, non-blocking
@@ -121,7 +134,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         return
       }
 
-      const { staff: staffRecord, isImpersonating: impersonating, impersonatingTenantName: impTenantName } = await res.json()
+      const { staff: staffRecord, isImpersonating: impersonating, impersonatingTenantName: impTenantName, isPlatformAdmin: platformAdmin } = await res.json()
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const tenantData = (staffRecord as any).tenants as Tenant
@@ -131,6 +144,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       setCurrentStaff(staffOnly as unknown as Staff)
       setIsImpersonating(!!impersonating)
       setImpersonatingTenantName(impTenantName || null)
+      setIsPlatformAdmin(!!platformAdmin)
       if (!impersonating) {
         setCachedTenant(tenantData, staffOnly as unknown as Staff)
       }
@@ -149,7 +163,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <TenantContext.Provider value={{ tenant, currentStaff, loading, error, isImpersonating, impersonatingTenantName, refetch: () => fetchTenant(true) }}>
+    <TenantContext.Provider value={{ tenant, currentStaff, loading, error, isImpersonating, impersonatingTenantName, isPlatformAdmin, refetch: () => fetchTenant(true) }}>
       {children}
     </TenantContext.Provider>
   )

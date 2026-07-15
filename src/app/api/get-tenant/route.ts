@@ -1,15 +1,20 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
-import { getImpersonationOverride } from '@/lib/admin'
+import { getImpersonationOverride, isAdminEmail } from '@/lib/admin'
 
 export async function GET() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  // Verify the JWT locally instead of round-tripping to the Auth server.
+  const { data: claimsData } = await supabase.auth.getClaims()
+  const claims = claimsData?.claims ?? null
 
-  if (!user) {
+  if (!claims?.sub) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
   }
+  const userId = claims.sub as string
+  const userEmail = (claims.email as string) || ''
+  const isPlatformAdmin = isAdminEmail(userEmail)
 
   // Use service role to bypass RLS for tenant lookup
   const serviceSupabase = createServiceClient(
@@ -18,7 +23,7 @@ export async function GET() {
   )
 
   // ─── Admin impersonation: check for View As override ───
-  const overrideTenantId = await getImpersonationOverride(user.id, user.email || '')
+  const overrideTenantId = await getImpersonationOverride(userId, userEmail)
 
   if (overrideTenantId) {
     // Admin is impersonating — return the target tenant's data
@@ -43,7 +48,7 @@ export async function GET() {
 
     // Build a synthetic staff record pointing to the impersonated tenant
     const syntheticStaff = {
-      ...(ownerStaff || { id: user.id, name: 'Admin', role: 'owner', tenant_id: overrideTenantId }),
+      ...(ownerStaff || { id: userId, name: 'Admin', role: 'owner', tenant_id: overrideTenantId }),
       tenants: tenant,
     }
 
@@ -51,6 +56,7 @@ export async function GET() {
       staff: syntheticStaff,
       isImpersonating: true,
       impersonatingTenantName: tenant.name,
+      isPlatformAdmin,
     })
   }
 
@@ -58,12 +64,12 @@ export async function GET() {
   const { data: staffRecord, error } = await serviceSupabase
     .from('staff')
     .select('*, tenants(*)')
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .single()
 
   if (error || !staffRecord) {
     return NextResponse.json({ error: 'No tenant found' }, { status: 404 })
   }
 
-  return NextResponse.json({ staff: staffRecord, isImpersonating: false })
+  return NextResponse.json({ staff: staffRecord, isImpersonating: false, isPlatformAdmin })
 }

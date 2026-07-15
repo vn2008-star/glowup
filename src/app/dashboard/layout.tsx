@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 // Dashboard layout v2 - updated nav items
 
 import styles from "./dashboard.module.css";
@@ -110,26 +110,16 @@ function ThemeToggle() {
   );
 }
 
-const ADMIN_EMAILS = ['joinglowup@gmail.com', 'vn2008@gmail.com'];
-
 function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { tenant, currentStaff, loading, isImpersonating, impersonatingTenantName } = useTenant();
+  const { tenant, currentStaff, loading, isImpersonating, impersonatingTenantName, isPlatformAdmin } = useTenant();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
+  // Platform-admin status comes from the tenant context (resolved server-side
+  // in /api/get-tenant) — no separate auth round-trip needed here.
+  const isAdmin = isPlatformAdmin;
   const t = useTranslations('dashboard');
   const tc = useTranslations('common');
-
-  // Check if the current user is a platform admin
-  useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user?.email && ADMIN_EMAILS.includes(user.email.toLowerCase())) {
-        setIsAdmin(true);
-      }
-    });
-  }, []);
 
   async function handleLogout() {
     clearTenantCache();

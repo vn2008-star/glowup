@@ -14,17 +14,22 @@ export async function POST(request: Request) {
 
   const { action, payload } = body
 
-  let user
+  // Verify the JWT locally (signature-checked against the cached signing key)
+  // instead of calling getUser(), which round-trips to the Auth server on
+  // every single data request. See src/lib/supabase/middleware.ts for details.
+  let claims: { sub?: string; email?: string } | null = null
   try {
-    const { data } = await supabase.auth.getUser()
-    user = data?.user
+    const { data } = await supabase.auth.getClaims()
+    claims = data?.claims ?? null
   } catch {
     return NextResponse.json({ error: 'Auth service unavailable' }, { status: 503 })
   }
 
-  if (!user) {
+  if (!claims?.sub) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
   }
+  const userId = claims.sub
+  const userEmail = claims.email || ''
 
   const svc = createServiceClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -35,7 +40,7 @@ export async function POST(request: Request) {
   const { data: staffRecord } = await svc
     .from('staff')
     .select('id, tenant_id, role')
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .single()
 
   if (!staffRecord) {
@@ -43,9 +48,8 @@ export async function POST(request: Request) {
   }
 
   // ─── Admin impersonation override (skip DB query for non-admins) ───
-  const userEmail = user.email || ''
   const overrideTenantId = isAdminEmail(userEmail)
-    ? await getImpersonationOverride(user.id, userEmail)
+    ? await getImpersonationOverride(userId, userEmail)
     : null
   const tenantId = overrideTenantId || staffRecord.tenant_id
   const staffRole = overrideTenantId ? 'owner' : staffRecord.role // Admin gets full owner access when impersonating
@@ -1837,7 +1841,7 @@ export async function POST(request: Request) {
           .from('staff')
           .select('id')
           .eq('tenant_id', tenantId)
-          .eq('user_id', user.id)
+          .eq('user_id', userId)
           .single()
 
         const { data: fb, error: fbErr } = await svc

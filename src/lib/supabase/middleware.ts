@@ -29,12 +29,15 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  // IMPORTANT: Do NOT use getSession() here — it reads from storage which
-  // can be tampered with. getUser() sends a request to Supabase Auth server
-  // to revalidate the token every time.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // IMPORTANT: Do NOT use getSession() here — it returns storage contents
+  // without verifying them. getClaims() cryptographically verifies the JWT
+  // signature against the project's asymmetric signing key (fetched once and
+  // cached), so it is as trustworthy as getUser() but WITHOUT a network
+  // round-trip to the Auth server on every request. getClaims() also calls
+  // getSession() under the hood, which still refreshes an expiring token and
+  // writes the rotated cookies via the setAll callback above.
+  const { data: claimsData } = await supabase.auth.getClaims()
+  const user = claimsData?.claims ?? null
 
   // Redirect unauthenticated users away from protected routes
   if (
