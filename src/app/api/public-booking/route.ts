@@ -213,7 +213,7 @@ export async function POST(request: Request) {
   }
 
   if (!clientId) {
-    const { data: newClient } = await svc
+    const { data: newClient, error: newClientErr } = await svc
       .from('clients')
       .insert({
         tenant_id: tenant.id,
@@ -228,7 +228,18 @@ export async function POST(request: Request) {
       .select('id')
       .single()
 
-    clientId = newClient?.id || null
+    // Never book an anonymous appointment. If the client row can't be created we
+    // have no name or contact details, so the salon would get an unusable slot
+    // and the customer would think they were booked.
+    if (newClientErr || !newClient) {
+      console.error('[public-booking] Failed to create client:', newClientErr)
+      return NextResponse.json(
+        { error: 'We could not save your details. Please try again or call the salon.' },
+        { status: 500 }
+      )
+    }
+
+    clientId = newClient.id
   } else if (client_birthday) {
     // Update existing client's birthday if provided
     await svc
@@ -606,7 +617,10 @@ async function sendBookingConfirmations(opts: {
       try {
         await resendClient.emails.send({
           from: `GlowUp <bookings@joinglowup.org>`,
-          replyTo: businessEmail || undefined,
+          // Reply goes to the CLIENT — this mail tells the owner someone just
+          // booked, so Reply should reach that person. Using businessEmail here
+          // pointed the owner at their own inbox.
+          replyTo: clientEmail || undefined,
           to: [ownerEmail],
           subject: `🆕 New Booking: ${clientName} — ${serviceName} on ${dateStr}`,
           text: ownerEmailBody,
