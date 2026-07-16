@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { waitUntil } from '@vercel/functions'
 import { createClient } from '@/lib/supabase/server'
-import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { createClient as createServiceClient, type SupabaseClient } from '@supabase/supabase-js'
 import { getImpersonationOverride, isAdminEmail } from '@/lib/admin'
 import { scheduleClientReminders, sendClientBookingConfirmation } from '@/lib/notifications'
 
@@ -42,6 +42,84 @@ function friendlyWriteError(
     return 'That staff member is already booked during this time. Pick a different time or staff member.'
   }
   return error.message
+}
+
+type RedeemedCard = {
+  table: 'gift_cards' | 'glowup_credits'
+  id: string
+  code: string
+  amount: number
+  /** Balance before the debit — what a refund restores to. */
+  previousBalance: number
+  previousStatus: string
+}
+
+/**
+ * Debit a salon gift card or a universal GlowUp Credit.
+ *
+ * The balance write is a compare-and-set: it only lands if the balance is still
+ * what we read. A plain read-then-write loses updates — two terminals redeeming
+ * the same card both read $50, both write $30, and the salon hands out $40 of
+ * services for a $20 debit. PostgREST cannot express `balance = balance - x`,
+ * so CAS is how we get atomicity without a stored procedure.
+ */
+async function redeemCard(
+  svc: SupabaseClient,
+  tenantId: string,
+  code: string,
+  amount: number
+): Promise<RedeemedCard | { error: string }> {
+  const isCredit = code.toUpperCase().startsWith('GU-')
+  const table: RedeemedCard['table'] = isCredit ? 'glowup_credits' : 'gift_cards'
+
+  // GlowUp Credits are platform-level and redeemable at any salon, so they are
+  // intentionally not tenant-scoped. Salon gift cards are.
+  let q = svc.from(table).select('*').eq('code', code).eq('status', 'active')
+  if (!isCredit) q = q.eq('tenant_id', tenantId)
+
+  const { data: card, error: findErr } = await q.single()
+  if (findErr || !card) {
+    return { error: isCredit ? 'GlowUp Credit not found or inactive' : 'Gift card not found or inactive' }
+  }
+  if (isCredit && card.expires_at && new Date(card.expires_at) < new Date()) {
+    await svc.from(table).update({ status: 'expired' }).eq('id', card.id)
+    return { error: 'This GlowUp Credit has expired' }
+  }
+  if (Number(card.balance) < amount) {
+    return { error: `Insufficient balance. Available: $${card.balance}` }
+  }
+
+  const newBalance = Number(card.balance) - amount
+  const { data: updated, error: updErr } = await svc
+    .from(table)
+    .update({ balance: newBalance, status: newBalance <= 0 ? 'redeemed' : 'active' })
+    .eq('id', card.id)
+    .eq('balance', card.balance) // compare-and-set
+    .select('id')
+
+  if (updErr) return { error: updErr.message }
+  if (!updated || updated.length === 0) {
+    // Someone else moved the balance between our read and our write.
+    return { error: 'That card was just used somewhere else. Please re-check the balance and try again.' }
+  }
+
+  return {
+    table, id: card.id, code, amount,
+    previousBalance: Number(card.balance),
+    previousStatus: card.status,
+  }
+}
+
+/** Undo a redeemCard(), restoring the exact prior balance. Returns an error string on failure. */
+async function refundCard(
+  svc: SupabaseClient,
+  r: RedeemedCard
+): Promise<string | null> {
+  const { error } = await svc
+    .from(r.table)
+    .update({ balance: r.previousBalance, status: r.previousStatus })
+    .eq('id', r.id)
+  return error ? error.message : null
 }
 
 // Unified data API — all dashboard queries go through here
@@ -1570,8 +1648,25 @@ export async function POST(request: Request) {
       }
 
       case 'appointments.checkout': {
-        // Mark appointment as completed with payment info
-        const { id, payment_method, tip_amount, total_price } = payload
+        // Mark appointment as completed with payment info.
+        //
+        // The gift-card redemption happens HERE, not in the browser. It used to
+        // be two separate calls from checkout/page.tsx — redeem, then check out
+        // — which meant the client could half-complete a money operation: the
+        // card was debited, the checkout write failed, its error was dropped,
+        // the button re-enabled, and the cashier clicked again. The retry
+        // redeemed a second time. One call, server-side, closes that window.
+        const { id, payment_method, tip_amount, total_price, gift_card_code, gift_card_amount } = payload
+
+        let redeemed: RedeemedCard | null = null
+        if (gift_card_code && Number(gift_card_amount) > 0) {
+          const result = await redeemCard(svc, tenantId, String(gift_card_code), Number(gift_card_amount))
+          if ('error' in result) {
+            return NextResponse.json({ data: null, error: result.error }, { status: 400 })
+          }
+          redeemed = result
+        }
+
         const { data, error } = await svc
           .from('appointments')
           .update({
@@ -1586,6 +1681,31 @@ export async function POST(request: Request) {
           .eq('tenant_id', tenantId)
           .select('id, tenant_id, client_id, staff_id, service_id, start_time, end_time, status, total_price, notes, payment_method, tip_amount, checked_out_at, checked_in_at, created_at, client:clients(id, first_name, last_name, phone, email, loyalty_points, visit_count, lifetime_spend, last_visit), staff_member:staff!staff_id(id, name), service:services(id, name, price, commission_rate)')
           .single()
+
+        // The card is already debited at this point. If the checkout write
+        // failed, put the money back rather than leaving the client out of
+        // pocket with no service recorded. Not a transaction — PostgREST cannot
+        // give us one — so log loudly if the compensation itself fails, because
+        // that is the case a human has to unpick.
+        if ((error || !data) && redeemed) {
+          const refundErr = await refundCard(svc, redeemed)
+          if (refundErr) {
+            console.error(
+              `[appointments.checkout] CRITICAL: checkout failed AND the ${redeemed.table} refund failed. ` +
+              `Code ${redeemed.code} was debited $${redeemed.amount} with no checkout recorded. ` +
+              `Refund error: ${refundErr}`
+            )
+          } else {
+            console.warn(`[appointments.checkout] checkout failed; refunded $${redeemed.amount} to ${redeemed.code}`)
+          }
+        }
+
+        if (error || !data) {
+          return NextResponse.json(
+            { data: null, error: error?.message || 'Checkout failed' },
+            { status: 500 }
+          )
+        }
 
         // Award loyalty points & update client stats ($5 = 1 point)
         if (data && !error && data.client_id) {
@@ -1610,7 +1730,8 @@ export async function POST(request: Request) {
           }
         }
 
-        return NextResponse.json({ data, error: error?.message })
+        // Failure already returned above, so `data` is present and `error` null.
+        return NextResponse.json({ data })
       }
 
       case 'reports.daily-tally': {

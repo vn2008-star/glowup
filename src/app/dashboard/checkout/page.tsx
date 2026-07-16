@@ -491,27 +491,28 @@ export default function CheckoutPage() {
     const chargeTotal = currentCharges.reduce((sum, c) => sum + Number(c.amount), 0);
     const tip = Number(tipAmount) || 0;
 
-    // Redeem gift card or GlowUp Credit if applied
-    if (paymentMethod === "gift_card" && gcCard && gcApplied > 0) {
-      const isGlowUpCredit = gcCard.code?.startsWith('GU-') || gcCard.type === 'glowup_credit';
-      const redeemAction = isGlowUpCredit ? 'credits.redeem' : 'giftcards.redeem';
-      const { error: redeemErr } = await queryData(redeemAction, {
-        code: gcCard.code,
-        amount: gcApplied,
-      });
-      if (redeemErr) {
-        setGcError(typeof redeemErr === 'string' ? redeemErr : 'Failed to redeem');
-        setCheckingOut(false);
-        return;
-      }
-    }
+    // Redemption is part of the checkout call, not a separate step. Doing it
+    // here first meant a failed checkout left the card debited with no service
+    // recorded — and since the error below was dropped, the button re-enabled
+    // and the next click debited the card a second time.
+    const redeemGiftCard = paymentMethod === "gift_card" && gcCard && gcApplied > 0;
 
-    const { data } = await queryData<FullAppointment>("appointments.checkout", {
+    const { data, error: checkoutErr } = await queryData<FullAppointment>("appointments.checkout", {
       id: selectedApt.id,
       payment_method: paymentMethod,
       tip_amount: tip,
       total_price: chargeTotal,
+      ...(redeemGiftCard ? { gift_card_code: gcCard.code, gift_card_amount: gcApplied } : {}),
     });
+
+    if (checkoutErr) {
+      // Was silently swallowed: the cashier's only signal was a missing badge.
+      const msg = typeof checkoutErr === 'string' ? checkoutErr : 'Checkout failed';
+      if (redeemGiftCard) setGcError(msg);
+      alert(`Checkout failed: ${msg}`);
+      setCheckingOut(false);
+      return;
+    }
 
     if (data) {
       setAppointments((prev) =>
