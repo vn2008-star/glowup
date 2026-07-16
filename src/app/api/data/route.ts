@@ -5,6 +5,25 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { getImpersonationOverride, isAdminEmail } from '@/lib/admin'
 import { scheduleClientReminders, sendClientBookingConfirmation } from '@/lib/notifications'
 
+// Columns a client is allowed to write on `staff`.
+//
+// Everything omitted here is omitted on purpose:
+//   tenant_id  — spreading the payload let a caller set this. `.eq('tenant_id', …)`
+//                constrains the WHERE clause, not the SET clause, so
+//                {id: <own staff id>, tenant_id: '<victim>'} moved your staff row into
+//                another salon. The tenant is then resolved FROM that row (see the staff
+//                lookup below), so the next request authenticated as the victim tenant —
+//                their clients, appointments, revenue, phone numbers. Full takeover.
+//   user_id    — links a row to an auth account. Only setup-tenant and auth/callback set
+//                it, from a verified session. No client caller ever sends it.
+//   id         — identifies the row; it belongs in the WHERE clause, never the SET.
+//   created_at / updated_at — owned by the database.
+const STAFF_WRITABLE = [
+  'name', 'email', 'phone', 'role', 'specialties', 'schedule',
+  'commission_rate', 'is_active', 'photo_url', 'pin',
+  'agreement_signature', 'agreement_signed_at',
+] as const
+
 // Unified data API — all dashboard queries go through here
 // Authenticates via session cookies, queries with service role to bypass RLS
 export async function POST(request: Request) {
@@ -56,6 +75,23 @@ export async function POST(request: Request) {
   const tenantId = overrideTenantId || staffRecord.tenant_id
   const staffRole = overrideTenantId ? 'owner' : staffRecord.role // Admin gets full owner access when impersonating
   const staffId = staffRecord.id
+
+  // Copy only the named columns out of a client payload.
+  //
+  // Never spread a request body into .update()/.insert(). The tenant filter
+  // (`.eq('tenant_id', tenantId)`) guards which ROW is touched — it does not
+  // guard which COLUMNS get written, so a spread lets the caller set any column
+  // on a row they are otherwise allowed to edit, including tenant_id itself.
+  function pickWritable<T extends readonly string[]>(
+    body: Record<string, unknown>,
+    allowed: T
+  ): Record<string, unknown> {
+    const out: Record<string, unknown> = {}
+    for (const key of allowed) {
+      if (Object.prototype.hasOwnProperty.call(body, key)) out[key] = body[key]
+    }
+    return out
+  }
 
   // Helper: mask contact info for technicians when client protection is enabled
   // Cached per-request to avoid re-querying tenant settings on every list call
@@ -379,18 +415,21 @@ export async function POST(request: Request) {
       case 'staff.add': {
         const { data, error } = await svc
           .from('staff')
-          .insert({ ...payload, tenant_id: tenantId })
+          .insert({ ...pickWritable(payload, STAFF_WRITABLE), tenant_id: tenantId })
           .select()
           .single()
         return NextResponse.json({ data, error: error?.message })
       }
 
       case 'staff.update': {
-        const { id, ...fields } = payload
+        const fields = pickWritable(payload, STAFF_WRITABLE)
+        if (Object.keys(fields).length === 0) {
+          return NextResponse.json({ data: null, error: 'No updatable fields supplied' }, { status: 400 })
+        }
         const { data, error } = await svc
           .from('staff')
           .update(fields)
-          .eq('id', id)
+          .eq('id', payload.id)
           .eq('tenant_id', tenantId)
           .select()
           .single()
