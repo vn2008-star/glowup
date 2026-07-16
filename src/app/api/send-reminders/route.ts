@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { toE164 } from '@/lib/utils'
+import { verifyCronRequest } from '@/lib/cron-auth'
+import { fillPlaceholders } from '@/lib/notifications'
 import { appointmentReminderHtml, googleCalendarUrl } from '@/lib/email-templates'
 
 // ─── Send Appointment Reminders (Cron-triggered) ───
@@ -14,11 +16,8 @@ import { appointmentReminderHtml, googleCalendarUrl } from '@/lib/email-template
 
 export async function GET(request: Request) {
   // ── Auth: only allow Vercel Cron or manual call with CRON_SECRET ──
-  const authHeader = request.headers.get('authorization')
-  const cronSecret = process.env.CRON_SECRET
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const unauthorized = verifyCronRequest(request)
+  if (unauthorized) return unauthorized
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -150,11 +149,41 @@ export async function GET(request: Request) {
       const gcalLink = googleCalendarUrl({ title: calTitle, startISO, endISO, location: calLocation })
 
       const customTemplates = (settings.reminder_templates || {}) as Record<string, string>
+
+      // Values for the {tokens} an owner can use in their custom templates.
+      // Both vocabularies are supplied for the same value because Settings
+      // advertises {client_name}/{service}/{address} while campaigns taught
+      // owners {name}/{greeting}/{booking_url}.
+      const templateVars: Record<string, string> = {
+        client_name: clientGreeting,
+        name: clientGreeting,
+        greeting: clientGreeting,
+        full_name: clientName,
+        service: serviceName,
+        staff_name: staffName,
+        business_name: businessName,
+        address: businessAddress,
+        phone: businessPhone,
+        date: dateStr,
+        time: timeStr,
+        manage_url: manageLink,
+        manage_link: manageLink,
+        booking_url: manageLink,
+        calendar_url: gcalLink,
+      }
+
+      // Only the 24h reminder honours the owner's custom SMS — the stock copy
+      // says "tomorrow", so reusing it for the 1h/2h nudges would misstate the
+      // time. Short-notice keeps its own wording.
       const smsTemplate = isShortNotice
         ? `⏰ ${clientGreeting}, your ${serviceName} appointment is ${urgencyLabel}!\n📅 ${dateStr} at ${timeStr}\n${staffName ? `💇 With: ${staffName}\n` : ''}${businessAddress ? `📍 ${businessName}, ${businessAddress}` : `📍 ${businessName}`}\n${businessPhone ? `📞 ${businessPhone}\n` : ''}📅 Add to Calendar: ${gcalLink}\n${manageLink ? `Manage: ${manageLink}` : ''}`
-        : customTemplates.sms || `Dear ${clientGreeting}! This is a reminder that your ${serviceName} appointment at ${businessName} is ${urgencyLabel}, ${dateStr} at ${timeStr}.\n${staffName ? `💇 With: ${staffName}\n` : ''}${businessAddress ? `📍 ${businessAddress}` : ''}${businessPhone ? `\n📞 ${businessPhone}` : ''}\n📅 Add to Calendar: ${gcalLink}${manageLink ? `\nManage: ${manageLink}` : '\nReply C to Confirm, M to Modify, X to Cancel. Reply STOP to opt out.'}`
+        : (customTemplates.sms
+            ? fillPlaceholders(customTemplates.sms, templateVars)
+            : `Dear ${clientGreeting}! This is a reminder that your ${serviceName} appointment at ${businessName} is ${urgencyLabel}, ${dateStr} at ${timeStr}.\n${staffName ? `💇 With: ${staffName}\n` : ''}${businessAddress ? `📍 ${businessAddress}` : ''}${businessPhone ? `\n📞 ${businessPhone}` : ''}\n📅 Add to Calendar: ${gcalLink}${manageLink ? `\nManage: ${manageLink}` : '\nReply C to Confirm, M to Modify, X to Cancel. Reply STOP to opt out.'}`)
 
-      const emailSubject = customTemplates.email_subject || `${subjectPrefix} — ${businessName}`
+      const emailSubject = customTemplates.email_subject
+        ? fillPlaceholders(customTemplates.email_subject, templateVars)
+        : `${subjectPrefix} — ${businessName}`
 
       try {
         if (reminder.channel === 'sms') {

@@ -16,6 +16,31 @@ export function greetingName(fullName: string): string {
   return `${parts[0]} ${parts[parts.length - 1][0]}.`
 }
 
+/**
+ * Fill {placeholder} tokens in an owner-authored message template.
+ *
+ * Owners write these in Settings → Reminders, where the UI advertises tokens
+ * like {client_name} and {date}. Without this the raw template ships to the
+ * client and they receive a literal "Hi {client_name}!".
+ *
+ * Two vocabularies exist in the product — Settings uses {client_name}/{service}
+ * /{address}, while campaigns use {name}/{greeting}/{booking_url} — so callers
+ * should pass both spellings for the same value. An unknown token is dropped
+ * rather than delivered: a stray blank beats sending a customer a curly brace.
+ *
+ * Named for what it does rather than "renderTemplate", because
+ * lib/outreach-templates already exports a renderTemplate() that picks a canned
+ * marketing email by id — an unrelated job with an unrelated signature.
+ */
+export function fillPlaceholders(template: string, vars: Record<string, string>): string {
+  return template.replace(/\{([a-zA-Z_]+)\}/g, (token, rawKey: string) => {
+    const key = rawKey.toLowerCase()
+    if (Object.prototype.hasOwnProperty.call(vars, key)) return vars[key] ?? ''
+    console.warn(`[notifications] Unknown template token ${token} — removed`)
+    return ''
+  })
+}
+
 /** Send an SMS via the Twilio REST API (no SDK — works in Edge/Serverless). */
 export async function sendSms(to: string, body: string): Promise<boolean> {
   const sid = process.env.TWILIO_ACCOUNT_SID
