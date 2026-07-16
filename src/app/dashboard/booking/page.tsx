@@ -283,7 +283,6 @@ export default function BookingPage() {
           campaign_id: campaign?.id,
           message: personalizedMessage,
           audience: fillAudience,
-          tenant_id: tenant?.id,
           channel: fillChannel,
         }),
       });

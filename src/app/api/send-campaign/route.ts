@@ -1,35 +1,73 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { getImpersonationOverride, isAdminEmail } from '@/lib/admin'
 import { toE164 } from '@/lib/utils'
 
 // ─── Send Campaign Blast (SMS + Email) ───
 // Called by the "Fill My Openings" and campaign blast features.
-// Receives a list of client IDs or audience filter, message template, and sends via Twilio/Resend.
+// Receives an audience filter and a message template, and sends via Twilio/Resend.
+//
+// This endpoint spends real money and messages real people, so it authenticates
+// the same way /api/data does: verify the JWT, then derive the tenant from the
+// caller's own staff record. tenant_id is never read from the request body — if
+// it were, any caller could blast another salon's entire client list.
 
 export async function POST(request: Request) {
-  const supabase = createClient(
+  // Parse body and authenticate in parallel
+  const [body, supabase] = await Promise.all([
+    request.json(),
+    createClient(),
+  ])
+
+  // Verify the JWT locally (signature-checked against the cached signing key)
+  // rather than round-tripping to the Auth server. See src/lib/supabase/middleware.ts.
+  let claims: { sub?: string; email?: string } | null = null
+  try {
+    const { data } = await supabase.auth.getClaims()
+    claims = data?.claims ?? null
+  } catch {
+    return NextResponse.json({ error: 'Auth service unavailable' }, { status: 503 })
+  }
+
+  if (!claims?.sub) {
+    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+  }
+  const userId = claims.sub
+  const userEmail = claims.email || ''
+
+  const svc = createServiceClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
-  // Verify auth via session cookie (same as data API)
-  const authHeader = request.headers.get('cookie')
-  if (!authHeader) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+  const { data: staffRecord } = await svc
+    .from('staff')
+    .select('tenant_id')
+    .eq('user_id', userId)
+    .single()
+
+  // ─── Admin impersonation override (skip DB query for non-admins) ───
+  const overrideTenantId = isAdminEmail(userEmail)
+    ? await getImpersonationOverride(userId, userEmail)
+    : null
+  const tenantId = overrideTenantId || staffRecord?.tenant_id
+
+  if (!tenantId) {
+    return NextResponse.json({ error: 'No tenant' }, { status: 404 })
   }
 
-  const body = await request.json()
-  const { campaign_id, message, audience, tenant_id, channel = 'sms' } = body
+  const { campaign_id, message, audience, channel = 'sms' } = body
 
-  if (!message || !tenant_id) {
-    return NextResponse.json({ error: 'Missing message or tenant_id' }, { status: 400 })
+  if (!message) {
+    return NextResponse.json({ error: 'Missing message' }, { status: 400 })
   }
 
   // Fetch recipients based on audience filter
-  let query = supabase
+  let query = svc
     .from('clients')
     .select('id, first_name, last_name, phone, email, sms_opt_out, status, visit_count, lifetime_spend')
-    .eq('tenant_id', tenant_id)
+    .eq('tenant_id', tenantId)
 
   switch (audience) {
     case 'active':
@@ -78,10 +116,10 @@ export async function POST(request: Request) {
   }
 
   // Fetch tenant name for templates
-  const { data: tenant } = await supabase
+  const { data: tenant } = await svc
     .from('tenants')
     .select('name, email, slug')
-    .eq('id', tenant_id)
+    .eq('id', tenantId)
     .single()
 
   const businessName = tenant?.name || 'our salon'
@@ -150,9 +188,10 @@ export async function POST(request: Request) {
     }
   }
 
-  // Update campaign metrics if campaign_id provided
+  // Update campaign metrics if campaign_id provided. Scoped to the caller's
+  // tenant so a foreign campaign_id can't be written through this endpoint.
   if (campaign_id) {
-    await supabase
+    await svc
       .from('campaigns')
       .update({
         status: 'completed',
@@ -160,6 +199,7 @@ export async function POST(request: Request) {
         metrics: { sent: sentCount, opened: 0, booked: 0, revenue: 0 },
       })
       .eq('id', campaign_id)
+      .eq('tenant_id', tenantId)
   }
 
   return NextResponse.json({
