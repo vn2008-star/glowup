@@ -292,7 +292,21 @@ export async function POST(request: Request) {
     .insert(appointmentRows)
     .select('id, start_time, end_time, manage_token')
 
+  // 23P01 = the appointments_no_double_book exclusion constraint. The overlap
+  // pre-check above is a TOCTOU — several round trips separate it from this
+  // INSERT, so two customers can both pass it and race here. The constraint is
+  // what actually decides. Answer exactly as the pre-check does: the client
+  // already handles 409 by refreshing availability and returning the customer
+  // to the time picker, so losing the race looks like a normal "slot taken".
+  if (error && (error as { code?: string }).code === '23P01') {
+    return NextResponse.json(
+      { error: 'This time slot is no longer available. Please choose another time.' },
+      { status: 409 }
+    )
+  }
+
   if (error || !appointments || appointments.length === 0) {
+    console.error('[public-booking] Failed to create appointments:', error)
     return NextResponse.json({ error: 'Failed to create booking' }, { status: 500 })
   }
 

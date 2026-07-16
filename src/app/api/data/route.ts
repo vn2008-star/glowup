@@ -24,6 +24,26 @@ const STAFF_WRITABLE = [
   'agreement_signature', 'agreement_signed_at',
 ] as const
 
+/**
+ * Turn a Postgres write error into something an owner can act on.
+ *
+ * 23P01 is the appointments_no_double_book exclusion constraint firing: that
+ * staff member already has an appointment overlapping this time. It is the only
+ * thing standing between the dashboard and a double-booking — the dashboard
+ * write path does no overlap checking of its own — so it fires on real user
+ * mistakes, not just races, and the raw text ("conflicting key value violates
+ * exclusion constraint ...") means nothing to a salon owner.
+ */
+function friendlyWriteError(
+  error: { code?: string; message?: string } | null
+): string | undefined {
+  if (!error) return undefined
+  if (error.code === '23P01') {
+    return 'That staff member is already booked during this time. Pick a different time or staff member.'
+  }
+  return error.message
+}
+
 // Unified data API — all dashboard queries go through here
 // Authenticates via session cookies, queries with service role to bypass RLS
 export async function POST(request: Request) {
@@ -370,7 +390,7 @@ export async function POST(request: Request) {
           }
         }
 
-        return NextResponse.json({ data, error: error?.message })
+        return NextResponse.json({ data, error: friendlyWriteError(error) })
       }
 
       case 'appointments.update': {
@@ -382,7 +402,7 @@ export async function POST(request: Request) {
           .eq('tenant_id', tenantId)
           .select('id, tenant_id, client_id, staff_id, service_id, start_time, end_time, status, total_price, notes, payment_method, tip_amount, checked_out_at, checked_in_at, created_at, client:clients(id, first_name, last_name, phone, email, photo_url), staff_member:staff!staff_id(id, name, photo_url, role), service:services(id, name, category, duration_minutes, price, commission_rate)')
           .single()
-        return NextResponse.json({ data, error: error?.message })
+        return NextResponse.json({ data, error: friendlyWriteError(error) })
       }
 
       case 'appointments.delete': {
