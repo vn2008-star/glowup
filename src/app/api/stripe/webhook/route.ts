@@ -11,6 +11,45 @@ const supabaseAdmin = createClient(
 // Disable body parsing — Stripe needs the raw body for signature verification
 export const dynamic = 'force-dynamic';
 
+/**
+ * Apply a tenant update from a webhook, loudly.
+ *
+ * Every handler here used to fire `.update(...)` and drop the error, then the
+ * route returned `{received: true}` regardless. Stripe treats any 2xx as
+ * delivered and never retries — so a failed write meant the customer was
+ * charged and stayed locked out, with a log line as the only trace.
+ *
+ * Two distinct failures, deliberately handled differently:
+ *
+ *   - The write errors  -> throw. The caller returns 500, Stripe retries with
+ *     backoff for ~3 days, and a transient blip resolves itself.
+ *   - The write succeeds but matches no row (bad tenant_id in metadata) ->
+ *     log at error level and return. Retrying cannot conjure the row, so a
+ *     500 would just buy three days of identical failures. This one needs a
+ *     human, and the log is how they find it.
+ */
+async function updateTenant(
+  tenantId: string,
+  fields: Record<string, unknown>,
+  context: string
+): Promise<void> {
+  const { data, error } = await supabaseAdmin
+    .from('tenants')
+    .update(fields)
+    .eq('id', tenantId)
+    .select('id');
+
+  if (error) {
+    throw new Error(`[stripe-webhook] ${context}: update failed for tenant ${tenantId}: ${error.message}`);
+  }
+  if (!data || data.length === 0) {
+    console.error(
+      `[stripe-webhook] ${context}: no tenant matched id ${tenantId}. ` +
+      `Payment succeeded at Stripe but nothing was activated — needs manual reconciliation.`
+    );
+  }
+}
+
 export async function POST(req: NextRequest) {
   const body = await req.text();
   const signature = req.headers.get('stripe-signature');
@@ -47,7 +86,7 @@ export async function POST(req: NextRequest) {
 
         const periodEnd = sub.items.data[0]?.current_period_end;
 
-        await supabaseAdmin.from('tenants').update({
+        await updateTenant(tenantId, {
           stripe_customer_id: session.customer as string,
           stripe_subscription_id: sub.id,
           stripe_price_id: sub.items.data[0]?.price.id,
@@ -58,18 +97,24 @@ export async function POST(req: NextRequest) {
           current_period_end: periodEnd
             ? new Date(periodEnd * 1000).toISOString()
             : null,
-        }).eq('id', tenantId);
+        }, 'checkout.session.completed');
 
         console.log(`✅ Subscription activated for tenant ${tenantId}`);
 
         // ── Issue client referral rewards as Universal GlowUp Credits ──
         // Credits are platform-level, redeemable at ANY GlowUp salon
-        const { data: pendingReferrals } = await supabaseAdmin
+        const { data: pendingReferrals, error: referralErr } = await supabaseAdmin
           .from('referral_log')
           .select('id, client_referrer_name, client_referrer_email, client_reward_amount')
           .eq('referred_tenant_id', tenantId)
           .eq('client_reward_status', 'pending')
           .not('client_referrer_email', 'is', null);
+
+        // Dropping this error meant pendingReferrals came back null, the loop
+        // below was skipped, and the referrer silently never got their credit.
+        if (referralErr) {
+          throw new Error(`[stripe-webhook] checkout.session.completed: referral lookup failed for tenant ${tenantId}: ${referralErr.message}`);
+        }
 
         if (pendingReferrals && pendingReferrals.length > 0) {
           // Get salon name for the email
@@ -91,7 +136,28 @@ export async function POST(req: NextRequest) {
             const expiresAt = new Date();
             expiresAt.setFullYear(expiresAt.getFullYear() + 1);
 
-            await supabaseAdmin.from('glowup_credits').insert({
+            // Claim the referral BEFORE issuing the credit. Stripe delivers
+            // at-least-once, so this handler can run twice for one event; the
+            // `.eq('client_reward_status','pending')` makes the claim a
+            // compare-and-set, and only the run that actually flips the row
+            // goes on to mint money. Issuing first and marking after left a
+            // window where a redelivery issued a second $25 credit.
+            const { data: claimed, error: claimErr } = await supabaseAdmin
+              .from('referral_log')
+              .update({ reward_applied: true, client_reward_status: 'rewarded' })
+              .eq('id', ref.id)
+              .eq('client_reward_status', 'pending')
+              .select('id');
+
+            if (claimErr) {
+              throw new Error(`[stripe-webhook] referral ${ref.id}: claim failed: ${claimErr.message}`);
+            }
+            if (!claimed || claimed.length === 0) {
+              console.log(`[stripe-webhook] referral ${ref.id} already rewarded — skipping (duplicate delivery)`);
+              continue;
+            }
+
+            const { error: creditErr } = await supabaseAdmin.from('glowup_credits').insert({
               code: creditCode,
               amount,
               balance: amount,
@@ -103,11 +169,15 @@ export async function POST(req: NextRequest) {
               expires_at: expiresAt.toISOString(),
             });
 
-            // Mark referral as rewarded
-            await supabaseAdmin
-              .from('referral_log')
-              .update({ reward_applied: true, client_reward_status: 'rewarded' })
-              .eq('id', ref.id);
+            if (creditErr) {
+              // Release the claim so a retry can issue it, rather than leaving
+              // the referral marked rewarded with no credit behind it.
+              await supabaseAdmin
+                .from('referral_log')
+                .update({ reward_applied: false, client_reward_status: 'pending' })
+                .eq('id', ref.id);
+              throw new Error(`[stripe-webhook] referral ${ref.id}: credit insert failed: ${creditErr.message}`);
+            }
 
             // ── Email the client about their GlowUp Credit ──
             if (ref.client_referrer_email) {
@@ -173,7 +243,7 @@ export async function POST(req: NextRequest) {
 
         const periodEnd2 = subscription.items.data[0]?.current_period_end;
 
-        await supabaseAdmin.from('tenants').update({
+        await updateTenant(tenantId, {
           stripe_price_id: subscription.items.data[0]?.price.id,
           subscription_status: subscription.status,
           trial_ends_at: subscription.trial_end
@@ -182,7 +252,7 @@ export async function POST(req: NextRequest) {
           current_period_end: periodEnd2
             ? new Date(periodEnd2 * 1000).toISOString()
             : null,
-        }).eq('id', tenantId);
+        }, 'customer.subscription.updated');
 
         console.log(`🔄 Subscription updated for tenant ${tenantId}: ${subscription.status}`);
         break;
@@ -193,11 +263,11 @@ export async function POST(req: NextRequest) {
         const tenantId = subscription.metadata?.tenant_id;
         if (!tenantId) break;
 
-        await supabaseAdmin.from('tenants').update({
+        await updateTenant(tenantId, {
           subscription_status: 'canceled',
           stripe_subscription_id: null,
           stripe_price_id: null,
-        }).eq('id', tenantId);
+        }, 'customer.subscription.deleted');
 
         console.log(`❌ Subscription canceled for tenant ${tenantId}`);
         break;
@@ -207,20 +277,26 @@ export async function POST(req: NextRequest) {
         const invoice = event.data.object as Stripe.Invoice;
         const customerId = invoice.customer as string;
 
-        // Find tenant by customer ID
-        const { data: tenant } = await supabaseAdmin
+        // Find tenant by customer ID. maybeSingle() rather than single(): a
+        // customer we don't know about is a real possibility, not an error, and
+        // single() turns "no rows" into a thrown error that would make Stripe
+        // retry a lookup that can never succeed.
+        const { data: tenant, error: lookupErr } = await supabaseAdmin
           .from('tenants')
           .select('id')
           .eq('stripe_customer_id', customerId)
-          .single();
+          .maybeSingle();
 
-        if (tenant) {
-          await supabaseAdmin.from('tenants').update({
-            subscription_status: 'past_due',
-          }).eq('id', tenant.id);
-
-          console.log(`⚠️ Payment failed for tenant ${tenant.id}`);
+        if (lookupErr) {
+          throw new Error(`[stripe-webhook] invoice.payment_failed: tenant lookup failed for customer ${customerId}: ${lookupErr.message}`);
         }
+        if (!tenant) {
+          console.error(`[stripe-webhook] invoice.payment_failed: no tenant with stripe_customer_id ${customerId} — cannot mark past_due.`);
+          break;
+        }
+
+        await updateTenant(tenant.id, { subscription_status: 'past_due' }, 'invoice.payment_failed');
+        console.log(`⚠️ Payment failed for tenant ${tenant.id}`);
         break;
       }
     }
