@@ -134,7 +134,14 @@
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   padding: var(--space-6);
+}
+/* Only the staff columns scroll. The banners and availability summary above
+   them must stay put, so the overflow cannot live on .dayView. */
+.dayScroll {
   overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
 }
 
 /* Availability Summary */
@@ -229,11 +236,12 @@
   background: rgba(168, 85, 247, 0.08);
 }
 
-/* Staff Columns */
+/* Staff Columns — grid-template-columns is set inline from the staff count, so
+   width scales with how many columns there actually are. A flat min-width here
+   would force a scrollbar even for a single staff member on a phone. */
 .techColumns {
   display: grid;
   gap: var(--space-6);
-  min-width: 600px;
 }
 .techColumn { position: relative; min-width: 0; }
 .techColumnCompact .aptBlock { left: 8px; }
@@ -281,12 +289,18 @@
   align-items: flex-start;
   position: relative;
 }
+/* Hour labels render only in the first staff column, so they'd scroll out of
+   sight once you pan to later staff. Pin them to keep the time reference. */
 .timeLabel {
   font-size: var(--text-xs);
   color: var(--text-tertiary);
   width: 56px;
   flex-shrink: 0;
   padding-top: 2px;
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--bg-card);
 }
 .slotLine {
   flex: 1;
@@ -407,16 +421,26 @@
   border-radius: var(--radius-lg);
   overflow: hidden;
 }
+/* Horizontal scroll container for the grid. The overflow MUST live here and not
+   on .weekView, which also wraps the staff filter (that should not scroll). */
+.weekScroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
 .weekGrid {
   display: grid;
-  grid-template-columns: 56px repeat(7, 1fr);
-  min-width: 700px;
+  grid-template-columns: 56px repeat(7, minmax(96px, 1fr));
 }
 
 /* Time axis (left column) */
 .weekTimeAxis {
   border-right: 1px solid var(--border-subtle);
   background: var(--bg-surface);
+  position: sticky;
+  left: 0;
+  z-index: 5;
 }
 .weekCorner {
   height: 64px;
@@ -1176,9 +1200,20 @@
   .headerRight {
     flex-wrap: wrap;
   }
+  /* Narrower day columns on phones so a portrait viewport shows ~3 days
+     before the user has to scroll, instead of clipping at day 4. */
   .weekGrid {
-    min-width: 600px;
-    overflow-x: auto;
+    grid-template-columns: 44px repeat(7, minmax(88px, 1fr));
+  }
+  .weekTimeLabel {
+    font-size: 9px;
+  }
+  /* Reclaim horizontal room for the staff columns on small screens. */
+  .dayView {
+    padding: var(--space-3);
+  }
+  .techColumns {
+    gap: var(--space-3);
   }
   .monthCell {
     min-height: 72px;

@@ -87,6 +87,14 @@ export default function CalendarPage() {
     return d;
   });
 
+  // Day view columns. The first column also holds the 64px hour-label gutter,
+  // so it gets a wider floor. A lone column uses minmax(0, 1fr) to stay within
+  // the viewport rather than forcing a scrollbar.
+  const dayColCount = Math.max(staffMembers.length, 1);
+  const dayColTemplate = dayColCount === 1
+    ? "minmax(0, 1fr)"
+    : `minmax(280px, 1fr) repeat(${dayColCount - 1}, minmax(220px, 1fr))`;
+
   // Month grid (6 weeks)
   const monthStart = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
   const monthGridStart = new Date(monthStart);
@@ -579,7 +587,8 @@ export default function CalendarPage() {
           </div>
 
           {/* Staff Columns */}
-          <div className={styles.techColumns} style={{ gridTemplateColumns: `repeat(${Math.max(staffMembers.length, 1)}, 1fr)` }}>
+          <div className={styles.dayScroll}>
+          <div className={styles.techColumns} style={{ gridTemplateColumns: dayColTemplate }}>
             {(staffMembers.length > 0 ? staffMembers : [{ id: "unassigned", name: "Unassigned" } as Staff]).map((staff, staffIdx) => {
               const staffApts = appointments.filter(a =>
                 staff.id === "unassigned" ? !a.staff_id : a.staff_id === staff.id
@@ -655,6 +664,7 @@ export default function CalendarPage() {
                 </div>
               );
             })}
+          </div>
           </div>
         </div>
       ) : view === "week" ? (() => {
@@ -736,6 +746,7 @@ export default function CalendarPage() {
               })}
             </div>
           )}
+          <div className={styles.weekScroll}>
           <div className={styles.weekGrid}>
             {/* Time axis */}
             <div className={styles.weekTimeAxis}>
@@ -853,6 +864,7 @@ export default function CalendarPage() {
                 </div>
               );
             })}
+          </div>
           </div>
         </div>
         );
