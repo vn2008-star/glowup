@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { toE164 } from '@/lib/utils'
+import { verifyCronRequest } from '@/lib/cron-auth'
 
 // ─── Automation Engine (Cron-triggered) ───
 // Runs daily. Checks each tenant's automation settings and fires:
@@ -12,11 +13,8 @@ import { toE164 } from '@/lib/utils'
 
 export async function GET(request: Request) {
   // Auth: only allow Vercel Cron or manual call with CRON_SECRET
-  const authHeader = request.headers.get('authorization')
-  const cronSecret = process.env.CRON_SECRET
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const unauthorized = verifyCronRequest(request)
+  if (unauthorized) return unauthorized
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

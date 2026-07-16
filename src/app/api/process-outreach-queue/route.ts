@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { renderTemplate, TEMPLATES, TemplateId } from '@/lib/outreach-templates'
+import { verifyCronRequest } from '@/lib/cron-auth'
 
 // ─── Outreach Queue Processor (Cron-triggered) ───
 // Runs daily at 10 AM. Picks up to 95 queued outreach leads and sends them.
@@ -10,11 +11,8 @@ const DAILY_LIMIT = 95
 
 export async function GET(request: Request) {
   // Auth: only allow Vercel Cron or manual call with CRON_SECRET
-  const authHeader = request.headers.get('authorization')
-  const cronSecret = process.env.CRON_SECRET
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const unauthorized = verifyCronRequest(request)
+  if (unauthorized) return unauthorized
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
