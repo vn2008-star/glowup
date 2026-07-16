@@ -1,13 +1,41 @@
 import { NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server'
+import { isAdminEmail } from '@/lib/admin'
 
+// ─── First-run tenant setup ───
+// Called by the signup page immediately after supabase.auth.signUp().
+//
+// This route previously had NO authentication and took `userId` and `email`
+// straight from the request body. `email` drove the ADMIN_EMAILS check, which
+// sets plan: 'professional' / subscription_status: 'active' — so anyone who
+// knew an admin address could POST themselves a free Professional tenant and
+// skip Stripe entirely. `userId` bound the owner staff row to an arbitrary
+// account.
+//
+// Identity now comes from the verified session. Email confirmation is off on
+// this project, so signUp() returns a session and the cookie is set by the time
+// the signup page calls this — verified, not assumed.
 export async function POST(request: Request) {
   const body = await request.json()
-  const { userId, email, businessName, ownerName, referralCode, clientReferralCode } = body
+  // Presentation-only fields. Anything identity-bearing is taken from the JWT.
+  const { businessName, ownerName, referralCode, clientReferralCode } = body
 
-  if (!userId || !email) {
-    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+  const authed = await createClient()
+  let claims: { sub?: string; email?: string } | null = null
+  try {
+    const { data } = await authed.auth.getClaims()
+    claims = data?.claims ?? null
+  } catch {
+    return NextResponse.json({ error: 'Auth service unavailable' }, { status: 503 })
   }
+
+  if (!claims?.sub || !claims.email) {
+    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+  }
+
+  const userId = claims.sub
+  const email = claims.email
 
   // Use service role to bypass RLS
   const supabase = createServerClient(
@@ -34,9 +62,13 @@ export async function POST(request: Request) {
     .replace(/^-|-$/g, '') +
     '-' + Math.random().toString(36).slice(2, 6)
 
-  // Check if this user is a platform admin (exempt from subscription)
-  const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase());
-  const isAdmin = adminEmails.includes(email.toLowerCase());
+  // Check if this user is a platform admin (exempt from subscription).
+  // `email` is the JWT's verified claim, not a body field, so this can no
+  // longer be spoofed into granting a free Professional plan. Uses the shared
+  // lib/admin helper rather than re-deriving the list — the hand-rolled copies
+  // drifted (several dropped .filter(Boolean), so a trailing comma in
+  // ADMIN_EMAILS made '' an admin email).
+  const isAdmin = isAdminEmail(email);
 
   const { data: tenant, error: tenantError } = await supabase
     .from('tenants')

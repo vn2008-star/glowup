@@ -1249,13 +1249,16 @@ export default function SettingsPage() {
               <button
                 className="btn btn-secondary"
                 onClick={async () => {
-                  const res = await fetch('/api/stripe/portal', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ tenantId: tenant.id }),
-                  });
-                  const { url } = await res.json();
-                  if (url) window.location.href = url;
+                  // No body — the server derives the tenant from the session.
+                  const res = await fetch('/api/stripe/portal', { method: 'POST' });
+                  const { url, error } = await res.json();
+                  if (url) {
+                    window.location.href = url;
+                  } else {
+                    // Previously this silently did nothing on failure, so a
+                    // non-owner just saw a dead button.
+                    alert(error || 'Could not open the billing portal. Please try again.');
+                  }
                 }}
               >
                 Manage Subscription
@@ -1328,12 +1331,10 @@ export default function SettingsPage() {
                                 const res = await fetch('/api/stripe/checkout', {
                                   method: 'POST',
                                   headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({
-                                    planKey: plan.key,
-                                    tenantId: tenant!.id,
-                                    tenantEmail: tenant!.email,
-                                    tenantName: tenant!.name,
-                                  }),
+                                  // Tenant id/email/name deliberately omitted —
+                                  // the server reads them from the session and
+                                  // the tenant record, not from the caller.
+                                  body: JSON.stringify({ planKey: plan.key }),
                                 });
                                 const data = await res.json();
                                 if (data.url) {

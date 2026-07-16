@@ -73,9 +73,9 @@ function SignupForm() {
       const res = await fetch('/api/setup-tenant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        // userId/email deliberately omitted — the server takes identity from
+        // the session cookie signUp() just established, never from the body.
         body: JSON.stringify({
-          userId: signUpData.user.id,
-          email: formData.email,
           businessName: formData.businessName,
           ownerName: formData.ownerName,
           referralCode: formData.referralCode.trim() || undefined,
