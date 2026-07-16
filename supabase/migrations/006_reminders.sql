@@ -2,8 +2,17 @@
 -- GlowUp Reminders — Migration 006
 -- Automatic appointment reminders (SMS + Email)
 -- =============================================
+--
+-- NOTE (2026-07-16): this migration was written 2026-04-27 but never applied to
+-- production, and the application moved on without it. Three defects were found
+-- and corrected before it was first run — see the inline notes on each. If you
+-- are reading this in a diff: nothing was ever created from the old version, so
+-- there is no deployed schema to reconcile against.
 
 -- ─── 1. Add SMS opt-out flag to clients ───
+-- DEFAULT false = existing clients are treated as opted IN. Consent collected
+-- by the booking form between 2026-07-15 and this migration was discarded
+-- (the column did not exist), so it cannot be honoured retroactively.
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS sms_opt_out BOOLEAN DEFAULT false;
 
 -- ─── 2. Appointment Reminders table ───
@@ -12,12 +21,23 @@ CREATE TABLE IF NOT EXISTS appointment_reminders (
   tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   appointment_id UUID NOT NULL REFERENCES appointments(id) ON DELETE CASCADE,
   client_id UUID REFERENCES clients(id) ON DELETE SET NULL,
-  type TEXT NOT NULL CHECK (type IN ('24h')),       -- '24h' only for free tier
+  -- FIX: was CHECK (type IN ('24h')). The app schedules 24h, 2h and 1h
+  -- (REMINDER_TYPES in src/lib/notifications.ts, and the loops in
+  -- public-booking / manage-appointment). A multi-row INSERT is atomic, so the
+  -- old constraint rejected the whole batch and NO reminders were ever created.
+  type TEXT NOT NULL CHECK (type IN ('24h', '2h', '1h')),
   channel TEXT NOT NULL CHECK (channel IN ('sms', 'email')),
   status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'failed', 'skipped')),
   sent_at TIMESTAMPTZ,
   error TEXT,
-  created_at TIMESTAMPTZ DEFAULT now()
+  created_at TIMESTAMPTZ DEFAULT now(),
+  -- FIX: added. trg_reminders_updated_at below calls update_updated_at(), which
+  -- does `NEW.updated_at = now()`. Without this column every UPDATE raised
+  -- `record "new" has no field "updated_at"` — and send-reminders marks rows
+  -- 'sent' via UPDATE without checking the error, so each reminder would have
+  -- been re-sent on every hourly cron run for as long as it stayed in the
+  -- window. That is a duplicate-SMS loop, billed per message.
+  updated_at TIMESTAMPTZ DEFAULT now()
 );
 
 -- Prevent duplicate reminders for same appointment + type + channel
@@ -36,42 +56,29 @@ CREATE INDEX IF NOT EXISTS idx_reminders_tenant
 -- ─── 3. RLS ───
 ALTER TABLE appointment_reminders ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Reminders tenant isolation" ON appointment_reminders;
 CREATE POLICY "Reminders tenant isolation" ON appointment_reminders
   FOR ALL USING (
     tenant_id IN (SELECT tenant_id FROM staff WHERE user_id = auth.uid())
   );
 
--- ─── 4. Trigger: Auto-generate reminder rows on appointment insert/update ───
-CREATE OR REPLACE FUNCTION generate_appointment_reminders()
-RETURNS TRIGGER AS $$
-BEGIN
-  -- Only generate for confirmed or pending appointments
-  IF NEW.status IN ('pending', 'confirmed') THEN
-    -- 24h SMS reminder
-    INSERT INTO appointment_reminders (tenant_id, appointment_id, client_id, type, channel, status)
-    VALUES (NEW.tenant_id, NEW.id, NEW.client_id, '24h', 'sms', 'pending')
-    ON CONFLICT (appointment_id, type, channel) DO NOTHING;
-
-    -- 24h Email reminder
-    INSERT INTO appointment_reminders (tenant_id, appointment_id, client_id, type, channel, status)
-    VALUES (NEW.tenant_id, NEW.id, NEW.client_id, '24h', 'email', 'pending')
-    ON CONFLICT (appointment_id, type, channel) DO NOTHING;
-
-  ELSIF NEW.status IN ('cancelled', 'no_show') THEN
-    -- Cancel pending reminders if appointment is cancelled
-    UPDATE appointment_reminders
-    SET status = 'skipped'
-    WHERE appointment_id = NEW.id AND status = 'pending';
-  END IF;
-
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-CREATE TRIGGER trg_generate_reminders
-  AFTER INSERT OR UPDATE OF status ON appointments
-  FOR EACH ROW EXECUTE FUNCTION generate_appointment_reminders();
+-- ─── 4. Reminder rows are created by the application, not a trigger ───
+-- FIX: the original migration created generate_appointment_reminders(), an
+-- AFTER INSERT trigger on appointments that inserted two '24h' rows. The app
+-- now schedules reminders itself (scheduleClientReminders in
+-- src/lib/notifications.ts, plus public-booking and manage-appointment), which
+-- also covers 2h/1h and only creates rows for channels the client can actually
+-- receive on. Both together collide: the trigger's rows land first, then the
+-- app's non-upsert INSERT hits idx_reminder_unique and the whole batch fails.
+-- The app also owns cancel (status → 'skipped') and reschedule (delete +
+-- recreate), so the trigger's ELSIF branch is redundant too.
+--
+-- Deliberately not created. If reminder scheduling is ever moved back into the
+-- database, remove the app-side scheduling in the same change.
+DROP TRIGGER IF EXISTS trg_generate_reminders ON appointments;
+DROP FUNCTION IF EXISTS generate_appointment_reminders();
 
 -- ─── 5. Auto-timestamp ───
+DROP TRIGGER IF EXISTS trg_reminders_updated_at ON appointment_reminders;
 CREATE TRIGGER trg_reminders_updated_at BEFORE UPDATE ON appointment_reminders
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
