@@ -191,6 +191,30 @@ export async function POST(request: Request) {
     return out
   }
 
+  // Remove columns a client must never set on an UPDATE.
+  //
+  // Every `<entity>.update` case does `const { id, ...fields } = payload` then
+  // spreads `fields` into `.update()`. The tenant filter (`.eq('tenant_id', tenantId)`)
+  // guards which ROW is touched, not which COLUMNS are written — so a payload of
+  // `{ id, tenant_id: '<victim>' }` moves a row the caller owns into another
+  // tenant. On `staff` that was a full takeover (handled separately with a
+  // positive allowlist, because `role`/`pin` are field-level escalations); on
+  // the other tables it is data vandalism rather than escalation, so stripping
+  // the identity/ownership columns is the proportionate fix.
+  //
+  // This is a denylist, which is normally the weaker choice — but the set it
+  // blocks is closed and will not grow: no UI legitimately updates a row's
+  // tenant, owner, primary key, or timestamps. Tables where specific fields
+  // carry power (like staff) still get a positive allowlist instead.
+  function stripImmutable(fields: Record<string, unknown>): Record<string, unknown> {
+    const blocked = ['tenant_id', 'id', 'user_id', 'created_at', 'updated_at']
+    const out: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(fields)) {
+      if (!blocked.includes(k)) out[k] = v
+    }
+    return out
+  }
+
   // Helper: mask contact info for technicians when client protection is enabled
   // Cached per-request to avoid re-querying tenant settings on every list call
   let _maskContactsResult: boolean | null = null
@@ -260,7 +284,7 @@ export async function POST(request: Request) {
         const { id, ...fields } = payload
         const { data, error } = await svc
           .from('clients')
-          .update(fields)
+          .update(stripImmutable(fields))
           .eq('id', id)
           .eq('tenant_id', tenantId)
           .select()
@@ -313,7 +337,7 @@ export async function POST(request: Request) {
         const { id, ...fields } = payload
         const { data, error } = await svc
           .from('services')
-          .update(fields)
+          .update(stripImmutable(fields))
           .eq('id', id)
           .eq('tenant_id', tenantId)
           .select()
@@ -475,7 +499,7 @@ export async function POST(request: Request) {
         const { id, ...fields } = payload
         const { data, error } = await svc
           .from('appointments')
-          .update(fields)
+          .update(stripImmutable(fields))
           .eq('id', id)
           .eq('tenant_id', tenantId)
           .select('id, tenant_id, client_id, staff_id, service_id, start_time, end_time, status, total_price, notes, payment_method, tip_amount, checked_out_at, checked_in_at, created_at, client:clients(id, first_name, last_name, phone, email, photo_url), staff_member:staff!staff_id(id, name, photo_url, role), service:services(id, name, category, duration_minutes, price, commission_rate)')
@@ -526,7 +550,7 @@ export async function POST(request: Request) {
         }
         const { data, error } = await svc
           .from('staff')
-          .update(fields)
+          .update(stripImmutable(fields))
           .eq('id', payload.id)
           .eq('tenant_id', tenantId)
           .select()
@@ -592,7 +616,7 @@ export async function POST(request: Request) {
         const { id, ...fields } = payload
         const { data, error } = await svc
           .from('campaigns')
-          .update(fields)
+          .update(stripImmutable(fields))
           .eq('id', id)
           .eq('tenant_id', tenantId)
           .select()
@@ -638,7 +662,7 @@ export async function POST(request: Request) {
         const { id, ...fields } = payload
         const { data, error } = await svc
           .from('service_history')
-          .update(fields)
+          .update(stripImmutable(fields))
           .eq('id', id)
           .eq('tenant_id', tenantId)
           .select('*, staff_member:staff!staff_id(id, name), service:services(id, name, category)')
@@ -682,7 +706,7 @@ export async function POST(request: Request) {
         const { id, ...fields } = payload
         const { data, error } = await svc
           .from('social_posts')
-          .update(fields)
+          .update(stripImmutable(fields))
           .eq('id', id)
           .eq('tenant_id', tenantId)
           .select()
@@ -728,7 +752,7 @@ export async function POST(request: Request) {
         const { id, ...fields } = payload
         const { data, error } = await svc
           .from('conversations')
-          .update(fields)
+          .update(stripImmutable(fields))
           .eq('id', id)
           .eq('tenant_id', tenantId)
           .select()
@@ -1040,7 +1064,7 @@ export async function POST(request: Request) {
         const { id, ...fields } = payload
         const { data, error } = await svc
           .from('waitlist')
-          .update(fields)
+          .update(stripImmutable(fields))
           .eq('id', id)
           .eq('tenant_id', tenantId)
           .select()
@@ -1080,7 +1104,7 @@ export async function POST(request: Request) {
         const { id, ...fields } = payload
         const { data, error } = await svc
           .from('packages')
-          .update(fields)
+          .update(stripImmutable(fields))
           .eq('id', id)
           .eq('tenant_id', tenantId)
           .select()
@@ -1273,7 +1297,7 @@ export async function POST(request: Request) {
         const { id: shId, ...shFields } = payload
         const { data, error } = await svc
           .from('service_history')
-          .update(shFields)
+          .update(stripImmutable(shFields))
           .eq('id', shId)
           .eq('tenant_id', tenantId)
           .select()
@@ -2151,7 +2175,7 @@ export async function POST(request: Request) {
 
         const { data: fbUp, error: fbUpErr } = await svc
           .from('feedback')
-          .update(updates)
+          .update(stripImmutable(updates))
           .eq('id', id)
           .eq('tenant_id', tenantId)
           .select()
