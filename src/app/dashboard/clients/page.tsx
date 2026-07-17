@@ -500,7 +500,7 @@ export default function ClientsPage() {
         </div>
       ) : viewMode === 'table' ? (
         /* ── Table View ── */
-        <div style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden', border: '1px solid var(--border-default)' }}>
+        <div style={{ borderRadius: 'var(--radius-lg)', overflowX: 'auto', border: '1px solid var(--border-default)' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
               <tr style={{ background: 'var(--bg-elevated)', textAlign: 'left' }}>

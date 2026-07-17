@@ -290,7 +290,10 @@
 .reminderGridUnified {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
-  overflow: hidden;
+  /* was overflow:hidden — the grid is wider than a phone, so the Staff SMS and
+     Staff Email columns were clipped off with no way to reach them. Let it
+     scroll horizontally instead. */
+  overflow-x: auto;
 }
 
 /* Super header — grouped audience labels */
@@ -723,4 +726,8 @@
   .reminderUnifiedRow { font-size: var(--text-xs); }
   .dangerItem { flex-direction: column; }
   .closedDaysGrid { grid-template-columns: 1fr; }
+  /* Two 160px time inputs plus the Closed toggle need ~578px and were clipped
+     past the viewport edge. Let the row wrap so the toggle drops onto its own
+     line instead of off-screen. */
+  .hoursRow { flex-wrap: wrap; }
 }

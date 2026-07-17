@@ -720,7 +720,10 @@
   .heroTitle { font-size: var(--text-4xl); }
   .heroSubtitle { font-size: var(--text-base); }
   .heroCta { flex-direction: column; }
-  .heroStats { flex-wrap: wrap; gap: var(--space-6); }
+  /* .heroStats is display:grid, so flex-wrap does nothing — the four stats
+     stayed in one 4-col row (~408px) and got clipped by body{overflow-x:hidden}
+     on a 390px phone. Two columns fit. */
+  .heroStats { grid-template-columns: repeat(2, 1fr); gap: var(--space-6); }
 
   .featureGrid { grid-template-columns: 1fr; gap: var(--space-4); }
 
