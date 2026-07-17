@@ -1,4 +1,10 @@
-/* ─── TypeScript types for Supabase tables ─── */
+/* ─── TypeScript types for Supabase tables ───
+ *
+ * Hand-written convenience types: they carry literal-union statuses and joined
+ * relation fields (e.g. `client?: Client`) that the generated types can't.
+ * The raw column shapes are generated from the live schema in
+ * ./database.types.ts (run `npm run gen:types`); keep the columns below in sync
+ * with it. Reconciled against the live schema 2026-07-17. */
 
 export interface Tenant {
   id: string
@@ -19,6 +25,7 @@ export interface Tenant {
   subscription_status: 'trialing' | 'active' | 'past_due' | 'canceled' | null
   trial_ends_at: string | null
   current_period_end: string | null
+  referred_by: string | null
   is_active: boolean
   deleted_at: string | null
   deletion_scheduled_at: string | null
@@ -40,6 +47,8 @@ export interface Staff {
   commission_rate: number
   is_active: boolean
   pin: string | null
+  agreement_signature: string | null
+  agreement_signed_at: string | null
   created_at: string
   updated_at: string
 }
@@ -62,6 +71,7 @@ export interface Client {
   visit_count: number
   last_visit: string | null
   status: 'active' | 'inactive' | 'at_risk' | 'new'
+  sms_opt_out: boolean | null
   created_at: string
   updated_at: string
 }
@@ -99,6 +109,7 @@ export interface Appointment {
   checked_out_at: string | null
   checked_out_by: string | null
   checked_in_at: string | null
+  manage_token: string | null
   created_at: string
   updated_at: string
   // Joined fields
