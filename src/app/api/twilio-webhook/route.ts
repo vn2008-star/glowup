@@ -1,11 +1,28 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { verifyTwilioRequest } from '@/lib/twilio-signature'
+import { phoneVariants } from '@/lib/utils'
 
 // ─── Twilio Webhook: Handle SMS replies (STOP opt-out / START opt-in) ───
 // Configure this URL in Twilio Console → Phone Number → Messaging → Webhook
+//
+// This endpoint is public by necessity and acts on whatever `From` it is given,
+// so every request must be proven to have come from Twilio. Without that,
+// `From=<victim>&Body=X` cancels a stranger's appointment and `Body=STOP` opts
+// them out of reminders — no account needed, and phone numbers are not secret.
 
 export async function POST(request: Request) {
   const formData = await request.formData()
+
+  // Signature is computed over ALL the POST params, not just the ones we read.
+  const params: Record<string, string> = {}
+  for (const [key, value] of formData.entries()) {
+    if (typeof value === 'string') params[key] = value
+  }
+
+  const unauthorized = verifyTwilioRequest(request, params)
+  if (unauthorized) return unauthorized
+
   const body = (formData.get('Body') as string || '').trim().toUpperCase()
   const from = (formData.get('From') as string || '').trim()
 
@@ -28,7 +45,7 @@ export async function POST(request: Request) {
     const { data: clients, error } = await supabase
       .from('clients')
       .update({ sms_opt_out: true })
-      .eq('phone', from)
+      .in('phone', phoneVariants(from))
       .select('id')
 
     if (error) {
@@ -43,7 +60,7 @@ export async function POST(request: Request) {
     const { data: clients, error } = await supabase
       .from('clients')
       .update({ sms_opt_out: false })
-      .eq('phone', from)
+      .in('phone', phoneVariants(from))
       .select('id')
 
     if (error) {
@@ -58,7 +75,7 @@ export async function POST(request: Request) {
     const { data: clients } = await supabase
       .from('clients')
       .select('id, tenant_id')
-      .eq('phone', from)
+      .in('phone', phoneVariants(from))
     
     if (clients && clients.length > 0) {
       const clientIds = clients.map(c => c.id)
@@ -92,7 +109,7 @@ export async function POST(request: Request) {
     const { data: clients } = await supabase
       .from('clients')
       .select('id, tenant_id')
-      .eq('phone', from)
+      .in('phone', phoneVariants(from))
     
     if (clients && clients.length > 0) {
       const clientIds = clients.map(c => c.id)

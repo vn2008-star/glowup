@@ -11,6 +11,39 @@ export function formatPhone(value: string): string {
 }
 
 /**
+ * Every spelling of a phone number that might be sitting in clients.phone.
+ *
+ * We send in E.164 (toE164) and store what formatPhone produced — "(408)
+ * 555-1234" for all 162 rows today. Twilio's webhook posts back E.164, so
+ * `.eq('phone', from)` compared "+14085551234" against "(408) 555-1234" and
+ * never matched a single client: STOP never recorded an opt-out, and every
+ * "Reply C to Confirm / X to Cancel" reply answered "we couldn't find your
+ * account".
+ *
+ * Returns the plausible stored formats for the same number so a lookup can use
+ * `.in('phone', …)`. Not a substitute for storing one canonical format — that
+ * needs a migration and a backfill — but it makes the lookup work against the
+ * data as it actually is.
+ */
+export function phoneVariants(phone: string): string[] {
+  const digits = phone.replace(/\D/g, "");
+  const local = digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
+  if (local.length !== 10) return [phone];
+
+  const a = local.slice(0, 3), b = local.slice(3, 6), c = local.slice(6);
+  return [...new Set([
+    phone,                    // exactly as given
+    `(${a}) ${b}-${c}`,       // what formatPhone writes — the current storage format
+    `${a}-${b}-${c}`,
+    `${a}.${b}.${c}`,
+    `${a} ${b} ${c}`,
+    local,                    // 4085551234
+    `+1${local}`,             // E.164
+    `1${local}`,
+  ])];
+}
+
+/**
  * Normalize a phone number to E.164 format for Twilio.
  * Strips non-digits, prepends +1 if missing country code.
  * Returns null if the result doesn't look like a valid phone.
