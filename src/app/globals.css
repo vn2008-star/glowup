@@ -28,13 +28,17 @@
   --color-accent-light: #f0a3b5;
   --color-accent-dark: #b85a70;
 
-  --color-success: #2d9d6a;
+  /* Darkened so status TEXT clears WCAG AA (4.5:1) on white — the originals
+     measured 2.5-3.4:1 and were used for real text in badges and labels. Only
+     the light ramp changed; dark mode (below) already passed. The *-bg tints
+     are unchanged; they sit behind the darker foreground. */
+  --color-success: #1e7a50;   /* was #2d9d6a (3.42) -> 5.31 */
   --color-success-bg: rgba(45, 157, 106, 0.10);
-  --color-warning: #c5a035;
+  --color-warning: #8a6d17;   /* was #c5a035 (2.48) -> 4.91 */
   --color-warning-bg: rgba(197, 160, 53, 0.10);
-  --color-danger: #d44e58;
+  --color-danger: #c0303b;    /* was #d44e58 (4.17) -> 5.63 */
   --color-danger-bg: rgba(212, 78, 88, 0.10);
-  --color-info: #3a9e97;
+  --color-info: #2a6f6a;      /* was #3a9e97 (3.22) -> 5.87 */
   --color-info-bg: rgba(58, 158, 151, 0.10);
 
   /* Surfaces — Warm cream light mode */
@@ -52,7 +56,7 @@
   /* Text */
   --text-primary: #1e1528;
   --text-secondary: #5e5270;
-  --text-tertiary: #9088a0;
+  --text-tertiary: #6d6578;   /* was #9088a0 (3.38) -> 5.55 on white; used as real text in 200+ places */
   --text-inverse: #ffffff;
   --text-link: #8c5fad;
 
@@ -647,4 +651,54 @@ input[type="week"] {
     --text-7xl: 3.25rem;
   }
   .container { padding: 0 var(--space-4); }
+}
+
+/* ═══════════════════════════════════════════
+   ACCESSIBILITY — global baselines
+   ═══════════════════════════════════════════ */
+
+/* Visible keyboard focus. The app had focus rules on form fields only, so every
+   custom button/link/tab relied on the UA default outline, near-invisible on
+   these surfaces. :focus-visible shows the ring for keyboard users without
+   drawing it on mouse clicks. */
+:where(a, button, [role="button"], [tabindex], input, select, textarea, summary):focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Honour a reduced-motion preference. The app has ~16 infinite decorative
+   animations (sidebar sparkle, rocket, floating orbs, chat dots, glow/pulse)
+   that auto-run with no pause — a WCAG 2.2.2 Level A issue.
+
+   Transitions are cut wholesale — safe, and the main win.
+
+   Animations are handled by name rather than a blanket `animation: none`,
+   because a blanket rule would also stop `spin`, the loading spinner, leaving a
+   reduced-motion user staring at a frozen "loading" state that looks broken.
+   Class-based exemption can't reach the spinner: its class is hashed by CSS
+   Modules. So we neutralise exactly the decorative keyframes and leave `spin`
+   (and any functional animation) running. Redefining a @keyframes here wins
+   over the module definition regardless of file. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  @keyframes sidebarSparkle { }
+  @keyframes qsRocket { }
+  @keyframes logoGlow { }
+  @keyframes logoIconPulse { }
+  @keyframes logoSparkle { }
+  @keyframes floatOrb1 { }
+  @keyframes floatOrb2 { }
+  @keyframes float { }
+  @keyframes sparkleFloat { }
+  @keyframes welcomeFloat { }
+  @keyframes shimmer { }
+  @keyframes pulseGlow { }
+  @keyframes pulse-glow { }
+  @keyframes feedbackPulse { }
+  @keyframes statusPulse { }
+  @keyframes unreadPulse { }
 }
