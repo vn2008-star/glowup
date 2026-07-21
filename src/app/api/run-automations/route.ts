@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { toE164 } from '@/lib/utils'
 import { verifyCronRequest } from '@/lib/cron-auth'
+import { promoEmailHtml } from '@/lib/email-templates'
 
 // ─── Automation Engine (Cron-triggered) ───
 // Runs daily. Checks each tenant's automation settings and fires:
@@ -237,6 +238,9 @@ export async function GET(request: Request) {
               twilioClient,
               resendClient,
               channel: fmoChannel,
+              subject: `⚡ ${totalOpenSlots} opening${totalOpenSlots !== 1 ? 's' : ''} this week at ${businessName}`,
+              ctaUrl: bookingUrl,
+              ctaText: 'Book Now',
             })
             results.fill_openings++
           }
@@ -288,7 +292,12 @@ export async function GET(request: Request) {
             : clientFirst
           const message = `Happy Birthday, ${clientGreeting}! 🎂 ${businessName} wants to celebrate YOU — enjoy 20% off any service this month! Book now → ${bookingUrl}`
 
-          await sendMessage({ client, message, businessName, businessEmail, twilioClient, resendClient, channel: 'both' })
+          await sendMessage({
+            client, message, businessName, businessEmail, twilioClient, resendClient, channel: 'both',
+            subject: `🎂 Happy Birthday from ${businessName} — 20% off for you!`,
+            ctaUrl: bookingUrl,
+            ctaText: 'Book Your Birthday Treat',
+          })
           results.birthday++
         }
       }
@@ -318,7 +327,12 @@ export async function GET(request: Request) {
           const daysSince = Math.round((Date.now() - new Date(client.last_visit).getTime()) / (1000 * 60 * 60 * 24))
           const message = `Dear ${clientGreeting}, it's been ${daysSince} days since your last visit to ${businessName}. Time for a refresh? Book now → ${bookingUrl}`
 
-          await sendMessage({ client, message, businessName, businessEmail, twilioClient, resendClient, channel: 'both' })
+          await sendMessage({
+            client, message, businessName, businessEmail, twilioClient, resendClient, channel: 'both',
+            subject: `💜 We miss you at ${businessName} — time for a refresh?`,
+            ctaUrl: bookingUrl,
+            ctaText: 'Book Now',
+          })
           results.rebooking++
 
           // Mark client as reminded to prevent duplicate sends
@@ -361,7 +375,12 @@ export async function GET(request: Request) {
             : clientFirst
           const message = `Dear ${clientGreeting}, we missed you today at ${businessName}! 😊 Life happens — we'd love to help you rebook. Book your next visit → ${bookingUrl}`
 
-          await sendMessage({ client, message, businessName, businessEmail, twilioClient, resendClient, channel: 'both' })
+          await sendMessage({
+            client, message, businessName, businessEmail, twilioClient, resendClient, channel: 'both',
+            subject: `We missed you today at ${businessName} 😊`,
+            ctaUrl: bookingUrl,
+            ctaText: 'Rebook Now',
+          })
           results.noshow++
 
           // Mark as followed up
@@ -409,7 +428,12 @@ export async function GET(request: Request) {
           }
 
           const reviewChannel = String(automations.auto_review_channel || 'sms') as 'sms' | 'email' | 'both'
-          await sendMessage({ client, message, businessName, businessEmail, twilioClient, resendClient, channel: reviewChannel })
+          await sendMessage({
+            client, message, businessName, businessEmail, twilioClient, resendClient, channel: reviewChannel,
+            subject: `🌟 How was your visit to ${businessName}?`,
+            ctaUrl: googleReviewUrl || undefined,
+            ctaText: 'Leave a Review',
+          })
           results.review++
 
           // Mark as requested
@@ -469,7 +493,12 @@ export async function GET(request: Request) {
             .replace(/\{booking_url\}/g, bookingUrl)
             .replace(/\{business_name\}/g, businessName)
 
-          await sendMessage({ client, message: personalizedMsg, businessName, businessEmail, twilioClient, resendClient, channel: 'both' })
+          await sendMessage({
+            client, message: personalizedMsg, businessName, businessEmail, twilioClient, resendClient, channel: 'both',
+            subject: `${holiday.emoji} ${holiday.name} Special at ${businessName}!`,
+            ctaUrl: bookingUrl,
+            ctaText: 'Book Now',
+          })
           holidaySent++
         }
 
@@ -508,8 +537,11 @@ async function sendMessage(opts: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   resendClient: any
   channel: 'sms' | 'email' | 'both'
+  subject?: string
+  ctaUrl?: string
+  ctaText?: string
 }) {
-  const { client, message, businessName, businessEmail, twilioClient, resendClient, channel } = opts
+  const { client, message, businessName, businessEmail, twilioClient, resendClient, channel, subject, ctaUrl, ctaText } = opts
 
   // SMS
   if ((channel === 'sms' || channel === 'both') && client.phone && !client.sms_opt_out) {
@@ -539,8 +571,8 @@ async function sendMessage(opts: {
           from: `${businessName} <bookings@joinglowup.org>`,
           replyTo: businessEmail || undefined,
           to: [client.email as string],
-          subject: `${businessName} — We're thinking of you! ✨`,
-          text: message,
+          subject: subject || `${businessName} — We're thinking of you! ✨`,
+          html: promoEmailHtml({ businessName, message, ctaUrl, ctaText }),
         })
       } catch (err) {
         console.error(`Email send failed for ${client.email}:`, err)

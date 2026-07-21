@@ -52,6 +52,52 @@ function emailButton(text: string, href: string, color: string = '#6c5ce7'): str
 </table>`
 }
 
+/** Escape HTML special characters in user/owner-authored text */
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+// ─── Promo / Marketing Email (automations + campaign blasts) ───
+// Takes the same plain-text message used for SMS, strips the raw CTA link out
+// of the body, and renders it in the styled shell with a proper button instead.
+export function promoEmailHtml(opts: {
+  businessName: string
+  message: string
+  ctaUrl?: string
+  ctaText?: string
+}): string {
+  const { businessName, message, ctaUrl, ctaText = 'Book Now' } = opts
+
+  // Remove the CTA URL from the text — the button below carries the link.
+  let text = message
+  if (ctaUrl) text = text.split(ctaUrl).join('')
+  text = text
+    .replace(/\s*(?:→|->)\s*(?=\n|$)/g, '') // dangling arrows left behind by the URL strip
+    .replace(/[ \t]+$/gm, '')
+    .trim()
+
+  // Escape, then linkify any other URLs the owner wrote, then preserve line breaks.
+  const bodyText = escapeHtml(text)
+    .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" style="color:#a855f7;text-decoration:none;">$1</a>')
+    .replace(/\n/g, '<br>')
+
+  const ctaSection = ctaUrl
+    ? `<div style="margin-top:28px;">${emailButton(ctaText, ctaUrl)}</div>`
+    : ''
+
+  const body = `
+    <p style="margin:0;color:#e8e8f0;font-size:15px;line-height:1.7;">${bodyText}</p>
+    ${ctaSection}
+    <p style="margin:28px 0 0;color:#a0a0c0;font-size:14px;">— ${businessName}</p>
+  `
+
+  return emailShell(businessName, body)
+}
+
 /** Detail row for appointment info */
 function detailRow(emoji: string, label: string, value: string): string {
   return `<tr>

@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { getImpersonationOverride, isAdminEmail } from '@/lib/admin'
 import { toE164 } from '@/lib/utils'
+import { promoEmailHtml } from '@/lib/email-templates'
 
 // ─── Send Campaign Blast (SMS + Email) ───
 // Called by the "Fill My Openings" and campaign blast features.
@@ -169,7 +170,12 @@ export async function POST(request: Request) {
             replyTo: tenant?.email || undefined,
             to: [client.email],
             subject: `${businessName} — Special for You! ✨`,
-            text: personalizedMsg,
+            html: promoEmailHtml({
+              businessName,
+              message: personalizedMsg,
+              ctaUrl: bookingUrl || undefined,
+              ctaText: 'Book Now',
+            }),
           })
           if (channel === 'email') sentCount++
         } else {
