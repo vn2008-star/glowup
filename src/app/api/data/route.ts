@@ -7,6 +7,7 @@ import { resolveStaffRecord } from '@/lib/api-auth'
 import { scheduleClientReminders, sendClientBookingConfirmation, sendClientChangeNotice, resolveTenantTz, sendSms, greetingName } from '@/lib/notifications'
 import { promoEmailHtml } from '@/lib/email-templates'
 import { getDashboardOverview } from '@/lib/overview-query'
+import { getClientsList, getCalendarLoad } from '@/lib/dashboard-queries'
 import { toE164 } from '@/lib/utils'
 
 // Columns a client is allowed to write on `staff`.
@@ -260,19 +261,12 @@ export async function POST(request: Request) {
     switch (action) {
       // ─── CLIENTS ───
       case 'clients.list': {
-        const { data, error } = await svc
-          .from('clients')
-          .select('id, tenant_id, first_name, last_name, phone, email, birthday, notes, photo_url, loyalty_points, tags, lifetime_spend, visit_count, last_visit, status, created_at, preferences, allergies')
-          .eq('tenant_id', tenantId)
-          .order('created_at', { ascending: false })
-          .limit(payload?.limit || 200)
-
-        if (await shouldMaskContacts()) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const masked = (data || []).map((c: any) => maskClientData(c))
-          return NextResponse.json({ data: masked, error: error?.message })
-        }
-        return NextResponse.json({ data, error: error?.message })
+        // Shared with the server-rendered clients page
+        const result = await getClientsList(svc, tenantId, {
+          mask: await shouldMaskContacts(),
+          limit: payload?.limit,
+        })
+        return NextResponse.json(result)
       }
 
       case 'clients.add': {
@@ -2338,43 +2332,14 @@ export async function POST(request: Request) {
       }
 
       // ─── CALENDAR BATCH LOAD (single round-trip for calendar page) ───
+      // Shared with the server-rendered calendar page
       case 'calendar.load': {
-        const [staffRes, svcRes, aptsQuery] = await Promise.all([
-          svc.from('staff').select('id, tenant_id, user_id, name, role, email, phone, photo_url, specialties, schedule, commission_rate, is_active').eq('tenant_id', tenantId),
-          svc.from('services').select('id, tenant_id, name, category, description, duration_minutes, price, price_addons, commission_rate, image_url, is_active, sort_order').eq('tenant_id', tenantId).order('sort_order', { ascending: true }),
-          (() => {
-            let q = svc
-              .from('appointments')
-              .select('id, tenant_id, client_id, staff_id, service_id, start_time, end_time, status, total_price, notes, payment_method, tip_amount, checked_out_at, checked_in_at, created_at, client:clients(id, first_name, last_name, phone, email, photo_url), staff_member:staff!staff_id(id, name, photo_url, role), service:services(id, name, category, duration_minutes, price, commission_rate)')
-              .eq('tenant_id', tenantId)
-              .order('start_time', { ascending: true })
-            if (payload?.startDate && payload?.endDate) {
-              q = q.gte('start_time', payload.startDate).lte('start_time', payload.endDate)
-            }
-            return q.limit(payload?.limit || 500)
-          })(),
-        ])
-
-        // Filter staff: hide Admin records, sort by role
-        const visible = (staffRes.data || []).filter((s: { name: string }) => s.name !== 'Admin')
-        const rolePriority: Record<string, number> = { owner: 0, manager: 1, technician: 2 }
-        const sortedStaff = visible.sort((a: { role: string; name: string }, b: { role: string; name: string }) => {
-          const ra = rolePriority[a.role] ?? 3
-          const rb = rolePriority[b.role] ?? 3
-          if (ra !== rb) return ra - rb
-          return a.name.localeCompare(b.name)
+        const { error, ...data } = await getCalendarLoad(svc, tenantId, {
+          startDate: payload?.startDate,
+          endDate: payload?.endDate,
+          limit: payload?.limit,
         })
-
-        const activeServices = (svcRes.data || []).filter((s: { is_active: boolean }) => s.is_active)
-
-        return NextResponse.json({
-          data: {
-            staff: sortedStaff,
-            services: activeServices,
-            appointments: aptsQuery.data || [],
-          },
-          error: staffRes.error?.message || svcRes.error?.message || aptsQuery.error?.message || null,
-        })
+        return NextResponse.json({ data, error: error || null })
       }
 
       default:
