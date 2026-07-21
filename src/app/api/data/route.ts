@@ -3,7 +3,10 @@ import { waitUntil } from '@vercel/functions'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient, type SupabaseClient } from '@supabase/supabase-js'
 import { getImpersonationOverride, isAdminEmail } from '@/lib/admin'
-import { scheduleClientReminders, sendClientBookingConfirmation } from '@/lib/notifications'
+import { resolveStaffRecord } from '@/lib/api-auth'
+import { scheduleClientReminders, sendClientBookingConfirmation, sendClientChangeNotice, resolveTenantTz, sendSms, greetingName } from '@/lib/notifications'
+import { promoEmailHtml } from '@/lib/email-templates'
+import { toE164 } from '@/lib/utils'
 
 // Columns a client is allowed to write on `staff`.
 //
@@ -24,6 +27,15 @@ const STAFF_WRITABLE = [
   'agreement_signature', 'agreement_signed_at',
 ] as const
 
+// Columns a client is allowed to write on `appointments` (add/update).
+// Spreading the payload let a caller set manage_token, checked_out_by, or a
+// foreign client_id — same class of hole as the staff mass-assignment above.
+const APPOINTMENT_WRITABLE = [
+  'client_id', 'staff_id', 'service_id', 'start_time', 'end_time',
+  'status', 'total_price', 'notes', 'payment_method', 'tip_amount',
+  'checked_in_at', 'checked_out_at',
+] as const
+
 /**
  * Turn a Postgres write error into something an owner can act on.
  *
@@ -42,6 +54,23 @@ function friendlyWriteError(
     return 'That staff member is already booked during this time. Pick a different time or staff member.'
   }
   return error.message
+}
+
+/**
+ * Days until the next occurrence of a birthday (0 = today), year-agnostic.
+ * Feb 29 birthdays count as Mar 1 in non-leap years.
+ */
+function daysUntilBirthday(birthday: string, from: Date): number | null {
+  const m = birthday.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (!m) return null
+  const month = Number(m[2]), day = Number(m[3])
+  const start = new Date(from.getFullYear(), from.getMonth(), from.getDate())
+  let next = new Date(from.getFullYear(), month - 1, day)
+  // Feb 29 in a non-leap year rolls to Mar 1 automatically via Date overflow —
+  // but guard against Date normalizing e.g. Feb 30 input differently than expected.
+  if (next.getMonth() !== month - 1 && !(month === 2 && day === 29)) return null
+  if (next < start) next = new Date(from.getFullYear() + 1, month - 1, day)
+  return Math.round((next.getTime() - start.getTime()) / 86400000)
 }
 
 type RedeemedCard = {
@@ -155,12 +184,8 @@ export async function POST(request: Request) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
-  // Get tenant_id and staff role from staff record
-  const { data: staffRecord } = await svc
-    .from('staff')
-    .select('id, tenant_id, role')
-    .eq('user_id', userId)
-    .single()
+  // Get tenant_id and staff role from staff record (cached per warm instance)
+  const staffRecord = await resolveStaffRecord(svc, userId)
 
   if (!staffRecord) {
     return NextResponse.json({ error: 'No tenant' }, { status: 404 })
@@ -292,6 +317,82 @@ export async function POST(request: Request) {
         return NextResponse.json({ data, error: error?.message })
       }
 
+      // Lightweight birthday list — the calendar only needs these four columns
+      // for its 🎂 markers, not the full 20-column client table.
+      case 'clients.birthdays': {
+        const { data, error } = await svc
+          .from('clients')
+          .select('id, first_name, last_name, birthday')
+          .eq('tenant_id', tenantId)
+          .not('birthday', 'is', null)
+          .limit(1000)
+        return NextResponse.json({ data, error: error?.message })
+      }
+
+      // Send this client the salon's birthday special right now (dashboard
+      // "Send Special" button). Uses the same configurable message as the
+      // birthday automation.
+      case 'clients.send_birthday_promo': {
+        const { data: client } = await svc
+          .from('clients')
+          .select('id, first_name, last_name, phone, email, sms_opt_out')
+          .eq('id', payload.id)
+          .eq('tenant_id', tenantId)
+          .single()
+        if (!client) return NextResponse.json({ error: 'Client not found' }, { status: 404 })
+        if (!client.phone && !client.email) {
+          return NextResponse.json({ error: 'Client has no phone or email on file' }, { status: 400 })
+        }
+
+        const { data: t } = await svc
+          .from('tenants')
+          .select('name, slug, email, settings')
+          .eq('id', tenantId)
+          .single()
+        const settings = (t?.settings || {}) as Record<string, unknown>
+        const automations = (settings.automations || {}) as Record<string, string | boolean>
+        const businessName = t?.name || 'our salon'
+        const baseUrl = process.env.NEXT_PUBLIC_SITE_URL
+          || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null)
+          || 'https://glowup-jade.vercel.app'
+        const bookingUrl = t?.slug ? `${baseUrl}/book/${t.slug}` : ''
+
+        const discount = String(automations.auto_birthday_discount || '20')
+        const template = String(automations.auto_birthday_message || '')
+          || `Happy Birthday, {name}! 🎂 {business_name} wants to celebrate YOU — enjoy {discount}% off any service this month! Book now → {booking_url}`
+        const clientGreeting = greetingName(`${client.first_name || ''} ${client.last_name || ''}`.trim())
+        const message = template
+          .replace(/\{name\}/g, clientGreeting)
+          .replace(/\{greeting\}/g, clientGreeting)
+          .replace(/\{discount\}/g, discount)
+          .replace(/\{business_name\}/g, businessName)
+          .replace(/\{booking_url\}/g, bookingUrl)
+
+        let sent = 0
+        if (client.phone && !client.sms_opt_out) {
+          const e164 = toE164(client.phone)
+          if (e164 && await sendSms(e164, message)) sent++
+        }
+        if (client.email && process.env.RESEND_API_KEY) {
+          try {
+            const { Resend } = await import('resend')
+            const resend = new Resend(process.env.RESEND_API_KEY)
+            await resend.emails.send({
+              from: `${businessName} <bookings@joinglowup.org>`,
+              replyTo: t?.email || undefined,
+              to: [client.email],
+              subject: `🎂 Happy Birthday from ${businessName} — ${discount}% off for you!`,
+              html: promoEmailHtml({ businessName, message, ctaUrl: bookingUrl || undefined, ctaText: 'Book Your Birthday Treat' }),
+            })
+            sent++
+          } catch (err) {
+            console.error('[send_birthday_promo] email failed:', err)
+          }
+        }
+
+        return NextResponse.json({ data: { sent }, error: sent === 0 ? 'Nothing sent — check contact info / SMS opt-out' : undefined })
+      }
+
       case 'clients.delete': {
         const { error } = await svc
           .from('clients')
@@ -408,7 +509,7 @@ export async function POST(request: Request) {
       case 'appointments.add': {
         const { data, error } = await svc
           .from('appointments')
-          .insert({ ...payload, tenant_id: tenantId })
+          .insert({ ...pickWritable(payload, APPOINTMENT_WRITABLE), tenant_id: tenantId })
           .select('id, tenant_id, client_id, staff_id, service_id, start_time, end_time, status, total_price, notes, payment_method, tip_amount, checked_out_at, checked_in_at, created_at, manage_token, client:clients(id, first_name, last_name, phone, email, photo_url, sms_opt_out), staff_member:staff!staff_id(id, name, photo_url, role), service:services(id, name, category, duration_minutes, price, commission_rate)')
           .single()
 
@@ -432,7 +533,7 @@ export async function POST(request: Request) {
               try {
                 const { data: t } = await svc
                   .from('tenants')
-                  .select('name, email, phone, address, settings')
+                  .select('name, email, phone, address, timezone, settings')
                   .eq('id', tenantId)
                   .single()
 
@@ -451,8 +552,7 @@ export async function POST(request: Request) {
                   ownerPhone = ownerPhone || owner?.phone || ''
                 }
 
-                const settings = (t?.settings || {}) as Record<string, unknown>
-                const tz = (settings.timezone as string) || 'America/Los_Angeles'
+                const tz = resolveTenantTz(t)
                 const baseUrl = process.env.NEXT_PUBLIC_SITE_URL
                   || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null)
                   || 'https://glowup-jade.vercel.app'
@@ -497,14 +597,147 @@ export async function POST(request: Request) {
 
       case 'appointments.update': {
         const { id, ...fields } = payload
-        const { data, error } = await svc
+
+        // Read the prior start time so we can tell a real reschedule apart from
+        // an ordinary edit (status change, price fix, notes).
+        const { data: before } = await svc
           .from('appointments')
-          .update(stripImmutable(fields))
+          .select('start_time')
           .eq('id', id)
           .eq('tenant_id', tenantId)
-          .select('id, tenant_id, client_id, staff_id, service_id, start_time, end_time, status, total_price, notes, payment_method, tip_amount, checked_out_at, checked_in_at, created_at, client:clients(id, first_name, last_name, phone, email, photo_url), staff_member:staff!staff_id(id, name, photo_url, role), service:services(id, name, category, duration_minutes, price, commission_rate)')
           .single()
+
+        const { data, error } = await svc
+          .from('appointments')
+          .update(pickWritable(stripImmutable(fields), APPOINTMENT_WRITABLE))
+          .eq('id', id)
+          .eq('tenant_id', tenantId)
+          .select('id, tenant_id, client_id, staff_id, service_id, start_time, end_time, status, total_price, notes, payment_method, tip_amount, checked_out_at, checked_in_at, created_at, manage_token, client:clients(id, first_name, last_name, phone, email, photo_url, sms_opt_out), staff_member:staff!staff_id(id, name, photo_url, role), service:services(id, name, category, duration_minutes, price, commission_rate)')
+          .single()
+
+        // ── Staff rescheduled a future appointment: tell the client and reset
+        // reminders. Previously this was silent — the customer showed up at the
+        // old time — and already-sent reminders never re-fired for the new date.
+        const movedTo = data?.start_time
+        const isReschedule = !!(before && movedTo && fields.start_time &&
+          new Date(before.start_time).getTime() !== new Date(movedTo).getTime())
+        if (data && isReschedule && data.client_id && new Date(movedTo).getTime() > Date.now() &&
+            (data.status === 'pending' || data.status === 'confirmed')) {
+          const apt = data as unknown as {
+            id: string; client_id: string; start_time: string; end_time: string; manage_token: string | null
+            client: { first_name?: string; last_name?: string; phone?: string | null; email?: string | null; sms_opt_out?: boolean } | null
+            service: { name?: string } | null
+            staff_member: { name?: string } | null
+          }
+          const notify = (async () => {
+            try {
+              // Reset ALL reminder rows (not just pending — a 'sent' 24h row
+              // blocks re-insert via the unique index and would never re-fire).
+              await svc.from('appointment_reminders').delete().eq('appointment_id', apt.id)
+              await scheduleClientReminders(svc, {
+                tenantId,
+                appointmentId: apt.id,
+                clientId: apt.client_id,
+                clientPhone: apt.client?.sms_opt_out ? null : (apt.client?.phone || null),
+                clientEmail: apt.client?.email || null,
+              })
+
+              const { data: t } = await svc
+                .from('tenants')
+                .select('name, email, phone, address, timezone, settings')
+                .eq('id', tenantId)
+                .single()
+              const baseUrl = process.env.NEXT_PUBLIC_SITE_URL
+                || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null)
+                || 'https://glowup-jade.vercel.app'
+              await sendClientChangeNotice({
+                type: 'reschedule',
+                businessName: t?.name || 'our salon',
+                businessAddress: t?.address || '',
+                businessPhone: t?.phone || '',
+                businessEmail: t?.email || null,
+                serviceName: apt.service?.name || 'your appointment',
+                staffName: apt.staff_member?.name || '',
+                clientName: `${apt.client?.first_name || ''}${apt.client?.last_name ? ' ' + apt.client.last_name : ''}`.trim() || 'there',
+                clientEmail: apt.client?.email || null,
+                clientPhone: apt.client?.sms_opt_out ? null : (apt.client?.phone || null),
+                actionLink: apt.manage_token ? `${baseUrl}/manage/${apt.manage_token}` : '',
+                start: new Date(apt.start_time),
+                end: new Date(apt.end_time),
+                timezone: resolveTenantTz(t),
+              })
+            } catch (err) {
+              console.error('[appointments.update] reschedule notice error:', err)
+            }
+          })()
+          try { waitUntil(notify) } catch { /* local dev */ }
+        }
+
         return NextResponse.json({ data, error: friendlyWriteError(error) })
+      }
+
+      // Cancel (keeps the row for history/reporting and notifies the client).
+      // The dashboard used to hard-DELETE, which silently erased the booking:
+      // no client notice, no owner record, no no-show analytics.
+      case 'appointments.cancel': {
+        const { data, error } = await svc
+          .from('appointments')
+          .update({ status: 'cancelled' })
+          .eq('id', payload.id)
+          .eq('tenant_id', tenantId)
+          .select('id, client_id, start_time, end_time, status, client:clients(first_name, last_name, phone, email, sms_opt_out), service:services(name), staff_member:staff!staff_id(name)')
+          .single()
+
+        if (data) {
+          // Free the reminder rows; a cancelled appointment must never remind.
+          await svc.from('appointment_reminders')
+            .update({ status: 'skipped' })
+            .eq('appointment_id', data.id)
+            .eq('status', 'pending')
+
+          const apt = data as unknown as {
+            id: string; client_id: string | null; start_time: string; end_time: string
+            client: { first_name?: string; last_name?: string; phone?: string | null; email?: string | null; sms_opt_out?: boolean } | null
+            service: { name?: string } | null
+            staff_member: { name?: string } | null
+          }
+          const isFuture = new Date(apt.start_time).getTime() > Date.now()
+          if (apt.client_id && apt.client && isFuture && payload.notify !== false) {
+            const notify = (async () => {
+              try {
+                const { data: t } = await svc
+                  .from('tenants')
+                  .select('name, slug, email, phone, address, timezone, settings')
+                  .eq('id', tenantId)
+                  .single()
+                const baseUrl = process.env.NEXT_PUBLIC_SITE_URL
+                  || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null)
+                  || 'https://glowup-jade.vercel.app'
+                await sendClientChangeNotice({
+                  type: 'cancel',
+                  businessName: t?.name || 'our salon',
+                  businessAddress: t?.address || '',
+                  businessPhone: t?.phone || '',
+                  businessEmail: t?.email || null,
+                  serviceName: apt.service?.name || 'your appointment',
+                  staffName: apt.staff_member?.name || '',
+                  clientName: `${apt.client?.first_name || ''}${apt.client?.last_name ? ' ' + apt.client.last_name : ''}`.trim() || 'there',
+                  clientEmail: apt.client?.email || null,
+                  clientPhone: apt.client?.sms_opt_out ? null : (apt.client?.phone || null),
+                  actionLink: t?.slug ? `${baseUrl}/book/${t.slug}` : '',
+                  start: new Date(apt.start_time),
+                  end: new Date(apt.end_time),
+                  timezone: resolveTenantTz(t),
+                })
+              } catch (err) {
+                console.error('[appointments.cancel] notice error:', err)
+              }
+            })()
+            try { waitUntil(notify) } catch { /* local dev */ }
+          }
+        }
+
+        return NextResponse.json({ data, error: error?.message })
       }
 
       case 'appointments.delete': {
@@ -872,6 +1105,7 @@ export async function POST(request: Request) {
           atRiskRes,
           activeClientsRes,
           unreadConvosRes,
+          birthdayClientsRes,
         ] = await Promise.all([
           svc.from('appointments')
             .select('id, client_id, staff_id, service_id, start_time, end_time, status, total_price, notes, payment_method, tip_amount, checked_in_at, client:clients(id, first_name, last_name, phone, email), service:services(id, name, price), staff_member:staff!staff_id(id, name, photo_url)')
@@ -904,6 +1138,11 @@ export async function POST(request: Request) {
             .select('id', { count: 'exact', head: true })
             .eq('tenant_id', tenantId)
             .gt('unread_count', 0),
+          svc.from('clients')
+            .select('id, first_name, last_name, phone, email, birthday, sms_opt_out')
+            .eq('tenant_id', tenantId)
+            .not('birthday', 'is', null)
+            .limit(1000),
         ])
 
         const todayApts = todayAptsRes.data || []
@@ -913,6 +1152,13 @@ export async function POST(request: Request) {
           .reduce((sum, a) => sum + (a.total_price || 0), 0)
         const pendingCount = todayApts.filter(a => a.status === 'pending' || a.status === 'confirmed').length
         const retentionRate = totalClients ? Math.round(((activeClientsRes.count || 0) / totalClients) * 100) : 0
+
+        // Birthdays coming up in the next 30 days, soonest first
+        const upcomingBirthdays = (birthdayClientsRes.data || [])
+          .map(c => ({ ...c, days_away: daysUntilBirthday(c.birthday as string, today) }))
+          .filter(c => c.days_away !== null && c.days_away <= 30)
+          .sort((a, b) => (a.days_away as number) - (b.days_away as number))
+          .slice(0, 8)
 
         return NextResponse.json({
           data: {
@@ -925,6 +1171,7 @@ export async function POST(request: Request) {
             recentClients: recentClientsRes.data || [],
             atRiskClients: atRiskRes.data || [],
             unreadConvos: unreadConvosRes.count || 0,
+            upcomingBirthdays,
           }
         })
       }

@@ -57,7 +57,7 @@ interface StaffRevenueData {
 const TABS = ["Overview", "Staff Performance", "Staff Revenue", "Client Retention", "Revenue Forecast", "Peak Hours"] as const;
 
 export default function ReportsPage() {
-  const { tenant } = useTenant();
+  const { tenant, refetch: refetchTenant } = useTenant();
   const t = useTranslations("reportsPage");
   const [activeTab, setActiveTab] = useState<string>(TABS[0]);
   const [loading, setLoading] = useState(true);
@@ -462,6 +462,25 @@ export default function ReportsPage() {
                   }}>
                   {sendingEmail === 'all' ? '⏳ Sending...' : '📧 Email All Staff'}
                 </button>
+                {/* Auto-send toggle — this flag is what the biweekly cron
+                    checks; without it the scheduled statements never fire */}
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={!!((tenant?.settings as Record<string, unknown>)?.automations as Record<string, boolean> | undefined)?.auto_staff_reports}
+                    onChange={async (e) => {
+                      const settings = (tenant?.settings || {}) as Record<string, unknown>;
+                      const automations = (settings.automations || {}) as Record<string, unknown>;
+                      await fetch('/api/save-settings', {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ settings: { ...settings, automations: { ...automations, auto_staff_reports: e.target.checked } } }),
+                      });
+                      refetchTenant();
+                    }}
+                  />
+                  Auto-email on the 1st &amp; 16th
+                </label>
               </div>
 
               {/* Summary KPIs */}

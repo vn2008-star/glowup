@@ -150,9 +150,12 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     fetchWaitlist();
-    // Refresh every 30 seconds
-    const iv = setInterval(fetchWaitlist, 30000);
-    return () => clearInterval(iv);
+    // Refresh every 30 seconds — but not while the tab is hidden; a kiosk left
+    // on another tab all day was hammering /api/data for nothing
+    const iv = setInterval(() => { if (!document.hidden) fetchWaitlist(); }, 30000);
+    const onVisible = () => { if (!document.hidden) fetchWaitlist(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { clearInterval(iv); document.removeEventListener('visibilitychange', onVisible); };
   }, [fetchWaitlist]);
 
   // ── Staff-facing waitlist fetch (raw entries for Accept flow) ──
@@ -169,7 +172,7 @@ export default function CheckoutPage() {
   useEffect(() => {
     if (unlockedStaffId) {
       fetchStaffWaitlist();
-      const iv = setInterval(fetchStaffWaitlist, 15000);
+      const iv = setInterval(() => { if (!document.hidden) fetchStaffWaitlist(); }, 15000);
       return () => clearInterval(iv);
     }
   }, [unlockedStaffId, fetchStaffWaitlist]);

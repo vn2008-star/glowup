@@ -47,7 +47,7 @@ export default function ClientsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<string>("all");
-  const [sortBy, setSortBy] = useState<'name' | 'recent' | 'spent' | 'visits'>('name');
+  const [sortBy, setSortBy] = useState<'name' | 'recent' | 'spent' | 'visits' | 'birthday'>('name');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('table');
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
@@ -99,6 +99,18 @@ export default function ClientsPage() {
 
   useEffect(() => { fetchClients(); }, [fetchClients]);
 
+  // Days until the next occurrence of a birthday (0 = today); null when unset
+  function daysToBirthday(birthday: string | null): number | null {
+    if (!birthday) return null;
+    const m = birthday.match(/^\d{4}-(\d{2})-(\d{2})/);
+    if (!m) return null;
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    let next = new Date(now.getFullYear(), Number(m[1]) - 1, Number(m[2]));
+    if (next < start) next = new Date(now.getFullYear() + 1, Number(m[1]) - 1, Number(m[2]));
+    return Math.round((next.getTime() - start.getTime()) / 86400000);
+  }
+
   const filtered = useMemo(() => {
     const list = clients.filter((c) => {
       const matchesSearch = `${c.first_name} ${c.last_name || ""} ${c.email || ""} ${c.phone || ""}`.toLowerCase().includes(search.toLowerCase());
@@ -116,6 +128,13 @@ export default function ClientsPage() {
           return (b.lifetime_spend || 0) - (a.lifetime_spend || 0);
         case 'visits':
           return (b.visit_count || 0) - (a.visit_count || 0);
+        case 'birthday': {
+          const da = daysToBirthday(a.birthday); const db = daysToBirthday(b.birthday);
+          if (da === null && db === null) return 0;
+          if (da === null) return 1;
+          if (db === null) return -1;
+          return da - db;
+        }
         default:
           return 0;
       }
@@ -434,7 +453,7 @@ export default function ClientsPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-3)', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
           <span style={{ fontSize: '12px', color: 'var(--text-tertiary)', fontWeight: 600 }}>Sort:</span>
-          {([['name', 'A → Z'], ['recent', 'Recent'], ['spent', 'Top Spent'], ['visits', 'Most Visits']] as const).map(([key, label]) => (
+          {([['name', 'A → Z'], ['recent', 'Recent'], ['spent', 'Top Spent'], ['visits', 'Most Visits'], ['birthday', '🎂 Birthday']] as const).map(([key, label]) => (
             <button
               key={key}
               onClick={() => setSortBy(key)}
@@ -509,6 +528,7 @@ export default function ClientsPage() {
                 </th>
                 <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-tertiary)' }}>Client</th>
                 <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-tertiary)' }}>Phone</th>
+                <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-tertiary)' }}>Birthday</th>
                 <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-tertiary)' }}>Status</th>
                 <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-tertiary)', textAlign: 'right' }}>Visits</th>
                 <th style={{ padding: '10px 12px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-tertiary)', textAlign: 'right' }}>Spent</th>
@@ -554,6 +574,17 @@ export default function ClientsPage() {
                     </div>
                   </td>
                   <td style={{ padding: '10px 12px', color: 'var(--text-secondary)' }}>{displayPhone(c.phone) || '—'}</td>
+                  <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
+                    {(() => {
+                      if (!c.birthday) return <span style={{ color: 'var(--text-tertiary)' }}>—</span>;
+                      const days = daysToBirthday(c.birthday);
+                      const label = localeDateStr(new Date(c.birthday + 'T00:00:00'), { month: 'short', day: 'numeric' });
+                      if (days !== null && days <= 30) {
+                        return <span style={{ color: 'var(--color-primary)', fontWeight: 600 }}>🎂 {label}{days === 0 ? ' · Today!' : days === 1 ? ' · Tomorrow' : ` · in ${days}d`}</span>;
+                      }
+                      return <span style={{ color: 'var(--text-secondary)' }}>{label}</span>;
+                    })()}
+                  </td>
                   <td style={{ padding: '10px 12px' }}>
                     <span className={`badge ${c.status === 'active' ? 'badge-success' : c.status === 'new' ? 'badge-info' : c.status === 'at_risk' ? 'badge-danger' : 'badge-warning'}`}>
                       {c.status}
@@ -596,6 +627,15 @@ export default function ClientsPage() {
               <div className={styles.clientMeta}>
                 {c.phone && <span>📱 {displayPhone(c.phone)}{shouldMask && <span className={styles.protectedTag}>Protected</span>}</span>}
                 {c.email && <span>✉️ {displayEmail(c.email)}{shouldMask && <span className={styles.protectedTag}>Protected</span>}</span>}
+                {c.birthday && (() => {
+                  const days = daysToBirthday(c.birthday);
+                  const label = localeDateStr(new Date(c.birthday + 'T00:00:00'), { month: 'short', day: 'numeric' });
+                  return (
+                    <span style={days !== null && days <= 30 ? { color: 'var(--color-primary)', fontWeight: 600 } : undefined}>
+                      🎂 {label}{days !== null && days <= 30 ? (days === 0 ? ' · Today!' : ` · in ${days}d`) : ''}
+                    </span>
+                  );
+                })()}
               </div>
               <div className={styles.clientStats}>
                 <span>{c.visit_count} visits</span>

@@ -1,14 +1,19 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
-import { getImpersonationOverride } from '@/lib/admin'
+import { authenticate, isAuthFailure } from '@/lib/api-auth'
+
+// Columns the Settings UI may write on `tenants`. Spreading the raw body let a
+// caller set any column (stripe_customer_id, subscription fields, ...).
+const TENANT_WRITABLE = [
+  'name', 'email', 'phone', 'address', 'website', 'timezone', 'logo_url', 'slug', 'settings',
+] as const
 
 export async function PUT(request: Request) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const caller = await authenticate()
+  if (isAuthFailure(caller)) return caller.response
 
-  if (!user) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+  if (!['owner', 'manager'].includes(caller.staffRole)) {
+    return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
   }
 
   const svc = createServiceClient(
@@ -16,28 +21,19 @@ export async function PUT(request: Request) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
-  // Get tenant_id
-  const { data: staffRecord } = await svc
-    .from('staff')
-    .select('tenant_id, role')
-    .eq('user_id', user.id)
-    .single()
-
-  // ─── Admin impersonation override ───
-  const overrideTenantId = await getImpersonationOverride(user.id, user.email || '')
-  const effectiveTenantId = overrideTenantId || staffRecord?.tenant_id
-  const effectiveRole = overrideTenantId ? 'owner' : staffRecord?.role
-
-  if (!effectiveTenantId || !['owner', 'manager'].includes(effectiveRole || '')) {
-    return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
-  }
-
   const body = await request.json()
+  const updates: Record<string, unknown> = {}
+  for (const key of TENANT_WRITABLE) {
+    if (Object.prototype.hasOwnProperty.call(body, key)) updates[key] = body[key]
+  }
+  if (Object.keys(updates).length === 0) {
+    return NextResponse.json({ error: 'No updatable fields supplied' }, { status: 400 })
+  }
 
   const { error } = await svc
     .from('tenants')
-    .update(body)
-    .eq('id', effectiveTenantId)
+    .update(updates)
+    .eq('id', caller.tenantId)
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })

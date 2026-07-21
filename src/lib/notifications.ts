@@ -5,9 +5,46 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { toE164 } from '@/lib/utils'
-import { bookingConfirmationHtml, googleCalendarUrl } from '@/lib/email-templates'
+import { timezoneFromAddress, DEFAULT_TZ } from '@/lib/tz'
+import { bookingConfirmationHtml, rescheduleConfirmationHtml, cancellationConfirmationHtml, googleCalendarUrl } from '@/lib/email-templates'
 
 const REMINDER_TYPES = ['24h', '2h', '1h'] as const
+
+/**
+ * Resolve a tenant's display timezone.
+ *
+ * The salon timezone lives in the `tenants.timezone` COLUMN (that's what
+ * Settings saves and what the booking page reads). `settings.timezone` in the
+ * JSON blob is legacy and usually absent — code that read only the blob showed
+ * every salon's emails in Pacific time. Callers must select the `timezone` and
+ * `address` columns for this to work.
+ */
+export function resolveTenantTz(tenant: {
+  timezone?: string | null
+  address?: string | null
+  settings?: Record<string, unknown> | null
+} | null | undefined): string {
+  if (!tenant) return DEFAULT_TZ
+  return tenant.timezone
+    || ((tenant.settings || {}) as Record<string, string>).timezone
+    || timezoneFromAddress(tenant.address)
+    || DEFAULT_TZ
+}
+
+/** Format an appointment start for messages, in the salon's timezone. */
+export function formatAptWhen(start: Date, tz: string): { dateStr: string; timeStr: string } {
+  try {
+    return {
+      dateStr: start.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: tz }),
+      timeStr: start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz }),
+    }
+  } catch {
+    return {
+      dateStr: start.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }),
+      timeStr: start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+    }
+  }
+}
 
 /** Format "James Davis" → "James D." for a friendlier greeting. */
 export function greetingName(fullName: string): string {
@@ -189,5 +226,95 @@ export async function sendClientBookingConfirmation(opts: {
     }
   } else if (clientEmail) {
     console.log(`[notifications] [DRY RUN] Client email to ${clientEmail}`)
+  }
+}
+
+/**
+ * Notify the CLIENT that staff rescheduled or cancelled their appointment.
+ * Used by the dashboard paths (data route), which previously did neither —
+ * the customer's appointment silently moved or vanished.
+ */
+export async function sendClientChangeNotice(opts: {
+  type: 'reschedule' | 'cancel'
+  businessName: string
+  businessAddress: string
+  businessPhone: string
+  businessEmail: string | null
+  serviceName: string
+  staffName: string
+  clientName: string
+  clientEmail: string | null
+  clientPhone: string | null
+  /** For reschedule: manage link. For cancel: public booking link to rebook. */
+  actionLink: string
+  start: Date
+  end: Date
+  timezone: string
+}): Promise<void> {
+  const {
+    type, businessName, businessAddress, businessPhone, businessEmail,
+    serviceName, staffName, clientName, clientEmail, clientPhone,
+    actionLink, start, end, timezone,
+  } = opts
+
+  const greeting = greetingName(clientName)
+  const { dateStr, timeStr } = formatAptWhen(start, timezone)
+  const isCancel = type === 'cancel'
+
+  // ── SMS ──
+  if (clientPhone) {
+    const clientE164 = toE164(clientPhone)
+    if (clientE164) {
+      const sms = isCancel
+        ? [
+            `❌ Appointment Cancelled`,
+            ``,
+            `Dear ${greeting}, your ${serviceName} appointment at ${businessName} on ${dateStr} at ${timeStr} has been cancelled.`,
+            actionLink ? `Book a new time: ${actionLink}` : '',
+            businessPhone ? `Questions? Call us at ${businessPhone}` : '',
+          ].filter(Boolean).join('\n')
+        : [
+            `🔄 Appointment Rescheduled`,
+            ``,
+            `Dear ${greeting}, your ${serviceName} appointment at ${businessName} has been moved to:`,
+            `📅 ${dateStr} at ${timeStr}`,
+            staffName ? `💇 With: ${staffName}` : '',
+            actionLink ? `Manage: ${actionLink}` : '',
+          ].filter(Boolean).join('\n')
+      try {
+        await sendSms(clientE164, sms)
+      } catch (err) {
+        console.error(`[notifications] ${type} SMS to client failed:`, err)
+      }
+    }
+  }
+
+  // ── Email ──
+  if (clientEmail && process.env.RESEND_API_KEY) {
+    try {
+      const { Resend } = await import('resend')
+      const resend = new Resend(process.env.RESEND_API_KEY)
+      const html = isCancel
+        ? cancellationConfirmationHtml({
+            greeting, serviceName, dateStr, timeStr, staffName,
+            businessName, businessAddress, businessPhone, bookingLink: actionLink,
+          })
+        : rescheduleConfirmationHtml({
+            greeting, serviceName, dateStr, timeStr, staffName,
+            businessName, businessAddress, businessPhone, manageLink: actionLink,
+            startISO: start.toISOString(), endISO: end.toISOString(),
+          })
+      await resend.emails.send({
+        from: `${businessName} <bookings@joinglowup.org>`,
+        replyTo: businessEmail || undefined,
+        to: [clientEmail],
+        subject: isCancel
+          ? `❌ Appointment Cancelled — ${serviceName} on ${dateStr}`
+          : `🔄 Appointment Rescheduled — ${serviceName} on ${dateStr}`,
+        html,
+      })
+    } catch (err) {
+      console.error(`[notifications] ${type} email to client failed:`, err)
+    }
   }
 }

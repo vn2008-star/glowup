@@ -10,7 +10,7 @@
 // body has no tenant isolation at all — the caller simply states who they are.
 
 import { createClient } from '@/lib/supabase/server'
-import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { createClient as createServiceClient, type SupabaseClient } from '@supabase/supabase-js'
 import { getImpersonationOverride, isAdminEmail } from '@/lib/admin'
 
 export type AuthedCaller = {
@@ -24,6 +24,33 @@ export type AuthedCaller = {
 }
 
 export type AuthFailure = { response: Response }
+
+type StaffRecord = { id: string; tenant_id: string; role: string } | null
+
+// The user→staff mapping barely ever changes, yet every /api/data call paid a
+// DB round-trip for it before touching the query it actually wanted. Cache it
+// per warm serverless instance with a short TTL — role/tenant changes propagate
+// within a minute, and the keep-warm cron keeps instances (and this cache) live.
+const staffCache = new Map<string, { rec: StaffRecord; at: number }>()
+const STAFF_CACHE_TTL_MS = 60_000
+
+export async function resolveStaffRecord(
+  svc: SupabaseClient,
+  userId: string
+): Promise<StaffRecord> {
+  const hit = staffCache.get(userId)
+  if (hit && Date.now() - hit.at < STAFF_CACHE_TTL_MS) return hit.rec
+
+  const { data } = await svc
+    .from('staff')
+    .select('id, tenant_id, role')
+    .eq('user_id', userId)
+    .single()
+
+  // Cache misses too — a user with no staff row would otherwise re-query every call.
+  staffCache.set(userId, { rec: (data as StaffRecord) || null, at: Date.now() })
+  return (data as StaffRecord) || null
+}
 
 export function isAuthFailure(x: AuthedCaller | AuthFailure): x is AuthFailure {
   return (x as AuthFailure).response !== undefined
@@ -63,11 +90,7 @@ export async function authenticate(
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
-  const { data: staffRecord } = await svc
-    .from('staff')
-    .select('id, tenant_id, role')
-    .eq('user_id', userId)
-    .single()
+  const staffRecord = await resolveStaffRecord(svc, userId)
 
   // Skip the impersonation lookup for non-admins — it is a DB round trip.
   const overrideTenantId = isAdminEmail(userEmail)

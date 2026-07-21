@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { toE164 } from '@/lib/utils'
 import { verifyCronRequest } from '@/lib/cron-auth'
-import { fillPlaceholders } from '@/lib/notifications'
-import { appointmentReminderHtml, googleCalendarUrl } from '@/lib/email-templates'
+import { fillPlaceholders, resolveTenantTz, sendSms } from '@/lib/notifications'
+import { appointmentReminderHtml, dailyDigestHtml, googleCalendarUrl } from '@/lib/email-templates'
+import { localToUTC, nowInTz, formatInTz } from '@/lib/tz'
 
 // ─── Send Appointment Reminders (Cron-triggered) ───
 // Vercel Cron calls this hourly.
@@ -79,7 +80,7 @@ export async function GET(request: Request) {
     const tenantIds = [...new Set(reminders.map(r => r.tenant_id))]
     const { data: tenants } = await supabase
       .from('tenants')
-      .select('id, name, email, phone, address, settings')
+      .select('id, name, email, phone, address, timezone, settings')
       .in('id', tenantIds)
 
     const tenantMap = new Map(tenants?.map(t => [t.id, t]) || [])
@@ -119,8 +120,9 @@ export async function GET(request: Request) {
       const businessAddress = (tenant?.address as string) || ''
       const businessPhone = (tenant?.phone as string) || ''
 
-      // Use tenant timezone for display
-      const tz = (settings.timezone as string) || 'America/Los_Angeles'
+      // Use tenant timezone for display — from the tenants.timezone COLUMN
+      // (what Settings saves), not the legacy settings blob.
+      const tz = resolveTenantTz(tenant)
       let dateStr: string, timeStr: string
       try {
         dateStr = startTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: tz })
@@ -274,10 +276,142 @@ export async function GET(request: Request) {
     }
   }
 
+  // ─── Daily schedule digest for the owner & staff ───
+  // Fires once per tenant per day, when the salon's local hour matches the
+  // configured send hour (default 7 AM). This is the "reminder for the
+  // business" that never existed: owner gets the whole day, each staff member
+  // gets their own appointments. Config lives in settings.staff_reminders
+  // ({ enabled, digest_hour, owner_sms }) — saved from Settings → Reminders.
+  let digestsSent = 0
+  if (hasResend || hasTwilio) {
+    const { data: allTenants } = await supabase
+      .from('tenants')
+      .select('id, name, email, phone, address, timezone, settings')
+
+    for (const tenant of allTenants || []) {
+      try {
+        const settings = (tenant.settings || {}) as Record<string, unknown>
+        const digestCfg = (settings.staff_reminders || {}) as Record<string, unknown>
+        if (digestCfg.enabled === false) continue
+
+        const tz = resolveTenantTz(tenant)
+        const digestHour = parseInt(String(digestCfg.digest_hour ?? '7'), 10)
+        const local = nowInTz(tz)
+        if (local.hour !== digestHour) continue
+
+        // Today's salon-local day expressed as a UTC window
+        const dayStart = localToUTC(local.dateStr, '00:00', tz)
+        const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000)
+
+        const [{ data: apts }, { data: staffList }] = await Promise.all([
+          supabase
+            .from('appointments')
+            .select('id, staff_id, start_time, status, client:clients(first_name, last_name), service:services(name), staff_member:staff!staff_id(name)')
+            .eq('tenant_id', tenant.id)
+            .gte('start_time', dayStart.toISOString())
+            .lt('start_time', dayEnd.toISOString())
+            .in('status', ['pending', 'confirmed'])
+            .order('start_time'),
+          supabase
+            .from('staff')
+            .select('id, name, email, role, is_active')
+            .eq('tenant_id', tenant.id)
+            .eq('is_active', true)
+            .neq('name', 'Admin'),
+        ])
+
+        if (!apts || apts.length === 0) continue // quiet day — no digest spam
+
+        const businessName = tenant.name || 'your salon'
+        const dateLabel = formatInTz(dayStart.toISOString(), tz, { weekday: 'long', month: 'long', day: 'numeric' })
+        const toEntry = (a: (typeof apts)[number]) => {
+          const client = a.client as unknown as { first_name?: string; last_name?: string } | null
+          const service = a.service as unknown as { name?: string } | null
+          const staffMember = a.staff_member as unknown as { name?: string } | null
+          return {
+            timeStr: formatInTz(a.start_time, tz, { hour: 'numeric', minute: '2-digit' }),
+            clientName: client ? `${client.first_name || ''}${client.last_name ? ' ' + client.last_name : ''}`.trim() || 'Walk-in' : 'Walk-in',
+            serviceName: service?.name || 'Service',
+            staffName: staffMember?.name || '',
+          }
+        }
+
+        const ownerStaff = (staffList || []).find(s => s.role === 'owner')
+        const ownerEmail = tenant.email || ownerStaff?.email || (settings.owner_email as string) || ''
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let resend: any = null
+        if (hasResend) {
+          const { Resend } = await import('resend')
+          resend = new Resend(process.env.RESEND_API_KEY!)
+        }
+
+        // ── Owner: full-day digest (email + optional SMS) ──
+        if (ownerEmail && resend) {
+          try {
+            await resend.emails.send({
+              from: `GlowUp <bookings@joinglowup.org>`,
+              to: [ownerEmail],
+              subject: `📅 Today at ${businessName} — ${apts.length} appointment${apts.length !== 1 ? 's' : ''} (${dateLabel})`,
+              html: dailyDigestHtml({
+                recipientName: ownerStaff?.name || businessName,
+                businessName,
+                dateLabel,
+                appointments: apts.map(toEntry),
+                showStaffColumn: true,
+              }),
+            })
+            digestsSent++
+          } catch (err) {
+            console.error(`[send-reminders] Owner digest email failed for ${tenant.id}:`, err)
+          }
+        }
+        if (digestCfg.owner_sms === true && tenant.phone && hasTwilio) {
+          const summary = apts.slice(0, 8).map(a => {
+            const e = toEntry(a)
+            return `${e.timeStr} — ${e.clientName} (${e.serviceName})`
+          }).join('\n')
+          const more = apts.length > 8 ? `\n…and ${apts.length - 8} more` : ''
+          await sendSms(toE164(tenant.phone) || tenant.phone,
+            `📅 Today at ${businessName} (${dateLabel}): ${apts.length} appointment${apts.length !== 1 ? 's' : ''}\n${summary}${more}`)
+        }
+
+        // ── Each staff member: their own appointments ──
+        if (resend) {
+          for (const s of staffList || []) {
+            if (!s.email || s.role === 'owner') continue // owner already got the full digest
+            const mine = apts.filter(a => a.staff_id === s.id)
+            if (mine.length === 0) continue
+            try {
+              await resend.emails.send({
+                from: `${businessName} <bookings@joinglowup.org>`,
+                replyTo: ownerEmail || undefined,
+                to: [s.email],
+                subject: `📅 Your schedule today — ${mine.length} appointment${mine.length !== 1 ? 's' : ''} (${dateLabel})`,
+                html: dailyDigestHtml({
+                  recipientName: s.name,
+                  businessName,
+                  dateLabel,
+                  appointments: mine.map(toEntry),
+                }),
+              })
+              digestsSent++
+            } catch (err) {
+              console.error(`[send-reminders] Staff digest email failed for ${s.id}:`, err)
+            }
+          }
+        }
+      } catch (err) {
+        console.error(`[send-reminders] Digest failed for tenant ${tenant.id}:`, err)
+      }
+    }
+  }
+
   return NextResponse.json({
     message: `Processed reminders`,
     sent: totalSent,
     skipped: totalSkipped,
     failed: totalFailed,
+    digests: digestsSent,
   })
 }

@@ -107,12 +107,13 @@ export default function BookingClient({ slug }: { slug: string }) {
     load()
   }, [slug])
 
-  // Re-fetch booked slots when entering date/time step to prevent stale data
+  // Re-fetch booked slots when entering date/time step to prevent stale data.
+  // only=slots skips re-downloading the business/services/staff payload.
   useEffect(() => {
     if (step !== 2) return
     async function refreshSlots() {
       try {
-        const res = await fetch(`/api/public-booking?slug=${encodeURIComponent(slug)}`)
+        const res = await fetch(`/api/public-booking?slug=${encodeURIComponent(slug)}&only=slots`)
         if (!res.ok) return
         const data = await res.json()
         setBookedSlots(data.bookedSlots)

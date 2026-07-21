@@ -107,6 +107,48 @@ function detailRow(emoji: string, label: string, value: string): string {
 </tr>`
 }
 
+// ─── Daily Schedule Digest (owner & staff) ───
+// Sent each morning by the send-reminders cron: the owner gets the full day,
+// each staff member gets their own appointments.
+export function dailyDigestHtml(opts: {
+  recipientName: string
+  businessName: string
+  dateLabel: string
+  appointments: { timeStr: string; clientName: string; serviceName: string; staffName?: string }[]
+  showStaffColumn?: boolean
+}): string {
+  const { recipientName, businessName, dateLabel, appointments, showStaffColumn } = opts
+
+  const rows = appointments.map(a => `<tr>
+    <td style="padding:10px 12px;color:#e8e8f0;font-size:14px;font-weight:600;white-space:nowrap;border-bottom:1px solid #2e2e52;">${a.timeStr}</td>
+    <td style="padding:10px 12px;color:#e8e8f0;font-size:14px;border-bottom:1px solid #2e2e52;">${escapeHtml(a.clientName)}</td>
+    <td style="padding:10px 12px;color:#a0a0c0;font-size:14px;border-bottom:1px solid #2e2e52;">${escapeHtml(a.serviceName)}</td>
+    ${showStaffColumn ? `<td style="padding:10px 12px;color:#a0a0c0;font-size:14px;border-bottom:1px solid #2e2e52;">${escapeHtml(a.staffName || '—')}</td>` : ''}
+  </tr>`).join('\n')
+
+  const header = `<tr>
+    <td style="padding:8px 12px;color:#6b6b8d;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">Time</td>
+    <td style="padding:8px 12px;color:#6b6b8d;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">Client</td>
+    <td style="padding:8px 12px;color:#6b6b8d;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">Service</td>
+    ${showStaffColumn ? `<td style="padding:8px 12px;color:#6b6b8d;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">Staff</td>` : ''}
+  </tr>`
+
+  const body = `
+    <p style="margin:0 0 4px;color:#e8e8f0;font-size:16px;">Good morning, ${escapeHtml(recipientName)}! ☀️</p>
+    <p style="margin:0 0 20px;color:#a0a0c0;font-size:14px;">Here's your schedule for <strong style="color:#e8e8f0;">${dateLabel}</strong> — ${appointments.length} appointment${appointments.length !== 1 ? 's' : ''}.</p>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#1e1e3a;border-radius:12px;overflow:hidden;">
+      ${header}
+      ${rows}
+    </table>
+
+    <p style="margin:24px 0 0;color:#a0a0c0;font-size:14px;">Have a great day! 💜</p>
+    <p style="margin:4px 0 0;color:#a0a0c0;font-size:14px;">— ${businessName}</p>
+  `
+
+  return emailShell(businessName, body)
+}
+
 // ─── Calendar Helpers ───
 
 /** Format ISO date for Google Calendar (YYYYMMDDTHHmmssZ) */

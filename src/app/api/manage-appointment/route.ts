@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { toE164 } from '@/lib/utils'
+import { resolveTenantTz } from '@/lib/notifications'
 import { rescheduleConfirmationHtml, cancellationConfirmationHtml, staffCancellationNotificationHtml, staffRescheduleNotificationHtml, ownerNotificationHtml, googleCalendarUrl } from '@/lib/email-templates'
 
 // Public API — token-based auth (no login required)
@@ -111,7 +112,7 @@ export async function PATCH(request: Request) {
       id, tenant_id, start_time, end_time, status, service_id, staff_id, client_id,
       services ( name, duration_minutes ),
       staff!staff_id ( name, email ),
-      clients ( first_name, last_name, email, phone )
+      clients ( first_name, last_name, email, phone, sms_opt_out )
     `)
     .eq('manage_token', token)
     .single()
@@ -131,13 +132,13 @@ export async function PATCH(request: Request) {
   // Get tenant info for notifications
   const { data: tenant } = await svc
     .from('tenants')
-    .select('id, name, email, phone, address, settings')
+    .select('id, name, email, phone, address, timezone, settings')
     .eq('id', apt.tenant_id)
     .single()
 
   const service = apt.services as unknown as { name: string; duration_minutes: number } | null
   const staff = apt.staff as unknown as { name: string; email: string | null } | null
-  const client = apt.clients as unknown as { first_name: string; last_name: string; email: string | null; phone: string | null } | null
+  const client = apt.clients as unknown as { first_name: string; last_name: string; email: string | null; phone: string | null; sms_opt_out?: boolean } | null
   const clientName = client ? `${client.first_name} ${client.last_name || ''}`.trim() : 'Client'
   // Greeting format: "Dear James D." instead of full name
   const clientGreeting = client
@@ -150,7 +151,7 @@ export async function PATCH(request: Request) {
   const businessAddress = (tenant?.address as string) || ''
 
   const tenantSettings = (tenant?.settings || {}) as Record<string, unknown>
-  const tz = (tenantSettings.timezone as string) || (tenant as { timezone?: string })?.timezone || 'America/Los_Angeles'
+  const tz = resolveTenantTz(tenant)
 
   if (action === 'cancel') {
     // Cancel the appointment
@@ -358,40 +359,32 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Failed to reschedule' }, { status: 500 })
     }
 
-    // Update reminders: delete old pending ones, create new ones
+    // Update reminders: delete ALL old rows, then create fresh ones.
+    // Deleting only 'pending' rows left already-fired rows ('sent'/'skipped')
+    // in place, and the unique index on (appointment_id, type, channel) then
+    // rejected the ENTIRE re-insert batch — the rescheduled appointment ended
+    // up with zero reminders.
     await svc
       .from('appointment_reminders')
       .delete()
       .eq('appointment_id', apt.id)
-      .eq('status', 'pending')
 
-    // Create new reminders
+    // Create new reminders (SMS only if the client hasn't opted out)
     const reminderRows: { tenant_id: string; appointment_id: string; client_id: string; type: string; channel: string; status: string }[] = []
     if (apt.client_id) {
-      // 24h reminders
-      if (client?.phone) {
-        reminderRows.push({ tenant_id: apt.tenant_id, appointment_id: apt.id, client_id: apt.client_id, type: '24h', channel: 'sms', status: 'pending' })
-      }
-      if (client?.email) {
-        reminderRows.push({ tenant_id: apt.tenant_id, appointment_id: apt.id, client_id: apt.client_id, type: '24h', channel: 'email', status: 'pending' })
-      }
-      // 2h reminders
-      if (client?.phone) {
-        reminderRows.push({ tenant_id: apt.tenant_id, appointment_id: apt.id, client_id: apt.client_id, type: '2h', channel: 'sms', status: 'pending' })
-      }
-      if (client?.email) {
-        reminderRows.push({ tenant_id: apt.tenant_id, appointment_id: apt.id, client_id: apt.client_id, type: '2h', channel: 'email', status: 'pending' })
-      }
-      // 1h reminders
-      if (client?.phone) {
-        reminderRows.push({ tenant_id: apt.tenant_id, appointment_id: apt.id, client_id: apt.client_id, type: '1h', channel: 'sms', status: 'pending' })
-      }
-      if (client?.email) {
-        reminderRows.push({ tenant_id: apt.tenant_id, appointment_id: apt.id, client_id: apt.client_id, type: '1h', channel: 'email', status: 'pending' })
+      const smsOk = !!client?.phone && !client?.sms_opt_out
+      for (const type of ['24h', '2h', '1h']) {
+        if (smsOk) {
+          reminderRows.push({ tenant_id: apt.tenant_id, appointment_id: apt.id, client_id: apt.client_id, type, channel: 'sms', status: 'pending' })
+        }
+        if (client?.email) {
+          reminderRows.push({ tenant_id: apt.tenant_id, appointment_id: apt.id, client_id: apt.client_id, type, channel: 'email', status: 'pending' })
+        }
       }
     }
     if (reminderRows.length > 0) {
-      await svc.from('appointment_reminders').insert(reminderRows)
+      const { error: remErr } = await svc.from('appointment_reminders').insert(reminderRows)
+      if (remErr) console.error('[manage-appointment] Failed to recreate reminders:', remErr)
     }
 
     // Notify business owner

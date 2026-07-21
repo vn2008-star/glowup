@@ -29,9 +29,12 @@ const TIER_COLORS: Record<string, string> = {
 };
 
 const LOYALTY_AUTOMATIONS = [
-  { key: "auto_birthday", name: "🎂 Birthday Auto-Send", trigger: "7 days before birthday", channel: "SMS + Email" },
+  { key: "auto_birthday", name: "🎂 Birthday Auto-Send", trigger: "Before each client's birthday", channel: "Configurable" },
   { key: "auto_loyalty", name: "🏆 Loyalty Milestone", trigger: "When reaching point threshold", channel: "SMS + Email" },
 ];
+
+const DEFAULT_BDAY_MESSAGE =
+  "Happy Birthday, {name}! 🎂 {business_name} wants to celebrate YOU — enjoy {discount}% off any service this month! Book now → {booking_url}";
 
 export default function LoyaltyPage() {
   const { tenant, refetch } = useTenant();
@@ -45,6 +48,10 @@ export default function LoyaltyPage() {
 
   // Automation toggles
   const [automationStates, setAutomationStates] = useState<Record<string, boolean>>({});
+
+  // Birthday special config (per-business, consumed by run-automations)
+  const [bdayCfg, setBdayCfg] = useState({ discount: "20", days: "7", channel: "both", message: "" });
+  const [bdaySaved, setBdaySaved] = useState<"idle" | "saving" | "saved">("idle");
 
   const fetchLoyalty = useCallback(async () => {
     if (!tenant) return;
@@ -70,8 +77,45 @@ export default function LoyaltyPage() {
     });
     setAutomationStates(states);
 
+    const auto = autoSettings as Record<string, unknown>;
+    setBdayCfg({
+      discount: String(auto.auto_birthday_discount || "20"),
+      days: String(auto.auto_birthday_days || "7"),
+      channel: String(auto.auto_birthday_channel || "both"),
+      message: String(auto.auto_birthday_message || ""),
+    });
+
     setLoading(false);
   }, [tenant]);
+
+  async function handleSaveBirthdayConfig() {
+    setBdaySaved("saving");
+    const settings = (tenant?.settings || {}) as Record<string, unknown>;
+    const existingAuto = (settings.automations || {}) as Record<string, unknown>;
+    const res = await fetch("/api/save-settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        settings: {
+          ...settings,
+          automations: {
+            ...existingAuto,
+            auto_birthday_discount: bdayCfg.discount,
+            auto_birthday_days: bdayCfg.days,
+            auto_birthday_channel: bdayCfg.channel,
+            auto_birthday_message: bdayCfg.message.trim(),
+          },
+        },
+      }),
+    });
+    if (res.ok) {
+      refetch();
+      setBdaySaved("saved");
+      setTimeout(() => setBdaySaved("idle"), 2000);
+    } else {
+      setBdaySaved("idle");
+    }
+  }
 
   useEffect(() => { fetchLoyalty(); }, [fetchLoyalty]);
 
@@ -200,20 +244,66 @@ export default function LoyaltyPage() {
         <p>Automate messages to keep clients engaged and coming back</p>
         <div className={styles.automationList}>
           {LOYALTY_AUTOMATIONS.map((a) => (
-            <div key={a.key} className={`card ${styles.automationCard}`}>
-              <div className={styles.automationInfo}>
-                <h3>{a.name}</h3>
-                <div className={styles.automationMeta}>
-                  <span className={styles.trigger}>⚡ {a.trigger}</span>
-                  <span className={styles.channel}>📱 {a.channel}</span>
+            <div key={a.key}>
+              <div className={`card ${styles.automationCard}`}>
+                <div className={styles.automationInfo}>
+                  <h3>{a.name}</h3>
+                  <div className={styles.automationMeta}>
+                    <span className={styles.trigger}>⚡ {a.key === "auto_birthday" ? `${bdayCfg.days} days before birthday` : a.trigger}</span>
+                    <span className={styles.channel}>📱 {a.key === "auto_birthday" ? (bdayCfg.channel === "both" ? "SMS + Email" : bdayCfg.channel.toUpperCase()) : a.channel}</span>
+                  </div>
+                </div>
+                <div>
+                  <label className={styles.toggleLabel}>
+                    <input type="checkbox" checked={automationStates[a.key] || false} onChange={() => handleToggleAutomation(a.key)} />
+                    <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
+                  </label>
                 </div>
               </div>
-              <div>
-                <label className={styles.toggleLabel}>
-                  <input type="checkbox" checked={automationStates[a.key] || false} onChange={() => handleToggleAutomation(a.key)} />
-                  <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
-                </label>
-              </div>
+
+              {/* Birthday special config — each business sets its own offer */}
+              {a.key === "auto_birthday" && automationStates.auto_birthday && (
+                <div className="card" style={{ marginTop: "-0.5rem", marginBottom: "1rem", padding: "1rem 1.25rem", borderTop: "none", borderTopLeftRadius: 0, borderTopRightRadius: 0 }}>
+                  <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", marginBottom: "0.75rem" }}>
+                    <label style={{ display: "flex", flexDirection: "column", gap: "0.25rem", fontSize: "0.85rem", color: "var(--text-secondary)" }}>
+                      Discount %
+                      <input className="input" type="number" min={0} max={100} style={{ width: 100 }}
+                        value={bdayCfg.discount}
+                        onChange={(e) => setBdayCfg((c) => ({ ...c, discount: e.target.value }))} />
+                    </label>
+                    <label style={{ display: "flex", flexDirection: "column", gap: "0.25rem", fontSize: "0.85rem", color: "var(--text-secondary)" }}>
+                      Send (days before)
+                      <input className="input" type="number" min={0} max={30} style={{ width: 120 }}
+                        value={bdayCfg.days}
+                        onChange={(e) => setBdayCfg((c) => ({ ...c, days: e.target.value }))} />
+                    </label>
+                    <label style={{ display: "flex", flexDirection: "column", gap: "0.25rem", fontSize: "0.85rem", color: "var(--text-secondary)" }}>
+                      Channel
+                      <select className="input" style={{ width: 140 }}
+                        value={bdayCfg.channel}
+                        onChange={(e) => setBdayCfg((c) => ({ ...c, channel: e.target.value }))}>
+                        <option value="both">SMS + Email</option>
+                        <option value="sms">SMS only</option>
+                        <option value="email">Email only</option>
+                      </select>
+                    </label>
+                  </div>
+                  <label style={{ display: "flex", flexDirection: "column", gap: "0.25rem", fontSize: "0.85rem", color: "var(--text-secondary)" }}>
+                    Message (blank = default) — tokens: {"{name}"}, {"{discount}"}, {"{business_name}"}, {"{booking_url}"}
+                    <textarea className="input" rows={3} placeholder={DEFAULT_BDAY_MESSAGE}
+                      value={bdayCfg.message}
+                      onChange={(e) => setBdayCfg((c) => ({ ...c, message: e.target.value }))} />
+                  </label>
+                  <div style={{ marginTop: "0.75rem", display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                    <button className="btn btn-primary btn-sm" onClick={handleSaveBirthdayConfig} disabled={bdaySaved === "saving"}>
+                      {bdaySaved === "saving" ? "Saving…" : bdaySaved === "saved" ? "✓ Saved" : "Save Birthday Special"}
+                    </button>
+                    <span style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>
+                      Emails include a Book button automatically.
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>

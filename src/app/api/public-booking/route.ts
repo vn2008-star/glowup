@@ -3,7 +3,8 @@ import { waitUntil } from '@vercel/functions'
 import { createClient } from '@supabase/supabase-js'
 import { timezoneFromAddress, DEFAULT_TZ } from '@/lib/tz'
 import { toE164 } from '@/lib/utils'
-import { bookingConfirmationHtml, googleCalendarUrl } from '@/lib/email-templates'
+import { resolveTenantTz } from '@/lib/notifications'
+import { bookingConfirmationHtml, promoEmailHtml, googleCalendarUrl } from '@/lib/email-templates'
 
 // Public API — no auth required. Used by the /book/[slug] public booking page.
 if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -33,6 +34,25 @@ export async function GET(request: Request) {
   if (tErr || !tenant) {
     console.error('[public-booking] tenant lookup failed', { slug, error: tErr?.message, code: tErr?.code })
     return NextResponse.json({ error: 'Business not found' }, { status: 404 })
+  }
+
+  // Lightweight mode: the booking page re-checks availability at step 2 and
+  // only needs fresh bookedSlots — skip the services/staff queries and payload.
+  if (searchParams.get('only') === 'slots') {
+    const tenantSettingsLite = (tenant.settings || {}) as Record<string, unknown>
+    const bookingLite = (tenantSettingsLite.booking || {}) as Record<string, string>
+    const lookAhead = parseInt(bookingLite.advanceBookingDays || '30', 10) || 30
+    const nowLite = new Date()
+    const { data: aptsLite } = await svc
+      .from('appointments')
+      .select('staff_id, start_time, end_time')
+      .eq('tenant_id', tenant.id)
+      .gt('end_time', nowLite.toISOString())
+      .lt('start_time', new Date(nowLite.getTime() + lookAhead * 24 * 60 * 60 * 1000).toISOString())
+      .in('status', ['pending', 'confirmed', 'blocked'])
+    return NextResponse.json({
+      bookedSlots: (aptsLite || []).map(a => ({ staff_id: a.staff_id, start: a.start_time, end: a.end_time })),
+    })
   }
 
   // Get active services
@@ -126,10 +146,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
-  // Resolve tenant (include name, phone, address, settings for notifications)
+  // Resolve tenant (include name, phone, address, timezone, settings for notifications)
   const { data: tenant } = await svc
     .from('tenants')
-    .select('id, name, email, phone, address, settings')
+    .select('id, name, email, phone, address, timezone, settings')
     .eq('slug', slug)
     .single()
 
@@ -150,6 +170,48 @@ export async function POST(request: Request) {
     cursor = e.getTime()
   }
   const overallEnd = new Date(cursor)
+
+  // ── "Any Available": assign a concrete free staff member ──
+  // Null-staff appointments bypass BOTH the conflict pre-check below and the
+  // DB exclusion constraint (it only covers staff_id IS NOT NULL), so several
+  // customers picking "Any Available" for the same slot all used to succeed.
+  // Resolving to a real staff member here puts every booking under the
+  // constraint's protection.
+  if (windows.some(w => !w.staff_id)) {
+    const { data: candidates } = await svc
+      .from('staff')
+      .select('id')
+      .eq('tenant_id', tenant.id)
+      .eq('is_active', true)
+      .neq('name', 'Admin')
+
+    const { data: busy } = await svc
+      .from('appointments')
+      .select('staff_id, start_time, end_time')
+      .eq('tenant_id', tenant.id)
+      .in('status', ['pending', 'confirmed', 'blocked'])
+      .lt('start_time', overallEnd.toISOString())
+      .gt('end_time', overallStart.toISOString())
+
+    for (const w of windows) {
+      if (w.staff_id) continue
+      const free = (candidates || []).find(c =>
+        // no existing appointment overlapping this window...
+        !(busy || []).some(b => b.staff_id === c.id &&
+          new Date(b.start_time) < w.end && new Date(b.end_time) > w.start) &&
+        // ...and not already claimed by another window of this same booking
+        !windows.some(o => o !== w && o.staff_id === c.id &&
+          o.start < w.end && o.end > w.start)
+      )
+      if (!free) {
+        return NextResponse.json(
+          { error: 'This time slot is no longer available. Please choose another time.' },
+          { status: 409 }
+        )
+      }
+      w.staff_id = free.id
+    }
+  }
 
   // ── Server-side double-booking prevention (per-staff conflict check) ──
   // Group windows by staff_id and check each staff's appointments
@@ -240,12 +302,15 @@ export async function POST(request: Request) {
     }
 
     clientId = newClient.id
-  } else if (client_birthday) {
-    // Update existing client's birthday if provided
-    await svc
-      .from('clients')
-      .update({ birthday: client_birthday })
-      .eq('id', clientId)
+  } else {
+    // Returning client: refresh birthday and their SMS consent choice. The
+    // consent checkbox used to be silently discarded for existing clients.
+    const updates: Record<string, unknown> = {}
+    if (client_birthday) updates.birthday = client_birthday
+    if ('sms_consent' in body) updates.sms_opt_out = !smsConsent
+    if (Object.keys(updates).length > 0) {
+      await svc.from('clients').update(updates).eq('id', clientId)
+    }
   }
 
   // ── Create appointments (one per service, back-to-back) ──
@@ -398,7 +463,7 @@ export async function PATCH(request: Request) {
 // Sends SMS + Email to the client AND the business owner right after booking.
 // Also creates 24h reminder rows for the existing cron to pick up.
 async function sendBookingConfirmations(opts: {
-  tenant: { id: string; name: string; email: string | null; phone: string | null; address: string | null; settings: Record<string, unknown> | null }
+  tenant: { id: string; name: string; email: string | null; phone: string | null; address: string | null; timezone?: string | null; settings: Record<string, unknown> | null }
   appointment: { id: string; start_time: string; end_time: string; manage_token?: string }
   serviceName: string
   staffName: string
@@ -458,9 +523,10 @@ async function sendBookingConfirmations(opts: {
   const businessPhone = tenant.phone || ownerFallbackPhone
   const businessEmail = tenant.email || ownerFallbackEmail
 
-  // Determine tenant timezone for display
+  // Determine tenant timezone for display — the tenants.timezone COLUMN is
+  // the source of truth (Settings saves it there); the settings blob is legacy.
   const tenantSettings = (tenant.settings || {}) as Record<string, unknown>
-  const tz = (tenantSettings.timezone as string) || 'America/Los_Angeles'
+  const tz = resolveTenantTz(tenant)
 
   // Format date/time in tenant timezone
   let dateStr: string
@@ -629,6 +695,7 @@ async function sendBookingConfirmations(opts: {
 
     if (resendClient) {
       try {
+        const dashboardUrl = `${baseUrl}/dashboard/calendar`
         await resendClient.emails.send({
           from: `GlowUp <bookings@joinglowup.org>`,
           // Reply goes to the CLIENT — this mail tells the owner someone just
@@ -637,7 +704,7 @@ async function sendBookingConfirmations(opts: {
           replyTo: clientEmail || undefined,
           to: [ownerEmail],
           subject: `🆕 New Booking: ${clientName} — ${serviceName} on ${dateStr}`,
-          text: ownerEmailBody,
+          html: promoEmailHtml({ businessName, message: ownerEmailBody, ctaUrl: dashboardUrl, ctaText: 'View Calendar' }),
         })
         console.log(`[public-booking] ✅ Owner email sent to ${ownerEmail}`)
       } catch (err) {

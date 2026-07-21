@@ -267,10 +267,20 @@ export async function GET(request: Request) {
     if (dailyGateHour === 8) {
 
     // ── Birthday Auto-Send ──
+    // Discount, lead time, channel, and message are per-business settings
+    // (configured on the Loyalty page); the old 20%/7-day/both defaults apply
+    // when the owner hasn't customized anything.
     if (automations.auto_birthday !== false) {
+      const bdayDiscount = String(automations.auto_birthday_discount || '20')
+      const bdayDaysBefore = parseInt(String(automations.auto_birthday_days || '7'), 10) || 7
+      const bdayChannel = (['sms', 'email', 'both'].includes(String(automations.auto_birthday_channel))
+        ? String(automations.auto_birthday_channel) : 'both') as 'sms' | 'email' | 'both'
+      const bdayTemplate = String(automations.auto_birthday_message || '')
+        || `Happy Birthday, {name}! 🎂 {business_name} wants to celebrate YOU — enjoy {discount}% off any service this month! Book now → {booking_url}`
+
       const today = new Date()
       const targetDate = new Date(today)
-      targetDate.setDate(targetDate.getDate() + 7) // 7 days from now
+      targetDate.setDate(targetDate.getDate() + bdayDaysBefore)
       const targetMonth = targetDate.getMonth() + 1
       const targetDay = targetDate.getDate()
 
@@ -290,11 +300,16 @@ export async function GET(request: Request) {
           const clientGreeting = client.last_name
             ? `${clientFirst} ${(client.last_name as string)[0]}.`
             : clientFirst
-          const message = `Happy Birthday, ${clientGreeting}! 🎂 ${businessName} wants to celebrate YOU — enjoy 20% off any service this month! Book now → ${bookingUrl}`
+          const message = bdayTemplate
+            .replace(/\{name\}/g, clientGreeting)
+            .replace(/\{greeting\}/g, clientGreeting)
+            .replace(/\{discount\}/g, bdayDiscount)
+            .replace(/\{business_name\}/g, businessName)
+            .replace(/\{booking_url\}/g, bookingUrl)
 
           await sendMessage({
-            client, message, businessName, businessEmail, twilioClient, resendClient, channel: 'both',
-            subject: `🎂 Happy Birthday from ${businessName} — 20% off for you!`,
+            client, message, businessName, businessEmail, twilioClient, resendClient, channel: bdayChannel,
+            subject: `🎂 Happy Birthday from ${businessName} — ${bdayDiscount}% off for you!`,
             ctaUrl: bookingUrl,
             ctaText: 'Book Your Birthday Treat',
           })

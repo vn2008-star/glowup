@@ -25,6 +25,8 @@ export default function DashboardOverview() {
   });
   const [recentClients, setRecentClients] = useState<Client[]>([]);
   const [atRiskClients, setAtRiskClients] = useState<Client[]>([]);
+  const [upcomingBirthdays, setUpcomingBirthdays] = useState<(Client & { days_away: number })[]>([]);
+  const [promoSent, setPromoSent] = useState<Record<string, "sending" | "sent" | "error">>({});
   const [loading, setLoading] = useState(true);
 
   const fetchDashboardData = useCallback(async () => {
@@ -40,6 +42,7 @@ export default function DashboardOverview() {
       retentionRate: number;
       recentClients: Client[];
       atRiskClients: Client[];
+      upcomingBirthdays: (Client & { days_away: number })[];
     }>("dashboard.overview");
 
     if (data) {
@@ -54,10 +57,17 @@ export default function DashboardOverview() {
       });
       setRecentClients(data.recentClients);
       setAtRiskClients(data.atRiskClients);
+      setUpcomingBirthdays(data.upcomingBirthdays || []);
     }
 
     setLoading(false);
   }, [tenant]);
+
+  async function sendBirthdayPromo(clientId: string) {
+    setPromoSent((p) => ({ ...p, [clientId]: "sending" }));
+    const { data, error } = await queryData<{ sent: number }>("clients.send_birthday_promo", { id: clientId });
+    setPromoSent((p) => ({ ...p, [clientId]: !error && data && data.sent > 0 ? "sent" : "error" }));
+  }
 
   useEffect(() => {
     fetchDashboardData();
@@ -70,15 +80,16 @@ export default function DashboardOverview() {
     const hasHours = !!settings.business_hours;
     // Check if basic setup is missing: no hours, no staff, no services
     if (!hasHours && metrics.todayAppointments === 0 && metrics.totalClients === 0) {
-      // Likely a new subscriber — check staff/services count
-      queryData<{ id: string }[]>("staff.list").then(({ data: staffData }) => {
-        queryData<{ id: string }[]>("services.list").then(({ data: serviceData }) => {
-          const staffCount = staffData?.length || 0;
-          const serviceCount = serviceData?.length || 0;
-          if (staffCount === 0 || serviceCount === 0 || !hasHours) {
-            router.replace("/dashboard/quick-start");
-          }
-        });
+      // Likely a new subscriber — check staff/services count (in parallel)
+      Promise.all([
+        queryData<{ id: string }[]>("staff.list"),
+        queryData<{ id: string }[]>("services.list"),
+      ]).then(([{ data: staffData }, { data: serviceData }]) => {
+        const staffCount = staffData?.length || 0;
+        const serviceCount = serviceData?.length || 0;
+        if (staffCount === 0 || serviceCount === 0 || !hasHours) {
+          router.replace("/dashboard/quick-start");
+        }
       });
     }
   }, [tenant, loading, metrics, router]);
@@ -183,6 +194,47 @@ export default function DashboardOverview() {
 
         {/* Right Column */}
         <div className={styles.rightCol}>
+          {/* Upcoming Birthdays */}
+          <div className={`card ${styles.recentCard}`} style={{ border: "1px solid var(--color-primary)" }}>
+            <div className={styles.scheduleHeader}>
+              <h2>🎂 Upcoming Birthdays</h2>
+              <a href="/dashboard/loyalty" className={styles.viewAll}>Birthday Special</a>
+            </div>
+            {loading ? (
+              <p className={styles.emptySchedule}>Loading...</p>
+            ) : upcomingBirthdays.length === 0 ? (
+              <p className={styles.emptySchedule}>No birthdays in the next 30 days</p>
+            ) : (
+              <div className={styles.recentList}>
+                {upcomingBirthdays.map((c) => {
+                  const bday = c.birthday ? new Date(c.birthday + "T00:00:00") : null;
+                  const when = c.days_away === 0 ? "Today! 🎉" : c.days_away === 1 ? "Tomorrow" : `in ${c.days_away} days`;
+                  const status = promoSent[c.id];
+                  return (
+                    <div key={c.id} className={styles.recentRow}>
+                      <div className={styles.clientAvatar} style={{ background: "var(--color-primary)" }}>🎂</div>
+                      <div className={styles.clientInfo}>
+                        <span className={styles.clientName}>{c.first_name} {c.last_name || ""}</span>
+                        <span className={styles.clientMeta}>
+                          {bday ? localeDateStr(bday, { month: "short", day: "numeric" }) : ""} · {when}
+                        </span>
+                      </div>
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        style={{ marginLeft: "auto", whiteSpace: "nowrap" }}
+                        disabled={status === "sending" || status === "sent"}
+                        onClick={() => sendBirthdayPromo(c.id)}
+                        title="Send this client your birthday special now"
+                      >
+                        {status === "sent" ? "✓ Sent" : status === "sending" ? "Sending…" : status === "error" ? "Retry" : "🎁 Send Special"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
           {/* Recent Clients */}
           <div className={`card ${styles.recentCard}`}>
             <h2>{t("recentClients")}</h2>

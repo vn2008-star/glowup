@@ -251,14 +251,14 @@ export default function CalendarPage() {
 
   useEffect(() => { fetchCalendarData(); }, [fetchCalendarData]);
 
-  // Load birthday clients once on mount (lightweight — just name + birthday)
+  // Load birthday clients once on mount — dedicated 4-column query instead of
+  // pulling the full 20-column client table just for 🎂 markers
   useEffect(() => {
     if (!tenant || birthdayClients.length > 0) return;
-    queryData<Client[]>("clients.list").then(res => {
-      const withBirthday = (res.data || []).filter(c => c.birthday).map(c => ({
+    queryData<Client[]>("clients.birthdays").then(res => {
+      setBirthdayClients((res.data || []).map(c => ({
         id: c.id, first_name: c.first_name, last_name: c.last_name, birthday: c.birthday,
-      }));
-      setBirthdayClients(withBirthday);
+      })));
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenant]);
@@ -383,7 +383,11 @@ export default function CalendarPage() {
     e.preventDefault();
     if (!formData.start_time || !formData.service_id) return;
     const service = services.find(s => s.id === formData.service_id);
-    const start = new Date(formData.start_time);
+    // datetime-local gives "YYYY-MM-DDTHH:mm" with no zone. Interpret it in the
+    // SALON's timezone, not the browser's — a remote staffer's browser tz used
+    // to shift the stored time.
+    const [aptDate, aptTime] = formData.start_time.split("T");
+    const start = localToUTC(aptDate, aptTime, salonTz);
     const end = new Date(start.getTime() + (service?.duration_minutes || 60) * 60 * 1000);
     const { data, error } = await queryData<FullAppointment>("appointments.add", {
       client_id: formData.client_id || null,
@@ -425,8 +429,8 @@ export default function CalendarPage() {
   async function handleBlockTime(e: React.FormEvent) {
     e.preventDefault();
     if (!blockData.staff_id || !blockData.date || !blockData.start_time || !blockData.end_time) return;
-    const start = new Date(`${blockData.date}T${blockData.start_time}:00`);
-    const end = new Date(`${blockData.date}T${blockData.end_time}:00`);
+    const start = localToUTC(blockData.date, blockData.start_time, salonTz);
+    const end = localToUTC(blockData.date, blockData.end_time, salonTz);
     if (end <= start) {
       alert("End time must be after start time");
       return;
@@ -1050,13 +1054,23 @@ export default function CalendarPage() {
               <button
                 className={styles.deleteBtn}
                 onClick={async () => {
-                  if (!confirm("Delete this appointment?")) return;
-                  await queryData("appointments.delete", { id: selectedApt.id });
-                  setAppointments(prev => prev.filter(a => a.id !== selectedApt.id));
+                  // Time-blocks have no client — a hard delete is fine there.
+                  // Real appointments get CANCELLED instead: the row stays for
+                  // history/reporting and the client is notified automatically.
+                  if (isBlocked(selectedApt)) {
+                    if (!confirm("Remove this blocked time?")) return;
+                    await queryData("appointments.delete", { id: selectedApt.id });
+                    setAppointments(prev => prev.filter(a => a.id !== selectedApt.id));
+                  } else {
+                    if (!confirm("Cancel this appointment? The client will be notified by text/email.")) return;
+                    const res = await queryData<{ id: string }>("appointments.cancel", { id: selectedApt.id });
+                    if (res.error) { alert(`Failed to cancel: ${res.error}`); return; }
+                    setAppointments(prev => prev.map(a => a.id === selectedApt.id ? { ...a, status: "cancelled" } : a));
+                  }
                   setSelectedApt(null);
                 }}
               >
-                🗑 Delete
+                {isBlocked(selectedApt) ? "🗑 Remove Block" : "❌ Cancel Appointment"}
               </button>
             </div>
           </div>
@@ -1071,9 +1085,11 @@ export default function CalendarPage() {
             <form onSubmit={async (e) => {
               e.preventDefault();
               if (editingApt) {
-                // Update existing
+                // Update existing — interpret the datetime-local value in the
+                // salon's timezone (see handleAddAppointment)
                 const service = services.find(s => s.id === formData.service_id);
-                const start = new Date(formData.start_time);
+                const [editDate, editTime] = formData.start_time.split("T");
+                const start = localToUTC(editDate, editTime, salonTz);
                 const end = new Date(start.getTime() + (service?.duration_minutes || 60) * 60000);
                 const res = await queryData<FullAppointment>("appointments.update", {
                   id: editingApt.id,

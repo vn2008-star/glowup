@@ -1,31 +1,16 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { authenticate, isAuthFailure } from '@/lib/api-auth'
 
 // Upload file to Supabase Storage
 export async function POST(request: Request) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
-  }
+  const caller = await authenticate()
+  if (isAuthFailure(caller)) return caller.response
 
   const svc = createServiceClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
-
-  // Get tenant_id
-  const { data: staffRecord } = await svc
-    .from('staff')
-    .select('tenant_id')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!staffRecord) {
-    return NextResponse.json({ error: 'No tenant' }, { status: 404 })
-  }
 
   const formData = await request.formData()
   const file = formData.get('file') as File
@@ -37,7 +22,7 @@ export async function POST(request: Request) {
 
   // Create unique filename
   const ext = file.name.split('.').pop() || 'jpg'
-  const fileName = `${staffRecord.tenant_id}/${folder}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`
+  const fileName = `${caller.tenantId}/${folder}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`
 
   // Upload to Supabase Storage
   const arrayBuffer = await file.arrayBuffer()
