@@ -58,14 +58,24 @@ export function clearTenantCache() {
   try { sessionStorage.removeItem(CACHE_KEY) } catch { /* ignore */ }
 }
 
-export function TenantProvider({ children }: { children: ReactNode }) {
-  const [tenant, setTenant] = useState<Tenant | null>(null)
-  const [currentStaff, setCurrentStaff] = useState<Staff | null>(null)
-  const [loading, setLoading] = useState(true)
+export interface TenantInitialData {
+  tenant: Tenant
+  staff: Staff
+  isImpersonating: boolean
+  impersonatingTenantName: string | null
+  isPlatformAdmin: boolean
+}
+
+export function TenantProvider({ children, initialData }: { children: ReactNode; initialData?: TenantInitialData | null }) {
+  // When the dashboard layout resolved the tenant server-side, hydrate straight
+  // from props — no /api/get-tenant round-trip, no loading spinner.
+  const [tenant, setTenant] = useState<Tenant | null>(initialData?.tenant ?? null)
+  const [currentStaff, setCurrentStaff] = useState<Staff | null>(initialData?.staff ?? null)
+  const [loading, setLoading] = useState(!initialData)
   const [error, setError] = useState<string | null>(null)
-  const [isImpersonating, setIsImpersonating] = useState(false)
-  const [impersonatingTenantName, setImpersonatingTenantName] = useState<string | null>(null)
-  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false)
+  const [isImpersonating, setIsImpersonating] = useState(initialData?.isImpersonating ?? false)
+  const [impersonatingTenantName, setImpersonatingTenantName] = useState<string | null>(initialData?.impersonatingTenantName ?? null)
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(initialData?.isPlatformAdmin ?? false)
   const setupFired = useRef(false)
 
   async function fetchTenant(skipCache = false) {
@@ -158,6 +168,9 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
+    // Server already provided the data — nothing to fetch. (refetch() still
+    // works for updates, e.g. after saving Settings.)
+    if (initialData) return
     fetchTenant()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
