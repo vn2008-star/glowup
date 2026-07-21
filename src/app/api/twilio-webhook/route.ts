@@ -2,6 +2,11 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { verifyTwilioRequest } from '@/lib/twilio-signature'
 import { phoneVariants } from '@/lib/utils'
+import { handleAiChat, resolveBotConfig, type TenantRow } from '@/lib/ai-receptionist'
+
+function xmlEscape(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
 
 // ─── Twilio Webhook: Handle SMS replies (STOP opt-out / START opt-in) ───
 // Configure this URL in Twilio Console → Phone Number → Messaging → Webhook
@@ -143,13 +148,62 @@ export async function POST(request: Request) {
     replyMessage = '📞 To modify your appointment, please call or text us directly and we\'ll find a new time for you!'
 
   } else {
-    replyMessage = 'Thanks for your message! Reply C to Confirm, M to Modify, X to Cancel your appointment. Reply STOP to opt out.'
+    // ── Not a keyword: hand the text to the AI Receptionist ──
+    // The sender's phone (verified by Twilio's signature) identifies the
+    // client AND their salon, so the AI can greet them by first name.
+    const rawBody = (formData.get('Body') as string || '').trim()
+    try {
+      const { data: client } = await supabase
+        .from('clients')
+        .select('id, tenant_id')
+        .in('phone', phoneVariants(from))
+        .limit(1)
+        .maybeSingle()
+
+      if (client) {
+        const { data: tenant } = await supabase
+          .from('tenants')
+          .select('id, name, slug, phone, email, address, timezone, settings')
+          .eq('id', client.tenant_id)
+          .single()
+
+        const botConfig = tenant ? resolveBotConfig(tenant as TenantRow) : null
+        if (tenant && botConfig?.enabled && botConfig.channels?.sms) {
+          // Continue the client's existing SMS thread if there is one
+          const { data: conv } = await supabase
+            .from('conversations')
+            .select('id')
+            .eq('tenant_id', tenant.id)
+            .eq('client_id', client.id)
+            .eq('channel', 'sms')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+
+          const result = await handleAiChat({
+            svc: supabase,
+            tenant: tenant as TenantRow,
+            message: rawBody,
+            conversationId: conv?.id || null,
+            clientPhone: from,
+            channel: 'sms',
+          })
+          if (result.ok) replyMessage = result.response
+        }
+      }
+    } catch (err) {
+      console.error('[twilio-webhook] AI receptionist failed:', err)
+    }
+
+    if (!replyMessage) {
+      replyMessage = 'Thanks for your message! Reply C to Confirm, M to Modify, X to Cancel your appointment. Reply STOP to opt out.'
+    }
   }
 
   // Return TwiML response
   const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Message>${replyMessage}</Message>
+  <Message>${xmlEscape(replyMessage)}</Message>
 </Response>`
 
   return new NextResponse(twiml, {
