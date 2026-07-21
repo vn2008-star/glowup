@@ -78,31 +78,11 @@ export function fillPlaceholders(template: string, vars: Record<string, string>)
   })
 }
 
-/** Send an SMS via the Twilio REST API (no SDK — works in Edge/Serverless). */
-export async function sendSms(to: string, body: string): Promise<boolean> {
-  const sid = process.env.TWILIO_ACCOUNT_SID
-  const token = process.env.TWILIO_AUTH_TOKEN
-  const from = process.env.TWILIO_PHONE_NUMBER
-  if (!sid || !token || !from) {
-    console.log(`[notifications] [DRY RUN] SMS to ${to}: ${body}`)
-    return false
-  }
-  const url = `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`
-  const auth = btoa(`${sid}:${token}`)
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Authorization': `Basic ${auth}`, 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ To: to, From: from, Body: body }).toString(),
-  })
-  if (!res.ok) {
-    const errBody = await res.text()
-    console.error(`[notifications] Twilio API error (${res.status}): ${errBody}`)
-    return false
-  }
-  const result = await res.json()
-  console.log(`[notifications] Twilio SMS queued: sid=${result.sid} status=${result.status}`)
-  return true
-}
+// SMS delivery is provider-routed (Twilio number OR the owner's own Android
+// phone via the SMS Gateway app) — see src/lib/sms.ts. Imported for local use
+// and re-exported so existing call sites keep working unchanged.
+import { sendSms } from '@/lib/sms'
+export { sendSms }
 
 /**
  * Insert pending 24h/2h/1h reminder rows for a client appointment.

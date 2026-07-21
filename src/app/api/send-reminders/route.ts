@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { toE164 } from '@/lib/utils'
 import { verifyCronRequest } from '@/lib/cron-auth'
-import { fillPlaceholders, resolveTenantTz, sendSms } from '@/lib/notifications'
+import { fillPlaceholders, resolveTenantTz } from '@/lib/notifications'
+import { sendSms, smsProvider } from '@/lib/sms'
 import { appointmentReminderHtml, dailyDigestHtml, googleCalendarUrl } from '@/lib/email-templates'
 import { localToUTC, nowInTz, formatInTz } from '@/lib/tz'
 
@@ -25,7 +26,7 @@ export async function GET(request: Request) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
-  const hasTwilio = process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER
+  const hasSms = smsProvider() !== null
   const hasResend = !!process.env.RESEND_API_KEY
 
   const now = new Date()
@@ -196,8 +197,8 @@ export async function GET(request: Request) {
             continue
           }
 
-          // Send SMS via Twilio REST API (no SDK — works in Edge/Serverless)
-          if (hasTwilio) {
+          // Send SMS via the configured provider (Twilio or the owner's Android phone)
+          if (hasSms) {
             const phoneE164 = toE164(client.phone as string)
             if (!phoneE164) {
               console.warn(`[send-reminders] ⚠️ Could not normalize phone: "${client.phone}"`)
@@ -205,19 +206,9 @@ export async function GET(request: Request) {
               totalSkipped++
               continue
             }
-            const sid = process.env.TWILIO_ACCOUNT_SID!
-            const token = process.env.TWILIO_AUTH_TOKEN!
-            const from = process.env.TWILIO_PHONE_NUMBER!
-            const url = `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`
-            const auth = btoa(`${sid}:${token}`)
-            const res = await fetch(url, {
-              method: 'POST',
-              headers: { 'Authorization': `Basic ${auth}`, 'Content-Type': 'application/x-www-form-urlencoded' },
-              body: new URLSearchParams({ To: phoneE164, From: from, Body: smsTemplate }).toString(),
-            })
-            if (!res.ok) {
-              const errBody = await res.text()
-              throw new Error(`Twilio API error (${res.status}): ${errBody}`)
+            const ok = await sendSms(phoneE164, smsTemplate)
+            if (!ok) {
+              throw new Error(`SMS send failed via ${smsProvider()}`)
             }
             console.log(`[send-reminders] ✅ ${win.type} SMS sent to ${phoneE164}`)
           } else {
@@ -283,7 +274,7 @@ export async function GET(request: Request) {
   // gets their own appointments. Config lives in settings.staff_reminders
   // ({ enabled, digest_hour, owner_sms }) — saved from Settings → Reminders.
   let digestsSent = 0
-  if (hasResend || hasTwilio) {
+  if (hasResend || hasSms) {
     const { data: allTenants } = await supabase
       .from('tenants')
       .select('id, name, email, phone, address, timezone, settings')
@@ -366,7 +357,7 @@ export async function GET(request: Request) {
             console.error(`[send-reminders] Owner digest email failed for ${tenant.id}:`, err)
           }
         }
-        if (digestCfg.owner_sms === true && tenant.phone && hasTwilio) {
+        if (digestCfg.owner_sms === true && tenant.phone && hasSms) {
           const summary = apts.slice(0, 8).map(a => {
             const e = toEntry(a)
             return `${e.timeStr} — ${e.clientName} (${e.serviceName})`

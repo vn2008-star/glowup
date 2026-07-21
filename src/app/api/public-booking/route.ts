@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 import { timezoneFromAddress, DEFAULT_TZ } from '@/lib/tz'
 import { toE164 } from '@/lib/utils'
 import { resolveTenantTz } from '@/lib/notifications'
+import { sendSms, smsProvider } from '@/lib/sms'
 import { bookingConfirmationHtml, promoEmailHtml, googleCalendarUrl } from '@/lib/email-templates'
 
 // Public API — no auth required. Used by the /book/[slug] public booking page.
@@ -542,36 +543,10 @@ async function sendBookingConfirmations(opts: {
     timeStr = start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
   }
 
-  const hasTwilio = process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER
+  const smsReady = smsProvider() !== null
   const hasResend = !!process.env.RESEND_API_KEY
 
-  console.log(`[public-booking] Notification channels: Twilio=${!!hasTwilio}, Resend=${!!hasResend} | Client: phone=${clientPhone || 'NONE'}, email=${clientEmail || 'NONE'} | Owner: phone=${businessPhone || 'NONE'}, email=${businessEmail || 'NONE'}`)
-
-  // Send SMS via Twilio REST API (no SDK — works in Edge/Serverless)
-  async function sendSms(to: string, body: string): Promise<boolean> {
-    const sid = process.env.TWILIO_ACCOUNT_SID!
-    const token = process.env.TWILIO_AUTH_TOKEN!
-    const from = process.env.TWILIO_PHONE_NUMBER!
-    const url = `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`
-    const auth = btoa(`${sid}:${token}`)
-    console.log(`[public-booking] Sending SMS to ${to} from ${from}`)
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Basic ${auth}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({ To: to, From: from, Body: body }).toString(),
-    })
-    if (!res.ok) {
-      const errBody = await res.text()
-      console.error(`[public-booking] Twilio API error (${res.status}): ${errBody}`)
-      return false
-    }
-    const result = await res.json()
-    console.log(`[public-booking] Twilio SMS queued: sid=${result.sid} status=${result.status}`)
-    return true
-  }
+  console.log(`[public-booking] Notification channels: SMS=${smsProvider() || 'none'}, Resend=${hasResend} | Client: phone=${clientPhone || 'NONE'}, email=${clientEmail || 'NONE'} | Owner: phone=${businessPhone || 'NONE'}, email=${businessEmail || 'NONE'}`)
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let resendClient: any = null
@@ -602,7 +577,7 @@ async function sendBookingConfirmations(opts: {
     ].filter(Boolean).join('\n')
 
     const clientE164 = toE164(clientPhone)
-    if (hasTwilio && clientE164) {
+    if (smsReady && clientE164) {
       try {
         const ok = await sendSms(clientE164, clientSms)
         if (ok) console.log(`[public-booking] ✅ Confirmation SMS sent to client ${clientE164}`)
@@ -663,7 +638,7 @@ async function sendBookingConfirmations(opts: {
     ].filter(Boolean).join('\n')
 
     const ownerE164 = toE164(businessPhone)
-    if (hasTwilio && ownerE164) {
+    if (smsReady && ownerE164) {
       try {
         const ok = await sendSms(ownerE164, ownerSms)
         if (ok) console.log(`[public-booking] ✅ Owner SMS sent to ${ownerE164}`)

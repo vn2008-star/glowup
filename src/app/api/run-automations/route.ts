@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { toE164 } from '@/lib/utils'
 import { verifyCronRequest } from '@/lib/cron-auth'
 import { promoEmailHtml } from '@/lib/email-templates'
+import { sendSms, smsProvider, canSendBulkSms } from '@/lib/sms'
 
 // ─── Automation Engine (Cron-triggered) ───
 // Runs daily. Checks each tenant's automation settings and fires:
@@ -22,19 +23,11 @@ export async function GET(request: Request) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
-  const hasTwilio = process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER
+  const hasSms = smsProvider() !== null
   const hasResend = !!process.env.RESEND_API_KEY
 
-  // Lazy-load SDKs
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let twilioClient: any = null
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let resendClient: any = null
-
-  if (hasTwilio) {
-    const twilio = await import('twilio')
-    twilioClient = twilio.default(process.env.TWILIO_ACCOUNT_SID!, process.env.TWILIO_AUTH_TOKEN!)
-  }
   if (hasResend) {
     const { Resend } = await import('resend')
     resendClient = new Resend(process.env.RESEND_API_KEY!)
@@ -235,9 +228,9 @@ export async function GET(request: Request) {
               message: personalizedMsg,
               businessName,
               businessEmail,
-              twilioClient,
               resendClient,
               channel: fmoChannel,
+              bulk: true,
               subject: `⚡ ${totalOpenSlots} opening${totalOpenSlots !== 1 ? 's' : ''} this week at ${businessName}`,
               ctaUrl: bookingUrl,
               ctaText: 'Book Now',
@@ -308,7 +301,7 @@ export async function GET(request: Request) {
             .replace(/\{booking_url\}/g, bookingUrl)
 
           await sendMessage({
-            client, message, businessName, businessEmail, twilioClient, resendClient, channel: bdayChannel,
+            client, message, businessName, businessEmail, resendClient, channel: bdayChannel,
             subject: `🎂 Happy Birthday from ${businessName} — ${bdayDiscount}% off for you!`,
             ctaUrl: bookingUrl,
             ctaText: 'Book Your Birthday Treat',
@@ -343,7 +336,7 @@ export async function GET(request: Request) {
           const message = `Dear ${clientGreeting}, it's been ${daysSince} days since your last visit to ${businessName}. Time for a refresh? Book now → ${bookingUrl}`
 
           await sendMessage({
-            client, message, businessName, businessEmail, twilioClient, resendClient, channel: 'both',
+            client, message, businessName, businessEmail, resendClient, channel: 'both', bulk: true,
             subject: `💜 We miss you at ${businessName} — time for a refresh?`,
             ctaUrl: bookingUrl,
             ctaText: 'Book Now',
@@ -391,7 +384,7 @@ export async function GET(request: Request) {
           const message = `Dear ${clientGreeting}, we missed you today at ${businessName}! 😊 Life happens — we'd love to help you rebook. Book your next visit → ${bookingUrl}`
 
           await sendMessage({
-            client, message, businessName, businessEmail, twilioClient, resendClient, channel: 'both',
+            client, message, businessName, businessEmail, resendClient, channel: 'both',
             subject: `We missed you today at ${businessName} 😊`,
             ctaUrl: bookingUrl,
             ctaText: 'Rebook Now',
@@ -444,7 +437,7 @@ export async function GET(request: Request) {
 
           const reviewChannel = String(automations.auto_review_channel || 'sms') as 'sms' | 'email' | 'both'
           await sendMessage({
-            client, message, businessName, businessEmail, twilioClient, resendClient, channel: reviewChannel,
+            client, message, businessName, businessEmail, resendClient, channel: reviewChannel,
             subject: `🌟 How was your visit to ${businessName}?`,
             ctaUrl: googleReviewUrl || undefined,
             ctaText: 'Leave a Review',
@@ -509,7 +502,7 @@ export async function GET(request: Request) {
             .replace(/\{business_name\}/g, businessName)
 
           await sendMessage({
-            client, message: personalizedMsg, businessName, businessEmail, twilioClient, resendClient, channel: 'both',
+            client, message: personalizedMsg, businessName, businessEmail, resendClient, channel: 'both', bulk: true,
             subject: `${holiday.emoji} ${holiday.name} Special at ${businessName}!`,
             ctaUrl: bookingUrl,
             ctaText: 'Book Now',
@@ -537,7 +530,7 @@ export async function GET(request: Request) {
   return NextResponse.json({
     message: 'Automations processed',
     results,
-    dry_run: !hasTwilio && !hasResend,
+    dry_run: !hasSms && !hasResend,
   })
 }
 
@@ -548,33 +541,27 @@ async function sendMessage(opts: {
   businessName: string
   businessEmail: string
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  twilioClient: any
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   resendClient: any
   channel: 'sms' | 'email' | 'both'
+  /** Campaign-style mass send. Bulk SMS needs a registered business number —
+   *  on the Android-phone provider these fall back to email-only. */
+  bulk?: boolean
   subject?: string
   ctaUrl?: string
   ctaText?: string
 }) {
-  const { client, message, businessName, businessEmail, twilioClient, resendClient, channel, subject, ctaUrl, ctaText } = opts
+  const { client, message, businessName, businessEmail, resendClient, channel, bulk, subject, ctaUrl, ctaText } = opts
 
   // SMS
   if ((channel === 'sms' || channel === 'both') && client.phone && !client.sms_opt_out) {
     const phoneE164 = toE164(client.phone as string)
-    if (twilioClient && phoneE164) {
-      try {
-        await twilioClient.messages.create({
-          body: message,
-          from: process.env.TWILIO_PHONE_NUMBER!,
-          to: phoneE164,
-        })
-      } catch (err) {
-        console.error(`SMS send failed for ${client.phone}:`, err)
-      }
-    } else if (!phoneE164) {
+    if (!phoneE164) {
       console.warn(`[run-automations] ⚠️ Could not normalize phone: "${client.phone}"`)
+    } else if (bulk && !canSendBulkSms()) {
+      console.log(`[run-automations] Bulk SMS to ${phoneE164} skipped — no registered business number (email-only)`)
     } else {
-      console.log(`[DRY RUN] SMS to ${client.phone}: ${message}`)
+      const ok = await sendSms(phoneE164, message)
+      if (!ok) console.error(`SMS send failed for ${client.phone}`)
     }
   }
 

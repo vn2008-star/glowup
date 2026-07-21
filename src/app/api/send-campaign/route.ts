@@ -4,6 +4,7 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { getImpersonationOverride, isAdminEmail } from '@/lib/admin'
 import { toE164 } from '@/lib/utils'
 import { promoEmailHtml } from '@/lib/email-templates'
+import { sendSms, canSendBulkSms } from '@/lib/sms'
 
 // ─── Send Campaign Blast (SMS + Email) ───
 // Called by the "Fill My Openings" and campaign blast features.
@@ -97,20 +98,15 @@ export async function POST(request: Request) {
   let skipCount = 0
   let failCount = 0
 
-  const hasTwilio = process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER
+  // Campaigns are bulk sends: SMS only through a registered business number
+  // (Twilio). On the Android-phone provider, blasting hundreds of identical
+  // texts risks the carrier flagging the personal line — so campaign SMS is
+  // skipped and the campaign goes out by email instead.
+  const bulkSmsOk = canSendBulkSms()
   const hasResend = !!process.env.RESEND_API_KEY
 
-  // Lazy-load SDKs
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let twilioClient: any = null
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let resend: any = null
-
-  if (hasTwilio && (channel === 'sms' || channel === 'both')) {
-    const twilio = await import('twilio')
-    twilioClient = twilio.default(process.env.TWILIO_ACCOUNT_SID!, process.env.TWILIO_AUTH_TOKEN!)
-  }
-
   if (hasResend && (channel === 'email' || channel === 'both')) {
     const { Resend } = await import('resend')
     resend = new Resend(process.env.RESEND_API_KEY!)
@@ -143,22 +139,16 @@ export async function POST(request: Request) {
       .replace(/\{booking_url\}/g, bookingUrl)
 
     try {
-      // Send SMS
-      if ((channel === 'sms' || channel === 'both') && client.phone && !client.sms_opt_out) {
+      // Send SMS (bulk — registered business number only)
+      if (bulkSmsOk && (channel === 'sms' || channel === 'both') && client.phone && !client.sms_opt_out) {
         const phoneE164 = toE164(client.phone)
-        if (twilioClient && phoneE164) {
-          await twilioClient.messages.create({
-            body: personalizedMsg,
-            from: process.env.TWILIO_PHONE_NUMBER!,
-            to: phoneE164,
-          })
-          sentCount++
-        } else if (!phoneE164) {
+        if (phoneE164) {
+          const ok = await sendSms(phoneE164, personalizedMsg)
+          if (ok) sentCount++
+          else failCount++
+        } else {
           console.warn(`[send-campaign] ⚠️ Could not normalize phone: "${client.phone}"`)
           skipCount++
-        } else {
-          console.log(`[DRY RUN] SMS to ${client.phone}: ${personalizedMsg}`)
-          sentCount++
         }
       }
 
@@ -213,6 +203,9 @@ export async function POST(request: Request) {
     skipped: skipCount,
     failed: failCount,
     total: clients.length,
-    dry_run: !hasTwilio && !hasResend,
+    dry_run: !bulkSmsOk && !hasResend,
+    sms_skipped: (channel === 'sms' || channel === 'both') && !bulkSmsOk
+      ? 'Campaign SMS requires a registered business number (Twilio) — sent by email only.'
+      : undefined,
   })
 }
