@@ -9,7 +9,7 @@ interface ChatMessage {
   time: string
 }
 
-export default function ChatWidget({ slug, businessName }: { slug: string; businessName: string }) {
+export default function ChatWidget({ slug, businessName, greeting }: { slug: string; businessName: string; greeting?: string }) {
   const [isOpen, setIsOpen] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
@@ -36,7 +36,7 @@ export default function ChatWidget({ slug, businessName }: { slug: string; busin
       setMessages([{
         id: 'greeting',
         role: 'bot',
-        content: `Hi there! 👋 Welcome to ${businessName}. How can I help you today?`,
+        content: greeting || `Hi there! 👋 Welcome to ${businessName}. How can I help you today?`,
         time: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
       }])
     }
@@ -78,9 +78,9 @@ export default function ChatWidget({ slug, businessName }: { slug: string; busin
         }
         setMessages(prev => [...prev, botMsg])
 
-        // Store conversation ID for context
-        if (data.message?.conversation_id) {
-          setConversationId(data.message.conversation_id)
+        // Store conversation ID for context (server creates one on first message)
+        if (data.conversation_id) {
+          setConversationId(data.conversation_id)
         }
       } else {
         setMessages(prev => [...prev, {

@@ -102,6 +102,8 @@ export async function GET(request: Request) {
       advanceBookingDays,
       closedHolidays: (tenantSettings.closed_holidays || []) as string[],
       customClosedDates: (tenantSettings.custom_closed_dates || []) as { date: string; label: string }[],
+      chatEnabled: ((tenantSettings.bot_config as { enabled?: boolean } | undefined)?.enabled) !== false,
+      chatGreeting: (tenantSettings.bot_config as { greeting?: string } | undefined)?.greeting || null,
     },
     services: services || [],
     staff: (staff || []).map(s => {

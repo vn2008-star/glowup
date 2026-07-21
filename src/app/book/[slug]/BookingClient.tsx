@@ -12,7 +12,7 @@ import type { CustomClosedDate } from '@/lib/schedule-utils'
 interface ServiceInfo { id: string; name: string; category: string; description: string | null; duration_minutes: number; price: number; sort_order: number; image_url: string | null }
 interface StaffInfo { id: string; name: string; specialties: string[]; schedule: Record<string, unknown>; service_durations: Record<string, number> }
 interface BookedSlot { staff_id: string | null; start: string; end: string }
-interface BusinessInfo { name: string; slug: string; phone: string | null; logo_url: string | null; address: string | null; timezone: string; hours: Record<string, { open: string; close: string; closed: boolean }> | null; advanceBookingDays?: number; closedHolidays?: string[]; customClosedDates?: CustomClosedDate[] }
+interface BusinessInfo { name: string; slug: string; phone: string | null; logo_url: string | null; address: string | null; timezone: string; hours: Record<string, { open: string; close: string; closed: boolean }> | null; advanceBookingDays?: number; closedHolidays?: string[]; customClosedDates?: CustomClosedDate[]; chatEnabled?: boolean; chatGreeting?: string | null }
 
 const STEPS = ['Service', 'Staff', 'Date & Time', 'Your Info', 'Confirm'] as const
 type Step = 0 | 1 | 2 | 3 | 4
@@ -856,7 +856,9 @@ export default function BookingClient({ slug }: { slug: string }) {
       </div>
 
       {/* AI Chat Widget */}
-      {business && <ChatWidget slug={slug} businessName={business.name} />}
+      {business && business.chatEnabled !== false && (
+        <ChatWidget slug={slug} businessName={business.name} greeting={business.chatGreeting || undefined} />
+      )}
     </div>
   )
 }
