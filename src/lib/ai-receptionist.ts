@@ -93,8 +93,8 @@ KNOWN CLIENT:
 
   const bookingRules = botConfig.auto_booking
     ? (knownClient
-        ? `- You CAN book appointments directly. Their name and phone are on file, so just confirm the service, date, and time. When confirmed, respond with BOOK_APPOINTMENT:{service_name}|{staff_name_or_any}|{date_YYYY-MM-DD}|{time_HH:MM}|${knownClient.first_name}|KNOWN on its own line at the end of your message.`
-        : `- You CAN book appointments directly. FIRST collect the client's full name AND phone number — never book without both. When the client has confirmed a time AND given their name and phone, respond with BOOK_APPOINTMENT:{service_name}|{staff_name_or_any}|{date_YYYY-MM-DD}|{time_HH:MM}|{client_name}|{client_phone} on its own line at the end of your message.`)
+        ? `- You CAN book appointments directly. Their name and phone are on file, so just confirm the service, date, and time.${knownClient.email ? '' : ' Also ask for their email address (optional — for the confirmation email); if they decline, that\'s fine.'} When confirmed, respond with BOOK_APPOINTMENT:{service_name}|{staff_name_or_any}|{date_YYYY-MM-DD}|{time_HH:MM}|${knownClient.first_name}|KNOWN|{email_or_NONE} on its own line at the end of your message.`
+        : `- You CAN book appointments directly. FIRST collect the client's full name AND phone number — never book without both. Also ask for their email address so they get an email confirmation (optional — if they decline, proceed without it). When the client has confirmed a time AND given their details, respond with BOOK_APPOINTMENT:{service_name}|{staff_name_or_any}|{date_YYYY-MM-DD}|{time_HH:MM}|{client_name}|{client_phone}|{email_or_NONE} on its own line at the end of your message.`)
     : '- Direct them to the booking page to complete their booking.'
 
   return `You are the AI Receptionist for "${tenant.name}", a beauty/salon business${channel === 'sms' ? ', replying by text message (SMS)' : ''}.
@@ -134,11 +134,17 @@ ${!isOpen ? `AFTER-HOURS NOTE: ${botConfig.after_hours}` : ''}
 `
 }
 
-// Parse booking intent (service|staff|date|time|name|phone-or-KNOWN)
-function parseBookingIntent(response: string): { service: string; staff: string; date: string; time: string; clientName: string; clientPhone: string } | null {
-  const match = response.match(/BOOK_APPOINTMENT:(.+?)\|(.+?)\|(\d{4}-\d{2}-\d{2})\|(\d{2}:\d{2})\|(.+?)\|(KNOWN|[\d\s()+-]{7,})/)
+// Parse booking intent (service|staff|date|time|name|phone-or-KNOWN|email-or-NONE)
+// The email segment is optional so older prompt outputs still parse.
+function parseBookingIntent(response: string): { service: string; staff: string; date: string; time: string; clientName: string; clientPhone: string; clientEmail: string | null } | null {
+  const match = response.match(/BOOK_APPOINTMENT:(.+?)\|(.+?)\|(\d{4}-\d{2}-\d{2})\|(\d{2}:\d{2})\|(.+?)\|(KNOWN|[\d\s()+-]{7,})(?:\|([^\s|]+@[^\s|]+|NONE|KNOWN))?/)
   if (!match) return null
-  return { service: match[1].trim(), staff: match[2].trim(), date: match[3], time: match[4], clientName: match[5].trim(), clientPhone: match[6].trim() }
+  const rawEmail = (match[7] || '').trim()
+  return {
+    service: match[1].trim(), staff: match[2].trim(), date: match[3], time: match[4],
+    clientName: match[5].trim(), clientPhone: match[6].trim(),
+    clientEmail: rawEmail && rawEmail !== 'NONE' && rawEmail !== 'KNOWN' ? rawEmail : null,
+  }
 }
 
 /** Extract a US phone number typed inside a chat message, if any. */
@@ -364,9 +370,10 @@ export async function handleAiChat(opts: {
           staffId = (staffRes.data || []).find(s => !busyIds.has(s.id))?.id || null
         }
 
-        // Find or create the client
+        // Find or create the client. An email collected in chat is saved to the
+        // client record and used for the confirmation email + email reminders.
         let clientId: string | null = knownClient?.id || null
-        let clientEmail: string | null = knownClient?.email || null
+        let clientEmail: string | null = intent.clientEmail || knownClient?.email || null
         if (!clientId) {
           const [firstName, ...lastParts] = intent.clientName.split(/\s+/)
           const { data: existingClient } = await svc
@@ -378,15 +385,19 @@ export async function handleAiChat(opts: {
             .maybeSingle()
           if (existingClient) {
             clientId = existingClient.id
-            clientEmail = existingClient.email
+            clientEmail = intent.clientEmail || existingClient.email
           } else {
             const { data: newClient } = await svc
               .from('clients')
-              .insert({ tenant_id: tenantId, first_name: firstName, last_name: lastParts.join(' ') || null, phone: bookingPhone, status: 'new' })
+              .insert({ tenant_id: tenantId, first_name: firstName, last_name: lastParts.join(' ') || null, phone: bookingPhone, email: intent.clientEmail, status: 'new' })
               .select('id')
               .single()
             clientId = newClient?.id || null
           }
+        }
+        // Backfill a newly collected email onto an existing record without one
+        if (clientId && intent.clientEmail) {
+          await svc.from('clients').update({ email: intent.clientEmail }).eq('id', clientId).is('email', null)
         }
 
         if (staffId && clientId) {
