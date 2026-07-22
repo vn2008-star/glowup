@@ -66,6 +66,9 @@ export async function getCalendarLoad(
         .from('appointments')
         .select('id, tenant_id, client_id, staff_id, service_id, start_time, end_time, status, total_price, notes, payment_method, tip_amount, checked_out_at, checked_in_at, created_at, client:clients(id, first_name, last_name, phone, email, photo_url), staff_member:staff!staff_id(id, name, photo_url, role), service:services(id, name, category, duration_minutes, price, commission_rate)')
         .eq('tenant_id', tenantId)
+        // Cancelled rows stay in the DB for history/reporting, but the calendar
+        // must not render them or count them against open slots/utilization.
+        .neq('status', 'cancelled')
         .order('start_time', { ascending: true })
       if (opts.startDate && opts.endDate) {
         q = q.gte('start_time', opts.startDate).lte('start_time', opts.endDate)

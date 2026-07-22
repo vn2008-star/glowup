@@ -1086,10 +1086,17 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
                     await queryData("appointments.delete", { id: selectedApt.id });
                     setAppointments(prev => prev.filter(a => a.id !== selectedApt.id));
                   } else {
-                    if (!confirm("Cancel this appointment? The client will be notified by text/email.")) return;
+                    // Notification only goes out for future appointments with a
+                    // reachable client — don't promise it for walk-ins/past ones.
+                    const willNotify = !!(selectedApt.client && (selectedApt.client.phone || selectedApt.client.email))
+                      && new Date(selectedApt.start_time).getTime() > Date.now();
+                    const msg = willNotify
+                      ? "Cancel this appointment? The client will be notified by text/email."
+                      : "Cancel this appointment?";
+                    if (!confirm(msg)) return;
                     const res = await queryData<{ id: string }>("appointments.cancel", { id: selectedApt.id });
                     if (res.error) { alert(`Failed to cancel: ${res.error}`); return; }
-                    setAppointments(prev => prev.map(a => a.id === selectedApt.id ? { ...a, status: "cancelled" } : a));
+                    setAppointments(prev => prev.filter(a => a.id !== selectedApt.id));
                   }
                   setSelectedApt(null);
                 }}
