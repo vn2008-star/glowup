@@ -7,6 +7,71 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { phoneVariants } from '@/lib/utils'
 import { handleAiChat, resolveBotConfig, type TenantRow } from '@/lib/ai-receptionist'
+import { resolveTenantTz, formatAptWhen, sendOwnerChangeNotice } from '@/lib/notifications'
+
+const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL
+  || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null)
+  || 'https://glowup-jade.vercel.app'
+
+type UpcomingApt = {
+  id: string
+  tenant_id: string
+  start_time: string
+  manage_token: string | null
+  clientName: string
+  serviceName: string
+  staffName: string
+  tenant: { name: string; email: string | null; phone: string | null; address: string | null; timezone: string | null; settings: Record<string, unknown> | null } | null
+}
+
+/**
+ * Every upcoming (pending/confirmed) appointment for the sender's phone,
+ * earliest first. Neither SMS webhook knows which salon the text was meant
+ * for — a phone can be a client at several GlowUp salons — so callers must
+ * NEVER act on an appointment without telling the sender exactly which one,
+ * and must not guess at all when the matches span multiple salons.
+ */
+async function findUpcomingAppointments(supabase: SupabaseClient, from: string): Promise<UpcomingApt[]> {
+  const { data: clients } = await supabase
+    .from('clients')
+    .select('id, first_name, last_name')
+    .in('phone', phoneVariants(from))
+  if (!clients || clients.length === 0) return []
+
+  const nameById = new Map(clients.map(c => [c.id, `${c.first_name || ''} ${c.last_name || ''}`.trim()]))
+  const { data: apts } = await supabase
+    .from('appointments')
+    .select(`
+      id, tenant_id, client_id, start_time, manage_token,
+      services ( name ),
+      staff!staff_id ( name ),
+      tenants ( name, email, phone, address, timezone, settings )
+    `)
+    .in('client_id', clients.map(c => c.id))
+    .gte('start_time', new Date().toISOString())
+    .in('status', ['pending', 'confirmed'])
+    .order('start_time', { ascending: true })
+    .limit(5)
+
+  return (apts || []).map(a => ({
+    id: a.id,
+    tenant_id: a.tenant_id,
+    start_time: a.start_time,
+    manage_token: a.manage_token,
+    clientName: nameById.get(a.client_id as string) || 'Client',
+    serviceName: (a.services as unknown as { name?: string } | null)?.name || 'appointment',
+    staffName: (a.staff as unknown as { name?: string } | null)?.name || '',
+    tenant: (a.tenants as unknown as UpcomingApt['tenant']) || null,
+  }))
+}
+
+function aptWhen(apt: UpcomingApt): { dateStr: string; timeStr: string } {
+  return formatAptWhen(new Date(apt.start_time), resolveTenantTz(apt.tenant))
+}
+
+function manageLink(apt: UpcomingApt): string {
+  return apt.manage_token ? `${BASE_URL}/manage/${apt.manage_token}` : ''
+}
 
 export async function handleInboundSms(
   supabase: SupabaseClient,
@@ -17,6 +82,10 @@ export async function handleInboundSms(
   let replyMessage = ''
 
   if (['STOP', 'UNSUBSCRIBE', 'CANCEL', 'QUIT'].includes(body)) {
+    // Carrier-mandated opt-out keywords — these MUST unsubscribe. But a client
+    // texting "CANCEL" almost always means "cancel my appointment", not "stop
+    // texting me": tell them the appointment is still booked and how to
+    // actually cancel it, or they find out at the front desk.
     const { data: clients, error } = await supabase
       .from('clients')
       .update({ sms_opt_out: true })
@@ -25,6 +94,16 @@ export async function handleInboundSms(
     if (error) console.error('Failed to opt out:', error)
     console.log(`SMS opt-out: ${from} (${clients?.length || 0} client records updated)`)
     replyMessage = 'You have been unsubscribed from appointment reminders. Reply START to re-subscribe.'
+
+    if (body === 'CANCEL') {
+      const upcoming = await findUpcomingAppointments(supabase, from)
+      if (upcoming.length > 0) {
+        const apt = upcoming[0]
+        const { dateStr, timeStr } = aptWhen(apt)
+        const link = manageLink(apt)
+        replyMessage += `\n\nNote: your ${apt.serviceName} on ${dateStr} at ${timeStr} is still booked. To cancel the appointment, reply X${link ? ` or visit: ${link}` : ''}.`
+      }
+    }
 
   } else if (['START', 'SUBSCRIBE', 'YES'].includes(body)) {
     const { data: clients, error } = await supabase
@@ -37,61 +116,85 @@ export async function handleInboundSms(
     replyMessage = 'You have been re-subscribed to appointment reminders. Reply STOP at any time to opt out.'
 
   } else if (['C', 'CONFIRM'].includes(body)) {
-    const { data: clients } = await supabase
-      .from('clients')
-      .select('id, tenant_id')
-      .in('phone', phoneVariants(from))
-    if (clients && clients.length > 0) {
-      const clientIds = clients.map(c => c.id)
-      const now = new Date().toISOString()
-      const { data: upcomingApt } = await supabase
-        .from('appointments')
-        .select('id')
-        .in('client_id', clientIds)
-        .gte('start_time', now)
-        .neq('status', 'cancelled')
-        .order('start_time', { ascending: true })
-        .limit(1)
-        .maybeSingle()
-      if (upcomingApt) {
-        await supabase.from('appointments').update({ status: 'confirmed' }).eq('id', upcomingApt.id)
-        replyMessage = '✅ Your appointment is confirmed! We look forward to seeing you.'
-      } else {
-        replyMessage = 'We couldn\'t find an upcoming appointment. Please contact the salon directly.'
-      }
+    const upcoming = await findUpcomingAppointments(supabase, from)
+    if (upcoming.length > 0) {
+      const apt = upcoming[0]
+      await supabase.from('appointments').update({ status: 'confirmed' }).eq('id', apt.id)
+      const { dateStr, timeStr } = aptWhen(apt)
+      replyMessage = `✅ Confirmed: ${apt.serviceName} on ${dateStr} at ${timeStr}${apt.tenant?.name ? ` at ${apt.tenant.name}` : ''}. We look forward to seeing you!`
     } else {
-      replyMessage = 'We couldn\'t find your account. Please contact the salon directly.'
+      replyMessage = 'We couldn\'t find an upcoming appointment. Please contact the salon directly.'
     }
 
   } else if (['X'].includes(body)) {
-    const { data: clients } = await supabase
-      .from('clients')
-      .select('id, tenant_id')
-      .in('phone', phoneVariants(from))
-    if (clients && clients.length > 0) {
-      const clientIds = clients.map(c => c.id)
-      const now = new Date().toISOString()
-      const { data: upcomingApt } = await supabase
-        .from('appointments')
-        .select('id')
-        .in('client_id', clientIds)
-        .gte('start_time', now)
-        .neq('status', 'cancelled')
-        .order('start_time', { ascending: true })
-        .limit(1)
-        .maybeSingle()
-      if (upcomingApt) {
-        await supabase.from('appointments').update({ status: 'cancelled' }).eq('id', upcomingApt.id)
-        replyMessage = '❌ Your appointment has been cancelled. Reply or call us anytime to rebook!'
-      } else {
-        replyMessage = 'We couldn\'t find an upcoming appointment to cancel. Please contact the salon directly.'
-      }
+    const upcoming = await findUpcomingAppointments(supabase, from)
+    if (upcoming.length === 0) {
+      replyMessage = 'We couldn\'t find an upcoming appointment to cancel. Please contact the salon directly.'
+    } else if (new Set(upcoming.map(a => a.tenant_id)).size > 1) {
+      // Appointments at more than one salon — never guess which to cancel.
+      const lines = upcoming
+        .filter((a, i, arr) => arr.findIndex(b => b.tenant_id === a.tenant_id) === i)
+        .map(a => {
+          const { dateStr, timeStr } = aptWhen(a)
+          const link = manageLink(a)
+          return `${a.tenant?.name || 'Salon'} — ${dateStr} at ${timeStr}${link ? `: ${link}` : ''}`
+        })
+      replyMessage = `You have appointments at more than one salon. To cancel, use the link for the right one:\n${lines.join('\n')}`
     } else {
-      replyMessage = 'We couldn\'t find your account. Please contact the salon directly.'
+      const apt = upcoming[0]
+      // Guard on status so a concurrent cancel/checkout isn't clobbered
+      const { error: cancelErr } = await supabase
+        .from('appointments')
+        .update({ status: 'cancelled' })
+        .eq('id', apt.id)
+        .in('status', ['pending', 'confirmed'])
+      if (cancelErr) {
+        console.error('[inbound-sms] cancel failed:', cancelErr)
+        replyMessage = 'Sorry, we couldn\'t cancel your appointment. Please contact the salon directly.'
+      } else {
+        // A cancelled appointment must never remind
+        await supabase
+          .from('appointment_reminders')
+          .update({ status: 'skipped' })
+          .eq('appointment_id', apt.id)
+          .eq('status', 'pending')
+
+        try {
+          await sendOwnerChangeNotice({
+            type: 'cancel',
+            tenant: apt.tenant,
+            clientName: apt.clientName,
+            serviceName: apt.serviceName,
+            staffName: apt.staffName,
+            start: new Date(apt.start_time),
+            tz: resolveTenantTz(apt.tenant),
+            via: 'by SMS reply',
+          })
+        } catch (err) {
+          console.error('[inbound-sms] owner cancel notice failed:', err)
+        }
+
+        const { dateStr, timeStr } = aptWhen(apt)
+        replyMessage = `❌ Cancelled: ${apt.serviceName} on ${dateStr} at ${timeStr}${apt.tenant?.name ? ` at ${apt.tenant.name}` : ''}. Reply or call us anytime to rebook!`
+        if (upcoming.length > 1) {
+          const next = upcoming[1]
+          const nw = aptWhen(next)
+          const link = manageLink(next)
+          replyMessage += `\nYour next appointment (${nw.dateStr} at ${nw.timeStr}) is still booked${link ? ` — manage it here: ${link}` : ''}.`
+        }
+      }
     }
 
   } else if (['M', 'MODIFY', 'RESCHEDULE', 'CHANGE'].includes(body)) {
-    replyMessage = '📞 To modify your appointment, please call or text us directly and we\'ll find a new time for you!'
+    const upcoming = await findUpcomingAppointments(supabase, from)
+    const apt = upcoming[0]
+    const link = apt ? manageLink(apt) : ''
+    if (apt && link) {
+      const { dateStr, timeStr } = aptWhen(apt)
+      replyMessage = `🔄 To reschedule your ${apt.serviceName} on ${dateStr} at ${timeStr}, pick a new time here: ${link}\nOr reply with a question and we'll help!`
+    } else {
+      replyMessage = '📞 To modify your appointment, please call or text us directly and we\'ll find a new time for you!'
+    }
 
   } else {
     // ── Not a keyword: hand the text to the AI Receptionist ──

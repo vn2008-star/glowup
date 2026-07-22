@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { localeDateStr } from "@/lib/utils";
-import { localToUTC, DEFAULT_TZ } from "@/lib/tz";
+import { localToUTC, nowInTz, todayInTz, formatDateInTz, DEFAULT_TZ } from "@/lib/tz";
+import { isStaffOffOnDate, isBusinessClosedOnDate, type CustomClosedDate } from "@/lib/schedule-utils";
 import styles from "./manage.module.css";
 
 interface AppointmentData {
@@ -24,6 +25,9 @@ interface BusinessData {
   logo_url: string | null;
   timezone: string;
   hours: Record<string, { open: string; close: string }> | null;
+  advanceBookingDays?: number;
+  closedHolidays?: string[];
+  customClosedDates?: CustomClosedDate[];
 }
 
 type ViewState = "details" | "cancel-confirm" | "reschedule" | "cancelled" | "rescheduled";
@@ -95,12 +99,16 @@ export default function ManageClient({ token }: { token: string }) {
     setActionLoading(false);
   }
 
+  // Salon timezone — ALL calendar/slot math uses this, never the browser's.
+  // A client browsing from another timezone used to see slots computed from
+  // their local clock and then submit times the salon never offered.
+  const salonTz = business?.timezone || DEFAULT_TZ;
+
   // Reschedule appointment
   async function handleReschedule() {
     if (!selectedDate || !selectedTime) return;
     setActionLoading(true);
     try {
-      const salonTz = business?.timezone || DEFAULT_TZ;
       const utcStart = localToUTC(selectedDate, selectedTime, salonTz);
       const newStartTime = utcStart.toISOString();
       const res = await fetch("/api/manage-appointment", {
@@ -128,19 +136,30 @@ export default function ManageClient({ token }: { token: string }) {
     setActionLoading(false);
   }
 
-  // Format date/time
+  // Format date/time — in the SALON's timezone, matching the confirmation
+  // emails and texts (browser-local display disagreed with them for
+  // out-of-area clients).
   function formatDate(iso: string) {
     const d = new Date(iso);
-    return localeDateStr(d, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+    return localeDateStr(d, { weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: salonTz });
   }
   function formatTime(iso: string) {
     const d = new Date(iso);
-    return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+    return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: salonTz });
   }
 
-  // Calendar helpers for reschedule
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  // Calendar helpers for reschedule — "today" is the salon's today
+  const todayStr = todayInTz(salonTz);
+  const today = new Date(todayStr + "T00:00:00");
+
+  // Latest selectable date: the salon's advance-booking horizon measured from
+  // the later of today and the current appointment (so appointments booked far
+  // out can still be moved around their original date).
+  const maxDateStr = (() => {
+    const days = business?.advanceBookingDays || 30;
+    const anchor = Math.max(Date.now(), appointment ? new Date(appointment.start_time).getTime() : 0);
+    return formatDateInTz(new Date(anchor + days * 24 * 60 * 60 * 1000), salonTz);
+  })();
 
   function getDaysInMonth(year: number, month: number) {
     return new Date(year, month + 1, 0).getDate();
@@ -191,25 +210,30 @@ export default function ManageClient({ token }: { token: string }) {
     return DEFAULT_HOURS;
   })();
 
-  // Staff vacations (date ranges when staff is unavailable)
-  const staffVacations: { start: string; end: string }[] =
-    (staffSchedule as Record<string, unknown>)?.vacations as { start: string; end: string }[] || [];
-
-  // Staff holidays off
-  const staffHolidaysOff: string[] =
-    (staffSchedule as Record<string, unknown>)?.holidays_off as string[] || [];
-
-  // Check if a specific date falls within a staff vacation
-  function isOnVacation(dateStr: string): boolean {
-    for (const v of staffVacations) {
-      if (dateStr >= v.start && dateStr <= v.end) return true;
-    }
-    return false;
+  // Whether the assigned staff member is off on a date — vacations, holidays,
+  // weekly off days, and every-other-week alternating days (shared logic with
+  // the public booking page).
+  function isStaffOff(dateStr: string): boolean {
+    return staffSchedule ? isStaffOffOnDate(staffSchedule, dateStr) : false;
   }
 
-  // Check if a time slot conflicts with existing booked appointments
+  // Whether the business is closed (holiday closures / custom closed dates)
+  function isBizClosed(dateStr: string): boolean {
+    return isBusinessClosedOnDate(business?.closedHolidays || [], business?.customClosedDates || [], dateStr);
+  }
+
+  // Raw staff day entry (keeps the fixed-slot grid the normalizer drops)
+  function rawStaffDay(dayKey: string): { useSlots?: boolean; slots?: { start: string; end: string }[] } | undefined {
+    if (!staffSchedule) return undefined;
+    const key = Object.keys(staffSchedule).find(k => k.toLowerCase() === dayKey);
+    return key ? (staffSchedule[key] as { useSlots?: boolean; slots?: { start: string; end: string }[] }) : undefined;
+  }
+
+  // Check if a time slot conflicts with existing booked appointments.
+  // Slot times are salon-local; booked slots are UTC — convert, don't assume
+  // the browser shares the salon's timezone.
   function isSlotBooked(dateStr: string, timeStr: string, durationMin: number): boolean {
-    const slotStart = new Date(`${dateStr}T${timeStr}:00`).getTime();
+    const slotStart = localToUTC(dateStr, timeStr, salonTz).getTime();
     const slotEnd = slotStart + durationMin * 60 * 1000;
     for (const b of bookedSlots) {
       const bStart = new Date(b.start).getTime();
@@ -221,36 +245,41 @@ export default function ManageClient({ token }: { token: string }) {
 
   // Generate available time slots for a date
   const generateTimeSlots = useCallback((dateStr: string) => {
-    const dayOfWeek = localeDateStr(new Date(dateStr + "T12:00:00"), { weekday: "long" }).toLowerCase();
-    const dayHours = effectiveHours[dayOfWeek];
-    if (!dayHours || !dayHours.open || !dayHours.close) return [];
-
-    const [openH, openM] = dayHours.open.split(":").map(Number);
-    const [closeH, closeM] = dayHours.close.split(":").map(Number);
-    const openMinutes = openH * 60 + (openM || 0);
-    const closeMinutes = closeH * 60 + (closeM || 0);
+    if (isStaffOff(dateStr) || isBizClosed(dateStr)) return [];
+    const dayKey = localeDateStr(new Date(dateStr + "T12:00:00"), { weekday: "long" }).toLowerCase();
+    const dayHours = effectiveHours[dayKey];
     const duration = appointment?.service?.duration_minutes || 60;
+    const toMin = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + (m || 0); };
 
-    const slots: string[] = [];
-    for (let m = openMinutes; m + duration <= closeMinutes; m += 30) {
-      const h = Math.floor(m / 60);
-      const min = m % 60;
-      const timeStr = `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
-
-      // Skip past times for today
-      if (dateStr === toDateStr(new Date())) {
-        const now = new Date();
-        if (h < now.getHours() || (h === now.getHours() && min <= now.getMinutes())) continue;
+    // Candidate start times: the staff member's fixed slot grid when they use
+    // one (e.g. lash fills every 90 min), otherwise 30-min increments within
+    // working hours. Offering raw 30-min increments to a slot-based staff
+    // member let clients move onto times the salon never takes.
+    const staffDay = rawStaffDay(dayKey);
+    let candidates: string[] = [];
+    if (staffDay?.useSlots && staffDay.slots?.length) {
+      candidates = staffDay.slots.map(s => s.start);
+    } else {
+      if (!dayHours || !dayHours.open || !dayHours.close) return [];
+      for (let m = toMin(dayHours.open); m + duration <= toMin(dayHours.close); m += 30) {
+        candidates.push(`${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`);
       }
-
-      // Skip slots that conflict with existing booked appointments
-      if (isSlotBooked(dateStr, timeStr, duration)) continue;
-
-      slots.push(timeStr);
     }
-    return slots;
+
+    const salonNow = nowInTz(salonTz);
+    return candidates.filter(timeStr => {
+      // Skip past times for today (salon clock, not the browser's)
+      if (dateStr === salonNow.dateStr) {
+        const [h, min] = timeStr.split(":").map(Number);
+        if (h < salonNow.hour || (h === salonNow.hour && min <= salonNow.minute)) return false;
+      }
+      // Keep the appointment inside closing time when hours are known
+      if (dayHours?.close && toMin(timeStr) + duration > toMin(dayHours.close)) return false;
+      // Skip slots that conflict with existing booked appointments
+      return !isSlotBooked(dateStr, timeStr, duration);
+    }).sort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [effectiveHours, appointment, bookedSlots]);
+  }, [effectiveHours, appointment, bookedSlots, staffSchedule, business, salonTz]);
 
   function toDateStr(d: Date) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -408,16 +437,18 @@ export default function ManageClient({ token }: { token: string }) {
                     const day = i + 1;
                     const dateStr = `${calMonth.getFullYear()}-${String(calMonth.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
                     const dateObj = new Date(dateStr + "T12:00:00");
-                    const isPastDay = dateObj < today;
-                    const isToday = toDateStr(new Date()) === dateStr;
+                    const isPastDay = dateStr < todayStr;
+                    const isTooFar = dateStr > maxDateStr;
+                    const isToday = dateStr === todayStr;
                     const isSelected = selectedDate === dateStr;
 
-                    // Check if day has working hours + not on vacation
+                    // Day must have working hours, staff must be in, salon must be open
                     const dayName = localeDateStr(dateObj, { weekday: "long" }).toLowerCase();
-                    const dayHoursEntry = effectiveHours[dayName];
-                    const hasHours = !!dayHoursEntry?.open;
-                    const onVacation = isOnVacation(dateStr);
-                    const isDisabled = isPastDay || !hasHours || onVacation;
+                    const staffDay = rawStaffDay(dayName);
+                    const hasHours = !!(effectiveHours[dayName]?.open || (staffDay?.useSlots && staffDay.slots?.length));
+                    const staffOff = isStaffOff(dateStr);
+                    const bizClosed = isBizClosed(dateStr);
+                    const isDisabled = isPastDay || isTooFar || !hasHours || staffOff || bizClosed;
 
                     return (
                       <button
@@ -425,7 +456,7 @@ export default function ManageClient({ token }: { token: string }) {
                         className={`${styles.calendarDay} ${isToday ? styles.calendarDayToday : ""} ${isSelected ? styles.calendarDaySelected : ""} ${isDisabled ? styles.calendarDayDisabled : ""}`}
                         disabled={isDisabled}
                         onClick={() => { setSelectedDate(dateStr); setSelectedTime(null); }}
-                        title={onVacation ? "Staff on vacation" : !hasHours ? "Closed" : ""}
+                        title={staffOff ? "Staff unavailable" : bizClosed || !hasHours ? "Closed" : isTooFar ? "Beyond the booking window" : ""}
                       >
                         {day}
                       </button>

@@ -6,7 +6,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { toE164 } from '@/lib/utils'
 import { timezoneFromAddress, DEFAULT_TZ } from '@/lib/tz'
-import { bookingConfirmationHtml, rescheduleConfirmationHtml, cancellationConfirmationHtml, googleCalendarUrl } from '@/lib/email-templates'
+import { bookingConfirmationHtml, rescheduleConfirmationHtml, cancellationConfirmationHtml, ownerNotificationHtml, googleCalendarUrl } from '@/lib/email-templates'
 
 const REMINDER_TYPES = ['24h', '2h', '1h'] as const
 
@@ -206,6 +206,84 @@ export async function sendClientBookingConfirmation(opts: {
     }
   } else if (clientEmail) {
     console.log(`[notifications] [DRY RUN] Client email to ${clientEmail}`)
+  }
+}
+
+/**
+ * Notify the OWNER that a client cancelled or rescheduled an appointment.
+ * Used by the client-initiated paths (SMS keywords, AI receptionist) — the
+ * owner used to learn about an SMS cancellation only when the client didn't
+ * show up. Mirrors the owner notice the manage page sends.
+ */
+export async function sendOwnerChangeNotice(opts: {
+  type: 'cancel' | 'reschedule'
+  tenant: {
+    name: string
+    email: string | null
+    phone: string | null
+    settings: Record<string, unknown> | null
+  } | null
+  clientName: string
+  serviceName: string
+  staffName: string
+  start: Date
+  oldStart?: Date
+  tz: string
+  /** Where the change came from, e.g. "by SMS reply" or "via AI receptionist". */
+  via?: string
+}): Promise<void> {
+  const { type, tenant, clientName, serviceName, staffName, start, oldStart, tz, via } = opts
+  if (!tenant) return
+
+  const { dateStr, timeStr } = formatAptWhen(start, tz)
+  const old = oldStart ? formatAptWhen(oldStart, tz) : null
+  const emoji = type === 'cancel' ? '❌' : '🔄'
+  const action = type === 'cancel' ? 'Cancelled' : 'Rescheduled'
+
+  // SMS to owner (provider-routed: Twilio or the owner's own Android gateway)
+  if (tenant.phone) {
+    const ownerE164 = toE164(tenant.phone)
+    if (ownerE164) {
+      const smsBody = [
+        `${emoji} Appointment ${action}${via ? ` (${via})` : ''}`,
+        ``,
+        `Client: ${clientName}`,
+        `📋 ${serviceName}`,
+        type === 'cancel'
+          ? `📅 Was: ${dateStr} at ${timeStr}`
+          : `📅 Was: ${old?.dateStr} at ${old?.timeStr}\n📅 New: ${dateStr} at ${timeStr}`,
+        staffName ? `💇 Staff: ${staffName}` : '',
+      ].filter(Boolean).join('\n')
+      try {
+        await sendSms(ownerE164, smsBody)
+      } catch (err) {
+        console.error(`[notifications] ${type} SMS to owner failed:`, err)
+      }
+    }
+  }
+
+  // Email to owner
+  const ownerEmail = tenant.email
+    || (((tenant.settings || {}) as Record<string, unknown>).owner_email as string)
+    || null
+  if (ownerEmail && process.env.RESEND_API_KEY) {
+    try {
+      const { Resend } = await import('resend')
+      const resend = new Resend(process.env.RESEND_API_KEY)
+      const html = ownerNotificationHtml({
+        type, clientName, serviceName, staffName, dateStr, timeStr,
+        oldDateStr: old?.dateStr, oldTimeStr: old?.timeStr,
+        businessName: tenant.name,
+      })
+      await resend.emails.send({
+        from: `GlowUp <bookings@joinglowup.org>`,
+        to: [ownerEmail],
+        subject: `${emoji} ${action}: ${clientName} — ${serviceName}`,
+        html,
+      })
+    } catch (err) {
+      console.error(`[notifications] ${type} email to owner failed:`, err)
+    }
   }
 }
 

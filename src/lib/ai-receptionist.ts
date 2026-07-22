@@ -5,7 +5,7 @@
 // appointments directly.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { resolveTenantTz, sendClientBookingConfirmation, scheduleClientReminders } from '@/lib/notifications'
+import { resolveTenantTz, sendClientBookingConfirmation, scheduleClientReminders, sendOwnerChangeNotice, formatAptWhen } from '@/lib/notifications'
 import { localToUTC, nowInTz, formatInTz } from '@/lib/tz'
 import { phoneVariants } from '@/lib/utils'
 
@@ -54,6 +54,8 @@ export function resolveBotConfig(tenant: TenantRow): BotConfig {
 
 type KnownClient = { id: string; first_name: string; last_name: string | null; phone: string | null; email: string | null; visit_count: number | null }
 
+type UpcomingApt = { id: string; desc: string; link: string; start: Date; serviceName: string; staffName: string }
+
 function buildSystemPrompt(opts: {
   tenant: TenantRow
   hours: Record<string, DayHours> | null
@@ -65,9 +67,12 @@ function buildSystemPrompt(opts: {
   tz: string
   todayStr: string
   knownClient: KnownClient | null
+  /** Identity-verified (SMS sender) — only then may the bot share manage links or cancel. */
+  verified: boolean
+  upcomingApts: UpcomingApt[]
   channel: 'web' | 'sms'
 }): string {
-  const { tenant, hours, services, staff, availableSlots, botConfig, bookingUrl, tz, todayStr, knownClient, channel } = opts
+  const { tenant, hours, services, staff, availableSlots, botConfig, bookingUrl, tz, todayStr, knownClient, verified, upcomingApts, channel } = opts
   const now = new Date()
   const dayName = now.toLocaleDateString('en-US', { weekday: 'long', timeZone: tz })
   const currentTime = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz })
@@ -81,14 +86,29 @@ function buildSystemPrompt(opts: {
     ? `Available appointment slots today:\n  ${availableSlots.slice(0, 10).join(', ')}`
     : 'No available slots for today.'
 
-  // Recognized returning client → personal greeting, minimal detail exposure
+  // Recognized returning client → personal greeting, minimal detail exposure.
+  // Manage links + the ability to cancel are only granted when the client's
+  // identity is VERIFIED (SMS sender phone). A web visitor merely typing
+  // someone's phone number must never receive that person's manage links.
+  const changeRules = verified
+    ? (upcomingApts.length > 0
+        ? `
+- Their upcoming appointments:
+${upcomingApts.map((a, i) => `  ${i + 1}. ${a.desc}${a.link ? ` — manage link: ${a.link}` : ''} [ID: ${a.id}]`).join('\n')}
+- If they want to RESCHEDULE an appointment: send them its manage link above — they pick the new time there themselves. Never promise or confirm a new time yourself.
+- If they want to CANCEL an appointment: tell them which appointment you understood (service, date, time) and ask them to confirm. ONLY after they clearly confirm cancelling, end your message with CANCEL_APPOINTMENT:{ID} on its own line, using the ID from the list above. Never emit CANCEL_APPOINTMENT before they confirm.`
+        : `
+- They have no upcoming appointments on file. If they ask to cancel or reschedule, say you don't see an upcoming appointment and suggest calling the salon.`)
+    : `
+- For appointment changes (cancel/reschedule), direct them to the manage link in their confirmation email/text, or the salon phone. You cannot make changes from this chat.`
+
   const knownClientBlock = knownClient
     ? `
 KNOWN CLIENT:
 - You are chatting with a returning client: ${knownClient.first_name}${knownClient.visit_count ? ` (${knownClient.visit_count} previous visit${knownClient.visit_count !== 1 ? 's' : ''})` : ''}.
 - Greet them warmly BY FIRST NAME (e.g., "Hi ${knownClient.first_name}! 👋") in your next reply if you haven't already.
 - Their phone number is already on file — never ask them for it again.
-- Do not reveal any other stored personal details. For appointment changes, direct them to the links or the salon phone.`
+- Do not reveal any other stored personal details.${changeRules}`
     : ''
 
   const bookingRules = botConfig.auto_booking
@@ -230,6 +250,40 @@ export async function handleAiChat(opts: {
     if (typedPhone) knownClient = await lookupClient(typedPhone)
   }
 
+  // Identity is only VERIFIED when the phone came from the SMS webhook (the
+  // carrier delivered the message from that number). Conversation links and
+  // phone numbers typed into web chat are self-asserted.
+  const verified = channel === 'sms' && !!opts.clientPhone && !!knownClient
+
+  // Upcoming appointments — lets the bot hand out manage links and cancel.
+  const baseUrlEarly = process.env.NEXT_PUBLIC_SITE_URL
+    || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null)
+    || 'https://glowup-jade.vercel.app'
+  let upcomingApts: UpcomingApt[] = []
+  if (verified && knownClient) {
+    const { data: apts } = await svc
+      .from('appointments')
+      .select('id, start_time, manage_token, services ( name ), staff!staff_id ( name )')
+      .eq('tenant_id', tenantId)
+      .eq('client_id', knownClient.id)
+      .in('status', ['pending', 'confirmed'])
+      .gte('start_time', new Date().toISOString())
+      .order('start_time', { ascending: true })
+      .limit(5)
+    upcomingApts = (apts || []).map(a => {
+      const start = new Date(a.start_time)
+      const { dateStr, timeStr } = formatAptWhen(start, tz)
+      const serviceName = (a.services as unknown as { name?: string } | null)?.name || 'Appointment'
+      const staffName = (a.staff as unknown as { name?: string } | null)?.name || ''
+      return {
+        id: a.id,
+        desc: `${serviceName} on ${dateStr} at ${timeStr}${staffName ? ` with ${staffName}` : ''}`,
+        link: a.manage_token ? `${baseUrlEarly}/manage/${a.manage_token}` : '',
+        start, serviceName, staffName,
+      }
+    })
+  }
+
   // Calculate available slots for today (salon-local)
   const hours = (settings.business_hours || null) as Record<string, DayHours> | null
   const dayName = new Date().toLocaleDateString('en-US', { weekday: 'long', timeZone: tz })
@@ -260,14 +314,12 @@ export async function handleAiChat(opts: {
     }
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL
-    || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null)
-    || 'https://glowup-jade.vercel.app'
+  const baseUrl = baseUrlEarly
   const bookingUrl = `${baseUrl}/book/${tenant.slug}`
 
   const systemPrompt = buildSystemPrompt({
     tenant, hours, services: servicesRes.data || [], staff: staffRes.data || [],
-    availableSlots, botConfig, bookingUrl, tz, todayStr, knownClient, channel,
+    availableSlots, botConfig, bookingUrl, tz, todayStr, knownClient, verified, upcomingApts, channel,
   })
 
   // ── Conversation persistence (chats land in the owner's Inbox) ──
@@ -337,6 +389,47 @@ export async function handleAiChat(opts: {
     }
   }
   if (!aiResponse) return { ok: false, error: 'AI service unavailable', status: 502 }
+
+  // ── Client-confirmed cancellation (verified SMS clients only) ──
+  // The id must come from the upcoming list we fetched — never trust an
+  // arbitrary id the model produced.
+  const cancelMatch = aiResponse.match(/CANCEL_APPOINTMENT:\s*([0-9a-fA-F-]{36})/)
+  aiResponse = aiResponse.replace(/CANCEL_APPOINTMENT:.*$/gm, '').trim()
+  if (cancelMatch && verified && knownClient) {
+    const target = upcomingApts.find(a => a.id === cancelMatch[1])
+    if (target) {
+      const { error: cancelErr } = await svc
+        .from('appointments')
+        .update({ status: 'cancelled' })
+        .eq('id', target.id)
+        .eq('client_id', knownClient.id)
+        .in('status', ['pending', 'confirmed'])
+      if (cancelErr) {
+        console.error('[ai-receptionist] cancel failed:', cancelErr)
+        aiResponse += `\n\n⚠️ Sorry — I couldn't cancel that appointment. Please call the salon.`
+      } else {
+        await svc
+          .from('appointment_reminders')
+          .update({ status: 'skipped' })
+          .eq('appointment_id', target.id)
+          .eq('status', 'pending')
+        try {
+          await sendOwnerChangeNotice({
+            type: 'cancel',
+            tenant: { name: tenant.name, email: tenant.email, phone: tenant.phone, settings: tenant.settings },
+            clientName: `${knownClient.first_name}${knownClient.last_name ? ' ' + knownClient.last_name : ''}`,
+            serviceName: target.serviceName,
+            staffName: target.staffName,
+            start: target.start,
+            tz,
+            via: 'via AI receptionist',
+          })
+        } catch (err) {
+          console.error('[ai-receptionist] owner cancel notice failed:', err)
+        }
+      }
+    }
+  }
 
   // ── Auto-booking ──
   let bookingResult: { success: boolean; appointment_id?: string; service?: string; time?: string } | null = null

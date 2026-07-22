@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { toE164 } from '@/lib/utils'
+import { formatDateInTz, formatInTz } from '@/lib/tz'
+import { isBusinessClosedOnDate, isStaffOffOnDate, type CustomClosedDate } from '@/lib/schedule-utils'
 import { resolveTenantTz } from '@/lib/notifications'
 import { rescheduleConfirmationHtml, cancellationConfirmationHtml, staffCancellationNotificationHtml, staffRescheduleNotificationHtml, ownerNotificationHtml, googleCalendarUrl } from '@/lib/email-templates'
 
@@ -54,9 +56,16 @@ export async function GET(request: Request) {
     staffSchedule = (staffRow?.schedule || null) as Record<string, unknown> | null
   }
 
-  // Fetch the staff's existing booked appointments (next 30 days) for conflict display
+  // Fetch the staff's existing booked appointments for conflict display.
+  // Window: the salon's advance-booking horizon measured from the LATER of now
+  // and the appointment itself — a fixed 30-days-from-now window left every
+  // appointment further out than that showing phantom availability.
+  const gSettings = (tenant?.settings || {}) as Record<string, unknown>
+  const gBooking = (gSettings.booking || {}) as Record<string, string>
+  const advanceBookingDays = parseInt(gBooking.advanceBookingDays || '30', 10) || 30
   const now = new Date()
-  const futureLimit = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
+  const horizonAnchor = Math.max(now.getTime(), new Date(apt.start_time).getTime())
+  const futureLimit = new Date(horizonAnchor + advanceBookingDays * 24 * 60 * 60 * 1000)
   let bookedSlots: { start: string; end: string }[] = []
   if (apt.staff_id) {
     const { data: existingApts } = await svc
@@ -90,6 +99,9 @@ export async function GET(request: Request) {
       logo_url: tenant.logo_url,
       timezone: tenant.timezone,
       hours: (tenant.settings as Record<string, unknown>)?.business_hours || null,
+      advanceBookingDays,
+      closedHolidays: (gSettings.closed_holidays || []) as string[],
+      customClosedDates: (gSettings.custom_closed_dates || []) as CustomClosedDate[],
     } : null,
     staffSchedule,
     bookedSlots,
@@ -325,6 +337,69 @@ export async function PATCH(request: Request) {
     const duration = service?.duration_minutes || 60
     const newEnd = new Date(newStart.getTime() + duration * 60 * 1000)
 
+    if (isNaN(newStart.getTime())) {
+      return NextResponse.json({ error: 'Invalid new_start_time' }, { status: 400 })
+    }
+    if (newStart.getTime() < Date.now()) {
+      return NextResponse.json({ error: 'Cannot reschedule to a time in the past' }, { status: 400 })
+    }
+
+    // ── Validate against the salon calendar & staff schedule ──
+    // The picker enforces this in the browser, but the API used to accept any
+    // timestamp — a client could move an appointment onto a closed day, a
+    // vacation day, or a time the staff member never offers.
+    const localDateStr = formatDateInTz(newStart, tz)
+    const localTimeStr = formatInTz(newStart.toISOString(), tz, { hour: '2-digit', minute: '2-digit', hour12: false }).replace(/^24/, '00')
+    const dayName = newStart.toLocaleDateString('en-US', { weekday: 'long', timeZone: tz })
+
+    const closedHolidays = (tenantSettings.closed_holidays || []) as string[]
+    const customClosedDates = (tenantSettings.custom_closed_dates || []) as { date: string; label: string }[]
+    if (isBusinessClosedOnDate(closedHolidays, customClosedDates, localDateStr)) {
+      return NextResponse.json({ error: 'The salon is closed on that date. Please choose another day.' }, { status: 400 })
+    }
+
+    // Case-insensitive day lookup — schedules store "Monday", some legacy rows "monday"
+    const dayEntry = <T,>(obj: Record<string, unknown> | null | undefined): T | undefined => {
+      if (!obj) return undefined
+      const key = Object.keys(obj).find(k => k.toLowerCase() === dayName.toLowerCase())
+      return key ? (obj[key] as T) : undefined
+    }
+    type DaySched = { off?: boolean; closed?: boolean; open?: string; close?: string; useSlots?: boolean; slots?: { start: string; end: string }[] }
+    const toMin = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + (m || 0) }
+    const startMin = toMin(localTimeStr)
+
+    let patchStaffSchedule: Record<string, unknown> | null = null
+    if (apt.staff_id) {
+      const { data: staffRow } = await svc
+        .from('staff')
+        .select('schedule')
+        .eq('id', apt.staff_id)
+        .single()
+      patchStaffSchedule = (staffRow?.schedule || null) as Record<string, unknown> | null
+    }
+    if (patchStaffSchedule && isStaffOffOnDate(patchStaffSchedule, localDateStr)) {
+      return NextResponse.json({ error: `${staffName || 'Your stylist'} is not available on that date. Please choose another day.` }, { status: 400 })
+    }
+
+    const staffDay = dayEntry<DaySched>(patchStaffSchedule)
+    const bizDay = dayEntry<DaySched>((tenantSettings.business_hours || null) as Record<string, unknown> | null)
+    if (staffDay?.off || (!staffDay && bizDay?.closed)) {
+      return NextResponse.json({ error: 'The salon is closed on that day. Please choose another day.' }, { status: 400 })
+    }
+    if (staffDay?.useSlots && staffDay.slots?.length) {
+      // Fixed slot grid — the new time must be one of the offered start times
+      // (compare minutes, not strings — "8:30" and "08:30" both occur in data)
+      if (!staffDay.slots.some(s => toMin(s.start) === startMin)) {
+        return NextResponse.json({ error: 'That time is not one of the offered appointment slots. Please choose another time.' }, { status: 400 })
+      }
+    } else {
+      const open = staffDay?.open || bizDay?.open
+      const close = staffDay?.close || bizDay?.close
+      if ((open && startMin < toMin(open)) || (close && startMin + duration > toMin(close))) {
+        return NextResponse.json({ error: 'That time is outside working hours. Please choose another time.' }, { status: 400 })
+      }
+    }
+
     // Check for conflicts
     if (apt.staff_id) {
       const { data: conflicts } = await svc
@@ -356,6 +431,14 @@ export async function PATCH(request: Request) {
       .eq('id', apt.id)
 
     if (updateErr) {
+      // 23P01 = the appointments_no_double_book exclusion constraint: the
+      // pre-check above is a TOCTOU, the constraint is what actually decides.
+      if ((updateErr as { code?: string }).code === '23P01') {
+        return NextResponse.json(
+          { error: 'This time slot is no longer available. Please choose another time.' },
+          { status: 409 }
+        )
+      }
       return NextResponse.json({ error: 'Failed to reschedule' }, { status: 500 })
     }
 

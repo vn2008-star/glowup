@@ -1125,6 +1125,13 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
                   total_price: service?.price || 0,
                   notes: formData.notes || null,
                 });
+                // Keep the modal open on failure — this used to swallow the
+                // error and close, so a rejected reschedule (e.g. the target
+                // slot is already booked) looked like it silently worked.
+                if (res.error) {
+                  alert(`Failed to update appointment: ${res.error}`);
+                  return;
+                }
                 if (res.data) {
                   const updated = res.data as FullAppointment;
                   setAppointments(prev => prev.map(a => a.id === editingApt.id ? updated : a));
