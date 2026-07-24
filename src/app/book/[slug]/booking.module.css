@@ -129,7 +129,10 @@
   background: #16161f;
   border-radius: 16px;
   border: 1px solid #2a2a3d;
+  /* clip (not hidden) keeps rounded corners without killing position: sticky
+     for the cart bar and the bottom action bar */
   overflow: hidden;
+  overflow: clip;
 }
 .stepPanel {
   padding: 2rem;
@@ -707,6 +710,19 @@
   align-items: center;
   margin-top: 1rem;
 }
+/* Keeps the Continue / Confirm buttons visible at the bottom of the screen
+   on steps whose content can grow long (many services selected) */
+.stickyActions {
+  position: sticky;
+  bottom: 0;
+  margin: 1rem -2rem -2rem;
+  padding: 1rem 2rem;
+  background: rgba(22, 22, 31, 0.92);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-top: 1px solid #2a2a3d;
+  z-index: 10;
+}
 .backBtn {
   background: none;
   border: none;
@@ -1037,6 +1053,7 @@
   .ambassadorCard { flex-direction: column; text-align: center; gap: 0.5rem; }
   .ambassadorArrow { display: none; }
   .cartBar { margin: 0 -1.25rem 1rem; padding: 0.75rem 1rem; border-radius: 0; }
+  .stickyActions { margin: 1rem -1.25rem -1.25rem; padding: 0.75rem 1.25rem; }
   .cartText { font-size: 0.72rem; }
   .cartTotal { font-size: 0.95rem; }
   .cartContinue { padding: 0.55rem 1rem; font-size: 0.78rem; }

@@ -655,7 +655,7 @@ export default function BookingClient({ slug }: { slug: string }) {
                 )
               })}
 
-              <div className={styles.stepActions}>
+              <div className={`${styles.stepActions} ${styles.stickyActions}`}>
                 <button className={styles.backBtn} onClick={() => setStep(0)}>← Back</button>
                 <button className={styles.nextBtn} onClick={() => setStep(2)}>Continue →</button>
               </div>
@@ -783,7 +783,7 @@ export default function BookingClient({ slug }: { slug: string }) {
                 </label>
               </div>
 
-              <div className={styles.stepActions}>
+              <div className={`${styles.stepActions} ${styles.stickyActions}`}>
                 <button className={styles.backBtn} onClick={() => setStep(2)}>← Back</button>
                 <button className={styles.nextBtn} onClick={() => { if (clientName.trim() && clientPhone.trim()) setStep(4) }} disabled={!clientName.trim() || !clientPhone.trim()}>
                   Review Booking →
@@ -837,7 +837,7 @@ export default function BookingClient({ slug }: { slug: string }) {
                 {clientEmail && <p>{clientEmail}</p>}
               </div>
 
-              <div className={styles.stepActions}>
+              <div className={`${styles.stepActions} ${styles.stickyActions}`}>
                 <button className={styles.backBtn} onClick={() => setStep(3)}>← Back</button>
                 <button className={styles.confirmBtn} onClick={handleSubmit} disabled={submitting}>
                   {submitting ? 'Booking...' : '✓ Confirm Booking'}
