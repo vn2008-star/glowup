@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "react";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData, uploadImage } from "@/lib/api";
@@ -27,6 +27,9 @@ export default function CheckoutPage() {
   const [selectedDate, setSelectedDate] = useState(() => {
     return todayInTz(DEFAULT_TZ);
   });
+  // Stamped once so the "Today" shortcut doesn't read the clock every render
+  const [todayStr] = useState(() => todayInTz(DEFAULT_TZ));
+  const dateInputRef = useRef<HTMLInputElement>(null);
 
   // Checkout state
   const [selectedApt, setSelectedApt] = useState<FullAppointment | null>(null);
@@ -1075,8 +1078,42 @@ export default function CheckoutPage() {
         <div className={styles.headerActions}>
           <div className={styles.dateNav}>
             <button onClick={() => changeDate(-1)}>‹</button>
-            <span className={styles.dateLabel}>{formatDate(selectedDate)}</span>
+            {/* Tap the date to jump straight to a day instead of stepping one
+                at a time. The native picker is anchored to the hidden input. */}
+            <div className={styles.datePickerWrap}>
+              <button
+                className={styles.dateLabel}
+                onClick={() => {
+                  const el = dateInputRef.current;
+                  if (!el) return;
+                  if (typeof el.showPicker === "function") el.showPicker();
+                  else el.click();
+                }}
+                title="Pick a date"
+              >
+                {formatDate(selectedDate)} <span className={styles.dateCaret}>▾</span>
+              </button>
+              <input
+                ref={dateInputRef}
+                type="date"
+                className={styles.dateInputHidden}
+                value={selectedDate}
+                onChange={(e) => {
+                  if (!e.target.value) return;
+                  setSelectedDate(e.target.value);
+                  setSelectedApt(null);
+                }}
+              />
+            </div>
             <button onClick={() => changeDate(1)}>›</button>
+            {selectedDate !== todayStr && (
+              <button
+                className={styles.todayBtn}
+                onClick={() => { setSelectedDate(todayStr); setSelectedApt(null); }}
+              >
+                Today
+              </button>
+            )}
           </div>
         </div>
       </div>

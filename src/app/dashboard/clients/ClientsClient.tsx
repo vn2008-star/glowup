@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData, uploadImage } from "@/lib/api";
@@ -21,6 +22,17 @@ function maskEmail(email: string | null): string | null {
   if (at <= 0) return '•••@•••';
   return `${email[0]}${'•'.repeat(Math.max(at - 1, 2))}${email.slice(at)}`;
 }
+
+/** One row of a client's appointment history (from clients.history). */
+type ClientApt = {
+  id: string;
+  start_time: string;
+  status: string;
+  total_price: number | null;
+  tip_amount: number | null;
+  service?: { name: string } | null;
+  staff_member?: { name: string } | null;
+};
 
 /* ── Dynamic client status computation ── */
 function computeClientStatus(c: Client): 'new' | 'active' | 'at_risk' | 'inactive' {
@@ -106,6 +118,39 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
     if (skipMountFetch.current) { skipMountFetch.current = false; return; }
     fetchClients();
   }, [fetchClients]);
+
+  // ── Appointment history shown inside the client profile ──
+  const [historyApts, setHistoryApts] = useState<ClientApt[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  function openClientProfile(c: Client) {
+    setSelectedClient(c);
+    setHistoryApts([]);
+    setHistoryLoading(true);
+    queryData<{ client: Client; appointments: ClientApt[] }>("clients.history", { client_id: c.id })
+      .then(({ data }) => {
+        setHistoryApts(data?.appointments || []);
+        setHistoryLoading(false);
+      });
+  }
+
+  // Deep link from the top-bar client search: /dashboard/clients?client=<id>.
+  // Resolved through the API rather than the loaded page of clients, so a client
+  // past the list limit still opens.
+  const searchParams = useSearchParams();
+  const deepLinkId = searchParams.get("client");
+  const openedDeepLink = useRef<string | null>(null);
+  useEffect(() => {
+    if (!deepLinkId || openedDeepLink.current === deepLinkId) return;
+    openedDeepLink.current = deepLinkId;
+    queryData<{ client: Client; appointments: ClientApt[] }>("clients.history", { client_id: deepLinkId })
+      .then(({ data }) => {
+        if (!data?.client) return;
+        setSelectedClient({ ...data.client, status: computeClientStatus(data.client) });
+        setHistoryApts(data.appointments || []);
+        setHistoryLoading(false);
+      });
+  }, [deepLinkId]);
 
   // Days until the next occurrence of a birthday (0 = today); null when unset
   function daysToBirthday(birthday: string | null): number | null {
@@ -548,7 +593,7 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
               {filtered.map((c, i) => (
                 <tr
                   key={c.id}
-                  onClick={() => setSelectedClient(c)}
+                  onClick={() => openClientProfile(c)}
                   style={{
                     cursor: 'pointer',
                     borderTop: '1px solid var(--border-subtle)',
@@ -611,7 +656,7 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
         /* ── Card View ── */
         <div className={styles.clientGrid}>
           {filtered.map((c) => (
-            <div key={c.id} className={`card ${styles.clientCard} ${selectedIds.has(c.id) ? styles.clientCardSelected : ''}`} onClick={() => setSelectedClient(c)}>
+            <div key={c.id} className={`card ${styles.clientCard} ${selectedIds.has(c.id) ? styles.clientCardSelected : ''}`} onClick={() => openClientProfile(c)}>
               <div className={styles.clientHeader}>
                 <input
                   type="checkbox"
@@ -915,12 +960,39 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
               </div>
             )}
 
-            {/* Service History Placeholder */}
+            {/* Appointments & service history */}
             <div className={styles.profileSection}>
-              <h3 className={styles.sectionTitle}>Service History</h3>
-              <div className={styles.emptyNote}>
-                Service history will appear here as appointments are completed.
-              </div>
+              <h3 className={styles.sectionTitle}>Appointments & History</h3>
+              {historyLoading ? (
+                <div className={styles.emptyNote}>Loading appointments…</div>
+              ) : historyApts.length === 0 ? (
+                <div className={styles.emptyNote}>
+                  No appointments yet — book one with the button below.
+                </div>
+              ) : (
+                <div className={styles.aptHistoryList}>
+                  {historyApts.map((a) => (
+                    <div key={a.id} className={styles.aptHistoryRow}>
+                      <span className={styles.aptHistoryDate}>
+                        {localeDateStr(new Date(a.start_time), { month: "short", day: "numeric", year: "numeric" })}
+                        <small>{new Date(a.start_time).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</small>
+                      </span>
+                      <span className={styles.aptHistoryService}>
+                        {a.service?.name || "—"}
+                        <small>{a.staff_member?.name || "Unassigned"}</small>
+                      </span>
+                      <span className={`badge ${a.status === "completed" ? "badge-success" : a.status === "cancelled" ? "badge-danger" : "badge-info"}`}>
+                        {a.status}
+                      </span>
+                      <span className={styles.aptHistoryPrice}>
+                        {a.total_price != null
+                          ? `$${(Number(a.total_price) + Number(a.tip_amount || 0)).toFixed(2)}`
+                          : "—"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Actions — WIRED */}

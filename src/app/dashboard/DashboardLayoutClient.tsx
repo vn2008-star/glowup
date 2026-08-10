@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 // Dashboard layout v2 - updated nav items
 
 import styles from "./dashboard.module.css";
@@ -7,6 +7,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTenant, TenantProvider, clearTenantCache, type TenantInitialData } from "@/lib/tenant-context";
 import { createClient } from "@/lib/supabase/client";
+import { queryData } from "@/lib/api";
+import type { Client } from "@/lib/types";
 import { GlowUpLogo } from "@/components/GlowUpLogo";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { FeedbackWidget } from "@/components/FeedbackWidget";
@@ -120,6 +122,45 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const isAdmin = isPlatformAdmin;
   const t = useTranslations('dashboard');
   const tc = useTranslations('common');
+
+  // ── Global client search (top bar) ──
+  // Was a dead placeholder input: typing a client's name did nothing at all.
+  const [clientQuery, setClientQuery] = useState("");
+  const [clientResults, setClientResults] = useState<Client[]>([]);
+  const [clientSearching, setClientSearching] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchSeq = useRef(0);
+
+  function handleClientSearch(value: string) {
+    setClientQuery(value);
+    setSearchOpen(true);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+
+    const q = value.trim();
+    if (q.length < 2) {
+      searchSeq.current++; // discard any in-flight response
+      setClientResults([]);
+      setClientSearching(false);
+      return;
+    }
+
+    setClientSearching(true);
+    const seq = ++searchSeq.current;
+    searchTimer.current = setTimeout(async () => {
+      const { data } = await queryData<Client[]>("clients.search", { q });
+      if (seq !== searchSeq.current) return; // a newer keystroke won
+      setClientResults(data || []);
+      setClientSearching(false);
+    }, 250);
+  }
+
+  function openClient(id: string) {
+    setSearchOpen(false);
+    setClientQuery("");
+    setClientResults([]);
+    router.push(`/dashboard/clients?client=${id}`);
+  }
 
   async function handleLogout() {
     clearTenantCache();
@@ -268,7 +309,42 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
           </button>
           <div className={styles.searchBar}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-            <input type="text" placeholder={tc('search')} className={styles.searchInput} />
+            <input
+              type="text"
+              placeholder={tc('search')}
+              className={styles.searchInput}
+              value={clientQuery}
+              autoComplete="off"
+              onChange={(e) => handleClientSearch(e.target.value)}
+              onFocus={() => setSearchOpen(true)}
+              onBlur={() => setTimeout(() => setSearchOpen(false), 150)}
+            />
+            {searchOpen && clientQuery.trim().length >= 2 && (
+              <div className={styles.searchResults}>
+                {clientSearching ? (
+                  <div className={styles.searchEmpty}>Searching…</div>
+                ) : clientResults.length === 0 ? (
+                  <div className={styles.searchEmpty}>No clients found</div>
+                ) : (
+                  clientResults.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      className={styles.searchResult}
+                      onMouseDown={(e) => { e.preventDefault(); openClient(c.id); }}
+                    >
+                      <span className={styles.searchResultName}>
+                        {c.first_name} {c.last_name || ""}
+                      </span>
+                      <span className={styles.searchResultMeta}>
+                        {c.phone || c.email || "—"}
+                        {c.visit_count ? ` · ${c.visit_count} visit${c.visit_count === 1 ? "" : "s"}` : ""}
+                      </span>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
           </div>
           <div className={styles.topBarActions}>
             <span className={styles.staffName}>{currentStaff?.name}</span>
