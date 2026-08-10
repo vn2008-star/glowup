@@ -1763,23 +1763,17 @@ export default function CheckoutPage() {
                             const color = m === "venmo" ? "#008CFF" : "#6D1ED4";
                             const label = m === "venmo" ? "Venmo" : "Zelle";
                             return (
-                              <div key={m} className={styles.payReqCol}>
-                                <button
-                                  className={styles.payReqBtn}
-                                  style={{ borderColor: color }}
-                                  onClick={() => handleRequestPayment(m)}
-                                  disabled={!!payReqSending}
-                                >
-                                  {payReqSending === m
-                                    ? t("processing")
-                                    : `📲 ${t("requestPayment", { method: label })}`}
-                                </button>
-                                {paymentQrSettings[`${m}_qr`] && (
-                                  <button className={styles.payReqQrBtn} onClick={() => setShowQrModal(m)}>
-                                    Show {label} QR
-                                  </button>
-                                )}
-                              </div>
+                              <button
+                                key={m}
+                                className={styles.payReqBtn}
+                                style={{ borderColor: color, color }}
+                                onClick={() => handleRequestPayment(m)}
+                                disabled={!!payReqSending}
+                              >
+                                {payReqSending === m
+                                  ? t("processing")
+                                  : `📲 ${t("requestPayment", { method: label })}`}
+                              </button>
                             );
                           })}
                         </div>

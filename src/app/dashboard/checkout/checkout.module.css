@@ -730,47 +730,34 @@
 }
 .changeServiceCancel:disabled { opacity: 0.5; cursor: not-allowed; }
 
-/* ── Venmo / Zelle payment request ── */
+/* ── Venmo / Zelle payment request ──
+   Uses the global bg/border tokens. The --surface-primary, --surface-secondary
+   and --border-primary names the rest of this file reaches for are not defined
+   anywhere, so they collapse to no background — and inside a `border:`
+   shorthand an invalid var kills the whole declaration, leaving no border. */
 .payReqPanel {
-  background: var(--surface-secondary);
-  border: 1px solid var(--border-primary);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   padding: var(--space-3);
   margin: var(--space-3) 0;
 }
 .payReqRow { display: flex; gap: var(--space-3); }
-.payReqCol {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  min-width: 0;
-}
 .payReqBtn {
   flex: 1;
+  min-width: 0;
   padding: var(--space-3);
-  background: var(--surface-primary);
-  border: 2px solid var(--border-primary);
+  background: var(--bg-card);
+  border: 2px solid var(--border-subtle);
   border-radius: var(--radius-md);
-  color: var(--text-primary);
   font-size: var(--text-sm);
   font-weight: 700;
   cursor: pointer;
-  transition: filter 0.15s;
+  transition: filter 0.15s, transform 0.1s;
 }
-.payReqBtn:hover { filter: brightness(1.08); }
+.payReqBtn:hover { filter: brightness(1.12); }
+.payReqBtn:active { transform: translateY(1px); }
 .payReqBtn:disabled { opacity: 0.5; cursor: not-allowed; }
-.payReqQrBtn {
-  padding: var(--space-2);
-  background: var(--surface-primary);
-  border: 1px solid var(--border-primary);
-  border-radius: var(--radius-md);
-  color: var(--text-secondary);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-}
 .payReqHint {
   font-size: var(--text-xs);
   color: var(--text-tertiary);
