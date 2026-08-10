@@ -498,6 +498,9 @@
     "checkedInStatus": "Checked In ✓",
     "noMatchingAppts": "No matching appointments found",
     "searchToCheckin": "Enter your name or phone to find your appointment",
-    "withStaff": "with"
+    "withStaff": "with",
+    "changeService": "Change",
+    "requestPayment": "Request {method} Payment",
+    "requestPaymentHint": "Texts/emails the client the total and how to pay. You still complete the checkout once they've paid."
   }
 }

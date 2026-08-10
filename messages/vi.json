@@ -498,6 +498,9 @@
     "checkedInStatus": "Đã đăng ký ✓",
     "noMatchingAppts": "Không tìm thấy lịch hẹn phù hợp",
     "searchToCheckin": "Nhập tên hoặc số điện thoại để tìm lịch hẹn",
-    "withStaff": "với"
+    "withStaff": "với",
+    "changeService": "Đổi",
+    "requestPayment": "Yêu cầu thanh toán {method}",
+    "requestPaymentHint": "Gửi tin nhắn/email cho khách tổng tiền và cách thanh toán. Bạn vẫn hoàn tất thanh toán sau khi khách trả tiền."
   }
 }

@@ -38,6 +38,11 @@ const APPOINTMENT_WRITABLE = [
   'checked_in_at', 'checked_out_at',
 ] as const
 
+// Columns a client is allowed to write on `appointment_charges` (update).
+// appointment_id and tenant_id are deliberately absent: they decide WHICH
+// checkout a line belongs to, and belong in the WHERE clause only.
+const CHARGE_WRITABLE = ['service_id', 'description', 'amount', 'is_upsell'] as const
+
 /**
  * Turn a Postgres write error into something an owner can act on.
  *
@@ -267,6 +272,73 @@ export async function POST(request: Request) {
           limit: payload?.limit,
         })
         return NextResponse.json(result)
+      }
+
+      // Type-ahead client lookup (calendar search box). Server-side rather than
+      // filtering a clients.list page in the browser — that caps out at 200 rows,
+      // so a busy salon's older clients were unfindable.
+      case 'clients.search': {
+        const q = String(payload?.q || '').trim()
+        if (q.length < 2) return NextResponse.json({ data: [] })
+        // PostgREST parses `or=(a.ilike.x,b.ilike.y)` — commas and parens inside
+        // a value would split the filter list, so strip them from user input.
+        const safe = q.replace(/[(),*]/g, ' ').trim()
+        const digits = q.replace(/\D/g, '')
+        const filters = [
+          `first_name.ilike.%${safe}%`,
+          `last_name.ilike.%${safe}%`,
+          `email.ilike.%${safe}%`,
+          `phone.ilike.%${safe}%`,
+        ]
+        if (digits.length >= 3) filters.push(`phone.ilike.%${digits}%`)
+
+        const { data, error } = await svc
+          .from('clients')
+          .select('id, first_name, last_name, phone, email, photo_url, birthday, notes, allergies, loyalty_points, visit_count, lifetime_spend, last_visit, status')
+          .eq('tenant_id', tenantId)
+          .or(filters.join(','))
+          .order('last_visit', { ascending: false, nullsFirst: false })
+          .limit(payload?.limit || 20)
+
+        if (await shouldMaskContacts()) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          return NextResponse.json({ data: (data || []).map((c: any) => maskClientData(c)), error: error?.message })
+        }
+        return NextResponse.json({ data, error: error?.message })
+      }
+
+      // One client's full appointment record — upcoming and past — for the
+      // calendar's client lookup panel.
+      case 'clients.history': {
+        const clientId = payload?.client_id
+        if (!clientId) return NextResponse.json({ error: 'client_id required' }, { status: 400 })
+
+        const [{ data: client }, { data: apts, error }] = await Promise.all([
+          svc
+            .from('clients')
+            .select('id, first_name, last_name, phone, email, photo_url, birthday, notes, allergies, preferences, loyalty_points, visit_count, lifetime_spend, last_visit, status')
+            .eq('id', clientId)
+            .eq('tenant_id', tenantId)
+            .single(),
+          svc
+            .from('appointments')
+            .select('id, client_id, staff_id, service_id, start_time, end_time, status, total_price, tip_amount, payment_method, notes, checked_out_at, staff_member:staff!staff_id(id, name), service:services(id, name, category, price, duration_minutes)')
+            .eq('tenant_id', tenantId)
+            .eq('client_id', clientId)
+            .neq('status', 'blocked')
+            .order('start_time', { ascending: false })
+            .limit(payload?.limit || 100),
+        ])
+
+        if (!client) return NextResponse.json({ error: 'Client not found' }, { status: 404 })
+
+        return NextResponse.json({
+          data: {
+            client: (await shouldMaskContacts()) ? maskClientData(client) : client,
+            appointments: apts || [],
+          },
+          error: error?.message,
+        })
       }
 
       case 'clients.add': {
@@ -1808,6 +1880,21 @@ export async function POST(request: Request) {
         return NextResponse.json({ data, error: error?.message })
       }
 
+      case 'charges.update': {
+        // Front desk swapping the service a charge line is for (client asked for
+        // a pedicure, not the manicure they booked). Allowlisted rather than a
+        // payload spread so a caller cannot repoint the row at another
+        // appointment or tenant — same reasoning as APPOINTMENT_WRITABLE.
+        const { data, error } = await svc
+          .from('appointment_charges')
+          .update(pickWritable(payload, CHARGE_WRITABLE))
+          .eq('id', payload.id)
+          .eq('tenant_id', tenantId)
+          .select('id, appointment_id, staff_id, service_id, description, amount, is_upsell, created_at, service:services(id, name, price, commission_rate)')
+          .single()
+        return NextResponse.json({ data, error: error?.message })
+      }
+
       case 'charges.delete': {
         const { error } = await svc
           .from('appointment_charges')
@@ -1902,6 +1989,111 @@ export async function POST(request: Request) {
 
         // Failure already returned above, so `data` is present and `error` null.
         return NextResponse.json({ data })
+      }
+
+      // Text/email the client a Venmo or Zelle payment request for the amount
+      // on screen at checkout. Nothing is charged here — the client pays from
+      // their own app and the cashier still marks the checkout paid.
+      case 'payments.request': {
+        const method = payload.method as 'venmo' | 'zelle'
+        if (method !== 'venmo' && method !== 'zelle') {
+          return NextResponse.json({ error: 'method must be venmo or zelle' }, { status: 400 })
+        }
+        const amount = Number(payload.amount)
+        if (!Number.isFinite(amount) || amount <= 0) {
+          return NextResponse.json({ error: 'A payment amount is required' }, { status: 400 })
+        }
+
+        const { data: apt } = await svc
+          .from('appointments')
+          .select('id, client_id, client:clients(id, first_name, last_name, phone, email, sms_opt_out)')
+          .eq('id', payload.appointment_id)
+          .eq('tenant_id', tenantId)
+          .single()
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const client = (apt?.client as any) as {
+          first_name?: string; last_name?: string
+          phone?: string | null; email?: string | null; sms_opt_out?: boolean
+        } | null
+        if (!apt) return NextResponse.json({ error: 'Appointment not found' }, { status: 404 })
+        if (!client) {
+          return NextResponse.json({ error: 'This walk-in has no client record — add a phone or email first' }, { status: 400 })
+        }
+        if (!client.phone && !client.email) {
+          return NextResponse.json({ error: 'Client has no phone or email on file' }, { status: 400 })
+        }
+
+        const { data: t } = await svc
+          .from('tenants')
+          .select('name, email, settings')
+          .eq('id', tenantId)
+          .single()
+        const settings = (t?.settings || {}) as Record<string, unknown>
+        const pay = (settings.payment_qr || {}) as Record<string, string>
+        const businessName = t?.name || 'our salon'
+        const amountStr = amount.toFixed(2)
+        const greeting = greetingName(`${client.first_name || ''} ${client.last_name || ''}`.trim()) || 'there'
+
+        let message: string
+        let ctaUrl: string | undefined
+        if (method === 'venmo') {
+          const handle = (pay.venmo_handle || '').trim().replace(/^@/, '')
+          if (!handle) {
+            return NextResponse.json(
+              { error: 'Add your Venmo username in Settings → Payment Methods first' },
+              { status: 400 }
+            )
+          }
+          // Venmo's web payment link — opens the app prefilled on a phone.
+          ctaUrl = `https://venmo.com/?txn=pay&recipients=${encodeURIComponent(handle)}`
+            + `&amount=${encodeURIComponent(amountStr)}`
+            + `&note=${encodeURIComponent(businessName)}`
+          message = `Hi ${greeting}! Your total at ${businessName} is $${amountStr}. `
+            + `Pay by Venmo (@${handle}) here: ${ctaUrl}\n\nThank you!`
+        } else {
+          const recipient = (pay.zelle_recipient || '').trim()
+          if (!recipient) {
+            return NextResponse.json(
+              { error: 'Add your Zelle phone or email in Settings → Payment Methods first' },
+              { status: 400 }
+            )
+          }
+          // Zelle has no payment link — the client sends from their bank app.
+          message = `Hi ${greeting}! Your total at ${businessName} is $${amountStr}. `
+            + `Send it by Zelle to ${recipient} (${businessName}) in your banking app.\n\nThank you!`
+        }
+
+        let sent = 0
+        if (client.phone && !client.sms_opt_out) {
+          const e164 = toE164(client.phone)
+          if (e164 && await sendSms(e164, message)) sent++
+        }
+        if (client.email && process.env.RESEND_API_KEY) {
+          try {
+            const { Resend } = await import('resend')
+            const resend = new Resend(process.env.RESEND_API_KEY)
+            await resend.emails.send({
+              from: `${businessName} <bookings@joinglowup.org>`,
+              replyTo: t?.email || undefined,
+              to: [client.email],
+              subject: `Payment request from ${businessName} — $${amountStr}`,
+              html: promoEmailHtml({
+                businessName,
+                message,
+                ctaUrl,
+                ctaText: ctaUrl ? `Pay $${amountStr} with Venmo` : undefined,
+              }),
+            })
+            sent++
+          } catch (err) {
+            console.error('[payments.request] email failed:', err)
+          }
+        }
+
+        return NextResponse.json({
+          data: { sent, method, amount, message },
+          error: sent === 0 ? 'Nothing sent — check the client’s contact info / SMS opt-out' : undefined,
+        })
       }
 
       case 'reports.daily-tally': {

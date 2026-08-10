@@ -50,6 +50,19 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
   const [editingApt, setEditingApt] = useState<FullAppointment | null>(null);
   const [activeStaffFilter, setActiveStaffFilter] = useState<string[]>([]);
 
+  // ── Client lookup: find a client, see their upcoming + past appointments ──
+  const [clientQuery, setClientQuery] = useState("");
+  const [clientResults, setClientResults] = useState<Client[]>([]);
+  const [clientSearching, setClientSearching] = useState(false);
+  const [lookupOpen, setLookupOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyClient, setHistoryClient] = useState<Client | null>(null);
+  const [historyApts, setHistoryApts] = useState<FullAppointment[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  // "Now" is stamped when the panel opens — reading the clock during render
+  // makes the upcoming/past split flip between renders.
+  const [historyNow, setHistoryNow] = useState(0);
+
   // ── Birthday clients (loaded once for calendar birthday indicators) ──
   const [birthdayClients, setBirthdayClients] = useState<Pick<Client, 'id' | 'first_name' | 'last_name' | 'birthday'>[]>(initialCalendar?.birthdays ?? []);
 
@@ -490,6 +503,63 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
     setShowModal(true);
   }
 
+  // ── Client lookup ──
+  // Debounced server-side search — the browser only ever holds the first 200
+  // clients, so filtering that list locally hid everyone else.
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchSeq = useRef(0);
+
+  function handleClientQuery(value: string) {
+    setClientQuery(value);
+    setLookupOpen(true);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+
+    const q = value.trim();
+    if (q.length < 2) {
+      searchSeq.current++; // drop any in-flight response
+      setClientResults([]);
+      setClientSearching(false);
+      return;
+    }
+
+    setClientSearching(true);
+    const seq = ++searchSeq.current;
+    searchTimer.current = setTimeout(async () => {
+      const { data } = await queryData<Client[]>("clients.search", { q });
+      if (seq !== searchSeq.current) return; // a newer keystroke won
+      setClientResults(data || []);
+      setClientSearching(false);
+    }, 250);
+  }
+
+  async function openClientHistory(clientId: string) {
+    setLookupOpen(false);
+    setHistoryOpen(true);
+    setHistoryNow(Date.now());
+    setHistoryLoading(true);
+    setHistoryApts([]);
+    setHistoryClient(null);
+    const { data } = await queryData<{ client: Client; appointments: FullAppointment[] }>(
+      "clients.history",
+      { client_id: clientId }
+    );
+    if (data) {
+      setHistoryClient(data.client);
+      setHistoryApts(data.appointments || []);
+    }
+    setHistoryLoading(false);
+  }
+
+  // Jump the calendar to one of the client's appointments and open its details.
+  function goToAppointment(apt: FullAppointment) {
+    setHistoryOpen(false);
+    setSelectedDate(new Date(apt.start_time));
+    setView("day");
+    // clients.history returns the appointment without the client embedded —
+    // graft it back on so the detail modal doesn't read it as a walk-in.
+    setSelectedApt({ ...apt, client: historyClient || apt.client });
+  }
+
   // ── Appointments for a specific day (timezone-safe) ──
   function aptsForDay(day: Date) {
     return appointments.filter(a => {
@@ -517,6 +587,44 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
           </div>
         </div>
         <div className={styles.headerRight}>
+          {/* Client lookup */}
+          <div className={styles.clientLookup}>
+            <input
+              className={styles.clientLookupInput}
+              type="search"
+              value={clientQuery}
+              placeholder="🔍 Search client…"
+              autoComplete="off"
+              onChange={(e) => handleClientQuery(e.target.value)}
+              onFocus={() => setLookupOpen(true)}
+              onBlur={() => setTimeout(() => setLookupOpen(false), 150)}
+            />
+            {lookupOpen && clientQuery.trim().length >= 2 && (
+              <div className={styles.lookupDropdown}>
+                {clientSearching ? (
+                  <div className={styles.lookupEmpty}>Searching…</div>
+                ) : clientResults.length === 0 ? (
+                  <div className={styles.lookupEmpty}>No clients found</div>
+                ) : (
+                  clientResults.map((c) => (
+                    <div
+                      key={c.id}
+                      className={styles.lookupOption}
+                      onMouseDown={(e) => { e.preventDefault(); openClientHistory(c.id); }}
+                    >
+                      <span className={styles.lookupName}>
+                        {c.first_name} {c.last_name || ""}
+                      </span>
+                      <span className={styles.lookupMeta}>
+                        {c.phone || c.email || "—"}
+                        {c.visit_count ? ` · ${c.visit_count} visit${c.visit_count === 1 ? "" : "s"}` : ""}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
           <button className={styles.todayBtn} onClick={() => { setSelectedDate(new Date()); setView("day"); }}>{t("today")}</button>
           <div className={styles.viewToggle}>
             {(["day", "week", "month"] as const).map(v => (
@@ -1329,6 +1437,116 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
                 <button type="submit" className={styles.blockSubmitBtn}>🚫 Block Time</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Client Lookup: appointments & history ── */}
+      {historyOpen && (
+        <div className={styles.modalOverlay} onClick={() => setHistoryOpen(false)}>
+          <div className={`${styles.modal} ${styles.historyModal}`} onClick={(e) => e.stopPropagation()}>
+            {historyLoading || !historyClient ? (
+              <div className={styles.historyLoading}>{historyLoading ? "Loading client…" : "Client not found"}</div>
+            ) : (() => {
+              const now = historyNow;
+              const upcoming = historyApts
+                .filter(a => new Date(a.start_time).getTime() >= now && a.status !== "cancelled")
+                .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+              const past = historyApts.filter(a => !upcoming.includes(a));
+              const completed = past.filter(a => a.status === "completed");
+              const spend = completed.reduce(
+                (sum, a) => sum + Number(a.total_price || 0) + Number(a.tip_amount || 0), 0
+              );
+
+              const row = (a: FullAppointment) => (
+                <button key={a.id} className={styles.historyRow} onClick={() => goToAppointment(a)}>
+                  <span className={styles.historyDate}>
+                    {localeDateStr(new Date(a.start_time), { month: "short", day: "numeric", year: "numeric" })}
+                    <small>{new Date(a.start_time).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</small>
+                  </span>
+                  <span className={styles.historyService}>
+                    {a.service?.name || "—"}
+                    <small>{a.staff_member?.name || t("unassigned")}</small>
+                  </span>
+                  <span className={`${styles.detailStatus} ${styles[`status_${a.status}`]}`}>{a.status}</span>
+                  <span className={styles.historyPrice}>
+                    {a.total_price != null ? `$${(Number(a.total_price) + Number(a.tip_amount || 0)).toFixed(2)}` : "—"}
+                  </span>
+                </button>
+              );
+
+              return (
+                <>
+                  <div className={styles.historyHeader}>
+                    <div>
+                      <h2>{historyClient.first_name} {historyClient.last_name || ""}</h2>
+                      <p className={styles.historyContact}>
+                        {[historyClient.phone, historyClient.email].filter(Boolean).join(" · ") || "No contact on file"}
+                      </p>
+                    </div>
+                    <button className={styles.historyClose} onClick={() => setHistoryOpen(false)}>✕</button>
+                  </div>
+
+                  <div className={styles.historyStats}>
+                    <div><strong>{completed.length}</strong><span>Visits</span></div>
+                    <div><strong>${spend.toFixed(0)}</strong><span>Spent</span></div>
+                    <div><strong>{historyClient.loyalty_points ?? 0}</strong><span>Points</span></div>
+                    <div>
+                      <strong>
+                        {historyClient.last_visit
+                          ? localeDateStr(new Date(historyClient.last_visit), { month: "short", day: "numeric" })
+                          : "—"}
+                      </strong>
+                      <span>Last visit</span>
+                    </div>
+                  </div>
+
+                  {(() => {
+                    // `allergies` is a text[] column, but older rows carry a plain string.
+                    const allergyText = Array.isArray(historyClient.allergies)
+                      ? historyClient.allergies.join(", ")
+                      : String(historyClient.allergies || "");
+                    if (!allergyText && !historyClient.notes) return null;
+                    return (
+                      <div className={styles.historyNotes}>
+                        {allergyText && <p>⚠️ <strong>Allergies:</strong> {allergyText}</p>}
+                        {historyClient.notes && <p>📝 {historyClient.notes}</p>}
+                      </div>
+                    );
+                  })()}
+
+                  <h3 className={styles.historySectionTitle}>Upcoming ({upcoming.length})</h3>
+                  {upcoming.length === 0 ? (
+                    <p className={styles.historyEmpty}>No upcoming appointments</p>
+                  ) : (
+                    <div className={styles.historyList}>{upcoming.map(row)}</div>
+                  )}
+
+                  <h3 className={styles.historySectionTitle}>History ({past.length})</h3>
+                  {past.length === 0 ? (
+                    <p className={styles.historyEmpty}>No past appointments</p>
+                  ) : (
+                    <div className={styles.historyList}>{past.map(row)}</div>
+                  )}
+
+                  <div className={styles.modalActions}>
+                    <button className="btn btn-secondary" onClick={() => setHistoryOpen(false)}>{t("cancel")}</button>
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => {
+                        const c = historyClient;
+                        setHistoryOpen(false);
+                        openNewAppointment();
+                        setFormData(prev => ({ ...prev, client_id: c.id }));
+                        setClientSearch(`${c.first_name} ${c.last_name || ""}`.trim());
+                      }}
+                    >
+                      {t("newAppointment")}
+                    </button>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>
       )}

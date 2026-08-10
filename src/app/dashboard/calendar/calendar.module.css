@@ -78,6 +78,151 @@
   border-color: var(--color-primary);
 }
 
+/* ── Client Lookup (search a client from the calendar) ── */
+.clientLookup {
+  position: relative;
+}
+.clientLookupInput {
+  width: 200px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  outline: none;
+  transition: border-color var(--transition-fast), width var(--transition-fast);
+}
+.clientLookupInput:focus { border-color: var(--color-primary); width: 260px; }
+.lookupDropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  min-width: 260px;
+  margin-top: 4px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  max-height: 320px;
+  overflow-y: auto;
+  z-index: 60;
+  animation: modalIn 0.15s ease-out;
+}
+.lookupOption {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border-subtle);
+  transition: background var(--transition-fast);
+}
+.lookupOption:last-child { border-bottom: none; }
+.lookupOption:hover { background: var(--bg-surface); }
+.lookupName { font-size: var(--text-sm); font-weight: 700; color: var(--text-primary); }
+.lookupMeta { font-size: var(--text-xs); color: var(--text-secondary); }
+.lookupEmpty {
+  padding: 12px;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+/* ── Client History Modal ── */
+.historyModal { max-width: 720px; }
+.historyLoading {
+  padding: var(--space-8);
+  text-align: center;
+  color: var(--text-secondary);
+}
+.historyHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+.historyHeader h2 { margin-bottom: 2px; }
+.historyContact { font-size: var(--text-sm); color: var(--text-secondary); }
+.historyClose {
+  background: none;
+  border: none;
+  font-size: var(--text-lg);
+  color: var(--text-secondary);
+  cursor: pointer;
+  line-height: 1;
+}
+.historyStats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+.historyStats > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: var(--space-3);
+  background: var(--bg-surface);
+  border-radius: var(--radius-md);
+}
+.historyStats strong { font-size: var(--text-lg); font-weight: 800; color: var(--text-primary); }
+.historyStats span { font-size: var(--text-xs); color: var(--text-secondary); }
+.historyNotes {
+  padding: var(--space-3);
+  background: var(--bg-surface);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.historySectionTitle {
+  font-size: var(--text-sm);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  margin: var(--space-4) 0 var(--space-2);
+}
+.historyEmpty { font-size: var(--text-sm); color: var(--text-secondary); }
+.historyList { display: flex; flex-direction: column; gap: var(--space-2); }
+.historyRow {
+  display: grid;
+  grid-template-columns: 1.1fr 1.4fr auto auto;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-3);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+.historyRow:hover { border-color: var(--color-primary); background: var(--bg-card); }
+.historyDate, .historyService {
+  display: flex;
+  flex-direction: column;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 0;
+}
+.historyDate small, .historyService small {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+.historyService { overflow: hidden; text-overflow: ellipsis; }
+.historyPrice { font-size: var(--text-sm); font-weight: 800; color: var(--text-primary); }
+
 /* ── View Toggle ── */
 .viewToggle {
   display: flex;

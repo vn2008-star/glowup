@@ -80,7 +80,9 @@ export default function SettingsPage() {
     email: "Hi {client_name},\n\nThis is a friendly reminder about your upcoming appointment:\n\n📋 Service: {service}\n📅 Date: {date}\n🕐 Time: {time}\n📍 At: {business_name}\n🏠 Address: {address}\n\nTo confirm, modify, or cancel your appointment, please reply to this email or contact us directly.\n\nSee you soon!\n— {business_name}",
   });
 
-  const [paymentQr, setPaymentQr] = useState({ venmo_qr: "", zelle_qr: "" });
+  // QR images are shown at the counter; the handle/recipient are what a
+  // Venmo or Zelle payment request texted to the client needs.
+  const [paymentQr, setPaymentQr] = useState({ venmo_qr: "", zelle_qr: "", venmo_handle: "", zelle_recipient: "" });
 
   // Business Closed Days state
   const [closedHolidays, setClosedHolidays] = useState<string[]>([]);
@@ -119,7 +121,7 @@ export default function SettingsPage() {
         });
       }
       if (s.reminder_templates) setReminderTemplates({ ...reminderTemplates, ...(s.reminder_templates as Record<string, string>) });
-      if (s.payment_qr) setPaymentQr({ venmo_qr: "", zelle_qr: "", ...(s.payment_qr as Record<string, string>) });
+      if (s.payment_qr) setPaymentQr({ venmo_qr: "", zelle_qr: "", venmo_handle: "", zelle_recipient: "", ...(s.payment_qr as Record<string, string>) });
       if (s.closed_holidays) setClosedHolidays(s.closed_holidays as string[]);
       if (s.custom_closed_dates) setCustomClosedDates(s.custom_closed_dates as CustomClosedDate[]);
     }
@@ -657,6 +659,7 @@ export default function SettingsPage() {
         <h2>💰 Payment Methods</h2>
         <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginBottom: "var(--space-4)" }}>
           Upload your Venmo and Zelle QR codes. Staff can show these to clients during checkout.
+          Add your username and Zelle contact below to also text or email clients a payment request from the checkout screen.
         </p>
         <div className={styles.formGrid}>
           {/* Venmo */}
@@ -703,6 +706,16 @@ export default function SettingsPage() {
                 </button>
               )}
             </div>
+            <label className="label" style={{ marginTop: 'var(--space-3)' }}>Venmo Username</label>
+            <input
+              className="input"
+              value={paymentQr.venmo_handle}
+              onChange={(e) => setPaymentQr(prev => ({ ...prev, venmo_handle: e.target.value }))}
+              placeholder="@your-salon"
+            />
+            <span style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)" }}>
+              Used to build the pay link in payment requests.
+            </span>
           </div>
 
           {/* Zelle */}
@@ -749,6 +762,16 @@ export default function SettingsPage() {
                 </button>
               )}
             </div>
+            <label className="label" style={{ marginTop: 'var(--space-3)' }}>Zelle Phone or Email</label>
+            <input
+              className="input"
+              value={paymentQr.zelle_recipient}
+              onChange={(e) => setPaymentQr(prev => ({ ...prev, zelle_recipient: e.target.value }))}
+              placeholder="(415) 555-0001 or pay@yoursalon.com"
+            />
+            <span style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)" }}>
+              Zelle has no pay link — clients send to this from their banking app.
+            </span>
           </div>
         </div>
       </div>

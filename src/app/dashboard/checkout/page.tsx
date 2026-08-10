@@ -35,6 +35,12 @@ export default function CheckoutPage() {
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "card" | "mixed" | "venmo" | "zelle" | "gift_card" | "">("")
   const [showQrModal, setShowQrModal] = useState<"venmo" | "zelle" | null>(null);;
   const [upsellServiceId, setUpsellServiceId] = useState("");
+  // Swapping the booked service for what the client actually had
+  const [changingService, setChangingService] = useState(false);
+  const [savingService, setSavingService] = useState(false);
+  // Venmo / Zelle payment request sent to the client
+  const [payReqSending, setPayReqSending] = useState(false);
+  const [payReqStatus, setPayReqStatus] = useState<{ ok: boolean; text: string } | null>(null);
   const [checkingOut, setCheckingOut] = useState(false);
   const [editingCheckout, setEditingCheckout] = useState(false);
   const [beforePhoto, setBeforePhoto] = useState<string | null>(null);
@@ -286,6 +292,12 @@ export default function CheckoutPage() {
     setPaymentMethod((selectedApt.payment_method as "cash" | "card" | "mixed" | "venmo" | "zelle" | "gift_card") || "");
   }, [selectedApt]);
 
+  // Venmo/Zelle QR images + handles the owner saved in Settings
+  const paymentQrSettings = useMemo(() => {
+    const s = (tenant?.settings || {}) as Record<string, unknown>;
+    return (s.payment_qr || {}) as Record<string, string>;
+  }, [tenant]);
+
   // ── Helpers ──
   function formatTime(iso: string) {
     return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -435,6 +447,49 @@ export default function CheckoutPage() {
     }
   }
 
+  // Swap the service the appointment is for — the client booked a manicure and
+  // ended up with a pedicure. Updates the appointment (what reporting and the
+  // daily tally price off) and the base charge line if one was already written.
+  async function changeBaseService(newServiceId: string) {
+    if (!selectedApt || !newServiceId) return;
+    if (newServiceId === selectedApt.service_id) {
+      setChangingService(false);
+      return;
+    }
+    const svc = services.find((s) => s.id === newServiceId);
+    if (!svc) return;
+    setSavingService(true);
+
+    const base = charges.find((c) => !c.is_upsell);
+    if (base) {
+      const { data: updated } = await queryData<AppointmentCharge>("charges.update", {
+        id: base.id,
+        service_id: svc.id,
+        description: svc.name,
+        amount: svc.price,
+      });
+      if (updated) {
+        setCharges((prev) => prev.map((c) => (c.id === base.id ? updated : c)));
+      }
+    }
+
+    const { data, error } = await queryData<FullAppointment>("appointments.update", {
+      id: selectedApt.id,
+      service_id: svc.id,
+    });
+
+    if (error || !data) {
+      alert(`Could not change the service: ${typeof error === "string" ? error : "unknown error"}`);
+    } else {
+      setAppointments((prev) => prev.map((a) => (a.id === selectedApt.id ? { ...a, ...data } : a)));
+      setSelectedApt((prev) => (prev ? { ...prev, ...data } : prev));
+      fetchTally();
+    }
+
+    setSavingService(false);
+    setChangingService(false);
+  }
+
   async function removeCharge(chargeId: string) {
     await queryData("charges.delete", { id: chargeId });
     setCharges((prev) => prev.filter((c) => c.id !== chargeId));
@@ -472,6 +527,38 @@ export default function CheckoutPage() {
     setGcCard(null);
     setGcError("");
     setGcApplied(0);
+  }
+
+  // Text/email the client a Venmo or Zelle request for the amount on screen.
+  // Nothing is charged — the client pays from their own app, and the cashier
+  // still completes the checkout once the money lands.
+  async function handleRequestPayment(method: "venmo" | "zelle") {
+    if (!selectedApt) return;
+    const amount = charges.length > 0
+      ? grandTotal
+      : Number(selectedApt.service?.price || 0) + (Number(tipAmount) || 0);
+    if (!(amount > 0)) {
+      setPayReqStatus({ ok: false, text: "Nothing to request — the total is $0." });
+      return;
+    }
+
+    setPayReqSending(true);
+    setPayReqStatus(null);
+    const { data, error } = await queryData<{ sent: number }>("payments.request", {
+      appointment_id: selectedApt.id,
+      method,
+      amount,
+    });
+    setPayReqSending(false);
+
+    if (error || !data?.sent) {
+      setPayReqStatus({
+        ok: false,
+        text: typeof error === "string" ? error : "Could not send the payment request",
+      });
+    } else {
+      setPayReqStatus({ ok: true, text: `Request for $${amount.toFixed(2)} sent to the client` });
+    }
   }
 
   async function handleCheckout() {
@@ -557,6 +644,8 @@ export default function CheckoutPage() {
     setEditingCheckout(false);
     setBeforePhoto(null);
     setAfterPhoto(null);
+    setChangingService(false);
+    setPayReqStatus(null);
     clearGiftCard();
   }
 
@@ -1402,27 +1491,71 @@ export default function CheckoutPage() {
                       <span>{t("services")}</span>
                     </div>
 
-                    {charges.length === 0 && selectedApt.service && (
-                      <div className={styles.chargeRow}>
-                        <span className={styles.chargeName}>{selectedApt.service.name}</span>
-                        <span className={styles.chargeAmount}>${Number(selectedApt.service.price).toFixed(2)}</span>
+                    {/* Booked service — swappable for what the client actually had */}
+                    {changingService && !isCheckedOut ? (
+                      <div className={styles.changeServiceRow}>
+                        <select
+                          value={selectedApt.service_id || ""}
+                          disabled={savingService}
+                          autoFocus
+                          onChange={(e) => changeBaseService(e.target.value)}
+                        >
+                          {!selectedApt.service_id && <option value="">— {t("selectService")} —</option>}
+                          {services.map((s) => (
+                            <option key={s.id} value={s.id}>{s.name} — ${s.price}</option>
+                          ))}
+                        </select>
+                        <button
+                          className={styles.changeServiceCancel}
+                          onClick={() => setChangingService(false)}
+                          disabled={savingService}
+                        >
+                          {savingService ? "…" : "✕"}
+                        </button>
                       </div>
-                    )}
+                    ) : (
+                      <>
+                        {charges.length === 0 && selectedApt.service && (
+                          <div className={styles.chargeRow}>
+                            <span className={styles.chargeName}>
+                              {selectedApt.service.name}
+                              {!isCheckedOut && (
+                                <button
+                                  className={styles.changeServiceBtn}
+                                  onClick={() => setChangingService(true)}
+                                >
+                                  {t("changeService")}
+                                </button>
+                              )}
+                            </span>
+                            <span className={styles.chargeAmount}>${Number(selectedApt.service.price).toFixed(2)}</span>
+                          </div>
+                        )}
 
-                    {charges.map((ch) => (
-                      <div key={ch.id} className={styles.chargeRow}>
-                        <span className={styles.chargeName}>
-                          {ch.description}
-                          {ch.is_upsell && <span className={styles.chargeUpsell}>{t("upsell")}</span>}
-                        </span>
-                        <span className={styles.chargeAmount}>
-                          ${Number(ch.amount).toFixed(2)}
-                          {!isCheckedOut && (
-                            <button className={styles.chargeDelete} onClick={() => removeCharge(ch.id)}>✕</button>
-                          )}
-                        </span>
-                      </div>
-                    ))}
+                        {charges.map((ch) => (
+                          <div key={ch.id} className={styles.chargeRow}>
+                            <span className={styles.chargeName}>
+                              {ch.description}
+                              {ch.is_upsell && <span className={styles.chargeUpsell}>{t("upsell")}</span>}
+                              {!ch.is_upsell && !isCheckedOut && (
+                                <button
+                                  className={styles.changeServiceBtn}
+                                  onClick={() => setChangingService(true)}
+                                >
+                                  {t("changeService")}
+                                </button>
+                              )}
+                            </span>
+                            <span className={styles.chargeAmount}>
+                              ${Number(ch.amount).toFixed(2)}
+                              {!isCheckedOut && (
+                                <button className={styles.chargeDelete} onClick={() => removeCharge(ch.id)}>✕</button>
+                              )}
+                            </span>
+                          </div>
+                        ))}
+                      </>
+                    )}
 
                     {!isCheckedOut && (
                       <div className={styles.addUpsellRow}>
@@ -1503,12 +1636,8 @@ export default function CheckoutPage() {
                                 setPaymentMethod(m);
                                 // Clear gift card state when switching away
                                 if (m !== "gift_card") clearGiftCard();
-                                if (m === "venmo" || m === "zelle") {
-                                  const tenantSettings = (tenant?.settings || {}) as Record<string, unknown>;
-                                  const paymentSettings = (tenantSettings.payment_qr || {}) as Record<string, string>;
-                                  if (paymentSettings[`${m}_qr`]) {
-                                    setShowQrModal(m);
-                                  }
+                                if ((m === "venmo" || m === "zelle") && paymentQrSettings[`${m}_qr`]) {
+                                  setShowQrModal(m);
                                 }
                               }}
                               style={paymentMethod === m && colors[m] ? { borderColor: colors[m], background: `${colors[m]}18` } : {}}
@@ -1583,6 +1712,35 @@ export default function CheckoutPage() {
                                 </p>
                               )}
                             </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* ── Venmo / Zelle: request payment from the client ── */}
+                      {(paymentMethod === "venmo" || paymentMethod === "zelle") && (
+                        <div className={styles.payReqPanel}>
+                          <div className={styles.payReqRow}>
+                            <button
+                              className={styles.payReqBtn}
+                              style={{ borderColor: paymentMethod === "venmo" ? "#008CFF" : "#6D1ED4" }}
+                              onClick={() => handleRequestPayment(paymentMethod)}
+                              disabled={payReqSending}
+                            >
+                              {payReqSending
+                                ? t("processing")
+                                : `📲 ${t("requestPayment", { method: paymentMethod === "venmo" ? "Venmo" : "Zelle" })}`}
+                            </button>
+                            {paymentQrSettings[`${paymentMethod}_qr`] && (
+                              <button className={styles.payReqQrBtn} onClick={() => setShowQrModal(paymentMethod)}>
+                                Show QR
+                              </button>
+                            )}
+                          </div>
+                          <p className={styles.payReqHint}>{t("requestPaymentHint")}</p>
+                          {payReqStatus && (
+                            <p className={payReqStatus.ok ? styles.payReqSuccess : styles.payReqError}>
+                              {payReqStatus.ok ? "✓ " : "⚠️ "}{payReqStatus.text}
+                            </p>
                           )}
                         </div>
                       )}
@@ -1885,9 +2043,7 @@ export default function CheckoutPage() {
 
       {/* ── Venmo / Zelle QR Code Modal ── */}
       {showQrModal && (() => {
-        const tenantSettings = (tenant?.settings || {}) as Record<string, unknown>;
-        const paymentSettings = (tenantSettings.payment_qr || {}) as Record<string, string>;
-        const qrImage = paymentSettings[`${showQrModal}_qr`];
+        const qrImage = paymentQrSettings[`${showQrModal}_qr`];
         const brandColor = showQrModal === "venmo" ? "#008CFF" : "#6D1ED4";
         const brandName = showQrModal === "venmo" ? "Venmo" : "Zelle";
 

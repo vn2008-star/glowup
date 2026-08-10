@@ -332,6 +332,9 @@
     "checkedInStatus": "Registrado ✓",
     "noMatchingAppts": "No se encontraron citas",
     "searchToCheckin": "Ingresa tu nombre o teléfono para encontrar tu cita",
-    "withStaff": "con"
+    "withStaff": "con",
+    "changeService": "Cambiar",
+    "requestPayment": "Solicitar pago por {method}",
+    "requestPaymentHint": "Envía al cliente el total y cómo pagar por SMS/correo. Tú completas el cobro cuando haya pagado."
   }
 }

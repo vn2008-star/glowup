@@ -368,6 +368,9 @@
     "checkedInStatus": "已签到 ✓",
     "noMatchingAppts": "未找到匹配的预约",
     "searchToCheckin": "输入姓名或电话查找预约",
-    "withStaff": "与"
+    "withStaff": "与",
+    "changeService": "更改",
+    "requestPayment": "请求 {method} 付款",
+    "requestPaymentHint": "以短信/邮件将总额和付款方式发给客户。客户付款后仍需由你完成结账。"
   }
 }
