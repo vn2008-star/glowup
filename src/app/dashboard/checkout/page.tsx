@@ -42,7 +42,7 @@ export default function CheckoutPage() {
   const [changingService, setChangingService] = useState(false);
   const [savingService, setSavingService] = useState(false);
   // Venmo / Zelle payment request sent to the client
-  const [payReqSending, setPayReqSending] = useState(false);
+  const [payReqSending, setPayReqSending] = useState<"" | "venmo" | "zelle">("");
   const [payReqStatus, setPayReqStatus] = useState<{ ok: boolean; text: string } | null>(null);
   const [checkingOut, setCheckingOut] = useState(false);
   const [editingCheckout, setEditingCheckout] = useState(false);
@@ -545,22 +545,23 @@ export default function CheckoutPage() {
       return;
     }
 
-    setPayReqSending(true);
+    setPayReqSending(method);
     setPayReqStatus(null);
     const { data, error } = await queryData<{ sent: number }>("payments.request", {
       appointment_id: selectedApt.id,
       method,
       amount,
     });
-    setPayReqSending(false);
+    setPayReqSending("");
 
+    const label = method === "venmo" ? "Venmo" : "Zelle";
     if (error || !data?.sent) {
       setPayReqStatus({
         ok: false,
-        text: typeof error === "string" ? error : "Could not send the payment request",
+        text: typeof error === "string" ? error : `Could not send the ${label} request`,
       });
     } else {
-      setPayReqStatus({ ok: true, text: `Request for $${amount.toFixed(2)} sent to the client` });
+      setPayReqStatus({ ok: true, text: `${label} request for $${amount.toFixed(2)} sent to the client` });
     }
   }
 
@@ -1753,34 +1754,42 @@ export default function CheckoutPage() {
                         </div>
                       )}
 
-                      {/* ── Venmo / Zelle: request payment from the client ── */}
-                      {(paymentMethod === "venmo" || paymentMethod === "zelle") && (
-                        <div className={styles.payReqPanel}>
-                          <div className={styles.payReqRow}>
-                            <button
-                              className={styles.payReqBtn}
-                              style={{ borderColor: paymentMethod === "venmo" ? "#008CFF" : "#6D1ED4" }}
-                              onClick={() => handleRequestPayment(paymentMethod)}
-                              disabled={payReqSending}
-                            >
-                              {payReqSending
-                                ? t("processing")
-                                : `📲 ${t("requestPayment", { method: paymentMethod === "venmo" ? "Venmo" : "Zelle" })}`}
-                            </button>
-                            {paymentQrSettings[`${paymentMethod}_qr`] && (
-                              <button className={styles.payReqQrBtn} onClick={() => setShowQrModal(paymentMethod)}>
-                                Show QR
-                              </button>
-                            )}
-                          </div>
-                          <p className={styles.payReqHint}>{t("requestPaymentHint")}</p>
-                          {payReqStatus && (
-                            <p className={payReqStatus.ok ? styles.payReqSuccess : styles.payReqError}>
-                              {payReqStatus.ok ? "✓ " : "⚠️ "}{payReqStatus.text}
-                            </p>
-                          )}
+                      {/* ── Request payment from the client. Always on screen:
+                           asking for money shouldn't require picking the
+                           payment method first. ── */}
+                      <div className={styles.payReqPanel}>
+                        <div className={styles.payReqRow}>
+                          {(["venmo", "zelle"] as const).map((m) => {
+                            const color = m === "venmo" ? "#008CFF" : "#6D1ED4";
+                            const label = m === "venmo" ? "Venmo" : "Zelle";
+                            return (
+                              <div key={m} className={styles.payReqCol}>
+                                <button
+                                  className={styles.payReqBtn}
+                                  style={{ borderColor: color }}
+                                  onClick={() => handleRequestPayment(m)}
+                                  disabled={!!payReqSending}
+                                >
+                                  {payReqSending === m
+                                    ? t("processing")
+                                    : `📲 ${t("requestPayment", { method: label })}`}
+                                </button>
+                                {paymentQrSettings[`${m}_qr`] && (
+                                  <button className={styles.payReqQrBtn} onClick={() => setShowQrModal(m)}>
+                                    Show {label} QR
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
-                      )}
+                        <p className={styles.payReqHint}>{t("requestPaymentHint")}</p>
+                        {payReqStatus && (
+                          <p className={payReqStatus.ok ? styles.payReqSuccess : styles.payReqError}>
+                            {payReqStatus.ok ? "✓ " : "⚠️ "}{payReqStatus.text}
+                          </p>
+                        )}
+                      </div>
 
                       <button
                         className={styles.checkoutBtn}
