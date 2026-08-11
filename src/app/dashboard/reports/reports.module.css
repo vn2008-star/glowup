@@ -260,3 +260,37 @@
 }
 .revEmailBtn:hover:not(:disabled) { opacity: 1; }
 .revEmailBtn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* ── Cancellations: share-of-total bar inside a table cell ── */
+.reasonBarTrack {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 120px;
+  height: 18px;
+  background: var(--bg-surface);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+.reasonBarFill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, var(--color-primary), var(--color-accent));
+  opacity: 0.35;
+}
+.reasonBarTrack span {
+  position: relative;
+  margin-left: auto;
+  padding-right: var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+.emptyNote {
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+  margin-top: var(--space-3);
+}

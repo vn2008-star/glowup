@@ -110,6 +110,9 @@ export interface Appointment {
   checked_out_by: string | null
   checked_in_at: string | null
   manage_token: string | null
+  /** Why it was cancelled, and who asked — only set from 2026-08-11 onward. */
+  cancellation_reason: string | null
+  cancelled_by: 'salon' | 'client' | null
   created_at: string
   updated_at: string
   // Joined fields

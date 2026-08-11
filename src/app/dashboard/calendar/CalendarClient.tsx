@@ -1544,7 +1544,12 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
                   </span>
                   <span className={styles.historyService}>
                     {a.service?.name || "—"}
-                    <small>{a.staff_member?.name || t("unassigned")}</small>
+                    <small>
+                      {a.staff_member?.name || t("unassigned")}
+                      {a.status === "cancelled" && a.cancellation_reason
+                        ? ` · ${a.cancellation_reason}${a.cancelled_by === "client" ? " (client)" : ""}`
+                        : ""}
+                    </small>
                   </span>
                   <span className={`${styles.detailStatus} ${styles[`status_${a.status}`]}`}>{a.status}</span>
                   <span className={styles.historyPrice}>

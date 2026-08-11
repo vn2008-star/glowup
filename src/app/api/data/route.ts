@@ -414,7 +414,7 @@ export async function POST(request: Request) {
             .single(),
           svc
             .from('appointments')
-            .select('id, client_id, staff_id, service_id, start_time, end_time, status, total_price, tip_amount, payment_method, notes, checked_out_at, staff_member:staff!staff_id(id, name), service:services(id, name, category, price, duration_minutes)')
+            .select('id, client_id, staff_id, service_id, start_time, end_time, status, total_price, tip_amount, payment_method, notes, checked_out_at, cancellation_reason, cancelled_by, staff_member:staff!staff_id(id, name), service:services(id, name, category, price, duration_minutes)')
             .eq('tenant_id', tenantId)
             .eq('client_id', clientId)
             .neq('status', 'blocked')
@@ -1849,6 +1849,80 @@ export async function POST(request: Request) {
             summary: { total: clientList.length, active, atRisk, lost, new: newCount, retentionRate: Math.round((active / total) * 100) },
             clients: scored.sort((a, b) => a.daysSinceLastVisit - b.daysSinceLastVisit)
           }
+        })
+      }
+
+      // Why appointments are being lost. Reasons only exist from 2026-08-11
+      // (when cancellation_reason was added), so older rows land in "Not
+      // recorded" rather than being silently dropped from the totals.
+      case 'reports.cancellations': {
+        const days = Math.min(Math.max(Number(payload?.days) || 90, 1), 365)
+        const since = new Date(Date.now() - days * 86400000).toISOString()
+
+        const { data: rows } = await svc
+          .from('appointments')
+          .select('id, start_time, total_price, cancellation_reason, cancelled_by, client:clients(first_name, last_name), service:services(name, price), staff_member:staff!staff_id(name)')
+          .eq('tenant_id', tenantId)
+          .eq('status', 'cancelled')
+          .gte('start_time', since)
+          .order('start_time', { ascending: false })
+          .limit(500)
+
+        // Total booked in the same window, so a cancellation COUNT can be read
+        // as a rate — 12 cancellations means nothing without the denominator.
+        const { count: bookedCount } = await svc
+          .from('appointments')
+          .select('id', { count: 'exact', head: true })
+          .eq('tenant_id', tenantId)
+          .neq('status', 'blocked')
+          .gte('start_time', since)
+
+        const byReason: Record<string, { count: number; lostRevenue: number }> = {}
+        const bySource: Record<string, number> = { salon: 0, client: 0, unknown: 0 }
+        let lostRevenue = 0
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        for (const r of (rows || []) as any[]) {
+          const reason = (r.cancellation_reason || '').trim() || 'Not recorded'
+          // Price of the service that would have been performed; total_price is
+          // only filled at checkout, which a cancelled appointment never reaches.
+          const value = Number(r.service?.price ?? r.total_price ?? 0)
+          if (!byReason[reason]) byReason[reason] = { count: 0, lostRevenue: 0 }
+          byReason[reason].count++
+          byReason[reason].lostRevenue += value
+          lostRevenue += value
+          const src = r.cancelled_by === 'salon' || r.cancelled_by === 'client' ? r.cancelled_by : 'unknown'
+          bySource[src]++
+        }
+
+        const reasons = Object.entries(byReason)
+          .map(([reason, v]) => ({ reason, ...v }))
+          .sort((a, b) => b.count - a.count)
+
+        const total = (rows || []).length
+        const booked = bookedCount || 0
+
+        return NextResponse.json({
+          data: {
+            days,
+            total,
+            booked,
+            cancellationRate: booked > 0 ? Math.round((total / booked) * 1000) / 10 : 0,
+            lostRevenue,
+            reasons,
+            bySource,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            recent: (rows || []).slice(0, 25).map((r: any) => ({
+              id: r.id,
+              date: r.start_time,
+              clientName: r.client ? `${r.client.first_name} ${r.client.last_name || ''}`.trim() : 'Walk-in',
+              serviceName: r.service?.name || '—',
+              staffName: r.staff_member?.name || 'Unassigned',
+              reason: r.cancellation_reason || '',
+              cancelledBy: r.cancelled_by || '',
+              value: Number(r.service?.price ?? r.total_price ?? 0),
+            })),
+          },
         })
       }
 

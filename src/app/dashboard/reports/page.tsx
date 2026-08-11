@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData } from "@/lib/api";
+import { localeDateStr } from "@/lib/utils";
 import styles from "./reports.module.css";
 
 /* ═══ Types ═══ */
@@ -54,7 +55,21 @@ interface StaffRevenueData {
   period: { start: string; end: string; label: string };
 }
 
-const TABS = ["Overview", "Staff Performance", "Staff Revenue", "Client Retention", "Revenue Forecast", "Peak Hours"] as const;
+const TABS = ["Overview", "Staff Performance", "Staff Revenue", "Client Retention", "Revenue Forecast", "Peak Hours", "Cancellations"] as const;
+
+type CancellationData = {
+  days: number;
+  total: number;
+  booked: number;
+  cancellationRate: number;
+  lostRevenue: number;
+  reasons: { reason: string; count: number; lostRevenue: number }[];
+  bySource: { salon: number; client: number; unknown: number };
+  recent: {
+    id: string; date: string; clientName: string; serviceName: string;
+    staffName: string; reason: string; cancelledBy: string; value: number;
+  }[];
+};
 
 export default function ReportsPage() {
   const { tenant, refetch: refetchTenant } = useTenant();
@@ -69,6 +84,8 @@ export default function ReportsPage() {
   const [forecast, setForecast] = useState<ForecastData | null>(null);
   const [peakHours, setPeakHours] = useState<PeakHoursData | null>(null);
   const [retFilter, setRetFilter] = useState<string>("all");
+  const [cancels, setCancels] = useState<CancellationData | null>(null);
+  const [cancelDays, setCancelDays] = useState(90);
 
   // Staff Revenue tab state
   const [staffRevData, setStaffRevData] = useState<StaffRevenueData | null>(null);
@@ -111,9 +128,14 @@ export default function ReportsPage() {
           setStaffRevData(data);
           break;
         }
+        case "Cancellations": {
+          const { data } = await queryData<CancellationData>("reports.cancellations", { days: cancelDays });
+          setCancels(data);
+          break;
+        }
       }
     } finally { setLoading(false); }
-  }, [tenant, activeTab, revPeriodType, revOffset]);
+  }, [tenant, activeTab, revPeriodType, revOffset, cancelDays]);
 
   useEffect(() => { fetchTabData(); }, [fetchTabData]);
 
@@ -427,6 +449,112 @@ export default function ReportsPage() {
                 <span>High</span>
               </div>
             </div>
+          )}
+
+          {/* ═══ CANCELLATIONS TAB ═══ */}
+          {activeTab === "Cancellations" && cancels && (
+            <>
+              <div className={styles.revControls}>
+                <div className={styles.revPeriodToggle}>
+                  {[30, 90, 365].map((d) => (
+                    <button
+                      key={d}
+                      className={`${styles.revToggleBtn} ${cancelDays === d ? styles.revToggleActive : ""}`}
+                      onClick={() => setCancelDays(d)}
+                    >
+                      {d === 365 ? "12 months" : `${d} days`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className={styles.kpiGrid}>
+                <div className={`card ${styles.kpiCard}`}>
+                  <span className={styles.statLabel}>Cancelled</span>
+                  <span className={styles.statValue}>{cancels.total}</span>
+                  <span className={styles.statSub}>of {cancels.booked} booked</span>
+                </div>
+                <div className={`card ${styles.kpiCard}`}>
+                  <span className={styles.statLabel}>Cancellation Rate</span>
+                  <span className={styles.statValue}>{cancels.cancellationRate}%</span>
+                  <span className={styles.statSub}>last {cancels.days} days</span>
+                </div>
+                <div className={`card ${styles.kpiCard}`}>
+                  <span className={styles.statLabel}>Revenue Not Earned</span>
+                  <span className={styles.statValue}>{fmt(cancels.lostRevenue)}</span>
+                  <span className={styles.statSub}>at list price</span>
+                </div>
+                <div className={`card ${styles.kpiCard}`}>
+                  <span className={styles.statLabel}>Who Cancelled</span>
+                  <span className={styles.statValue}>
+                    {cancels.bySource.client}/{cancels.bySource.salon}
+                  </span>
+                  <span className={styles.statSub}>client / salon</span>
+                </div>
+              </div>
+
+              <div className={`card ${styles.revTableCard}`}>
+                <h2>Why appointments were cancelled</h2>
+                {cancels.reasons.length === 0 ? (
+                  <p className={styles.emptyNote}>No cancellations in this period.</p>
+                ) : (
+                  <table className={styles.revTable}>
+                    <thead>
+                      <tr><th>Reason</th><th>Count</th><th>Share</th><th>Value</th></tr>
+                    </thead>
+                    <tbody>
+                      {cancels.reasons.map((r) => (
+                        <tr key={r.reason}>
+                          <td>{r.reason === "Not recorded" ? <em>Not recorded</em> : r.reason}</td>
+                          <td>{r.count}</td>
+                          <td>
+                            <div className={styles.reasonBarTrack}>
+                              <div
+                                className={styles.reasonBarFill}
+                                style={{ width: `${cancels.total ? (r.count / cancels.total) * 100 : 0}%` }}
+                              />
+                              <span>{cancels.total ? Math.round((r.count / cancels.total) * 100) : 0}%</span>
+                            </div>
+                          </td>
+                          <td>{fmt(r.lostRevenue)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+                {cancels.reasons.some((r) => r.reason === "Not recorded") && (
+                  <p className={styles.emptyNote}>
+                    Reasons have only been captured since 11 Aug 2026 — anything cancelled before that shows as
+                    &ldquo;Not recorded&rdquo;.
+                  </p>
+                )}
+              </div>
+
+              <div className={`card ${styles.revTableCard}`}>
+                <h2>Recent cancellations</h2>
+                {cancels.recent.length === 0 ? (
+                  <p className={styles.emptyNote}>Nothing to show.</p>
+                ) : (
+                  <table className={styles.revTable}>
+                    <thead>
+                      <tr><th>Date</th><th>Client</th><th>Service</th><th>Staff</th><th>Reason</th><th>By</th></tr>
+                    </thead>
+                    <tbody>
+                      {cancels.recent.map((r) => (
+                        <tr key={r.id}>
+                          <td>{localeDateStr(new Date(r.date), { month: "short", day: "numeric" })}</td>
+                          <td>{r.clientName}</td>
+                          <td>{r.serviceName}</td>
+                          <td>{r.staffName}</td>
+                          <td>{r.reason || <span className={styles.emptyNote}>—</span>}</td>
+                          <td>{r.cancelledBy || "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </>
           )}
 
           {/* ═══ STAFF REVENUE TAB ═══ */}

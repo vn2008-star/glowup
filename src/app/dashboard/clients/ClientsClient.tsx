@@ -32,6 +32,8 @@ type ClientApt = {
   tip_amount: number | null;
   service?: { name: string } | null;
   staff_member?: { name: string } | null;
+  cancellation_reason?: string | null;
+  cancelled_by?: string | null;
 };
 
 /* ── Dynamic client status computation ── */
@@ -979,7 +981,12 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
                       </span>
                       <span className={styles.aptHistoryService}>
                         {a.service?.name || "—"}
-                        <small>{a.staff_member?.name || "Unassigned"}</small>
+                        <small>
+                          {a.staff_member?.name || "Unassigned"}
+                          {a.status === "cancelled" && a.cancellation_reason
+                            ? ` · ${a.cancellation_reason}${a.cancelled_by === "client" ? " (client)" : ""}`
+                            : ""}
+                        </small>
                       </span>
                       <span className={`badge ${a.status === "completed" ? "badge-success" : a.status === "cancelled" ? "badge-danger" : "badge-info"}`}>
                         {a.status}
