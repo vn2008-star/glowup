@@ -43,6 +43,8 @@ export default function CheckoutPage() {
   const [savingService, setSavingService] = useState(false);
   // Venmo / Zelle payment request sent to the client
   const [payReqSending, setPayReqSending] = useState<"" | "venmo" | "zelle">("");
+  // Blank = due today; the front desk can push it out for a client paying later
+  const [payReqDue, setPayReqDue] = useState("");
   const [payReqStatus, setPayReqStatus] = useState<{ ok: boolean; text: string } | null>(null);
   const [checkingOut, setCheckingOut] = useState(false);
   const [editingCheckout, setEditingCheckout] = useState(false);
@@ -551,6 +553,7 @@ export default function CheckoutPage() {
       appointment_id: selectedApt.id,
       method,
       amount,
+      due_date: payReqDue || undefined,
     });
     setPayReqSending("");
 
@@ -1776,6 +1779,22 @@ export default function CheckoutPage() {
                               </button>
                             );
                           })}
+                        </div>
+                        <div className={styles.payReqDueRow}>
+                          <label htmlFor="payreq-due">Due date</label>
+                          <input
+                            id="payreq-due"
+                            type="date"
+                            className={styles.payReqDueInput}
+                            value={payReqDue || todayStr}
+                            min={todayStr}
+                            onChange={(e) => setPayReqDue(e.target.value)}
+                          />
+                          {payReqDue && payReqDue !== todayStr && (
+                            <button className={styles.payReqDueReset} onClick={() => setPayReqDue("")}>
+                              Today
+                            </button>
+                          )}
                         </div>
                         <p className={styles.payReqHint}>{t("requestPaymentHint")}</p>
                         {payReqStatus && (

@@ -2186,14 +2186,27 @@ export async function POST(request: Request) {
 
         const { data: t } = await svc
           .from('tenants')
-          .select('name, email, settings')
+          .select('name, email, address, timezone, settings')
           .eq('id', tenantId)
           .single()
         const settings = (t?.settings || {}) as Record<string, unknown>
         const pay = (settings.payment_qr || {}) as Record<string, string>
         const businessName = t?.name || 'our salon'
         const amountStr = amount.toFixed(2)
-        const greeting = greetingName(`${client.first_name || ''} ${client.last_name || ''}`.trim()) || 'there'
+        // First name only — "Hi Sarah" reads like a person wrote it; the
+        // "Sarah C." form used elsewhere is for internal-facing lists.
+        const firstName = (client.first_name || '').trim() || 'there'
+
+        // Due today by default, in the SALON's timezone — a due date computed
+        // in UTC shows tomorrow's date to a salon texting after 5pm Pacific.
+        const dueDate = payload.due_date
+          ? new Date(`${payload.due_date}T12:00:00`)
+          : new Date()
+        const dueStr = dueDate.toLocaleDateString('en-US', {
+          month: 'long', day: 'numeric', year: 'numeric', timeZone: resolveTenantTz(t),
+        })
+
+        const closing = `Thank you, and we look forward to seeing you at your next appointment!\n\n${businessName}`
 
         let message: string
         let ctaUrl: string | undefined
@@ -2209,8 +2222,10 @@ export async function POST(request: Request) {
           ctaUrl = `https://venmo.com/?txn=pay&recipients=${encodeURIComponent(handle)}`
             + `&amount=${encodeURIComponent(amountStr)}`
             + `&note=${encodeURIComponent(businessName)}`
-          message = `Hi ${greeting}! Your total at ${businessName} is $${amountStr}. `
-            + `Pay by Venmo (@${handle}) here: ${ctaUrl}\n\nThank you!`
+          message = `Hi ${firstName},\n\n`
+            + `Your total at ${businessName} is $${amountStr}, due on ${dueStr}.\n\n`
+            + `Please send your payment by Venmo to @${handle} (${businessName}) — you can pay here: ${ctaUrl}\n\n`
+            + closing
         } else {
           const recipient = (pay.zelle_recipient || '').trim()
           if (!recipient) {
@@ -2220,8 +2235,10 @@ export async function POST(request: Request) {
             )
           }
           // Zelle has no payment link — the client sends from their bank app.
-          message = `Hi ${greeting}! Your total at ${businessName} is $${amountStr}. `
-            + `Send it by Zelle to ${recipient} (${businessName}) in your banking app.\n\nThank you!`
+          message = `Hi ${firstName},\n\n`
+            + `Your total at ${businessName} is $${amountStr}, due on ${dueStr}.\n\n`
+            + `Please send your payment by Zelle to ${recipient} (${businessName}) through your banking app.\n\n`
+            + closing
         }
 
         let sent = 0
@@ -2237,7 +2254,7 @@ export async function POST(request: Request) {
               from: `${businessName} <bookings@joinglowup.org>`,
               replyTo: t?.email || undefined,
               to: [client.email],
-              subject: `Payment request from ${businessName} — $${amountStr}`,
+              subject: `Your total at ${businessName} — $${amountStr}, due ${dueStr}`,
               html: promoEmailHtml({
                 businessName,
                 message,
