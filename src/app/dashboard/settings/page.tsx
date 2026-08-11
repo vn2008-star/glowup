@@ -80,6 +80,69 @@ export default function SettingsPage() {
     email: "Hi {client_name},\n\nThis is a friendly reminder about your upcoming appointment:\n\n📋 Service: {service}\n📅 Date: {date}\n🕐 Time: {time}\n📍 At: {business_name}\n🏠 Address: {address}\n\nTo confirm, modify, or cancel your appointment, please reply to this email or contact us directly.\n\nSee you soon!\n— {business_name}",
   });
 
+  // ── This salon's own SMS gateway phone ──
+  // Credentials are write-only from the browser's side: the server never sends
+  // the password back, so `password: ""` means "keep the stored one".
+  type SmsStatus = {
+    configured: boolean; enabled: boolean; login: string; phone: string;
+    base_url: string; webhook_url: string; platform_fallback: string;
+  };
+  const [smsStatus, setSmsStatus] = useState<SmsStatus | null>(null);
+  const [smsForm, setSmsForm] = useState({ login: "", password: "", phone: "", base_url: "" });
+  const [smsSaving, setSmsSaving] = useState(false);
+  const [smsTesting, setSmsTesting] = useState(false);
+  const [smsTestTo, setSmsTestTo] = useState("");
+  const [smsMessage, setSmsMessage] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const loadSmsStatus = useCallback(async () => {
+    const { data } = await queryData<SmsStatus>("sms.gateway-status");
+    if (data) {
+      setSmsStatus(data);
+      setSmsForm(p => ({ ...p, login: data.login, phone: data.phone, base_url: data.base_url }));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (tenant) loadSmsStatus();
+  }, [tenant, loadSmsStatus]);
+
+  async function handleSaveSmsGateway() {
+    setSmsSaving(true);
+    setSmsMessage(null);
+    const { error } = await queryData("sms.save-gateway", {
+      login: smsForm.login.trim(),
+      password: smsForm.password || undefined,
+      phone: smsForm.phone.trim(),
+      base_url: smsForm.base_url.trim(),
+    });
+    setSmsSaving(false);
+    if (error) {
+      setSmsMessage({ ok: false, text: typeof error === "string" ? error : "Could not save" });
+      return;
+    }
+    setSmsForm(p => ({ ...p, password: "" }));
+    setSmsMessage({ ok: true, text: "Saved. Send a test text to confirm the phone is reachable." });
+    loadSmsStatus();
+  }
+
+  async function handleTestSms() {
+    setSmsTesting(true);
+    setSmsMessage(null);
+    const { data, error } = await queryData<{ from: string }>("sms.test", { to: smsTestTo });
+    setSmsTesting(false);
+    setSmsMessage(error || !data
+      ? { ok: false, text: typeof error === "string" ? error : "Test failed" }
+      : { ok: true, text: `Test text sent from ${data.from}. Check the phone that received it.` });
+  }
+
+  async function handleRemoveSmsGateway() {
+    if (!confirm("Disconnect this phone? Texts will fall back to the platform number.")) return;
+    await queryData("sms.remove-gateway", {});
+    setSmsForm({ login: "", password: "", phone: "", base_url: "" });
+    setSmsMessage(null);
+    loadSmsStatus();
+  }
+
   // QR images are shown at the counter; the handle/recipient are what a
   // Venmo or Zelle payment request texted to the client needs.
   const [paymentQr, setPaymentQr] = useState({ venmo_qr: "", zelle_qr: "", venmo_handle: "", zelle_recipient: "" });
@@ -652,6 +715,108 @@ export default function SettingsPage() {
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Text Messaging — this salon's own phone sends its texts */}
+      <div className={`card ${styles.section}`} id="sms">
+        <h2>💬 Text Messaging (SMS)</h2>
+        <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginBottom: "var(--space-4)" }}>
+          Send reminders, confirmations and payment requests from <strong>your own salon phone</strong> —
+          clients see your real number, and there&apos;s no carrier registration to wait on.
+          Install the free <strong>SMS Gateway for Android</strong> app (sms-gate.app) on the salon phone,
+          create a username and password in it, and enter them here.
+        </p>
+
+        {smsStatus?.configured && (
+          <div className={styles.smsStatusBadge}>
+            ✅ Connected{smsStatus.phone ? ` — texts send from ${smsStatus.phone}` : ""}
+          </div>
+        )}
+
+        <div className={styles.formGrid}>
+          <div className={styles.formGroup}>
+            <label className="label">Gateway Username *</label>
+            <input
+              className="input"
+              value={smsForm.login}
+              onChange={(e) => setSmsForm(p => ({ ...p, login: e.target.value }))}
+              placeholder="from the app's Settings screen"
+              autoComplete="off"
+            />
+          </div>
+          <div className={styles.formGroup}>
+            <label className="label">Gateway Password {smsStatus?.configured ? "(leave blank to keep)" : "*"}</label>
+            <input
+              className="input"
+              type="password"
+              value={smsForm.password}
+              onChange={(e) => setSmsForm(p => ({ ...p, password: e.target.value }))}
+              placeholder={smsStatus?.configured ? "••••••••" : "from the app"}
+              autoComplete="new-password"
+            />
+          </div>
+          <div className={styles.formGroup}>
+            <label className="label">Salon Cell Number</label>
+            <input
+              className="input"
+              value={smsForm.phone}
+              onChange={(e) => setSmsForm(p => ({ ...p, phone: formatPhone(e.target.value) }))}
+              placeholder="(916) 555-0123"
+            />
+          </div>
+          <div className={styles.formGroup}>
+            <label className="label">Server URL (optional)</label>
+            <input
+              className="input"
+              value={smsForm.base_url}
+              onChange={(e) => setSmsForm(p => ({ ...p, base_url: e.target.value }))}
+              placeholder="leave blank for sms-gate.app cloud"
+            />
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap", alignItems: "center" }}>
+          <button className="btn btn-primary" onClick={handleSaveSmsGateway} disabled={smsSaving}>
+            {smsSaving ? "Saving…" : "Save Phone Connection"}
+          </button>
+          {smsStatus?.configured && (
+            <>
+              <input
+                className="input"
+                style={{ maxWidth: 200 }}
+                value={smsTestTo}
+                onChange={(e) => setSmsTestTo(formatPhone(e.target.value))}
+                placeholder="Test number"
+              />
+              <button className="btn btn-secondary" onClick={handleTestSms} disabled={smsTesting || !smsTestTo}>
+                {smsTesting ? "Sending…" : "📲 Send Test Text"}
+              </button>
+              <button className={styles.smsRemoveBtn} onClick={handleRemoveSmsGateway}>Disconnect</button>
+            </>
+          )}
+        </div>
+
+        {smsMessage && (
+          <p className={smsMessage.ok ? styles.smsOk : styles.smsError}>
+            {smsMessage.ok ? "✅ " : "⚠️ "}{smsMessage.text}
+          </p>
+        )}
+
+        {smsStatus?.webhook_url && (
+          <div className={styles.smsWebhookBox}>
+            <strong>To receive replies</strong> (client texts back STOP, or answers the AI receptionist),
+            paste this into the app under Settings → Webhooks → event <code>sms:received</code>:
+            <code className={styles.smsWebhookUrl}>{smsStatus.webhook_url}</code>
+          </div>
+        )}
+
+        {!smsStatus?.configured && (
+          <p style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)", marginTop: "var(--space-3)" }}>
+            Until this is set up, texts go out through the platform number
+            {smsStatus?.platform_fallback === "none" ? " — which is not configured, so nothing sends" : ""}.
+            Note: bulk marketing campaigns always go by email on a personal line, to protect it from carrier spam blocks.
+          </p>
+        )}
       </div>
 
       {/* Payment Methods */}

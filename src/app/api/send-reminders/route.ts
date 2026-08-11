@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { toE164 } from '@/lib/utils'
 import { verifyCronRequest } from '@/lib/cron-auth'
 import { fillPlaceholders, resolveTenantTz } from '@/lib/notifications'
-import { sendSms, smsProvider } from '@/lib/sms'
+import { sendSms, smsProvider, smsConfigFromSettings } from '@/lib/sms'
 import { appointmentReminderHtml, dailyDigestHtml, googleCalendarUrl } from '@/lib/email-templates'
 import { localToUTC, nowInTz, formatInTz } from '@/lib/tz'
 
@@ -197,8 +197,9 @@ export async function GET(request: Request) {
             continue
           }
 
-          // Send SMS via the configured provider (Twilio or the owner's Android phone)
-          if (hasSms) {
+          // Prefer this salon's own phone; fall back to the platform provider
+          const tenantSms = smsConfigFromSettings(tenant?.settings)
+          if (hasSms || tenantSms) {
             const phoneE164 = toE164(client.phone as string)
             if (!phoneE164) {
               console.warn(`[send-reminders] ⚠️ Could not normalize phone: "${client.phone}"`)
@@ -206,9 +207,9 @@ export async function GET(request: Request) {
               totalSkipped++
               continue
             }
-            const ok = await sendSms(phoneE164, smsTemplate)
+            const ok = await sendSms(phoneE164, smsTemplate, tenantSms)
             if (!ok) {
-              throw new Error(`SMS send failed via ${smsProvider()}`)
+              throw new Error(`SMS send failed via ${smsProvider(tenantSms)}`)
             }
             console.log(`[send-reminders] ✅ ${win.type} SMS sent to ${phoneE164}`)
           } else {
@@ -357,14 +358,16 @@ export async function GET(request: Request) {
             console.error(`[send-reminders] Owner digest email failed for ${tenant.id}:`, err)
           }
         }
-        if (digestCfg.owner_sms === true && tenant.phone && hasSms) {
+        const digestSms = smsConfigFromSettings(tenant.settings)
+        if (digestCfg.owner_sms === true && tenant.phone && (hasSms || digestSms)) {
           const summary = apts.slice(0, 8).map(a => {
             const e = toEntry(a)
             return `${e.timeStr} — ${e.clientName} (${e.serviceName})`
           }).join('\n')
           const more = apts.length > 8 ? `\n…and ${apts.length - 8} more` : ''
           await sendSms(toE164(tenant.phone) || tenant.phone,
-            `📅 Today at ${businessName} (${dateLabel}): ${apts.length} appointment${apts.length !== 1 ? 's' : ''}\n${summary}${more}`)
+            `📅 Today at ${businessName} (${dateLabel}): ${apts.length} appointment${apts.length !== 1 ? 's' : ''}\n${summary}${more}`,
+            digestSms)
         }
 
         // ── Each staff member: their own appointments ──

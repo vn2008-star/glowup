@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { toE164 } from '@/lib/utils'
 import { verifyCronRequest } from '@/lib/cron-auth'
 import { promoEmailHtml } from '@/lib/email-templates'
-import { sendSms, smsProvider, canSendBulkSms } from '@/lib/sms'
+import { sendSms, smsProvider, canSendBulkSms, smsConfigFromSettings, type TenantSmsConfig } from '@/lib/sms'
 
 // ─── Automation Engine (Cron-triggered) ───
 // Runs daily. Checks each tenant's automation settings and fires:
@@ -70,6 +70,8 @@ export async function GET(request: Request) {
   for (const tenant of tenants) {
     const settings = (tenant.settings || {}) as Record<string, unknown>
     const automations = (settings.automations || {}) as Record<string, boolean | string>
+    // This salon's own phone, if it has the SMS Gateway app set up
+    const smsConfig = smsConfigFromSettings(settings)
     const businessName = tenant.name || 'our salon'
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
     const bookingUrl = `${baseUrl}/book/${tenant.slug}`
@@ -301,7 +303,7 @@ export async function GET(request: Request) {
             .replace(/\{booking_url\}/g, bookingUrl)
 
           await sendMessage({
-            client, message, businessName, businessEmail, resendClient, channel: bdayChannel,
+            client, message, businessName, businessEmail, resendClient, smsConfig, channel: bdayChannel,
             subject: `🎂 Happy Birthday from ${businessName} — ${bdayDiscount}% off for you!`,
             ctaUrl: bookingUrl,
             ctaText: 'Book Your Birthday Treat',
@@ -336,7 +338,7 @@ export async function GET(request: Request) {
           const message = `Dear ${clientGreeting}, it's been ${daysSince} days since your last visit to ${businessName}. Time for a refresh? Book now → ${bookingUrl}`
 
           await sendMessage({
-            client, message, businessName, businessEmail, resendClient, channel: 'both', bulk: true,
+            client, message, businessName, businessEmail, resendClient, smsConfig, channel: 'both', bulk: true,
             subject: `💜 We miss you at ${businessName} — time for a refresh?`,
             ctaUrl: bookingUrl,
             ctaText: 'Book Now',
@@ -384,7 +386,7 @@ export async function GET(request: Request) {
           const message = `Dear ${clientGreeting}, we missed you today at ${businessName}! 😊 Life happens — we'd love to help you rebook. Book your next visit → ${bookingUrl}`
 
           await sendMessage({
-            client, message, businessName, businessEmail, resendClient, channel: 'both',
+            client, message, businessName, businessEmail, resendClient, smsConfig, channel: 'both',
             subject: `We missed you today at ${businessName} 😊`,
             ctaUrl: bookingUrl,
             ctaText: 'Rebook Now',
@@ -437,7 +439,7 @@ export async function GET(request: Request) {
 
           const reviewChannel = String(automations.auto_review_channel || 'sms') as 'sms' | 'email' | 'both'
           await sendMessage({
-            client, message, businessName, businessEmail, resendClient, channel: reviewChannel,
+            client, message, businessName, businessEmail, resendClient, smsConfig, channel: reviewChannel,
             subject: `🌟 How was your visit to ${businessName}?`,
             ctaUrl: googleReviewUrl || undefined,
             ctaText: 'Leave a Review',
@@ -502,7 +504,7 @@ export async function GET(request: Request) {
             .replace(/\{business_name\}/g, businessName)
 
           await sendMessage({
-            client, message: personalizedMsg, businessName, businessEmail, resendClient, channel: 'both', bulk: true,
+            client, message: personalizedMsg, businessName, businessEmail, resendClient, smsConfig, channel: 'both', bulk: true,
             subject: `${holiday.emoji} ${holiday.name} Special at ${businessName}!`,
             ctaUrl: bookingUrl,
             ctaText: 'Book Now',
@@ -549,18 +551,20 @@ async function sendMessage(opts: {
   subject?: string
   ctaUrl?: string
   ctaText?: string
+  /** This salon's own gateway phone, when it has one set up. */
+  smsConfig?: TenantSmsConfig | null
 }) {
-  const { client, message, businessName, businessEmail, resendClient, channel, bulk, subject, ctaUrl, ctaText } = opts
+  const { client, message, businessName, businessEmail, resendClient, channel, bulk, subject, ctaUrl, ctaText, smsConfig } = opts
 
   // SMS
   if ((channel === 'sms' || channel === 'both') && client.phone && !client.sms_opt_out) {
     const phoneE164 = toE164(client.phone as string)
     if (!phoneE164) {
       console.warn(`[run-automations] ⚠️ Could not normalize phone: "${client.phone}"`)
-    } else if (bulk && !canSendBulkSms()) {
+    } else if (bulk && !canSendBulkSms(smsConfig)) {
       console.log(`[run-automations] Bulk SMS to ${phoneE164} skipped — no registered business number (email-only)`)
     } else {
-      const ok = await sendSms(phoneE164, message)
+      const ok = await sendSms(phoneE164, message, smsConfig)
       if (!ok) console.error(`SMS send failed for ${client.phone}`)
     }
   }

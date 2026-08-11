@@ -81,8 +81,9 @@ export function fillPlaceholders(template: string, vars: Record<string, string>)
 // SMS delivery is provider-routed (Twilio number OR the owner's own Android
 // phone via the SMS Gateway app) — see src/lib/sms.ts. Imported for local use
 // and re-exported so existing call sites keep working unchanged.
-import { sendSms } from '@/lib/sms'
+import { sendSms, type TenantSmsConfig } from '@/lib/sms'
 export { sendSms }
+export type { TenantSmsConfig }
 
 /**
  * Insert pending 24h/2h/1h reminder rows for a client appointment.
@@ -133,11 +134,13 @@ export async function sendClientBookingConfirmation(opts: {
   start: Date
   end: Date
   timezone: string
+  /** This salon's own gateway phone; omit to use the platform provider. */
+  smsConfig?: TenantSmsConfig | null
 }): Promise<void> {
   const {
     businessName, businessAddress, businessPhone, businessEmail,
     serviceName, staffName, clientName, clientEmail, clientPhone,
-    manageLink, start, end, timezone,
+    manageLink, start, end, timezone, smsConfig,
   } = opts
 
   const greeting = greetingName(clientName)
@@ -173,7 +176,7 @@ export async function sendClientBookingConfirmation(opts: {
         manageLink ? `Manage your appointment: ${manageLink}` : `Need to change? Contact us at ${businessPhone || 'the salon'}.`,
       ].filter(Boolean).join('\n')
       try {
-        const ok = await sendSms(clientE164, clientSms)
+        const ok = await sendSms(clientE164, clientSms, smsConfig)
         if (ok) console.log(`[notifications] ✅ Confirmation SMS sent to client ${clientE164}`)
       } catch (err) {
         console.error(`[notifications] SMS to client failed:`, err)
@@ -231,8 +234,10 @@ export async function sendOwnerChangeNotice(opts: {
   tz: string
   /** Where the change came from, e.g. "by SMS reply" or "via AI receptionist". */
   via?: string
+  /** This salon's own gateway phone; omit to use the platform provider. */
+  smsConfig?: TenantSmsConfig | null
 }): Promise<void> {
-  const { type, tenant, clientName, serviceName, staffName, start, oldStart, tz, via } = opts
+  const { type, tenant, clientName, serviceName, staffName, start, oldStart, tz, via, smsConfig } = opts
   if (!tenant) return
 
   const { dateStr, timeStr } = formatAptWhen(start, tz)
@@ -255,7 +260,7 @@ export async function sendOwnerChangeNotice(opts: {
         staffName ? `💇 Staff: ${staffName}` : '',
       ].filter(Boolean).join('\n')
       try {
-        await sendSms(ownerE164, smsBody)
+        await sendSms(ownerE164, smsBody, smsConfig)
       } catch (err) {
         console.error(`[notifications] ${type} SMS to owner failed:`, err)
       }
@@ -308,11 +313,13 @@ export async function sendClientChangeNotice(opts: {
   start: Date
   end: Date
   timezone: string
+  /** This salon's own gateway phone; omit to use the platform provider. */
+  smsConfig?: TenantSmsConfig | null
 }): Promise<void> {
   const {
     type, businessName, businessAddress, businessPhone, businessEmail,
     serviceName, staffName, clientName, clientEmail, clientPhone,
-    actionLink, start, end, timezone,
+    actionLink, start, end, timezone, smsConfig,
   } = opts
 
   const greeting = greetingName(clientName)
@@ -340,7 +347,7 @@ export async function sendClientChangeNotice(opts: {
             actionLink ? `Manage: ${actionLink}` : '',
           ].filter(Boolean).join('\n')
       try {
-        await sendSms(clientE164, sms)
+        await sendSms(clientE164, sms, smsConfig)
       } catch (err) {
         console.error(`[notifications] ${type} SMS to client failed:`, err)
       }

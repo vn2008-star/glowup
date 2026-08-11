@@ -10,6 +10,7 @@
 
 import { cache } from 'react'
 import { createClient } from '@/lib/supabase/server'
+import { redactTenantSettings } from '@/lib/tenant-settings'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { getImpersonationOverride, isAdminEmail } from '@/lib/admin'
 import type { Tenant, Staff } from '@/lib/types'
@@ -74,7 +75,8 @@ export const resolveDashboardContext = cache(async (): Promise<DashboardContext>
 
     return {
       status: 'ok',
-      tenant: tenant as Tenant,
+      // Secrets (the salon's SMS gateway password) never leave the server.
+      tenant: redactTenantSettings(tenant as Record<string, unknown>) as unknown as Tenant,
       staff: syntheticStaff,
       tenantId: overrideTenantId,
       isImpersonating: true,
@@ -98,7 +100,7 @@ export const resolveDashboardContext = cache(async (): Promise<DashboardContext>
 
   return {
     status: 'ok',
-    tenant,
+    tenant: redactTenantSettings(tenant as unknown as Record<string, unknown>) as unknown as Tenant,
     staff: staffOnly as unknown as Staff,
     tenantId: tenant.id,
     isImpersonating: false,

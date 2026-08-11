@@ -26,6 +26,24 @@ export async function PUT(request: Request) {
   for (const key of TENANT_WRITABLE) {
     if (Object.prototype.hasOwnProperty.call(body, key)) updates[key] = body[key]
   }
+
+  // The Settings page round-trips the whole settings object, but it only ever
+  // received a REDACTED sms_gateway (credentials are stripped server-side).
+  // Writing that back would overwrite the salon's gateway login/password with
+  // the status stub, silently unhooking its phone. Carry the stored one over.
+  if (updates.settings && typeof updates.settings === 'object') {
+    const { data: current } = await svc
+      .from('tenants')
+      .select('settings')
+      .eq('id', caller.tenantId)
+      .single()
+    const storedGateway = ((current?.settings || {}) as Record<string, unknown>).sms_gateway
+    if (storedGateway) {
+      updates.settings = { ...(updates.settings as Record<string, unknown>), sms_gateway: storedGateway }
+    } else {
+      delete (updates.settings as Record<string, unknown>).sms_gateway
+    }
+  }
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: 'No updatable fields supplied' }, { status: 400 })
   }

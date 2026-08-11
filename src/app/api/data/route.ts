@@ -5,6 +5,7 @@ import { createClient as createServiceClient, type SupabaseClient } from '@supab
 import { getImpersonationOverride, isAdminEmail } from '@/lib/admin'
 import { resolveStaffRecord } from '@/lib/api-auth'
 import { scheduleClientReminders, sendClientBookingConfirmation, sendClientChangeNotice, resolveTenantTz, sendSms, greetingName } from '@/lib/notifications'
+import { getTenantSmsConfig, sendSmsVerbose, smsProvider, type StoredSmsGateway } from '@/lib/sms'
 import { promoEmailHtml } from '@/lib/email-templates'
 import { getDashboardOverview } from '@/lib/overview-query'
 import { getClientsList, getCalendarLoad } from '@/lib/dashboard-queries'
@@ -264,6 +265,96 @@ export async function POST(request: Request) {
 
   try {
     switch (action) {
+      // ─── SMS GATEWAY (this salon's own phone sends its texts) ───
+      // Credentials live in tenants.settings.sms_gateway and are never sent to
+      // a browser — only this status is.
+      case 'sms.gateway-status': {
+        const { data: t } = await svc.from('tenants').select('settings').eq('id', tenantId).single()
+        const gw = (((t?.settings || {}) as Record<string, unknown>).sms_gateway || {}) as StoredSmsGateway
+        const baseUrl = process.env.NEXT_PUBLIC_SITE_URL
+          || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null)
+          || 'https://joinglowup.org'
+        return NextResponse.json({
+          data: {
+            configured: !!(gw.login && gw.password),
+            enabled: gw.enabled !== false,
+            login: gw.login || '',
+            phone: gw.phone || '',
+            base_url: gw.base_url || '',
+            // The salon pastes this into the Android app so replies come back.
+            webhook_url: gw.webhook_key ? `${baseUrl}/api/sms-gateway-webhook?key=${gw.webhook_key}` : '',
+            platform_fallback: smsProvider() || 'none',
+          },
+        })
+      }
+
+      case 'sms.save-gateway': {
+        if (staffRole === 'technician') {
+          return NextResponse.json({ error: 'Only an owner or manager can change this' }, { status: 403 })
+        }
+        const { data: t } = await svc.from('tenants').select('settings').eq('id', tenantId).single()
+        const settings = (t?.settings || {}) as Record<string, unknown>
+        const existing = (settings.sms_gateway || {}) as StoredSmsGateway
+
+        const login = String(payload.login ?? existing.login ?? '').trim()
+        // A blank password means "keep the stored one" — the UI never receives
+        // it back, so re-saving other fields must not wipe it.
+        const password = payload.password ? String(payload.password) : (existing.password || '')
+        if (!login || !password) {
+          return NextResponse.json({ error: 'Username and password from the SMS Gateway app are both required' }, { status: 400 })
+        }
+
+        const gateway: StoredSmsGateway = {
+          enabled: payload.enabled !== false,
+          login,
+          password,
+          base_url: String(payload.base_url ?? existing.base_url ?? '').trim() || undefined,
+          phone: String(payload.phone ?? existing.phone ?? '').trim() || undefined,
+          webhook_key: existing.webhook_key || crypto.randomUUID().replace(/-/g, ''),
+        }
+
+        const { error } = await svc
+          .from('tenants')
+          .update({ settings: { ...settings, sms_gateway: gateway } })
+          .eq('id', tenantId)
+        if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+        return NextResponse.json({ data: { configured: true } })
+      }
+
+      case 'sms.remove-gateway': {
+        if (staffRole === 'technician') {
+          return NextResponse.json({ error: 'Only an owner or manager can change this' }, { status: 403 })
+        }
+        const { data: t } = await svc.from('tenants').select('settings').eq('id', tenantId).single()
+        const settings = (t?.settings || {}) as Record<string, unknown>
+        delete settings.sms_gateway
+        const { error } = await svc.from('tenants').update({ settings }).eq('id', tenantId)
+        if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+        return NextResponse.json({ data: { configured: false } })
+      }
+
+      // Send a real text through this salon's phone and report why if it fails.
+      case 'sms.test': {
+        if (staffRole === 'technician') {
+          return NextResponse.json({ error: 'Only an owner or manager can send a test' }, { status: 403 })
+        }
+        const to = toE164(String(payload.to || ''))
+        if (!to) return NextResponse.json({ error: 'Enter a valid phone number' }, { status: 400 })
+
+        const cfg = await getTenantSmsConfig(svc, tenantId)
+        if (!cfg) {
+          return NextResponse.json({ error: 'Set up this salon’s phone first, then send a test' }, { status: 400 })
+        }
+        const { data: t } = await svc.from('tenants').select('name').eq('id', tenantId).single()
+        const result = await sendSmsVerbose(
+          to,
+          `Test message from ${t?.name || 'your salon'} via GlowUp. If you got this, your phone is set up to send texts. ✅`,
+          cfg
+        )
+        if (!result.ok) return NextResponse.json({ error: result.error || 'Send failed' }, { status: 400 })
+        return NextResponse.json({ data: { sent: 1, from: cfg.phone || 'your salon phone' } })
+      }
+
       // ─── CLIENTS ───
       case 'clients.list': {
         // Shared with the server-rendered clients page
@@ -421,7 +512,7 @@ export async function POST(request: Request) {
         let sent = 0
         if (client.phone && !client.sms_opt_out) {
           const e164 = toE164(client.phone)
-          if (e164 && await sendSms(e164, message)) sent++
+          if (e164 && await sendSms(e164, message, await getTenantSmsConfig(svc, tenantId))) sent++
         }
         if (client.email && process.env.RESEND_API_KEY) {
           try {
@@ -2066,7 +2157,7 @@ export async function POST(request: Request) {
         let sent = 0
         if (client.phone && !client.sms_opt_out) {
           const e164 = toE164(client.phone)
-          if (e164 && await sendSms(e164, message)) sent++
+          if (e164 && await sendSms(e164, message, await getTenantSmsConfig(svc, tenantId))) sent++
         }
         if (client.email && process.env.RESEND_API_KEY) {
           try {

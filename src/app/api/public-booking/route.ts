@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 import { timezoneFromAddress, DEFAULT_TZ } from '@/lib/tz'
 import { toE164 } from '@/lib/utils'
 import { resolveTenantTz } from '@/lib/notifications'
-import { sendSms, smsProvider } from '@/lib/sms'
+import { sendSms, smsProvider, smsConfigFromSettings } from '@/lib/sms'
 import { bookingConfirmationHtml, promoEmailHtml, googleCalendarUrl } from '@/lib/email-templates'
 
 // Public API — no auth required. Used by the /book/[slug] public booking page.
@@ -543,10 +543,12 @@ async function sendBookingConfirmations(opts: {
     timeStr = start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
   }
 
-  const smsReady = smsProvider() !== null
+  // The salon's own phone when it has one, else the platform provider
+  const tenantSms = smsConfigFromSettings(tenant.settings)
+  const smsReady = smsProvider(tenantSms) !== null
   const hasResend = !!process.env.RESEND_API_KEY
 
-  console.log(`[public-booking] Notification channels: SMS=${smsProvider() || 'none'}, Resend=${hasResend} | Client: phone=${clientPhone || 'NONE'}, email=${clientEmail || 'NONE'} | Owner: phone=${businessPhone || 'NONE'}, email=${businessEmail || 'NONE'}`)
+  console.log(`[public-booking] Notification channels: SMS=${smsProvider(tenantSms) || 'none'}, Resend=${hasResend} | Client: phone=${clientPhone || 'NONE'}, email=${clientEmail || 'NONE'} | Owner: phone=${businessPhone || 'NONE'}, email=${businessEmail || 'NONE'}`)
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let resendClient: any = null
@@ -579,7 +581,7 @@ async function sendBookingConfirmations(opts: {
     const clientE164 = toE164(clientPhone)
     if (smsReady && clientE164) {
       try {
-        const ok = await sendSms(clientE164, clientSms)
+        const ok = await sendSms(clientE164, clientSms, tenantSms)
         if (ok) console.log(`[public-booking] ✅ Confirmation SMS sent to client ${clientE164}`)
       } catch (err: unknown) {
         const e = err as { message?: string }
@@ -640,7 +642,7 @@ async function sendBookingConfirmations(opts: {
     const ownerE164 = toE164(businessPhone)
     if (smsReady && ownerE164) {
       try {
-        const ok = await sendSms(ownerE164, ownerSms)
+        const ok = await sendSms(ownerE164, ownerSms, tenantSms)
         if (ok) console.log(`[public-booking] ✅ Owner SMS sent to ${ownerE164}`)
       } catch (err: unknown) {
         const e = err as { message?: string }
