@@ -39,6 +39,7 @@ export default function ManageClient({ token }: { token: string }) {
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<ViewState>("details");
   const [actionLoading, setActionLoading] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
 
   // Staff schedule & booked slots for reschedule calendar
   const [staffSchedule, setStaffSchedule] = useState<Record<string, unknown> | null>(null);
@@ -84,7 +85,7 @@ export default function ManageClient({ token }: { token: string }) {
       const res = await fetch("/api/manage-appointment", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, action: "cancel" }),
+        body: JSON.stringify({ token, action: "cancel", cancellation_reason: cancelReason.trim() }),
       });
       if (res.ok) {
         setView("cancelled");
@@ -578,6 +579,33 @@ export default function ManageClient({ token }: { token: string }) {
                   Are you sure you want to <strong>cancel</strong> your{" "}
                   {appointment.service?.name || "appointment"} on {formatDate(appointment.start_time)}?
                 </p>
+
+                {/* Optional reason — never block the cancellation on it */}
+                <label className={styles.reasonLabel} htmlFor="cancel-reason">
+                  Reason (optional) — it helps the salon
+                </label>
+                <div className={styles.reasonChips}>
+                  {["Schedule conflict", "Feeling unwell", "Running late", "Found another time", "Personal reasons"].map((r) => (
+                    <button
+                      key={r}
+                      type="button"
+                      className={`${styles.reasonChip} ${cancelReason === r ? styles.reasonChipActive : ""}`}
+                      onClick={() => setCancelReason(cancelReason === r ? "" : r)}
+                    >
+                      {r}
+                    </button>
+                  ))}
+                </div>
+                <textarea
+                  id="cancel-reason"
+                  className={styles.reasonInput}
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value.slice(0, 500))}
+                  placeholder="Anything you'd like them to know…"
+                  rows={2}
+                  maxLength={500}
+                />
+
                 <div className={styles.confirmActions}>
                   <button className={styles.confirmYes} onClick={handleCancel} disabled={actionLoading}>
                     {actionLoading ? "Cancelling..." : "Yes, Cancel"}

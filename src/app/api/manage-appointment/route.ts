@@ -5,6 +5,7 @@ import { formatDateInTz, formatInTz } from '@/lib/tz'
 import { isBusinessClosedOnDate, isStaffOffOnDate, type CustomClosedDate } from '@/lib/schedule-utils'
 import { resolveTenantTz } from '@/lib/notifications'
 import { sendSms, smsProvider, smsConfigFromSettings } from '@/lib/sms'
+import { cancelAppointment } from '@/lib/cancel-appointment'
 import { rescheduleConfirmationHtml, cancellationConfirmationHtml, staffCancellationNotificationHtml, staffRescheduleNotificationHtml, ownerNotificationHtml, googleCalendarUrl } from '@/lib/email-templates'
 
 // Public API — token-based auth (no login required)
@@ -167,11 +168,11 @@ export async function PATCH(request: Request) {
   const tz = resolveTenantTz(tenant)
 
   if (action === 'cancel') {
-    // Cancel the appointment
-    const { error: updateErr } = await svc
-      .from('appointments')
-      .update({ status: 'cancelled' })
-      .eq('id', apt.id)
+    // Cancel the appointment, recording the client's reason if they gave one
+    const clientReason = String(body.cancellation_reason || '').trim().slice(0, 500)
+    const { error: updateErr } = await cancelAppointment(
+      svc, apt.tenant_id, apt.id, clientReason, 'client'
+    )
 
     if (updateErr) {
       return NextResponse.json({ error: 'Failed to cancel appointment' }, { status: 500 })
@@ -193,6 +194,7 @@ export async function PATCH(request: Request) {
       staffName,
       startTime: new Date(apt.start_time),
       tz,
+      reason: clientReason,
     })
     // Send cancellation SMS to client — via the salon's own phone when it has
     // one, so this still works after Twilio is dropped.
@@ -554,8 +556,10 @@ async function notifyOwner(opts: {
   startTime: Date
   oldStartTime?: Date
   tz: string
+  /** What the client typed when cancelling, if anything. */
+  reason?: string
 }) {
-  const { type, tenant, clientName, serviceName, staffName, startTime, oldStartTime, tz } = opts
+  const { type, tenant, clientName, serviceName, staffName, startTime, oldStartTime, tz, reason } = opts
   if (!tenant) return
 
   let dateStr: string, timeStr: string
@@ -587,8 +591,11 @@ async function notifyOwner(opts: {
   const ownerPhone = tenant.phone
   const ownerSmsConfig = smsConfigFromSettings(tenant.settings)
   if (ownerPhone && smsProvider(ownerSmsConfig)) {
+    // The reason is the whole point of the notice for a cancellation — the
+    // owner wants to know WHY before deciding whether to chase the slot.
+    const reasonLine = type === 'cancel' && reason ? `\n💬 Reason: ${reason}` : ''
     const smsBody = type === 'cancel'
-      ? `${emoji} Appointment ${action}\n\nClient: ${clientName}\n📋 ${serviceName}\n📅 Was: ${dateStr} at ${timeStr}\n${staffName ? `💇 Staff: ${staffName}` : ''}`
+      ? `${emoji} Appointment ${action}\n\nClient: ${clientName}\n📋 ${serviceName}\n📅 Was: ${dateStr} at ${timeStr}\n${staffName ? `💇 Staff: ${staffName}` : ''}${reasonLine}`
       : `${emoji} Appointment ${action}\n\nClient: ${clientName}\n📋 ${serviceName}\n📅 Was: ${oldDateStr} at ${oldTimeStr}\n📅 New: ${dateStr} at ${timeStr}\n${staffName ? `💇 Staff: ${staffName}` : ''}`
 
     const ownerE164 = toE164(ownerPhone)

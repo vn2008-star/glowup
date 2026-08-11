@@ -532,3 +532,49 @@
   .actions { flex-direction: column; }
   .businessName { font-size: 1.25rem; }
 }
+
+/* ── Cancellation reason (optional) ── */
+.reasonLabel {
+  display: block;
+  margin: 1rem 0 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #8b8b9e;
+  text-align: left;
+}
+.reasonChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.6rem;
+}
+.reasonChip {
+  padding: 0.35rem 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
+  background: transparent;
+  color: #b8b8c8;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.reasonChip:hover { border-color: rgba(255, 255, 255, 0.35); color: #fff; }
+.reasonChipActive {
+  background: rgba(201, 160, 220, 0.18);
+  border-color: #c9a0dc;
+  color: #fff;
+}
+.reasonInput {
+  width: 100%;
+  padding: 0.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  font: inherit;
+  font-size: 0.85rem;
+  resize: vertical;
+  outline: none;
+}
+.reasonInput:focus { border-color: #c9a0dc; }
+.reasonInput::placeholder { color: #6d6578; }

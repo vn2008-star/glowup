@@ -6,6 +6,7 @@ import { getImpersonationOverride, isAdminEmail } from '@/lib/admin'
 import { resolveStaffRecord } from '@/lib/api-auth'
 import { scheduleClientReminders, sendClientBookingConfirmation, sendClientChangeNotice, resolveTenantTz, sendSms, greetingName } from '@/lib/notifications'
 import { getTenantSmsConfig, sendSmsVerbose, smsProvider, type StoredSmsGateway } from '@/lib/sms'
+import { cancelAppointment } from '@/lib/cancel-appointment'
 import { promoEmailHtml } from '@/lib/email-templates'
 import { getDashboardOverview } from '@/lib/overview-query'
 import { getClientsList, getCalendarLoad } from '@/lib/dashboard-queries'
@@ -821,13 +822,8 @@ export async function POST(request: Request) {
       // The dashboard used to hard-DELETE, which silently erased the booking:
       // no client notice, no owner record, no no-show analytics.
       case 'appointments.cancel': {
-        const { data, error } = await svc
-          .from('appointments')
-          .update({ status: 'cancelled' })
-          .eq('id', payload.id)
-          .eq('tenant_id', tenantId)
-          .select('id, client_id, start_time, end_time, status, client:clients(first_name, last_name, phone, email, sms_opt_out), service:services(name), staff_member:staff!staff_id(name)')
-          .single()
+        const reason = String(payload.cancellation_reason || '').trim().slice(0, 500)
+        const { data, error } = await cancelAppointment(svc, tenantId, payload.id, reason, 'salon')
 
         if (data) {
           // Free the reminder rows; a cancelled appointment must never remind.

@@ -50,6 +50,25 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
   const [editingApt, setEditingApt] = useState<FullAppointment | null>(null);
   const [activeStaffFilter, setActiveStaffFilter] = useState<string[]>([]);
 
+  // ── Cancellation reason dialog ──
+  const [cancelTarget, setCancelTarget] = useState<FullAppointment | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelling, setCancelling] = useState(false);
+
+  async function confirmCancel() {
+    if (!cancelTarget) return;
+    setCancelling(true);
+    const res = await queryData<{ id: string }>("appointments.cancel", {
+      id: cancelTarget.id,
+      cancellation_reason: cancelReason.trim(),
+    });
+    setCancelling(false);
+    if (res.error) { alert(`Failed to cancel: ${res.error}`); return; }
+    setAppointments(prev => prev.filter(a => a.id !== cancelTarget.id));
+    setCancelTarget(null);
+    setCancelReason("");
+  }
+
   // ── Client lookup: find a client, see their upcoming + past appointments ──
   const [clientQuery, setClientQuery] = useState("");
   const [clientResults, setClientResults] = useState<Client[]>([]);
@@ -1194,17 +1213,12 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
                     await queryData("appointments.delete", { id: selectedApt.id });
                     setAppointments(prev => prev.filter(a => a.id !== selectedApt.id));
                   } else {
-                    // Notification only goes out for future appointments with a
-                    // reachable client — don't promise it for walk-ins/past ones.
-                    const willNotify = !!(selectedApt.client && (selectedApt.client.phone || selectedApt.client.email))
-                      && new Date(selectedApt.start_time).getTime() > Date.now();
-                    const msg = willNotify
-                      ? "Cancel this appointment? The client will be notified by text/email."
-                      : "Cancel this appointment?";
-                    if (!confirm(msg)) return;
-                    const res = await queryData<{ id: string }>("appointments.cancel", { id: selectedApt.id });
-                    if (res.error) { alert(`Failed to cancel: ${res.error}`); return; }
-                    setAppointments(prev => prev.filter(a => a.id !== selectedApt.id));
+                    // Real cancellations go through a dialog so the reason gets
+                    // captured — a bare confirm() throws that information away.
+                    setCancelTarget(selectedApt);
+                    setCancelReason("");
+                    setSelectedApt(null);
+                    return;
                   }
                   setSelectedApt(null);
                 }}
@@ -1440,6 +1454,70 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
           </div>
         </div>
       )}
+
+      {/* ── Cancel Appointment (with reason) ── */}
+      {cancelTarget && (() => {
+        // Only promise a notification when one can actually be sent.
+        const willNotify = !!(cancelTarget.client && (cancelTarget.client.phone || cancelTarget.client.email))
+          && new Date(cancelTarget.start_time).getTime() > Date.now();
+        const REASONS = ["Client request", "Client no-show", "Client illness", "Staff unavailable", "Salon closure", "Double-booked"];
+        return (
+          <div className={styles.modalOverlay} onClick={() => setCancelTarget(null)}>
+            <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+              <h2>❌ Cancel Appointment</h2>
+              <p className={styles.cancelSummary}>
+                <strong>
+                  {cancelTarget.client
+                    ? `${cancelTarget.client.first_name} ${cancelTarget.client.last_name || ""}`.trim()
+                    : t("walkin")}
+                </strong>
+                {" — "}{cancelTarget.service?.name || "appointment"}
+                <br />
+                {localeDateStr(new Date(cancelTarget.start_time), { weekday: "short", month: "short", day: "numeric" })}
+                {" at "}
+                {new Date(cancelTarget.start_time).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+              </p>
+
+              <label className="label">Reason (optional)</label>
+              <div className={styles.reasonChips}>
+                {REASONS.map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    className={`${styles.reasonChip} ${cancelReason === r ? styles.reasonChipActive : ""}`}
+                    onClick={() => setCancelReason(cancelReason === r ? "" : r)}
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
+              <textarea
+                className="input"
+                rows={2}
+                value={cancelReason}
+                maxLength={500}
+                onChange={(e) => setCancelReason(e.target.value.slice(0, 500))}
+                placeholder="Add detail for your records…"
+              />
+
+              <p className={styles.cancelNotice}>
+                {willNotify
+                  ? "The client will be notified by text/email. The reason stays internal — it is not included in their message."
+                  : "No notification will be sent for this one."}
+              </p>
+
+              <div className={styles.modalActions}>
+                <button className="btn btn-secondary" onClick={() => setCancelTarget(null)} disabled={cancelling}>
+                  Keep Appointment
+                </button>
+                <button className={styles.deleteBtn} onClick={confirmCancel} disabled={cancelling}>
+                  {cancelling ? "Cancelling…" : "❌ Cancel Appointment"}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Client Lookup: appointments & history ── */}
       {historyOpen && (
