@@ -4,6 +4,7 @@ import { toE164 } from '@/lib/utils'
 import { formatDateInTz, formatInTz } from '@/lib/tz'
 import { isBusinessClosedOnDate, isStaffOffOnDate, type CustomClosedDate } from '@/lib/schedule-utils'
 import { resolveTenantTz } from '@/lib/notifications'
+import { sendSms, smsProvider, smsConfigFromSettings } from '@/lib/sms'
 import { rescheduleConfirmationHtml, cancellationConfirmationHtml, staffCancellationNotificationHtml, staffRescheduleNotificationHtml, ownerNotificationHtml, googleCalendarUrl } from '@/lib/email-templates'
 
 // Public API — token-based auth (no login required)
@@ -193,8 +194,9 @@ export async function PATCH(request: Request) {
       startTime: new Date(apt.start_time),
       tz,
     })
-    // Send cancellation SMS to client
-    if (client?.phone && process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER) {
+    // Send cancellation SMS to client — via the salon's own phone when it has
+    // one, so this still works after Twilio is dropped.
+    if (client?.phone && smsProvider(smsConfigFromSettings(tenant?.settings))) {
       const startTime = new Date(apt.start_time)
       let smsDateStr: string, smsTimeStr: string
       try {
@@ -220,17 +222,8 @@ export async function PATCH(request: Request) {
       const clientE164 = toE164(client.phone)
       if (clientE164) {
         try {
-          const sid = process.env.TWILIO_ACCOUNT_SID!
-          const token = process.env.TWILIO_AUTH_TOKEN!
-          const from = process.env.TWILIO_PHONE_NUMBER!
-          const url = `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`
-          const auth = btoa(`${sid}:${token}`)
-          await fetch(url, {
-            method: 'POST',
-            headers: { 'Authorization': `Basic ${auth}`, 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({ To: clientE164, From: from, Body: cancelSms }).toString(),
-          })
-          console.log(`[manage-appointment] ✅ Cancellation SMS sent to client ${clientE164}`)
+          const ok = await sendSms(clientE164, cancelSms, smsConfigFromSettings(tenant?.settings))
+          if (ok) console.log(`[manage-appointment] ✅ Cancellation SMS sent to client ${clientE164}`)
         } catch (err) {
           console.error(`[manage-appointment] Cancel SMS to client failed:`, err)
         }
@@ -588,9 +581,12 @@ async function notifyOwner(opts: {
     }
   }
 
-  // SMS to owner
+  // SMS to owner. Gated on a provider existing at all rather than on the Twilio
+  // env vars specifically — a salon using its own gateway phone has no Twilio
+  // credentials, and this notice used to go silent for them.
   const ownerPhone = tenant.phone
-  if (ownerPhone && process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER) {
+  const ownerSmsConfig = smsConfigFromSettings(tenant.settings)
+  if (ownerPhone && smsProvider(ownerSmsConfig)) {
     const smsBody = type === 'cancel'
       ? `${emoji} Appointment ${action}\n\nClient: ${clientName}\n📋 ${serviceName}\n📅 Was: ${dateStr} at ${timeStr}\n${staffName ? `💇 Staff: ${staffName}` : ''}`
       : `${emoji} Appointment ${action}\n\nClient: ${clientName}\n📋 ${serviceName}\n📅 Was: ${oldDateStr} at ${oldTimeStr}\n📅 New: ${dateStr} at ${timeStr}\n${staffName ? `💇 Staff: ${staffName}` : ''}`
@@ -598,16 +594,7 @@ async function notifyOwner(opts: {
     const ownerE164 = toE164(ownerPhone)
     if (ownerE164) {
       try {
-        const sid = process.env.TWILIO_ACCOUNT_SID!
-        const token = process.env.TWILIO_AUTH_TOKEN!
-        const from = process.env.TWILIO_PHONE_NUMBER!
-        const url = `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`
-        const auth = btoa(`${sid}:${token}`)
-        await fetch(url, {
-          method: 'POST',
-          headers: { 'Authorization': `Basic ${auth}`, 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({ To: ownerE164, From: from, Body: smsBody }).toString(),
-        })
+        await sendSms(ownerE164, smsBody, ownerSmsConfig)
       } catch (err) {
         console.error(`[manage-appointment] SMS to owner failed:`, err)
       }
@@ -646,7 +633,8 @@ async function notifyOwner(opts: {
 
 // ── Notify client of reschedule confirmation ──
 async function notifyClient(opts: {
-  tenant: { name: string; email: string | null; phone: string | null } | null
+  // settings carries sms_gateway — needed to text from the salon's own phone
+  tenant: { name: string; email: string | null; phone: string | null; settings?: Record<string, unknown> | null } | null
   client: { first_name: string; last_name: string; email: string | null; phone: string | null } | null
   clientName: string
   serviceName: string
@@ -659,7 +647,7 @@ async function notifyClient(opts: {
   manageToken: string
   tz: string
 }) {
-  const { client, clientName, serviceName, staffName, startTime, endTime, businessName, businessAddress, businessPhone, manageToken, tz } = opts
+  const { tenant, client, clientName, serviceName, staffName, startTime, endTime, businessName, businessAddress, businessPhone, manageToken, tz } = opts
   if (!client) return
 
   // Greeting format: "Dear James D." instead of full name
@@ -683,7 +671,7 @@ async function notifyClient(opts: {
   const gcalLink = googleCalendarUrl({ title: calTitle, startISO, endISO, location: calLocation })
 
   // SMS
-  if (client.phone && process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER) {
+  if (client.phone && smsProvider(smsConfigFromSettings(tenant?.settings))) {
     const smsBody = [
       `🔄 Appointment Rescheduled!`,
       ``,
@@ -701,16 +689,7 @@ async function notifyClient(opts: {
     const clientE164 = toE164(client.phone)
     if (clientE164) {
       try {
-        const sid = process.env.TWILIO_ACCOUNT_SID!
-        const twilioToken = process.env.TWILIO_AUTH_TOKEN!
-        const from = process.env.TWILIO_PHONE_NUMBER!
-        const url = `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`
-        const auth = btoa(`${sid}:${twilioToken}`)
-        await fetch(url, {
-          method: 'POST',
-          headers: { 'Authorization': `Basic ${auth}`, 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({ To: clientE164, From: from, Body: smsBody }).toString(),
-        })
+        await sendSms(clientE164, smsBody, smsConfigFromSettings(tenant?.settings))
       } catch (err) {
         console.error(`[manage-appointment] SMS to client failed:`, err)
       }
