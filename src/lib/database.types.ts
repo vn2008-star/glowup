@@ -107,6 +107,8 @@ export interface Database {
           checked_out_by: string | null
           checked_in_at: string | null
           manage_token: string
+          cancellation_reason: string | null
+          cancelled_by: string | null
         }
         Insert: {
           id?: string
@@ -127,6 +129,8 @@ export interface Database {
           checked_out_by?: string | null
           checked_in_at?: string | null
           manage_token?: string
+          cancellation_reason?: string | null
+          cancelled_by?: string | null
         }
         Update: {
           id?: string
@@ -147,6 +151,8 @@ export interface Database {
           checked_out_by?: string | null
           checked_in_at?: string | null
           manage_token?: string
+          cancellation_reason?: string | null
+          cancelled_by?: string | null
         }
       }
       campaigns: {
