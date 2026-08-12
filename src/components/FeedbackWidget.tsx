@@ -38,7 +38,7 @@ const STATUS_CONFIG: Record<string, { label: string; emoji: string; color: strin
 };
 
 const PAGE_LABELS: Record<string, string> = {
-  '/dashboard': 'Overview',
+  '/dashboard': 'Home',
   '/dashboard/calendar': 'Calendar',
   '/dashboard/checkout': 'Front Desk',
   '/dashboard/clients': 'Clients',

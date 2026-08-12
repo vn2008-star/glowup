@@ -1,13 +1,28 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { authenticate, isAuthFailure } from '@/lib/api-auth'
 
 export async function POST(request: Request) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  // Was: resolve the caller's own staff row directly, ignoring impersonation.
+  // Every action below writes to that tenant — so a platform admin in "View As"
+  // saw a banner reading "Viewing as: <salon>", opened Settings → Danger Zone,
+  // clicked Delete, and scheduled their OWN tenant for deletion instead.
+  const caller = await authenticate()
+  if (isAuthFailure(caller)) return caller.response
 
-  if (!user) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+  // authenticate() resolves the impersonated tenant, which fixes the wrong
+  // target — but the right target is neither one. An admin should not be able
+  // to suspend or delete a customer's salon from inside that customer's
+  // dashboard, so refuse and make them exit View As first.
+  if (caller.isImpersonating) {
+    return NextResponse.json(
+      { error: 'Account management is disabled while viewing as another salon. Exit View As first.' },
+      { status: 403 }
+    )
+  }
+
+  if (caller.staffRole !== 'owner') {
+    return NextResponse.json({ error: 'Only the account owner can perform this action' }, { status: 403 })
   }
 
   const svc = createServiceClient(
@@ -15,17 +30,7 @@ export async function POST(request: Request) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
-  // Only owners can manage account
-  const { data: staffRecord } = await svc
-    .from('staff')
-    .select('tenant_id, role')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!staffRecord || staffRecord.role !== 'owner') {
-    return NextResponse.json({ error: 'Only the account owner can perform this action' }, { status: 403 })
-  }
-
+  const tenantId = caller.tenantId
   const { action, confirm_name } = await request.json()
 
   // ── Disable (Suspend) Account ──
@@ -33,7 +38,7 @@ export async function POST(request: Request) {
     const { error } = await svc
       .from('tenants')
       .update({ is_active: false })
-      .eq('id', staffRecord.tenant_id)
+      .eq('id', tenantId)
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ success: true, message: 'Account suspended' })
@@ -44,7 +49,7 @@ export async function POST(request: Request) {
     const { error } = await svc
       .from('tenants')
       .update({ is_active: true, deleted_at: null, deletion_scheduled_at: null })
-      .eq('id', staffRecord.tenant_id)
+      .eq('id', tenantId)
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ success: true, message: 'Account reactivated' })
@@ -56,7 +61,7 @@ export async function POST(request: Request) {
     const { data: tenantData } = await svc
       .from('tenants')
       .select('name')
-      .eq('id', staffRecord.tenant_id)
+      .eq('id', tenantId)
       .single()
 
     if (!tenantData) {
@@ -78,7 +83,7 @@ export async function POST(request: Request) {
         deleted_at: new Date().toISOString(),
         deletion_scheduled_at: deletionDate.toISOString(),
       })
-      .eq('id', staffRecord.tenant_id)
+      .eq('id', tenantId)
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
@@ -94,7 +99,7 @@ export async function POST(request: Request) {
     const { error } = await svc
       .from('tenants')
       .update({ is_active: true, deleted_at: null, deletion_scheduled_at: null })
-      .eq('id', staffRecord.tenant_id)
+      .eq('id', tenantId)
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ success: true, message: 'Deletion cancelled, account reactivated' })

@@ -45,6 +45,67 @@ const APPOINTMENT_WRITABLE = [
 // checkout a line belongs to, and belong in the WHERE clause only.
 const CHARGE_WRITABLE = ['service_id', 'description', 'amount', 'is_upsell'] as const
 
+// The table each caller-supplied foreign key points at.
+const FK_TABLE: Record<string, string> = {
+  client_id: 'clients',
+  staff_id: 'staff',
+  service_id: 'services',
+  appointment_id: 'appointments',
+  conversation_id: 'conversations',
+}
+
+/**
+ * Verify every caller-supplied foreign key points at a row in THIS tenant.
+ *
+ * `.eq('tenant_id', tenantId)` guards which ROW is written and pickWritable
+ * guards which COLUMNS are written — but neither guards what those columns
+ * POINT AT. An appointment inserted into your own tenant carrying another
+ * salon's client_id is a well-formed row of yours, so every later tenant
+ * filter passes it.
+ *
+ * The damage lands on READ. appointments.list embeds `client:clients(...)`,
+ * PostgREST resolves that embed by foreign key, and because the whole dashboard
+ * queries with the service role there is no RLS underneath to stop it — so the
+ * other salon's client name, phone and email come back inside your own
+ * calendar. Same shape for waitlist, gallery, conversations and service_history,
+ * each of which embeds a client on read.
+ *
+ * Returns the first column pointing outside the tenant, or null if all pass.
+ * A malformed id fails the lookup and is reported the same way, so this fails
+ * closed.
+ */
+async function foreignKeyOutsideTenant(
+  svc: SupabaseClient,
+  tenantId: string,
+  refs: Record<string, unknown>
+): Promise<string | null> {
+  const pending = Object.entries(refs).filter(
+    ([col, id]) => FK_TABLE[col] && id !== undefined && id !== null && id !== ''
+  )
+  if (pending.length === 0) return null
+
+  const results = await Promise.all(
+    pending.map(async ([col, id]) => {
+      const { data } = await svc
+        .from(FK_TABLE[col])
+        .select('id')
+        .eq('id', id as string)
+        .eq('tenant_id', tenantId)
+        .maybeSingle()
+      return data ? null : col
+    })
+  )
+  return results.find((c): c is string => c !== null) ?? null
+}
+
+/** 400 for a foreign key that belongs to another salon. */
+function foreignRefError(column: string) {
+  return NextResponse.json(
+    { error: `Invalid ${column} — that record belongs to another salon` },
+    { status: 400 }
+  )
+}
+
 /**
  * Turn a Postgres write error into something an owner can act on.
  *
@@ -189,7 +250,23 @@ export async function POST(request: Request) {
     : null
   const tenantId = overrideTenantId || staffRecord.tenant_id
   const staffRole = overrideTenantId ? 'owner' : staffRecord.role // Admin gets full owner access when impersonating
-  const staffId = staffRecord.id
+
+  // While impersonating, the admin's OWN staff row belongs to a different
+  // tenant. Stamping its id on checked_out_by (or handing it back as
+  // currentStaffId) writes a cross-tenant reference into the salon's own
+  // records, so a checkout done in View As is attributed to a staff member who
+  // does not work there. Attribute to the salon's owner instead.
+  let staffId: string | null = staffRecord.id
+  if (overrideTenantId) {
+    const { data: ownerStaff } = await svc
+      .from('staff')
+      .select('id')
+      .eq('tenant_id', overrideTenantId)
+      .eq('role', 'owner')
+      .limit(1)
+      .maybeSingle()
+    staffId = ownerStaff?.id ?? null
+  }
 
   // Copy only the named columns out of a client payload.
   //
@@ -649,9 +726,13 @@ export async function POST(request: Request) {
       }
 
       case 'appointments.add': {
+        const newApt = pickWritable(payload, APPOINTMENT_WRITABLE)
+        const badRef = await foreignKeyOutsideTenant(svc, tenantId, newApt)
+        if (badRef) return foreignRefError(badRef)
+
         const { data, error } = await svc
           .from('appointments')
-          .insert({ ...pickWritable(payload, APPOINTMENT_WRITABLE), tenant_id: tenantId })
+          .insert({ ...newApt, tenant_id: tenantId })
           .select('id, tenant_id, client_id, staff_id, service_id, start_time, end_time, status, total_price, notes, payment_method, tip_amount, checked_out_at, checked_in_at, created_at, manage_token, client:clients(id, first_name, last_name, phone, email, photo_url, sms_opt_out), staff_member:staff!staff_id(id, name, photo_url, role), service:services(id, name, category, duration_minutes, price, commission_rate)')
           .single()
 
@@ -749,9 +830,13 @@ export async function POST(request: Request) {
           .eq('tenant_id', tenantId)
           .single()
 
+        const updates = pickWritable(stripImmutable(fields), APPOINTMENT_WRITABLE)
+        const badRef = await foreignKeyOutsideTenant(svc, tenantId, updates)
+        if (badRef) return foreignRefError(badRef)
+
         const { data, error } = await svc
           .from('appointments')
-          .update(pickWritable(stripImmutable(fields), APPOINTMENT_WRITABLE))
+          .update(updates)
           .eq('id', id)
           .eq('tenant_id', tenantId)
           .select('id, tenant_id, client_id, staff_id, service_id, start_time, end_time, status, total_price, notes, payment_method, tip_amount, checked_out_at, checked_in_at, created_at, manage_token, client:clients(id, first_name, last_name, phone, email, photo_url, sms_opt_out), staff_member:staff!staff_id(id, name, photo_url, role), service:services(id, name, category, duration_minutes, price, commission_rate)')
@@ -1020,6 +1105,9 @@ export async function POST(request: Request) {
       }
 
       case 'service_history.add': {
+        const badRef = await foreignKeyOutsideTenant(svc, tenantId, payload)
+        if (badRef) return foreignRefError(badRef)
+
         const { data, error } = await svc
           .from('service_history')
           .insert({ ...payload, tenant_id: tenantId })
@@ -1110,6 +1198,11 @@ export async function POST(request: Request) {
       }
 
       case 'conversations.add': {
+        const badRef = await foreignKeyOutsideTenant(svc, tenantId, {
+          client_id: payload.client_id,
+        })
+        if (badRef) return foreignRefError(badRef)
+
         const { data, error } = await svc
           .from('conversations')
           .insert({ ...payload, tenant_id: tenantId })
@@ -1142,6 +1235,13 @@ export async function POST(request: Request) {
       }
 
       case 'messages.add': {
+        // The message row is stamped with our tenant, but conversation_id came
+        // off the request — unchecked, it posted into another salon's inbox.
+        const badRef = await foreignKeyOutsideTenant(svc, tenantId, {
+          conversation_id: payload.conversation_id,
+        })
+        if (badRef) return foreignRefError(badRef)
+
         const { data: msg, error } = await svc
           .from('messages')
           .insert({ ...payload, tenant_id: tenantId })
@@ -1158,6 +1258,7 @@ export async function POST(request: Request) {
               unread_count: payload.sender_type === 'client' ? 1 : 0,
             })
             .eq('id', msg.conversation_id)
+            .eq('tenant_id', tenantId)
         }
 
         return NextResponse.json({ data: msg, error: error?.message })
@@ -1357,6 +1458,9 @@ export async function POST(request: Request) {
       }
 
       case 'waitlist.add': {
+        const badRef = await foreignKeyOutsideTenant(svc, tenantId, payload)
+        if (badRef) return foreignRefError(badRef)
+
         const { data, error } = await svc
           .from('waitlist')
           .insert({ ...payload, tenant_id: tenantId })
@@ -1590,6 +1694,9 @@ export async function POST(request: Request) {
       }
 
       case 'service-history.add': {
+        const badRef = await foreignKeyOutsideTenant(svc, tenantId, payload)
+        if (badRef) return foreignRefError(badRef)
+
         const { data, error } = await svc
           .from('service_history')
           .insert({ ...payload, tenant_id: tenantId })
@@ -1623,6 +1730,11 @@ export async function POST(request: Request) {
       }
 
       case 'gallery.create': {
+        // gallery.list embeds `client:clients(...)` — an unchecked client_id
+        // here is the same read leak as on appointments.
+        const badRef = await foreignKeyOutsideTenant(svc, tenantId, payload)
+        if (badRef) return foreignRefError(badRef)
+
         const { data, error } = await svc
           .from('service_history')
           .insert({
@@ -2033,6 +2145,9 @@ export async function POST(request: Request) {
       }
 
       case 'charges.add': {
+        const badRef = await foreignKeyOutsideTenant(svc, tenantId, payload)
+        if (badRef) return foreignRefError(badRef)
+
         const { data, error } = await svc
           .from('appointment_charges')
           .insert({ ...payload, tenant_id: tenantId })
@@ -2046,6 +2161,11 @@ export async function POST(request: Request) {
         // a pedicure, not the manicure they booked). Allowlisted rather than a
         // payload spread so a caller cannot repoint the row at another
         // appointment or tenant — same reasoning as APPOINTMENT_WRITABLE.
+        const badRef = await foreignKeyOutsideTenant(svc, tenantId, {
+          service_id: payload.service_id,
+        })
+        if (badRef) return foreignRefError(badRef)
+
         const { data, error } = await svc
           .from('appointment_charges')
           .update(pickWritable(payload, CHARGE_WRITABLE))
@@ -2128,11 +2248,16 @@ export async function POST(request: Request) {
         // Award loyalty points & update client stats ($5 = 1 point)
         if (data && !error && data.client_id) {
           const pointsEarned = Math.round((total_price || 0) / 5)
+          // Tenant-filtered even though client_id came off a tenant-scoped
+          // appointment: an appointment can only be created or moved onto a
+          // client in its own tenant now, but this write hands out loyalty
+          // points and rewrites lifetime_spend, so it does not lean on that.
           const { data: clientRow } = await svc
             .from('clients')
             .select('loyalty_points, visit_count, lifetime_spend')
             .eq('id', data.client_id)
-            .single()
+            .eq('tenant_id', tenantId)
+            .maybeSingle()
 
           if (clientRow) {
             await svc
@@ -2145,6 +2270,7 @@ export async function POST(request: Request) {
                 status: 'active',
               })
               .eq('id', data.client_id)
+              .eq('tenant_id', tenantId)
           }
         }
 
@@ -2461,12 +2587,17 @@ export async function POST(request: Request) {
           return NextResponse.json({ error: 'staff_id and service_id required' }, { status: 400 })
         }
 
-        // Get service details for duration & price
+        const badRef = await foreignKeyOutsideTenant(svc, tenantId, { staff_id })
+        if (badRef) return foreignRefError(badRef)
+
+        // Get service details for duration & price. Tenant-filtered — an
+        // unscoped lookup handed back another salon's service name and price.
         const { data: svcData } = await svc
           .from('services')
           .select('id, name, duration_minutes, price')
           .eq('id', service_id)
-          .single()
+          .eq('tenant_id', tenantId)
+          .maybeSingle()
 
         if (!svcData) {
           return NextResponse.json({ error: 'Service not found' }, { status: 404 })
@@ -2586,6 +2717,9 @@ export async function POST(request: Request) {
         if (!waitlist_id || !claimStaffId) {
           return NextResponse.json({ error: 'Missing waitlist_id or staff_id' }, { status: 400 })
         }
+
+        const badRef = await foreignKeyOutsideTenant(svc, tenantId, { staff_id: claimStaffId })
+        if (badRef) return foreignRefError(badRef)
 
         // Get the waitlist entry with client + service
         const { data: wlEntry, error: wlGetErr } = await svc

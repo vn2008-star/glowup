@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { authenticate, isAuthFailure } from '@/lib/api-auth'
+
+// Both handlers resolve the tenant through authenticate(), which honours the
+// admin "View As" override. Resolving the caller's own staff row directly (the
+// previous approach) showed a platform admin THEIR referral code and history
+// while the dashboard banner said they were viewing another salon.
 
 export async function GET() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const caller = await authenticate()
+  if (isAuthFailure(caller)) return caller.response
 
   // Use service role to bypass RLS for lookups
   const db = createServiceClient(
@@ -13,15 +17,7 @@ export async function GET() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
-  // Get tenant
-  const { data: staff } = await db
-    .from('staff')
-    .select('tenant_id')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!staff) return NextResponse.json({ error: 'No tenant found' }, { status: 404 })
-  const tenantId = staff.tenant_id
+  const tenantId = caller.tenantId
 
   // Get referral code
   const { data: code } = await db
@@ -56,9 +52,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const caller = await authenticate()
+  if (isAuthFailure(caller)) return caller.response
 
   // Use service role to bypass RLS
   const db = createServiceClient(
@@ -67,16 +62,7 @@ export async function POST(request: Request) {
   )
 
   const { action } = await request.json()
-
-  // Get tenant
-  const { data: staff } = await db
-    .from('staff')
-    .select('tenant_id')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!staff) return NextResponse.json({ error: 'No tenant found' }, { status: 404 })
-  const tenantId = staff.tenant_id
+  const tenantId = caller.tenantId
 
   if (action === 'generate') {
     // Get tenant name for code
