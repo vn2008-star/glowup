@@ -8,7 +8,7 @@ import styles from "./staff.module.css";
 import type { Staff, Service } from "@/lib/types";
 import { PROFESSIONAL_TYPES, getProfessionalType } from "./staff-specialties";
 import StaffAgreement from "./StaffAgreement";
-import { getISOWeekNumber, CLOSED_DAY_HOLIDAYS } from "@/lib/schedule-utils";
+import { getISOWeekNumber, CLOSED_DAY_HOLIDAYS, getNextHolidayDate } from "@/lib/schedule-utils";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -1100,7 +1100,8 @@ export default function StaffPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 'var(--space-2)' }}>
                   {CLOSED_DAY_HOLIDAYS.map(h => {
                     const checked = getHolidaysOff(vacationStaff).includes(h.name);
-                    const dateLabel = localeDateStr(new Date(2026, h.month, h.day), { month: 'short', day: 'numeric' });
+                    const nextDate = getNextHolidayDate(h);
+                    const dateLabel = nextDate ? localeDateStr(nextDate, { month: 'short', day: 'numeric' }) : '';
                     return (
                       <label
                         key={h.name}

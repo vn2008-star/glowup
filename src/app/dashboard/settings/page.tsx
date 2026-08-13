@@ -8,7 +8,7 @@ import Link from "next/link";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData, uploadImage } from "@/lib/api";
 import { US_TIMEZONES, timezoneFromAddress } from "@/lib/tz";
-import { CLOSED_DAY_HOLIDAYS } from "@/lib/schedule-utils";
+import { CLOSED_DAY_HOLIDAYS, getNextHolidayDate } from "@/lib/schedule-utils";
 import type { CustomClosedDate } from "@/lib/schedule-utils";
 import styles from "./settings.module.css";
 import { formatPhone, localeDateStr } from "@/lib/utils";
@@ -638,7 +638,8 @@ export default function SettingsPage() {
         <div className={styles.closedDaysGrid}>
           {CLOSED_DAY_HOLIDAYS.map(h => {
             const checked = closedHolidays.includes(h.name);
-            const dateLabel = localeDateStr(new Date(2026, h.month, h.day), { month: 'short', day: 'numeric' });
+            const nextDate = getNextHolidayDate(h);
+            const dateLabel = nextDate ? localeDateStr(nextDate, { month: 'short', day: 'numeric' }) : '';
             return (
               <label key={h.name} className={`${styles.closedDayItem} ${checked ? styles.closedDayItemChecked : ''}`}>
                 <input

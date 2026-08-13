@@ -16,25 +16,172 @@
 import { localeDateStr } from '@/lib/utils'
 
 /* ─── Shared Holiday Definitions ─── */
-export interface ClosedDayHoliday {
-  name: string
+interface HolidayBase {
+  name: string   // stable key — this is what's persisted in closed_holidays / holidays_off
   emoji: string
+}
+
+/** Falls on the same calendar date every year (e.g. 4th of July). */
+export interface FixedHoliday extends HolidayBase {
   month: number  // 0-indexed
   day: number
 }
 
-/** Common US holidays — shared across Settings, Staff, and Booking pages. */
+/**
+ * Falls on the nth weekday of the month, so the date moves every year
+ * (e.g. Labor Day = 1st Monday of September).
+ */
+export interface FloatingHoliday extends HolidayBase {
+  month: number     // 0-indexed
+  weekday: number   // 0 = Sunday … 6 = Saturday
+  nth: number       // 1 = first, 2 = second, … ; -1 = last, -2 = second to last
+  offsetDays?: number  // days added after resolving (Black Friday = Thanksgiving + 1)
+}
+
+/**
+ * Follows no Gregorian rule at all (Lunar New Year) — dates come from a table.
+ * Years outside the table resolve to null; extend `dates` before it runs out.
+ */
+export interface LookupHoliday extends HolidayBase {
+  dates: Record<number, string>  // year → 'MM-DD'
+}
+
+export type ClosedDayHoliday = FixedHoliday | FloatingHoliday | LookupHoliday
+
+/** Common US holidays — shared across Settings, Staff, Calendar, and Booking pages. */
 export const CLOSED_DAY_HOLIDAYS: ClosedDayHoliday[] = [
   { name: "New Year's Day", emoji: '🎆', month: 0, day: 1 },
-  { name: "MLK Day", emoji: '✊', month: 0, day: 20 },
-  { name: "Presidents' Day", emoji: '🇺🇸', month: 1, day: 17 },
-  { name: "Memorial Day", emoji: '🇺🇸', month: 4, day: 26 },
+  { name: "MLK Day", emoji: '✊', month: 0, weekday: 1, nth: 3 },
+  { name: "Presidents' Day", emoji: '🇺🇸', month: 1, weekday: 1, nth: 3 },
+  { name: "Memorial Day", emoji: '🇺🇸', month: 4, weekday: 1, nth: -1 },
   { name: "4th of July", emoji: '🎆', month: 6, day: 4 },
-  { name: "Labor Day", emoji: '💪', month: 8, day: 1 },
-  { name: "Thanksgiving", emoji: '🦃', month: 10, day: 27 },
+  { name: "Labor Day", emoji: '💪', month: 8, weekday: 1, nth: 1 },
+  { name: "Thanksgiving", emoji: '🦃', month: 10, weekday: 4, nth: 4 },
   { name: "Christmas Eve", emoji: '🎄', month: 11, day: 24 },
   { name: "Christmas", emoji: '🎄', month: 11, day: 25 },
   { name: "New Year's Eve", emoji: '🎉', month: 11, day: 31 },
+]
+
+/**
+ * The Date this holiday falls on in a given year.
+ * Returns null only for a lookup holiday in a year the table doesn't cover.
+ */
+export function getHolidayDate(holiday: ClosedDayHoliday, year: number): Date | null {
+  if ('dates' in holiday) {
+    const md = holiday.dates[year]
+    if (!md) return null
+    const [month, day] = md.split('-').map(Number)
+    return new Date(year, month - 1, day)
+  }
+
+  if ('day' in holiday) return new Date(year, holiday.month, holiday.day)
+
+  const { month, weekday, nth } = holiday
+  let day: number
+
+  if (nth > 0) {
+    // Offset from the 1st of the month to the first matching weekday.
+    const firstWeekday = new Date(year, month, 1).getDay()
+    day = 1 + ((weekday - firstWeekday + 7) % 7) + (nth - 1) * 7
+  } else {
+    // Count backwards from the last day of the month.
+    const lastDate = new Date(year, month + 1, 0)
+    day = lastDate.getDate() - ((lastDate.getDay() - weekday + 7) % 7) - (-nth - 1) * 7
+  }
+
+  const d = new Date(year, month, day)
+  if (holiday.offsetDays) d.setDate(d.getDate() + holiday.offsetDays)  // may roll into the next month
+  return d
+}
+
+/**
+ * The next occurrence of a holiday on or after `from` — used for UI labels and
+ * promo scheduling so a holiday never displays or fires on a stale date.
+ */
+export function getNextHolidayDate(holiday: ClosedDayHoliday, from: Date = new Date()): Date | null {
+  const today = new Date(from.getFullYear(), from.getMonth(), from.getDate())
+  const thisYear = getHolidayDate(holiday, today.getFullYear())
+  if (thisYear && thisYear >= today) return thisYear
+  return getHolidayDate(holiday, today.getFullYear() + 1)
+}
+
+/** True if `holiday` falls on `dateStr` (YYYY-MM-DD), resolved for that date's own year. */
+export function holidayFallsOn(holiday: ClosedDayHoliday, dateStr: string): boolean {
+  const target = new Date(dateStr + 'T00:00:00')
+  const resolved = getHolidayDate(holiday, target.getFullYear())
+  return !!resolved && resolved.getTime() === target.getTime()
+}
+
+/**
+ * Find which of the named holidays (if any) falls on `dateStr` (YYYY-MM-DD).
+ * Floating holidays are resolved against that date's own year.
+ */
+export function findHolidayOnDate(
+  holidayNames: string[],
+  dateStr: string,
+): ClosedDayHoliday | undefined {
+  if (holidayNames.length === 0) return undefined
+
+  for (const name of holidayNames) {
+    const holiday = CLOSED_DAY_HOLIDAYS.find(h => h.name === name)
+    if (holiday && holidayFallsOn(holiday, dateStr)) return holiday
+  }
+
+  return undefined
+}
+
+/* ─── Promo Holiday Calendar ─── */
+/**
+ * Marketing holidays — a different set from CLOSED_DAY_HOLIDAYS (these are days
+ * you sell into, not days you close). Shared by the campaigns page and the
+ * holiday auto-send in /api/run-automations so the two can't drift apart.
+ */
+export type PromoHoliday = ClosedDayHoliday & {
+  template: string    // {name} / {booking_url} / {business_name} tokens
+  promoIdea: string   // shown in the campaigns UI as inspiration
+}
+
+export const PROMO_HOLIDAYS: PromoHoliday[] = [
+  // Lunar New Year is lunisolar — no Gregorian rule fits, so the dates are tabulated.
+  { name: "Lunar New Year", emoji: "🧧", dates: {
+      2026: '02-17', 2027: '02-06', 2028: '01-26', 2029: '02-13', 2030: '02-03',
+      2031: '01-23', 2032: '02-11', 2033: '01-31', 2034: '02-19', 2035: '02-08',
+    },
+    template: "🧧 Lunar New Year Special! Ring in the new year looking radiant. 20% off all services + lucky red gift cards available 🎊 Book now → {booking_url}",
+    promoIdea: "Lucky red gift cards, new year glow-up packages, family bundles, festive nail art" },
+  { name: "Valentine's Day", emoji: "💖", month: 1, day: 14,
+    template: "💖 Valentine's Day Special! Look & feel amazing for your date. 15% off any service this week. Book now → {booking_url}",
+    promoIdea: "Couples packages, date-night glam, gift cards, pampering bundles" },
+  { name: "International Women's Day", emoji: "💜", month: 2, day: 8,
+    template: "💜 Happy Women's Day, {name}! Celebrate YOU with a self-care session. 20% off this week only → {booking_url}",
+    promoIdea: "Self-care packages, group bookings, squad deals, wellness bundles" },
+  { name: "Mother's Day", emoji: "🌹", month: 4, weekday: 0, nth: 2,
+    template: "🌹 Mother's Day Special! Give Mom the gift of pampering. Gift cards + 15% off spa & beauty packages → {booking_url}",
+    promoIdea: "Gift cards, mother-daughter packages, spa bundles, relaxation treats" },
+  { name: "Memorial Day", emoji: "🇺🇸", month: 4, weekday: 1, nth: -1,
+    template: "🇺🇸 Memorial Day Sale! Get summer-ready. 20% off all services this weekend → {booking_url}",
+    promoIdea: "Summer-ready specials, weekend flash sales, seasonal treatments" },
+  { name: "4th of July", emoji: "🎆", month: 6, day: 4,
+    template: "🎆 4th of July Glow-Up! Get party-ready with our holiday special. Book now → {booking_url}",
+    promoIdea: "Festive styling, summer glow packages, group party prep" },
+  { name: "Back to School", emoji: "🎒", month: 7, day: 15,
+    template: "🎒 Back to School Special! Start the year fresh with a new look. Student discount: 15% off → {booking_url}",
+    promoIdea: "Student discounts, fresh-start packages, new-look specials" },
+  { name: "Halloween", emoji: "🎃", month: 9, day: 31,
+    template: "🎃 Halloween Glam! Get costume-ready with our spooky season specials. Book now → {booking_url}",
+    promoIdea: "Themed styling, costume-ready looks, group rates, special effects" },
+  { name: "Thanksgiving", emoji: "🦃", month: 10, weekday: 4, nth: 4,
+    template: "🦃 Look stunning for Thanksgiving! Book your holiday session. Family discounts available → {booking_url}",
+    promoIdea: "Family packages, pre-holiday styling, gift cards, group bookings" },
+  { name: "Black Friday", emoji: "💰", month: 10, weekday: 4, nth: 4, offsetDays: 1,
+    template: "💰 Black Friday DEAL! Our biggest sale of the year. Up to 30% off services + bonus gift cards → {booking_url}",
+    promoIdea: "Flash sales, bundle deals, buy-one-get-one gift cards, VIP packages" },
+  { name: "Christmas", emoji: "🎄", month: 11, day: 25,
+    template: "🎄 Holiday Glow! Get party-ready for the season. Gift cards make the perfect present 🎁 Book now → {booking_url}",
+    promoIdea: "Gift cards, holiday party prep, pampering packages, wellness gifts" },
+  { name: "New Year's Eve", emoji: "🎉", month: 11, day: 31,
+    template: "🎉 New Year's Glow-Up! Ring in the new year looking & feeling amazing. Limited spots available → {booking_url}",
+    promoIdea: "NYE glam packages, last-minute appointments, fresh-start specials" },
 ]
 
 export interface CustomClosedDate {
@@ -64,17 +211,8 @@ export function isBusinessClosedOnDate(
   // Check custom closed dates (exact match)
   if (customClosedDates.some(c => c.date === dateStr)) return true
 
-  // Check holiday closures by month/day
-  const d = new Date(dateStr + 'T00:00:00')
-  const month = d.getMonth()
-  const day = d.getDate()
-
-  for (const holidayName of closedHolidays) {
-    const holiday = CLOSED_DAY_HOLIDAYS.find(h => h.name === holidayName)
-    if (holiday && holiday.month === month && holiday.day === day) return true
-  }
-
-  return false
+  // Check holiday closures (floating holidays resolved for this date's year)
+  return !!findHolidayOnDate(closedHolidays, dateStr)
 }
 
 interface DaySchedule {
@@ -103,15 +241,7 @@ export function isStaffOffOnDate(
 
   // Check per-staff holidays_off
   const holidaysOff = (schedule.holidays_off || []) as string[]
-  if (holidaysOff.length > 0) {
-    const d = new Date(dateStr + 'T00:00:00')
-    const month = d.getMonth()
-    const day = d.getDate()
-    for (const holidayName of holidaysOff) {
-      const holiday = CLOSED_DAY_HOLIDAYS.find(h => h.name === holidayName)
-      if (holiday && holiday.month === month && holiday.day === day) return true
-    }
-  }
+  if (findHolidayOnDate(holidaysOff, dateStr)) return true
 
   // Check vacations
   const vacations = (schedule.vacations || []) as { start: string; end: string }[]

@@ -4,42 +4,21 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData } from "@/lib/api";
 import { localeDateStr } from "@/lib/utils";
+import { PROMO_HOLIDAYS, getNextHolidayDate, type PromoHoliday } from "@/lib/schedule-utils";
 import styles from "./campaigns.module.css";
 import type { Campaign } from "@/lib/types";
 
 /* ─── Holiday Calendar ─── */
-interface HolidayInfo {
-  name: string;
-  emoji: string;
-  month: number; // 0-indexed
-  day: number;
-  template: string;
-  promoIdea: string;
-}
+// The calendar itself lives in @/lib/schedule-utils (PROMO_HOLIDAYS) so this
+// page and the auto-send in /api/run-automations stay in sync.
 
-const HOLIDAYS: HolidayInfo[] = [
-  { name: "Lunar New Year", emoji: "🧧", month: 0, day: 29, template: "🧧 Lunar New Year Special! Start the Year of the Snake looking radiant. 20% off all services + lucky red gift cards available 🎊 Book now →", promoIdea: "Lucky red gift cards, new year glow-up packages, family bundles, festive nail art" },
-  { name: "Valentine's Day", emoji: "💖", month: 1, day: 14, template: "💖 Valentine's Day Special! Look & feel amazing for your date. 15% off any service this week. Book now →", promoIdea: "Couples packages, date-night glam, gift cards, pampering bundles" },
-  { name: "International Women's Day", emoji: "💜", month: 2, day: 8, template: "💜 Happy Women's Day, {name}! Celebrate YOU with a self-care session. 20% off this week only →", promoIdea: "Self-care packages, group bookings, squad deals, wellness bundles" },
-  { name: "Mother's Day", emoji: "🌹", month: 4, day: 11, template: "🌹 Mother's Day Special! Give Mom the gift of pampering. Gift cards + 15% off spa & beauty packages →", promoIdea: "Gift cards, mother-daughter packages, spa bundles, relaxation treats" },
-  { name: "Memorial Day", emoji: "🇺🇸", month: 4, day: 26, template: "🇺🇸 Memorial Day Sale! Get summer-ready. 20% off all services this weekend →", promoIdea: "Summer-ready specials, weekend flash sales, seasonal treatments" },
-  { name: "4th of July", emoji: "🎆", month: 6, day: 4, template: "🎆 4th of July Glow-Up! Get party-ready with our holiday special. {details} →", promoIdea: "Festive styling, summer glow packages, group party prep" },
-  { name: "Back to School", emoji: "🎒", month: 7, day: 15, template: "🎒 Back to School Special! Start the year fresh with a new look. Student discount: 15% off →", promoIdea: "Student discounts, fresh-start packages, new-look specials" },
-  { name: "Halloween", emoji: "🎃", month: 9, day: 31, template: "🎃 Halloween Glam! Get costume-ready with our spooky season specials. Book now →", promoIdea: "Themed styling, costume-ready looks, group rates, special effects" },
-  { name: "Thanksgiving", emoji: "🦃", month: 10, day: 27, template: "🦃 Look stunning for Thanksgiving! Book your holiday session. Family discounts available →", promoIdea: "Family packages, pre-holiday styling, gift cards, group bookings" },
-  { name: "Black Friday", emoji: "💰", month: 10, day: 28, template: "💰 Black Friday DEAL! Our biggest sale of the year. Up to 30% off services + bonus gift cards →", promoIdea: "Flash sales, bundle deals, buy-one-get-one gift cards, VIP packages" },
-  { name: "Christmas", emoji: "🎄", month: 11, day: 25, template: "🎄 Holiday Glow! Get party-ready for the season. Gift cards make the perfect present 🎁 Book now →", promoIdea: "Gift cards, holiday party prep, pampering packages, wellness gifts" },
-  { name: "New Year's Eve", emoji: "🎉", month: 11, day: 31, template: "🎉 New Year's Glow-Up! Ring in the new year looking & feeling amazing. Limited spots available →", promoIdea: "NYE glam packages, last-minute appointments, fresh-start specials" },
-];
-
-function getUpcomingHolidays(): (HolidayInfo & { date: Date; daysUntil: number })[] {
+function getUpcomingHolidays(): (PromoHoliday & { date: Date; daysUntil: number })[] {
   const now = new Date();
-  const year = now.getFullYear();
-  return HOLIDAYS.map(h => {
-    let date = new Date(year, h.month, h.day);
-    if (date < now) date = new Date(year + 1, h.month, h.day);
+  return PROMO_HOLIDAYS.flatMap(h => {
+    const date = getNextHolidayDate(h, now);
+    if (!date) return [];  // lookup holiday past the end of its table
     const daysUntil = Math.ceil((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-    return { ...h, date, daysUntil };
+    return [{ ...h, date, daysUntil }];
   }).sort((a, b) => a.daysUntil - b.daysUntil);
 }
 
@@ -77,7 +56,7 @@ export default function HolidaysPage() {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   // ── Inline CRUD helpers ──
-  async function handleCreateHolidayPromo(h: HolidayInfo & { date: Date }) {
+  async function handleCreateHolidayPromo(h: PromoHoliday & { date: Date }) {
     const payload = {
       name: `${h.name} ${h.date.getFullYear()} Special`,
       type: 'holiday',

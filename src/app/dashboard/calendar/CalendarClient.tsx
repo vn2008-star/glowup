@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData } from "@/lib/api";
 import { localToUTC, todayInTz, DEFAULT_TZ } from "@/lib/tz";
-import { CLOSED_DAY_HOLIDAYS, isBusinessClosedOnDate, isStaffOffOnDate } from "@/lib/schedule-utils";
+import { findHolidayOnDate, isBusinessClosedOnDate, isStaffOffOnDate } from "@/lib/schedule-utils";
 import type { CustomClosedDate } from "@/lib/schedule-utils";
 import { localeDateStr } from "@/lib/utils";
 import styles from "./calendar.module.css";
@@ -166,15 +166,10 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
       const dateStr = toDateStr(day);
       if (cache[dateStr]) continue;
       const markers: DayMarker[] = [];
-      const d = new Date(dateStr + "T00:00:00");
-      const month = d.getMonth();
-      const dayNum = d.getDate();
 
-      for (const holidayName of closedHolidays) {
-        const h = CLOSED_DAY_HOLIDAYS.find(hd => hd.name === holidayName);
-        if (h && h.month === month && h.day === dayNum) {
-          markers.push({ type: "holiday", label: `${h.emoji} ${h.name}` });
-        }
+      const closedHoliday = findHolidayOnDate(closedHolidays, dateStr);
+      if (closedHoliday) {
+        markers.push({ type: "holiday", label: `${closedHoliday.emoji} ${closedHoliday.name}` });
       }
 
       for (const c of customClosedDates) {
@@ -195,13 +190,11 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
           }
         }
 
-        const holidaysOff = (sched.holidays_off || []) as string[];
-        for (const holidayName of holidaysOff) {
-          if (closedHolidays.includes(holidayName)) continue;
-          const h = CLOSED_DAY_HOLIDAYS.find(hd => hd.name === holidayName);
-          if (h && h.month === month && h.day === dayNum) {
-            markers.push({ type: "day-off", label: h.name, staffName: staff.name });
-          }
+        const holidaysOff = ((sched.holidays_off || []) as string[])
+          .filter(name => !closedHolidays.includes(name));
+        const staffHoliday = findHolidayOnDate(holidaysOff, dateStr);
+        if (staffHoliday) {
+          markers.push({ type: "day-off", label: staffHoliday.name, staffName: staff.name });
         }
 
         if (isStaffOffOnDate(sched, dateStr)) {

@@ -4,6 +4,7 @@ import { toE164 } from '@/lib/utils'
 import { verifyCronRequest } from '@/lib/cron-auth'
 import { promoEmailHtml } from '@/lib/email-templates'
 import { sendSms, smsProvider, canSendBulkSms, smsConfigFromSettings, type TenantSmsConfig } from '@/lib/sms'
+import { PROMO_HOLIDAYS, getNextHolidayDate } from '@/lib/schedule-utils'
 
 // ─── Automation Engine (Cron-triggered) ───
 // Runs daily. Checks each tenant's automation settings and fires:
@@ -42,21 +43,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ message: 'No tenants found', processed: 0 })
   }
 
-  // Holiday calendar (must match the UI list in campaigns/page.tsx)
-  const HOLIDAYS = [
-    { name: 'Lunar New Year', emoji: '🧧', month: 0, day: 29, template: '🧧 Lunar New Year Special! Start the Year of the Snake looking radiant. 20% off all services + lucky red gift cards available 🎊 Book now → {booking_url}' },
-    { name: "Valentine's Day", emoji: '💖', month: 1, day: 14, template: "💖 Valentine's Day Special! Look & feel amazing for your date. 15% off any service this week. Book now → {booking_url}" },
-    { name: "International Women's Day", emoji: '💜', month: 2, day: 8, template: "💜 Happy Women's Day, {name}! Celebrate YOU with a self-care session. 20% off this week only → {booking_url}" },
-    { name: "Mother's Day", emoji: '🌹', month: 4, day: 11, template: "🌹 Mother's Day Special! Give Mom the gift of pampering. Gift cards + 15% off spa & beauty packages → {booking_url}" },
-    { name: 'Memorial Day', emoji: '🇺🇸', month: 4, day: 26, template: '🇺🇸 Memorial Day Sale! Get summer-ready. 20% off all services this weekend → {booking_url}' },
-    { name: '4th of July', emoji: '🎆', month: 6, day: 4, template: '🎆 4th of July Glow-Up! Get party-ready with our holiday special. Book now → {booking_url}' },
-    { name: 'Back to School', emoji: '🎒', month: 7, day: 15, template: '🎒 Back to School Special! Start the year fresh with a new look. Student discount: 15% off → {booking_url}' },
-    { name: 'Halloween', emoji: '🎃', month: 9, day: 31, template: '🎃 Halloween Glam! Get costume-ready with our spooky season specials. Book now → {booking_url}' },
-    { name: 'Thanksgiving', emoji: '🦃', month: 10, day: 27, template: '🦃 Look stunning for Thanksgiving! Book your holiday session. Family discounts available → {booking_url}' },
-    { name: 'Black Friday', emoji: '💰', month: 10, day: 28, template: '💰 Black Friday DEAL! Our biggest sale of the year. Up to 30% off services + bonus gift cards → {booking_url}' },
-    { name: 'Christmas', emoji: '🎄', month: 11, day: 25, template: '🎄 Holiday Glow! Get party-ready for the season. Gift cards make the perfect present 🎁 Book now → {booking_url}' },
-    { name: "New Year's Eve", emoji: '🎉', month: 11, day: 31, template: '🎉 New Year\'s Glow-Up! Ring in the new year looking & feeling amazing. Limited spots available → {booking_url}' },
-  ]
+  // Holiday calendar lives in @/lib/schedule-utils (PROMO_HOLIDAYS) so this
+  // route and the campaigns UI can't drift apart.
 
   const results: Record<string, number> = {
     birthday: 0,
@@ -460,12 +448,12 @@ export async function GET(request: Request) {
       const holidaySettings = (settings.holiday_settings || {}) as Record<string, number>
       const sendDaysBefore = holidaySettings.send_days_before ?? 7
       const today = new Date()
-      const year = today.getFullYear()
 
-      for (const holiday of HOLIDAYS) {
-        // Calculate the holiday date (this year or next)
-        let holidayDate = new Date(year, holiday.month, holiday.day)
-        if (holidayDate < today) holidayDate = new Date(year + 1, holiday.month, holiday.day)
+      for (const holiday of PROMO_HOLIDAYS) {
+        // Next occurrence — floating holidays resolve per year, so this never
+        // fires against a stale date.
+        const holidayDate = getNextHolidayDate(holiday, today)
+        if (!holidayDate) continue  // lookup table doesn't reach this year yet
 
         const daysUntil = Math.ceil((holidayDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
 
