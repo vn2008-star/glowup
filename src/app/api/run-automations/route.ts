@@ -214,7 +214,7 @@ export async function GET(request: Request) {
           const message = [
             `Hey {name}! ⚡`,
             ``,
-            `We have ${totalOpenSlots} opening${totalOpenSlots !== 1 ? 's' : ''} coming up:`,
+            `We have openings coming up:`,
             ``,
             slotLines,
             ``,
@@ -237,7 +237,7 @@ export async function GET(request: Request) {
               logoUrl: tenant.logo_url,
               channel: fmoChannel,
               bulk: true,
-              subject: `⚡ ${totalOpenSlots} opening${totalOpenSlots !== 1 ? 's' : ''} this week at ${businessName}`,
+              subject: `⚡ Openings this week at ${businessName}`,
               ctaUrl: bookingUrl,
               ctaText: 'Book Now',
             })
