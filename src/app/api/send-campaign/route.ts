@@ -4,6 +4,7 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { getImpersonationOverride, isAdminEmail } from '@/lib/admin'
 import { toE164 } from '@/lib/utils'
 import { promoEmailHtml } from '@/lib/email-templates'
+import { siteBaseUrl } from '@/lib/site-url'
 import { sendSms, canSendBulkSms } from '@/lib/sms'
 
 // ─── Send Campaign Blast (SMS + Email) ───
@@ -120,9 +121,7 @@ export async function POST(request: Request) {
     .single()
 
   const businessName = tenant?.name || 'our salon'
-  const bookingUrl = tenant?.slug
-    ? `${process.env.NEXT_PUBLIC_SITE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')}/book/${tenant.slug}`
-    : ''
+  const bookingUrl = tenant?.slug ? `${siteBaseUrl()}/book/${tenant.slug}` : ''
 
   for (const client of clients) {
     const clientName = `${client.first_name || ''}${client.last_name ? ' ' + client.last_name : ''}`.trim() || 'there'

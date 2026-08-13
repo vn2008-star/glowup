@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 import { verifyCronRequest } from '@/lib/cron-auth'
+import { siteBaseUrl } from '@/lib/site-url'
 
 // ─── Staff Revenue Report Email Sender ───
 // POST: Manual send from dashboard (authenticated via session)
@@ -211,10 +212,10 @@ async function sendReports(
     })
   }
 
-  // Build base URL for statement links
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : 'http://localhost:3000'
+  // Build base URL for statement links.
+  // Was `A || B ? x : y`, which parses as `(A || B) ? x : y` — with
+  // NEXT_PUBLIC_APP_URL set but VERCEL_URL unset it produced "https://undefined".
+  const baseUrl = siteBaseUrl()
 
   // Send emails
   const hasResend = !!process.env.RESEND_API_KEY

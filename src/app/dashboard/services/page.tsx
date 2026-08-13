@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
-import { queryData } from "@/lib/api";
+import { queryData, uploadImage } from "@/lib/api";
 import styles from "./services.module.css";
 import type { Service } from "@/lib/types";
 import { SERVICE_CATEGORIES, type ServiceTemplate, type ServiceCategory } from "./service-catalog";
@@ -71,21 +71,10 @@ export default function ServicesPage() {
 
   async function handleUpload(file: File) {
     setUploading(true);
-    try {
-      const fd = new FormData();
-      fd.append('file', file);
-      fd.append('folder', 'services');
-      const res = await fetch('/api/upload', { method: 'POST', body: fd });
-      if (res.ok) {
-        const { url } = await res.json();
-        setFormData(prev => ({ ...prev, image_url: url }));
-      } else {
-        const err = await res.json();
-        alert(`Upload failed: ${err.error}`);
-      }
-    } catch {
-      alert('Upload failed. Please try again.');
-    }
+    // Shared helper so this picks up the same downscaling as every other upload
+    const { url, error } = await uploadImage(file, 'services');
+    if (url) setFormData(prev => ({ ...prev, image_url: url }));
+    else alert(`Upload failed: ${error}`);
     setUploading(false);
   }
 

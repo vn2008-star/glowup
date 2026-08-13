@@ -4,6 +4,7 @@ import { toE164 } from '@/lib/utils'
 import { formatDateInTz, formatInTz } from '@/lib/tz'
 import { isBusinessClosedOnDate, isStaffOffOnDate, type CustomClosedDate } from '@/lib/schedule-utils'
 import { resolveTenantTz, resolveSpecialInstructions, appendInstructionsToSms } from '@/lib/notifications'
+import { siteBaseUrl } from '@/lib/site-url'
 import { sendSms, smsProvider, smsConfigFromSettings } from '@/lib/sms'
 import { cancelAppointment } from '@/lib/cancel-appointment'
 import { rescheduleConfirmationHtml, cancellationConfirmationHtml, staffCancellationNotificationHtml, staffRescheduleNotificationHtml, ownerNotificationHtml, googleCalendarUrl } from '@/lib/email-templates'
@@ -249,11 +250,7 @@ export async function PATCH(request: Request) {
           timeStr = startTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
         }
 
-        const baseUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
-          ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-          : process.env.VERCEL_URL
-            ? `https://${process.env.VERCEL_URL}`
-            : 'https://glowup-jade.vercel.app'
+        const baseUrl = siteBaseUrl()
 
         // Get tenant slug for booking link
         const { data: tenantSlug } = await svc
@@ -712,11 +709,7 @@ async function notifyClient(opts: {
     try {
       const { Resend } = await import('resend')
       const resend = new Resend(process.env.RESEND_API_KEY)
-      const baseUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
-        ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-        : process.env.VERCEL_URL
-          ? `https://${process.env.VERCEL_URL}`
-          : 'https://glowup-jade.vercel.app'
+      const baseUrl = siteBaseUrl()
       const manageLink = `${baseUrl}/manage/${manageToken}`
       const rescheduleHtml = rescheduleConfirmationHtml({
         greeting: clientGreeting,

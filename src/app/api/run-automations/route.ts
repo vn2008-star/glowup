@@ -5,6 +5,7 @@ import { verifyCronRequest } from '@/lib/cron-auth'
 import { promoEmailHtml } from '@/lib/email-templates'
 import { sendSms, smsProvider, canSendBulkSms, smsConfigFromSettings, type TenantSmsConfig } from '@/lib/sms'
 import { PROMO_HOLIDAYS, getNextHolidayDate } from '@/lib/schedule-utils'
+import { siteBaseUrl } from '@/lib/site-url'
 
 // ─── Automation Engine (Cron-triggered) ───
 // Runs daily. Checks each tenant's automation settings and fires:
@@ -61,7 +62,7 @@ export async function GET(request: Request) {
     // This salon's own phone, if it has the SMS Gateway app set up
     const smsConfig = smsConfigFromSettings(settings)
     const businessName = tenant.name || 'our salon'
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
+    const baseUrl = siteBaseUrl()
     const bookingUrl = `${baseUrl}/book/${tenant.slug}`
     const businessEmail = tenant.email || ''
 
@@ -203,8 +204,20 @@ export async function GET(request: Request) {
         const { data: recipients } = await clientQuery
 
         if (recipients && recipients.length > 0) {
-          const slotsText = slotDescriptions.length > 0 ? slotDescriptions.join(', ') : `the next ${lookAheadDays} day${lookAheadDays !== 1 ? 's' : ''}`
-          const message = `Hey {name}! ⚡ We have ${totalOpenSlots} opening${totalOpenSlots !== 1 ? 's' : ''} on ${slotsText}. Book now before they're gone → ${bookingUrl}`
+          // One date per line. Joining them with commas ran the day and date
+          // together — "Mon, Aug 10, Tue, Aug 11" reads as six separate items.
+          const slotLines = slotDescriptions.length > 0
+            ? slotDescriptions.map(d => `📅 ${d}`).join('\n')
+            : `📅 In the next ${lookAheadDays} day${lookAheadDays !== 1 ? 's' : ''}`
+          const message = [
+            `Hey {name}! ⚡`,
+            ``,
+            `We have ${totalOpenSlots} opening${totalOpenSlots !== 1 ? 's' : ''} coming up:`,
+            ``,
+            slotLines,
+            ``,
+            `Book now before they're gone → ${bookingUrl}`,
+          ].join('\n')
 
           for (const client of recipients) {
             const clientFirst = `${client.first_name || ''}`.trim() || 'there'
