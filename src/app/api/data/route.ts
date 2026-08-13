@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient, type SupabaseClient } from '@supabase/supabase-js'
 import { getImpersonationOverride, isAdminEmail } from '@/lib/admin'
 import { resolveStaffRecord } from '@/lib/api-auth'
-import { scheduleClientReminders, sendClientBookingConfirmation, sendClientChangeNotice, resolveTenantTz, sendSms, greetingName } from '@/lib/notifications'
+import { scheduleClientReminders, sendClientBookingConfirmation, sendClientChangeNotice, resolveTenantTz, resolveSpecialInstructions, sendSms, greetingName } from '@/lib/notifications'
 import { getTenantSmsConfig, sendSmsVerbose, smsProvider, type StoredSmsGateway } from '@/lib/sms'
 import { cancelAppointment } from '@/lib/cancel-appointment'
 import { promoEmailHtml } from '@/lib/email-templates'
@@ -756,7 +756,7 @@ export async function POST(request: Request) {
               try {
                 const { data: t } = await svc
                   .from('tenants')
-                  .select('name, email, phone, address, timezone, settings')
+                  .select('name, email, phone, address, timezone, logo_url, settings')
                   .eq('id', tenantId)
                   .single()
 
@@ -806,6 +806,8 @@ export async function POST(request: Request) {
                   start: new Date(apt.start_time),
                   end: new Date(apt.end_time),
                   timezone: tz,
+                  logoUrl: t?.logo_url || null,
+                  specialInstructions: resolveSpecialInstructions(t),
                 })
               } catch (err) {
                 console.error('[appointments.add] notification error:', err)
@@ -871,7 +873,7 @@ export async function POST(request: Request) {
 
               const { data: t } = await svc
                 .from('tenants')
-                .select('name, email, phone, address, timezone, settings')
+                .select('name, email, phone, address, timezone, logo_url, settings')
                 .eq('id', tenantId)
                 .single()
               const baseUrl = process.env.NEXT_PUBLIC_SITE_URL
@@ -892,6 +894,8 @@ export async function POST(request: Request) {
                 start: new Date(apt.start_time),
                 end: new Date(apt.end_time),
                 timezone: resolveTenantTz(t),
+                logoUrl: t?.logo_url || null,
+                specialInstructions: resolveSpecialInstructions(t),
               })
             } catch (err) {
               console.error('[appointments.update] reschedule notice error:', err)
@@ -929,7 +933,7 @@ export async function POST(request: Request) {
               try {
                 const { data: t } = await svc
                   .from('tenants')
-                  .select('name, slug, email, phone, address, timezone, settings')
+                  .select('name, slug, email, phone, address, timezone, logo_url, settings')
                   .eq('id', tenantId)
                   .single()
                 const baseUrl = process.env.NEXT_PUBLIC_SITE_URL
@@ -950,6 +954,7 @@ export async function POST(request: Request) {
                   start: new Date(apt.start_time),
                   end: new Date(apt.end_time),
                   timezone: resolveTenantTz(t),
+                  logoUrl: t?.logo_url || null,
                 })
               } catch (err) {
                 console.error('[appointments.cancel] notice error:', err)

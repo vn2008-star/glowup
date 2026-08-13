@@ -37,7 +37,7 @@ export async function GET(request: Request) {
   // Fetch all tenants with automation settings
   const { data: tenants } = await supabase
     .from('tenants')
-    .select('id, name, email, slug, settings')
+    .select('id, name, email, slug, logo_url, settings')
 
   if (!tenants || tenants.length === 0) {
     return NextResponse.json({ message: 'No tenants found', processed: 0 })
@@ -219,6 +219,7 @@ export async function GET(request: Request) {
               businessName,
               businessEmail,
               resendClient,
+              logoUrl: tenant.logo_url,
               channel: fmoChannel,
               bulk: true,
               subject: `⚡ ${totalOpenSlots} opening${totalOpenSlots !== 1 ? 's' : ''} this week at ${businessName}`,
@@ -292,6 +293,7 @@ export async function GET(request: Request) {
 
           await sendMessage({
             client, message, businessName, businessEmail, resendClient, smsConfig, channel: bdayChannel,
+            logoUrl: tenant.logo_url,
             subject: `🎂 Happy Birthday from ${businessName} — ${bdayDiscount}% off for you!`,
             ctaUrl: bookingUrl,
             ctaText: 'Book Your Birthday Treat',
@@ -327,6 +329,7 @@ export async function GET(request: Request) {
 
           await sendMessage({
             client, message, businessName, businessEmail, resendClient, smsConfig, channel: 'both', bulk: true,
+            logoUrl: tenant.logo_url,
             subject: `💜 We miss you at ${businessName} — time for a refresh?`,
             ctaUrl: bookingUrl,
             ctaText: 'Book Now',
@@ -375,6 +378,7 @@ export async function GET(request: Request) {
 
           await sendMessage({
             client, message, businessName, businessEmail, resendClient, smsConfig, channel: 'both',
+            logoUrl: tenant.logo_url,
             subject: `We missed you today at ${businessName} 😊`,
             ctaUrl: bookingUrl,
             ctaText: 'Rebook Now',
@@ -428,6 +432,7 @@ export async function GET(request: Request) {
           const reviewChannel = String(automations.auto_review_channel || 'sms') as 'sms' | 'email' | 'both'
           await sendMessage({
             client, message, businessName, businessEmail, resendClient, smsConfig, channel: reviewChannel,
+            logoUrl: tenant.logo_url,
             subject: `🌟 How was your visit to ${businessName}?`,
             ctaUrl: googleReviewUrl || undefined,
             ctaText: 'Leave a Review',
@@ -493,6 +498,7 @@ export async function GET(request: Request) {
 
           await sendMessage({
             client, message: personalizedMsg, businessName, businessEmail, resendClient, smsConfig, channel: 'both', bulk: true,
+            logoUrl: tenant.logo_url,
             subject: `${holiday.emoji} ${holiday.name} Special at ${businessName}!`,
             ctaUrl: bookingUrl,
             ctaText: 'Book Now',
@@ -541,8 +547,9 @@ async function sendMessage(opts: {
   ctaText?: string
   /** This salon's own gateway phone, when it has one set up. */
   smsConfig?: TenantSmsConfig | null
+  logoUrl?: string | null
 }) {
-  const { client, message, businessName, businessEmail, resendClient, channel, bulk, subject, ctaUrl, ctaText, smsConfig } = opts
+  const { client, message, businessName, businessEmail, resendClient, channel, bulk, subject, ctaUrl, ctaText, smsConfig, logoUrl } = opts
 
   // SMS
   if ((channel === 'sms' || channel === 'both') && client.phone && !client.sms_opt_out) {
@@ -566,7 +573,7 @@ async function sendMessage(opts: {
           replyTo: businessEmail || undefined,
           to: [client.email as string],
           subject: subject || `${businessName} — We're thinking of you! ✨`,
-          html: promoEmailHtml({ businessName, message, ctaUrl, ctaText }),
+          html: promoEmailHtml({ businessName, message, ctaUrl, ctaText, logoUrl }),
         })
       } catch (err) {
         console.error(`Email send failed for ${client.email}:`, err)

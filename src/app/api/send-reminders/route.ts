@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { toE164 } from '@/lib/utils'
 import { verifyCronRequest } from '@/lib/cron-auth'
-import { fillPlaceholders, resolveTenantTz } from '@/lib/notifications'
+import { fillPlaceholders, resolveTenantTz, resolveSpecialInstructions, appendInstructionsToSms } from '@/lib/notifications'
 import { sendSms, smsProvider, smsConfigFromSettings } from '@/lib/sms'
 import { appointmentReminderHtml, dailyDigestHtml, googleCalendarUrl } from '@/lib/email-templates'
 import { localToUTC, nowInTz, formatInTz } from '@/lib/tz'
@@ -81,7 +81,7 @@ export async function GET(request: Request) {
     const tenantIds = [...new Set(reminders.map(r => r.tenant_id))]
     const { data: tenants } = await supabase
       .from('tenants')
-      .select('id, name, email, phone, address, timezone, settings')
+      .select('id, name, email, phone, address, timezone, logo_url, settings')
       .in('id', tenantIds)
 
     const tenantMap = new Map(tenants?.map(t => [t.id, t]) || [])
@@ -124,6 +124,7 @@ export async function GET(request: Request) {
       // Use tenant timezone for display — from the tenants.timezone COLUMN
       // (what Settings saves), not the legacy settings blob.
       const tz = resolveTenantTz(tenant)
+      const specialInstructions = resolveSpecialInstructions(tenant)
       let dateStr: string, timeStr: string
       try {
         dateStr = startTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: tz })
@@ -207,7 +208,7 @@ export async function GET(request: Request) {
               totalSkipped++
               continue
             }
-            const ok = await sendSms(phoneE164, smsTemplate, tenantSms)
+            const ok = await sendSms(phoneE164, appendInstructionsToSms(smsTemplate, specialInstructions), tenantSms)
             if (!ok) {
               throw new Error(`SMS send failed via ${smsProvider(tenantSms)}`)
             }
@@ -243,6 +244,8 @@ export async function GET(request: Request) {
               manageLink,
               startISO,
               endISO,
+              logoUrl: tenant?.logo_url || null,
+              specialInstructions: specialInstructions.text,
             })
             await resend.emails.send({
               from: `${businessName} <bookings@joinglowup.org>`,
@@ -278,7 +281,7 @@ export async function GET(request: Request) {
   if (hasResend || hasSms) {
     const { data: allTenants } = await supabase
       .from('tenants')
-      .select('id, name, email, phone, address, timezone, settings')
+      .select('id, name, email, phone, address, timezone, logo_url, settings')
 
     for (const tenant of allTenants || []) {
       try {
@@ -351,6 +354,7 @@ export async function GET(request: Request) {
                 dateLabel,
                 appointments: apts.map(toEntry),
                 showStaffColumn: true,
+                logoUrl: tenant?.logo_url || null,
               }),
             })
             digestsSent++
@@ -387,6 +391,7 @@ export async function GET(request: Request) {
                   businessName,
                   dateLabel,
                   appointments: mine.map(toEntry),
+                  logoUrl: tenant?.logo_url || null,
                 }),
               })
               digestsSent++

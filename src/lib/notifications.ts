@@ -31,6 +31,35 @@ export function resolveTenantTz(tenant: {
     || DEFAULT_TZ
 }
 
+/**
+ * Resolve a salon's arrival instructions — how to find the suite, where to
+ * park, what to do on arrival. Lives in the `tenants.settings` JSON blob
+ * (`special_instructions`), so no schema change is needed; callers must select
+ * the `settings` column.
+ *
+ * Emails always show them. SMS only when the salon ticks the box, because the
+ * text is long and the reminder SMS already carries emoji — which forces UCS-2
+ * at 67 chars per segment, so a typical note adds ~3 billable segments to every
+ * message.
+ */
+export function resolveSpecialInstructions(tenant: {
+  settings?: Record<string, unknown> | null
+} | null | undefined): { text: string; includeInSms: boolean } {
+  const settings = (tenant?.settings || {}) as Record<string, unknown>
+  const raw = settings.special_instructions
+  const text = typeof raw === 'string' ? raw.trim() : ''
+  return { text, includeInSms: !!text && settings.special_instructions_sms === true }
+}
+
+/** Append arrival instructions to an SMS body, if this salon opted in. */
+export function appendInstructionsToSms(
+  body: string,
+  instructions: { text: string; includeInSms: boolean },
+): string {
+  if (!instructions.includeInSms) return body
+  return `${body}\n\n📌 ${instructions.text}`
+}
+
 /** Format an appointment start for messages, in the salon's timezone. */
 export function formatAptWhen(start: Date, tz: string): { dateStr: string; timeStr: string } {
   try {
@@ -136,11 +165,15 @@ export async function sendClientBookingConfirmation(opts: {
   timezone: string
   /** This salon's own gateway phone; omit to use the platform provider. */
   smsConfig?: TenantSmsConfig | null
+  logoUrl?: string | null
+  /** From resolveSpecialInstructions(tenant) — arrival notes for the client. */
+  specialInstructions?: { text: string; includeInSms: boolean }
 }): Promise<void> {
   const {
     businessName, businessAddress, businessPhone, businessEmail,
     serviceName, staffName, clientName, clientEmail, clientPhone,
-    manageLink, start, end, timezone, smsConfig,
+    manageLink, start, end, timezone, smsConfig, logoUrl,
+    specialInstructions = { text: '', includeInSms: false },
   } = opts
 
   const greeting = greetingName(clientName)
@@ -176,7 +209,7 @@ export async function sendClientBookingConfirmation(opts: {
         manageLink ? `Manage your appointment: ${manageLink}` : `Need to change? Contact us at ${businessPhone || 'the salon'}.`,
       ].filter(Boolean).join('\n')
       try {
-        const ok = await sendSms(clientE164, clientSms, smsConfig)
+        const ok = await sendSms(clientE164, appendInstructionsToSms(clientSms, specialInstructions), smsConfig)
         if (ok) console.log(`[notifications] ✅ Confirmation SMS sent to client ${clientE164}`)
       } catch (err) {
         console.error(`[notifications] SMS to client failed:`, err)
@@ -195,6 +228,7 @@ export async function sendClientBookingConfirmation(opts: {
         greeting, serviceName, dateStr, timeStr, staffName,
         businessName, businessAddress, businessPhone, manageLink,
         startISO: start.toISOString(), endISO: end.toISOString(),
+        logoUrl, specialInstructions: specialInstructions.text,
       })
       await resend.emails.send({
         from: `${businessName} <bookings@joinglowup.org>`,
@@ -315,11 +349,15 @@ export async function sendClientChangeNotice(opts: {
   timezone: string
   /** This salon's own gateway phone; omit to use the platform provider. */
   smsConfig?: TenantSmsConfig | null
+  logoUrl?: string | null
+  /** From resolveSpecialInstructions(tenant) — arrival notes for the client. */
+  specialInstructions?: { text: string; includeInSms: boolean }
 }): Promise<void> {
   const {
     type, businessName, businessAddress, businessPhone, businessEmail,
     serviceName, staffName, clientName, clientEmail, clientPhone,
-    actionLink, start, end, timezone, smsConfig,
+    actionLink, start, end, timezone, smsConfig, logoUrl,
+    specialInstructions = { text: '', includeInSms: false },
   } = opts
 
   const greeting = greetingName(clientName)
@@ -346,8 +384,10 @@ export async function sendClientChangeNotice(opts: {
             staffName ? `💇 With: ${staffName}` : '',
             actionLink ? `Manage: ${actionLink}` : '',
           ].filter(Boolean).join('\n')
+      // Cancellations don't get arrival notes — there's nothing to arrive at.
+      const smsBody = isCancel ? sms : appendInstructionsToSms(sms, specialInstructions)
       try {
-        await sendSms(clientE164, sms, smsConfig)
+        await sendSms(clientE164, smsBody, smsConfig)
       } catch (err) {
         console.error(`[notifications] ${type} SMS to client failed:`, err)
       }
@@ -363,11 +403,13 @@ export async function sendClientChangeNotice(opts: {
         ? cancellationConfirmationHtml({
             greeting, serviceName, dateStr, timeStr, staffName,
             businessName, businessAddress, businessPhone, bookingLink: actionLink,
+            logoUrl,
           })
         : rescheduleConfirmationHtml({
             greeting, serviceName, dateStr, timeStr, staffName,
             businessName, businessAddress, businessPhone, manageLink: actionLink,
             startISO: start.toISOString(), endISO: end.toISOString(),
+            logoUrl, specialInstructions: specialInstructions.text,
           })
       await resend.emails.send({
         from: `${businessName} <bookings@joinglowup.org>`,

@@ -147,6 +147,11 @@ export default function SettingsPage() {
   // Venmo or Zelle payment request texted to the client needs.
   const [paymentQr, setPaymentQr] = useState({ venmo_qr: "", zelle_qr: "", venmo_handle: "", zelle_recipient: "" });
 
+  // Arrival instructions shown to clients in confirmations/reminders —
+  // how to find the suite, where to park, what to do on arrival.
+  const [specialInstructions, setSpecialInstructions] = useState("");
+  const [specialInstructionsSms, setSpecialInstructionsSms] = useState(false);
+
   // Business Closed Days state
   const [closedHolidays, setClosedHolidays] = useState<string[]>([]);
   const [customClosedDates, setCustomClosedDates] = useState<CustomClosedDate[]>([]);
@@ -187,6 +192,8 @@ export default function SettingsPage() {
       if (s.payment_qr) setPaymentQr({ venmo_qr: "", zelle_qr: "", venmo_handle: "", zelle_recipient: "", ...(s.payment_qr as Record<string, string>) });
       if (s.closed_holidays) setClosedHolidays(s.closed_holidays as string[]);
       if (s.custom_closed_dates) setCustomClosedDates(s.custom_closed_dates as CustomClosedDate[]);
+      if (typeof s.special_instructions === "string") setSpecialInstructions(s.special_instructions);
+      setSpecialInstructionsSms(s.special_instructions_sms === true);
     }
 
     setLoading(false);
@@ -256,6 +263,8 @@ export default function SettingsPage() {
       payment_qr: paymentQr,
       closed_holidays: closedHolidays,
       custom_closed_dates: customClosedDates,
+      special_instructions: specialInstructions.trim(),
+      special_instructions_sms: specialInstructionsSms,
     };
 
     const res = await fetch("/api/save-settings", {
@@ -627,6 +636,39 @@ export default function SettingsPage() {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Special Instructions */}
+      <div id="special-instructions" className={`card ${styles.section}`}>
+        <h2>📌 Special Instructions</h2>
+        <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginBottom: "var(--space-4)" }}>
+          Arrival details for your clients — how to find your suite, where to park, what to do
+          when they get there. This appears in every booking confirmation, reminder, and
+          reschedule notice.
+        </p>
+        <textarea
+          className="input"
+          rows={5}
+          value={specialInstructions}
+          onChange={(e) => setSpecialInstructions(e.target.value)}
+          placeholder={"Palladio Shopping Center inside Phenix Salon Suites, next to H&M\n\nI look forward to your on-time appointment.\n\n* Please wait in your car and text me at (916) 555-0100. I'll text you when I'm ready."}
+          style={{ width: "100%", resize: "vertical", fontFamily: "inherit", lineHeight: 1.6 }}
+        />
+        <label style={{ display: "flex", alignItems: "flex-start", gap: "var(--space-2)", marginTop: "var(--space-3)", cursor: "pointer" }}>
+          <input
+            type="checkbox"
+            checked={specialInstructionsSms}
+            onChange={() => setSpecialInstructionsSms(v => !v)}
+            style={{ accentColor: "var(--color-primary)", marginTop: 3 }}
+          />
+          <span style={{ fontSize: "var(--text-sm)" }}>
+            Also include in text messages
+            <span style={{ display: "block", fontSize: "var(--text-xs)", color: "var(--text-tertiary)" }}>
+              Emails always show these instructions. Texts are billed per 67-character segment, so
+              a long note can add ~3 segments to every confirmation and reminder you send.
+            </span>
+          </span>
+        </label>
       </div>
 
       {/* Business Closed Days */}

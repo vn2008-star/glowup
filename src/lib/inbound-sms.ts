@@ -211,7 +211,7 @@ export async function handleInboundSms(
       if (client) {
         const { data: tenant } = await supabase
           .from('tenants')
-          .select('id, name, slug, phone, email, address, timezone, settings')
+          .select('id, name, slug, phone, email, address, timezone, logo_url, settings')
           .eq('id', client.tenant_id)
           .single()
 

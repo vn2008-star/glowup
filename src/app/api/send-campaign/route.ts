@@ -115,7 +115,7 @@ export async function POST(request: Request) {
   // Fetch tenant name for templates
   const { data: tenant } = await svc
     .from('tenants')
-    .select('name, email, slug')
+    .select('name, email, slug, logo_url')
     .eq('id', tenantId)
     .single()
 
@@ -165,6 +165,7 @@ export async function POST(request: Request) {
               message: personalizedMsg,
               ctaUrl: bookingUrl || undefined,
               ctaText: 'Book Now',
+              logoUrl: tenant?.logo_url || null,
             }),
           })
           if (channel === 'email') sentCount++

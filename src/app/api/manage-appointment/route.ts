@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { toE164 } from '@/lib/utils'
 import { formatDateInTz, formatInTz } from '@/lib/tz'
 import { isBusinessClosedOnDate, isStaffOffOnDate, type CustomClosedDate } from '@/lib/schedule-utils'
-import { resolveTenantTz } from '@/lib/notifications'
+import { resolveTenantTz, resolveSpecialInstructions, appendInstructionsToSms } from '@/lib/notifications'
 import { sendSms, smsProvider, smsConfigFromSettings } from '@/lib/sms'
 import { cancelAppointment } from '@/lib/cancel-appointment'
 import { rescheduleConfirmationHtml, cancellationConfirmationHtml, staffCancellationNotificationHtml, staffRescheduleNotificationHtml, ownerNotificationHtml, googleCalendarUrl } from '@/lib/email-templates'
@@ -146,7 +146,7 @@ export async function PATCH(request: Request) {
   // Get tenant info for notifications
   const { data: tenant } = await svc
     .from('tenants')
-    .select('id, name, email, phone, address, timezone, settings')
+    .select('id, name, email, phone, address, timezone, logo_url, settings')
     .eq('id', apt.tenant_id)
     .single()
 
@@ -273,6 +273,7 @@ export async function PATCH(request: Request) {
           businessAddress,
           businessPhone,
           bookingLink,
+          logoUrl: tenant?.logo_url || null,
         })
         await resend.emails.send({
           from: `${businessName} <bookings@joinglowup.org>`,
@@ -309,6 +310,7 @@ export async function PATCH(request: Request) {
           dateStr,
           timeStr,
           businessName,
+          logoUrl: tenant?.logo_url || null,
         })
         await resend.emails.send({
           from: `${businessName} <bookings@joinglowup.org>`,
@@ -522,6 +524,7 @@ export async function PATCH(request: Request) {
           newDateStr,
           newTimeStr,
           businessName,
+          logoUrl: tenant?.logo_url || null,
         })
         await resend.emails.send({
           from: `${businessName} <bookings@joinglowup.org>`,
@@ -549,7 +552,7 @@ export async function PATCH(request: Request) {
 // ── Notify business owner of changes ──
 async function notifyOwner(opts: {
   type: 'cancel' | 'reschedule'
-  tenant: { name: string; email: string | null; phone: string | null; settings: Record<string, unknown> | null } | null
+  tenant: { name: string; email: string | null; phone: string | null; logo_url?: string | null; settings: Record<string, unknown> | null } | null
   clientName: string
   serviceName: string
   staffName: string
@@ -624,6 +627,7 @@ async function notifyOwner(opts: {
         oldDateStr: oldDateStr || undefined,
         oldTimeStr: oldTimeStr || undefined,
         businessName: tenant.name,
+        logoUrl: tenant.logo_url || null,
       })
 
       await resend.emails.send({
@@ -641,7 +645,7 @@ async function notifyOwner(opts: {
 // ── Notify client of reschedule confirmation ──
 async function notifyClient(opts: {
   // settings carries sms_gateway — needed to text from the salon's own phone
-  tenant: { name: string; email: string | null; phone: string | null; settings?: Record<string, unknown> | null } | null
+  tenant: { name: string; email: string | null; phone: string | null; logo_url?: string | null; settings?: Record<string, unknown> | null } | null
   client: { first_name: string; last_name: string; email: string | null; phone: string | null } | null
   clientName: string
   serviceName: string
@@ -696,7 +700,7 @@ async function notifyClient(opts: {
     const clientE164 = toE164(client.phone)
     if (clientE164) {
       try {
-        await sendSms(clientE164, smsBody, smsConfigFromSettings(tenant?.settings))
+        await sendSms(clientE164, appendInstructionsToSms(smsBody, resolveSpecialInstructions(tenant)), smsConfigFromSettings(tenant?.settings))
       } catch (err) {
         console.error(`[manage-appointment] SMS to client failed:`, err)
       }
@@ -726,6 +730,8 @@ async function notifyClient(opts: {
         manageLink,
         startISO,
         endISO,
+        logoUrl: tenant?.logo_url || null,
+        specialInstructions: resolveSpecialInstructions(tenant).text,
       })
       await resend.emails.send({
         from: `${businessName} <bookings@joinglowup.org>`,

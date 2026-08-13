@@ -20,7 +20,7 @@ export async function POST(request: Request) {
 
     const { data: tenant } = await svc
       .from('tenants')
-      .select('id, name, slug, phone, email, address, timezone, settings')
+      .select('id, name, slug, phone, email, address, timezone, logo_url, settings')
       .eq('slug', slug)
       .single()
 

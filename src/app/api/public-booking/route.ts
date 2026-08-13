@@ -3,7 +3,7 @@ import { waitUntil } from '@vercel/functions'
 import { createClient } from '@supabase/supabase-js'
 import { timezoneFromAddress, DEFAULT_TZ } from '@/lib/tz'
 import { toE164 } from '@/lib/utils'
-import { resolveTenantTz } from '@/lib/notifications'
+import { resolveTenantTz, resolveSpecialInstructions, appendInstructionsToSms } from '@/lib/notifications'
 import { sendSms, smsProvider, smsConfigFromSettings } from '@/lib/sms'
 import { bookingConfirmationHtml, promoEmailHtml, googleCalendarUrl } from '@/lib/email-templates'
 
@@ -152,7 +152,7 @@ export async function POST(request: Request) {
   // Resolve tenant (include name, phone, address, timezone, settings for notifications)
   const { data: tenant } = await svc
     .from('tenants')
-    .select('id, name, email, phone, address, timezone, settings')
+    .select('id, name, email, phone, address, timezone, logo_url, settings')
     .eq('slug', slug)
     .single()
 
@@ -466,7 +466,7 @@ export async function PATCH(request: Request) {
 // Sends SMS + Email to the client AND the business owner right after booking.
 // Also creates 24h reminder rows for the existing cron to pick up.
 async function sendBookingConfirmations(opts: {
-  tenant: { id: string; name: string; email: string | null; phone: string | null; address: string | null; timezone?: string | null; settings: Record<string, unknown> | null }
+  tenant: { id: string; name: string; email: string | null; phone: string | null; address: string | null; timezone?: string | null; logo_url?: string | null; settings: Record<string, unknown> | null }
   appointment: { id: string; start_time: string; end_time: string; manage_token?: string }
   serviceName: string
   staffName: string
@@ -530,6 +530,7 @@ async function sendBookingConfirmations(opts: {
   // the source of truth (Settings saves it there); the settings blob is legacy.
   const tenantSettings = (tenant.settings || {}) as Record<string, unknown>
   const tz = resolveTenantTz(tenant)
+  const specialInstructions = resolveSpecialInstructions(tenant)
 
   // Format date/time in tenant timezone
   let dateStr: string
@@ -581,7 +582,7 @@ async function sendBookingConfirmations(opts: {
     const clientE164 = toE164(clientPhone)
     if (smsReady && clientE164) {
       try {
-        const ok = await sendSms(clientE164, clientSms, tenantSms)
+        const ok = await sendSms(clientE164, appendInstructionsToSms(clientSms, specialInstructions), tenantSms)
         if (ok) console.log(`[public-booking] ✅ Confirmation SMS sent to client ${clientE164}`)
       } catch (err: unknown) {
         const e = err as { message?: string }
@@ -608,6 +609,8 @@ async function sendBookingConfirmations(opts: {
       manageLink,
       startISO: start.toISOString(),
       endISO: opts.end.toISOString(),
+      logoUrl: tenant.logo_url || null,
+      specialInstructions: specialInstructions.text,
     })
 
     if (resendClient) {
@@ -683,7 +686,7 @@ async function sendBookingConfirmations(opts: {
           replyTo: clientEmail || undefined,
           to: [ownerEmail],
           subject: `🆕 New Booking: ${clientName} — ${serviceName} on ${dateStr}`,
-          html: promoEmailHtml({ businessName, message: ownerEmailBody, ctaUrl: dashboardUrl, ctaText: 'View Calendar' }),
+          html: promoEmailHtml({ businessName, message: ownerEmailBody, ctaUrl: dashboardUrl, ctaText: 'View Calendar', logoUrl: tenant.logo_url || null }),
         })
         console.log(`[public-booking] ✅ Owner email sent to ${ownerEmail}`)
       } catch (err) {

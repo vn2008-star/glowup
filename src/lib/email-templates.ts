@@ -1,8 +1,31 @@
 // ─── Shared HTML Email Templates ───
 // Table-based layout + inline styles for maximum email client compatibility.
 
-/** Base wrapper: dark gradient background, centered card */
-function emailShell(businessName: string, bodyContent: string): string {
+/**
+ * Make an asset URL absolute. Some tenants store `logo_url` as a site-relative
+ * path (e.g. `/logos/luxe-nails-spa.png`), which renders fine in the browser
+ * but is a broken image in an inbox — email has no base URL to resolve against.
+ */
+function absoluteAssetUrl(url: string): string {
+  if (/^[a-z][a-z0-9+.-]*:/i.test(url)) return url  // already has a scheme (https:, data:)
+  const base = process.env.NEXT_PUBLIC_SITE_URL
+    || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null)
+    || 'https://glowup-jade.vercel.app'
+  return `${base}${url.startsWith('/') ? '' : '/'}${url}`
+}
+
+/**
+ * Base wrapper: dark gradient background, centered card.
+ * `logoUrl` (tenants.logo_url) renders above the name in the header banner —
+ * the name stays put so the header still reads when a client's mail app blocks
+ * images, which Gmail does by default.
+ */
+function emailShell(businessName: string, bodyContent: string, logoUrl?: string | null): string {
+  const logoSrc = logoUrl ? absoluteAssetUrl(logoUrl) : ''
+  const logoBlock = logoSrc
+    ? `<img src="${escapeHtml(logoSrc)}" alt="${escapeHtml(businessName)}" height="56" style="display:block;margin:0 auto 12px;max-height:56px;max-width:180px;border:0;outline:none;text-decoration:none;border-radius:10px;">`
+    : ''
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -17,7 +40,8 @@ function emailShell(businessName: string, bodyContent: string): string {
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background-color:#242444;border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.3);">
           <!-- Header bar -->
           <tr>
-            <td style="background:linear-gradient(135deg,#6c5ce7,#a855f7);padding:24px 32px;text-align:center;">
+            <td style="background-color:#6c5ce7;background:linear-gradient(135deg,#6c5ce7,#a855f7);padding:24px 32px;text-align:center;">
+              ${logoBlock}
               <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:700;letter-spacing:0.5px;">${businessName}</h1>
             </td>
           </tr>
@@ -69,8 +93,9 @@ export function promoEmailHtml(opts: {
   message: string
   ctaUrl?: string
   ctaText?: string
+  logoUrl?: string | null
 }): string {
-  const { businessName, message, ctaUrl, ctaText = 'Book Now' } = opts
+  const { businessName, message, ctaUrl, ctaText = 'Book Now', logoUrl } = opts
 
   // Remove the CTA URL from the text — the button below carries the link.
   let text = message
@@ -95,7 +120,29 @@ export function promoEmailHtml(opts: {
     <p style="margin:28px 0 0;color:#a0a0c0;font-size:14px;">— ${businessName}</p>
   `
 
-  return emailShell(businessName, body)
+  return emailShell(businessName, body, logoUrl)
+}
+
+/**
+ * Owner-authored arrival notes (settings.special_instructions) — how to find the
+ * suite, where to park, what to do on arrival. Rendered under the appointment
+ * card in every upcoming-visit email.
+ */
+function specialInstructionsHtml(text: string | null | undefined): string {
+  const trimmed = (text || '').trim()
+  if (!trimmed) return ''
+
+  const bodyText = escapeHtml(trimmed)
+    .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" style="color:#a855f7;text-decoration:none;">$1</a>')
+    .replace(/\n/g, '<br>')
+
+  return `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#2a2450;border-left:3px solid #a855f7;border-radius:8px;margin:16px 0 8px;">
+      <tr><td style="padding:16px 18px;">
+        <p style="margin:0 0 8px;color:#c9a9ff;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;">📌 Special Instructions</p>
+        <p style="margin:0;color:#e8e8f0;font-size:14px;line-height:1.6;">${bodyText}</p>
+      </td></tr>
+    </table>`
 }
 
 /** Detail row for appointment info */
@@ -116,8 +163,9 @@ export function dailyDigestHtml(opts: {
   dateLabel: string
   appointments: { timeStr: string; clientName: string; serviceName: string; staffName?: string }[]
   showStaffColumn?: boolean
+  logoUrl?: string | null
 }): string {
-  const { recipientName, businessName, dateLabel, appointments, showStaffColumn } = opts
+  const { recipientName, businessName, dateLabel, appointments, showStaffColumn, logoUrl } = opts
 
   const rows = appointments.map(a => `<tr>
     <td style="padding:10px 12px;color:#e8e8f0;font-size:14px;font-weight:600;white-space:nowrap;border-bottom:1px solid #2e2e52;">${a.timeStr}</td>
@@ -146,7 +194,7 @@ export function dailyDigestHtml(opts: {
     <p style="margin:4px 0 0;color:#a0a0c0;font-size:14px;">— ${businessName}</p>
   `
 
-  return emailShell(businessName, body)
+  return emailShell(businessName, body, logoUrl)
 }
 
 // ─── Calendar Helpers ───
@@ -243,8 +291,10 @@ export function bookingConfirmationHtml(opts: {
   manageLink: string
   startISO?: string
   endISO?: string
+  logoUrl?: string | null
+  specialInstructions?: string | null
 }): string {
-  const { greeting, serviceName, dateStr, timeStr, staffName, businessName, businessAddress, businessPhone, manageLink, startISO, endISO } = opts
+  const { greeting, serviceName, dateStr, timeStr, staffName, businessName, businessAddress, businessPhone, manageLink, startISO, endISO, logoUrl, specialInstructions } = opts
 
   const detailRows = [
     detailRow('📋', 'Service', serviceName),
@@ -281,6 +331,7 @@ export function bookingConfirmationHtml(opts: {
       </td></tr>
     </table>
 
+    ${specialInstructionsHtml(specialInstructions)}
     ${calendarSection}
     ${manageSection}
     ${contactLine}
@@ -289,7 +340,7 @@ export function bookingConfirmationHtml(opts: {
     <p style="margin:4px 0 0;color:#a0a0c0;font-size:14px;">— ${businessName}</p>
   `
 
-  return emailShell(businessName, body)
+  return emailShell(businessName, body, logoUrl)
 }
 
 // ─── Appointment Reminder Email ───
@@ -304,8 +355,10 @@ export function appointmentReminderHtml(opts: {
   manageLink: string
   startISO?: string
   endISO?: string
+  logoUrl?: string | null
+  specialInstructions?: string | null
 }): string {
-  const { greeting, serviceName, dateStr, timeStr, staffName, businessName, businessAddress, manageLink, startISO, endISO } = opts
+  const { greeting, serviceName, dateStr, timeStr, staffName, businessName, businessAddress, manageLink, startISO, endISO, logoUrl, specialInstructions } = opts
 
   const detailRows = [
     detailRow('📋', 'Service', serviceName),
@@ -337,6 +390,7 @@ export function appointmentReminderHtml(opts: {
       </td></tr>
     </table>
 
+    ${specialInstructionsHtml(specialInstructions)}
     ${calendarSection}
     ${manageSection}
 
@@ -344,7 +398,7 @@ export function appointmentReminderHtml(opts: {
     <p style="margin:4px 0 0;color:#a0a0c0;font-size:14px;">— ${businessName}</p>
   `
 
-  return emailShell(businessName, body)
+  return emailShell(businessName, body, logoUrl)
 }
 
 // ─── Reschedule Confirmation Email ───
@@ -360,8 +414,10 @@ export function rescheduleConfirmationHtml(opts: {
   manageLink: string
   startISO?: string
   endISO?: string
+  logoUrl?: string | null
+  specialInstructions?: string | null
 }): string {
-  const { greeting, serviceName, dateStr, timeStr, staffName, businessName, businessAddress, businessPhone, manageLink, startISO, endISO } = opts
+  const { greeting, serviceName, dateStr, timeStr, staffName, businessName, businessAddress, businessPhone, manageLink, startISO, endISO, logoUrl, specialInstructions } = opts
 
   const detailRows = [
     detailRow('📋', 'Service', serviceName),
@@ -398,6 +454,7 @@ export function rescheduleConfirmationHtml(opts: {
       </td></tr>
     </table>
 
+    ${specialInstructionsHtml(specialInstructions)}
     ${calendarSection}
     ${manageSection}
     ${contactLine}
@@ -406,7 +463,7 @@ export function rescheduleConfirmationHtml(opts: {
     <p style="margin:4px 0 0;color:#a0a0c0;font-size:14px;">— ${businessName}</p>
   `
 
-  return emailShell(businessName, body)
+  return emailShell(businessName, body, logoUrl)
 }
 
 // ─── Cancellation Confirmation Email (to Client) ───
@@ -420,8 +477,9 @@ export function cancellationConfirmationHtml(opts: {
   businessAddress: string
   businessPhone: string
   bookingLink: string
+  logoUrl?: string | null
 }): string {
-  const { greeting, serviceName, dateStr, timeStr, staffName, businessName, businessAddress, businessPhone, bookingLink } = opts
+  const { greeting, serviceName, dateStr, timeStr, staffName, businessName, businessAddress, businessPhone, bookingLink, logoUrl } = opts
 
   const detailRows = [
     detailRow('📋', 'Service', serviceName),
@@ -461,7 +519,7 @@ export function cancellationConfirmationHtml(opts: {
     <p style="margin:4px 0 0;color:#a0a0c0;font-size:14px;">— ${businessName}</p>
   `
 
-  return emailShell(businessName, body)
+  return emailShell(businessName, body, logoUrl)
 }
 
 // ─── Staff Cancellation Notification Email ───
@@ -472,8 +530,9 @@ export function staffCancellationNotificationHtml(opts: {
   dateStr: string
   timeStr: string
   businessName: string
+  logoUrl?: string | null
 }): string {
-  const { staffName, clientName, serviceName, dateStr, timeStr, businessName } = opts
+  const { staffName, clientName, serviceName, dateStr, timeStr, businessName, logoUrl } = opts
 
   const detailRows = [
     detailRow('👤', 'Client', clientName),
@@ -499,7 +558,7 @@ export function staffCancellationNotificationHtml(opts: {
     <p style="margin:4px 0 0;color:#a0a0c0;font-size:14px;">— ${businessName}</p>
   `
 
-  return emailShell(businessName, body)
+  return emailShell(businessName, body, logoUrl)
 }
 
 // ─── Staff Reschedule Notification Email ───
@@ -512,8 +571,9 @@ export function staffRescheduleNotificationHtml(opts: {
   newDateStr: string
   newTimeStr: string
   businessName: string
+  logoUrl?: string | null
 }): string {
-  const { staffName, clientName, serviceName, oldDateStr, oldTimeStr, newDateStr, newTimeStr, businessName } = opts
+  const { staffName, clientName, serviceName, oldDateStr, oldTimeStr, newDateStr, newTimeStr, businessName, logoUrl } = opts
 
   const detailRows = [
     detailRow('👤', 'Client', clientName),
@@ -538,7 +598,7 @@ export function staffRescheduleNotificationHtml(opts: {
     <p style="margin:4px 0 0;color:#a0a0c0;font-size:14px;">— ${businessName}</p>
   `
 
-  return emailShell(businessName, body)
+  return emailShell(businessName, body, logoUrl)
 }
 
 // ─── Owner Notification Email (Cancel or Reschedule) ───
@@ -552,8 +612,9 @@ export function ownerNotificationHtml(opts: {
   oldDateStr?: string
   oldTimeStr?: string
   businessName: string
+  logoUrl?: string | null
 }): string {
-  const { type, clientName, serviceName, staffName, dateStr, timeStr, oldDateStr, oldTimeStr, businessName } = opts
+  const { type, clientName, serviceName, staffName, dateStr, timeStr, oldDateStr, oldTimeStr, businessName, logoUrl } = opts
 
   const isCancel = type === 'cancel'
   const emoji = isCancel ? '❌' : '🔄'
@@ -589,5 +650,5 @@ export function ownerNotificationHtml(opts: {
     <p style="margin:24px 0 0;color:#a0a0c0;font-size:14px;">— ${businessName}</p>
   `
 
-  return emailShell(businessName, body)
+  return emailShell(businessName, body, logoUrl)
 }
