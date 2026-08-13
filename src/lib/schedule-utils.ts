@@ -130,6 +130,19 @@ export function findHolidayOnDate(
   return undefined
 }
 
+/**
+ * Default birthday-promo copy. Owners can override it in Settings; this is what
+ * they see until they do. Defined once — the automation cron, the manual
+ * "send birthday promo" action, and the Loyalty settings screen all read it.
+ */
+export const DEFAULT_BIRTHDAY_TEMPLATE = [
+  `Happy Birthday, {name}! 🎂`,
+  ``,
+  `{business_name} wants to celebrate YOU — enjoy {discount}% off any service this month.`,
+  ``,
+  `Book now → {booking_url}`,
+].join('\n')
+
 /* ─── Promo Holiday Calendar ─── */
 /**
  * Marketing holidays — a different set from CLOSED_DAY_HOLIDAYS (these are days
@@ -147,40 +160,40 @@ export const PROMO_HOLIDAYS: PromoHoliday[] = [
       2026: '02-17', 2027: '02-06', 2028: '01-26', 2029: '02-13', 2030: '02-03',
       2031: '01-23', 2032: '02-11', 2033: '01-31', 2034: '02-19', 2035: '02-08',
     },
-    template: "🧧 Lunar New Year Special! Ring in the new year looking radiant. 20% off all services + lucky red gift cards available 🎊 Book now → {booking_url}",
+    template: "🧧 Lunar New Year Special!\n\nRing in the new year looking radiant — 20% off all services, plus lucky red gift cards 🎊\n\nBook now → {booking_url}",
     promoIdea: "Lucky red gift cards, new year glow-up packages, family bundles, festive nail art" },
   { name: "Valentine's Day", emoji: "💖", month: 1, day: 14,
-    template: "💖 Valentine's Day Special! Look & feel amazing for your date. 15% off any service this week. Book now → {booking_url}",
+    template: "💖 Valentine's Day Special!\n\nLook & feel amazing for your date — 15% off any service this week.\n\nBook now → {booking_url}",
     promoIdea: "Couples packages, date-night glam, gift cards, pampering bundles" },
   { name: "International Women's Day", emoji: "💜", month: 2, day: 8,
-    template: "💜 Happy Women's Day, {name}! Celebrate YOU with a self-care session. 20% off this week only → {booking_url}",
+    template: "💜 Happy Women's Day, {name}!\n\nCelebrate YOU with a self-care session — 20% off this week only.\n\nBook now → {booking_url}",
     promoIdea: "Self-care packages, group bookings, squad deals, wellness bundles" },
   { name: "Mother's Day", emoji: "🌹", month: 4, weekday: 0, nth: 2,
-    template: "🌹 Mother's Day Special! Give Mom the gift of pampering. Gift cards + 15% off spa & beauty packages → {booking_url}",
+    template: "🌹 Mother's Day Special!\n\nGive Mom the gift of pampering — gift cards plus 15% off spa & beauty packages.\n\nBook now → {booking_url}",
     promoIdea: "Gift cards, mother-daughter packages, spa bundles, relaxation treats" },
   { name: "Memorial Day", emoji: "🇺🇸", month: 4, weekday: 1, nth: -1,
-    template: "🇺🇸 Memorial Day Sale! Get summer-ready. 20% off all services this weekend → {booking_url}",
+    template: "🇺🇸 Memorial Day Sale!\n\nGet summer-ready — 20% off all services this weekend.\n\nBook now → {booking_url}",
     promoIdea: "Summer-ready specials, weekend flash sales, seasonal treatments" },
   { name: "4th of July", emoji: "🎆", month: 6, day: 4,
-    template: "🎆 4th of July Glow-Up! Get party-ready with our holiday special. Book now → {booking_url}",
+    template: "🎆 4th of July Glow-Up!\n\nGet party-ready with our holiday special.\n\nBook now → {booking_url}",
     promoIdea: "Festive styling, summer glow packages, group party prep" },
   { name: "Back to School", emoji: "🎒", month: 7, day: 15,
-    template: "🎒 Back to School Special! Start the year fresh with a new look. Student discount: 15% off → {booking_url}",
+    template: "🎒 Back to School Special!\n\nStart the year fresh with a new look — student discount: 15% off.\n\nBook now → {booking_url}",
     promoIdea: "Student discounts, fresh-start packages, new-look specials" },
   { name: "Halloween", emoji: "🎃", month: 9, day: 31,
-    template: "🎃 Halloween Glam! Get costume-ready with our spooky season specials. Book now → {booking_url}",
+    template: "🎃 Halloween Glam!\n\nGet costume-ready with our spooky season specials.\n\nBook now → {booking_url}",
     promoIdea: "Themed styling, costume-ready looks, group rates, special effects" },
   { name: "Thanksgiving", emoji: "🦃", month: 10, weekday: 4, nth: 4,
-    template: "🦃 Look stunning for Thanksgiving! Book your holiday session. Family discounts available → {booking_url}",
+    template: "🦃 Look stunning for Thanksgiving!\n\nBook your holiday session — family discounts available.\n\nBook now → {booking_url}",
     promoIdea: "Family packages, pre-holiday styling, gift cards, group bookings" },
   { name: "Black Friday", emoji: "💰", month: 10, weekday: 4, nth: 4, offsetDays: 1,
-    template: "💰 Black Friday DEAL! Our biggest sale of the year. Up to 30% off services + bonus gift cards → {booking_url}",
+    template: "💰 Black Friday DEAL!\n\nOur biggest sale of the year — up to 30% off services, plus bonus gift cards.\n\nBook now → {booking_url}",
     promoIdea: "Flash sales, bundle deals, buy-one-get-one gift cards, VIP packages" },
   { name: "Christmas", emoji: "🎄", month: 11, day: 25,
-    template: "🎄 Holiday Glow! Get party-ready for the season. Gift cards make the perfect present 🎁 Book now → {booking_url}",
+    template: "🎄 Holiday Glow!\n\nGet party-ready for the season — gift cards make the perfect present 🎁\n\nBook now → {booking_url}",
     promoIdea: "Gift cards, holiday party prep, pampering packages, wellness gifts" },
   { name: "New Year's Eve", emoji: "🎉", month: 11, day: 31,
-    template: "🎉 New Year's Glow-Up! Ring in the new year looking & feeling amazing. Limited spots available → {booking_url}",
+    template: "🎉 New Year's Glow-Up!\n\nRing in the new year looking & feeling amazing — limited spots available.\n\nBook now → {booking_url}",
     promoIdea: "NYE glam packages, last-minute appointments, fresh-start specials" },
 ]
 

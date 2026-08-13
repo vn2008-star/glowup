@@ -8,6 +8,7 @@ import { scheduleClientReminders, sendClientBookingConfirmation, sendClientChang
 import { getTenantSmsConfig, sendSmsVerbose, smsProvider, type StoredSmsGateway } from '@/lib/sms'
 import { cancelAppointment } from '@/lib/cancel-appointment'
 import { promoEmailHtml } from '@/lib/email-templates'
+import { DEFAULT_BIRTHDAY_TEMPLATE } from '@/lib/schedule-utils'
 import { getDashboardOverview } from '@/lib/overview-query'
 import { getClientsList, getCalendarLoad } from '@/lib/dashboard-queries'
 import { toE164 } from '@/lib/utils'
@@ -577,8 +578,7 @@ export async function POST(request: Request) {
         const bookingUrl = t?.slug ? `${baseUrl}/book/${t.slug}` : ''
 
         const discount = String(automations.auto_birthday_discount || '20')
-        const template = String(automations.auto_birthday_message || '')
-          || `Happy Birthday, {name}! 🎂 {business_name} wants to celebrate YOU — enjoy {discount}% off any service this month! Book now → {booking_url}`
+        const template = String(automations.auto_birthday_message || '') || DEFAULT_BIRTHDAY_TEMPLATE
         const clientGreeting = greetingName(`${client.first_name || ''} ${client.last_name || ''}`.trim())
         const message = template
           .replace(/\{name\}/g, clientGreeting)

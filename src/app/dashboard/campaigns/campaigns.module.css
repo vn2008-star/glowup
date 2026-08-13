@@ -153,6 +153,9 @@
   border-radius: var(--radius-md);
   border-left: 3px solid var(--color-primary);
   font-style: italic;
+  /* Templates are multi-line; without this the preview collapses them into one
+     run-on line and misrepresents what the client actually receives. */
+  white-space: pre-wrap;
 }
 .holidayEditArea {
   font-size: var(--text-sm);

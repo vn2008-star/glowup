@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData } from "@/lib/api";
 import { localeDateStr } from "@/lib/utils";
+import { DEFAULT_BIRTHDAY_TEMPLATE } from "@/lib/schedule-utils";
 import styles from "./loyalty.module.css";
 
 interface LoyaltyTier {
@@ -33,8 +34,7 @@ const LOYALTY_AUTOMATIONS = [
   { key: "auto_loyalty", name: "🏆 Loyalty Milestone", trigger: "When reaching point threshold", channel: "SMS + Email" },
 ];
 
-const DEFAULT_BDAY_MESSAGE =
-  "Happy Birthday, {name}! 🎂 {business_name} wants to celebrate YOU — enjoy {discount}% off any service this month! Book now → {booking_url}";
+const DEFAULT_BDAY_MESSAGE = DEFAULT_BIRTHDAY_TEMPLATE;
 
 export default function LoyaltyPage() {
   const { tenant, refetch } = useTenant();
@@ -290,7 +290,7 @@ export default function LoyaltyPage() {
                   </div>
                   <label style={{ display: "flex", flexDirection: "column", gap: "0.25rem", fontSize: "0.85rem", color: "var(--text-secondary)" }}>
                     Message (blank = default) — tokens: {"{name}"}, {"{discount}"}, {"{business_name}"}, {"{booking_url}"}
-                    <textarea className="input" rows={3} placeholder={DEFAULT_BDAY_MESSAGE}
+                    <textarea className="input" rows={6} placeholder={DEFAULT_BDAY_MESSAGE}
                       value={bdayCfg.message}
                       onChange={(e) => setBdayCfg((c) => ({ ...c, message: e.target.value }))} />
                   </label>

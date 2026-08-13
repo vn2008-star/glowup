@@ -209,7 +209,7 @@ export default function HolidaysPage() {
                       className={styles.holidayEditArea}
                       value={editingMessage}
                       onChange={e => setEditingMessage(e.target.value)}
-                      rows={4}
+                      rows={8}
                       autoFocus
                     />
                   ) : (

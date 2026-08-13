@@ -4,7 +4,7 @@ import { toE164 } from '@/lib/utils'
 import { verifyCronRequest } from '@/lib/cron-auth'
 import { promoEmailHtml } from '@/lib/email-templates'
 import { sendSms, smsProvider, canSendBulkSms, smsConfigFromSettings, type TenantSmsConfig } from '@/lib/sms'
-import { PROMO_HOLIDAYS, getNextHolidayDate } from '@/lib/schedule-utils'
+import { PROMO_HOLIDAYS, getNextHolidayDate, DEFAULT_BIRTHDAY_TEMPLATE } from '@/lib/schedule-utils'
 import { siteBaseUrl } from '@/lib/site-url'
 
 // ─── Automation Engine (Cron-triggered) ───
@@ -206,9 +206,11 @@ export async function GET(request: Request) {
         if (recipients && recipients.length > 0) {
           // One date per line. Joining them with commas ran the day and date
           // together — "Mon, Aug 10, Tue, Aug 11" reads as six separate items.
+          // Plain bullets, NOT 📅: Android draws that emoji as a calendar page
+          // with "July 17" printed on it, so every row contradicted its own date.
           const slotLines = slotDescriptions.length > 0
-            ? slotDescriptions.map(d => `📅 ${d}`).join('\n')
-            : `📅 In the next ${lookAheadDays} day${lookAheadDays !== 1 ? 's' : ''}`
+            ? slotDescriptions.map(d => `• ${d}`).join('\n')
+            : `• In the next ${lookAheadDays} day${lookAheadDays !== 1 ? 's' : ''}`
           const message = [
             `Hey {name}! ⚡`,
             ``,
@@ -272,8 +274,7 @@ export async function GET(request: Request) {
       const bdayDaysBefore = parseInt(String(automations.auto_birthday_days || '7'), 10) || 7
       const bdayChannel = (['sms', 'email', 'both'].includes(String(automations.auto_birthday_channel))
         ? String(automations.auto_birthday_channel) : 'both') as 'sms' | 'email' | 'both'
-      const bdayTemplate = String(automations.auto_birthday_message || '')
-        || `Happy Birthday, {name}! 🎂 {business_name} wants to celebrate YOU — enjoy {discount}% off any service this month! Book now → {booking_url}`
+      const bdayTemplate = String(automations.auto_birthday_message || '') || DEFAULT_BIRTHDAY_TEMPLATE
 
       const today = new Date()
       const targetDate = new Date(today)
@@ -338,7 +339,13 @@ export async function GET(request: Request) {
             ? `${clientFirst} ${(client.last_name as string)[0]}.`
             : clientFirst
           const daysSince = Math.round((Date.now() - new Date(client.last_visit).getTime()) / (1000 * 60 * 60 * 24))
-          const message = `Dear ${clientGreeting}, it's been ${daysSince} days since your last visit to ${businessName}. Time for a refresh? Book now → ${bookingUrl}`
+          const message = [
+            `Dear ${clientGreeting},`,
+            ``,
+            `It's been ${daysSince} days since your last visit to ${businessName}. Time for a refresh? 💜`,
+            ``,
+            `Book now → ${bookingUrl}`,
+          ].join('\n')
 
           await sendMessage({
             client, message, businessName, businessEmail, resendClient, smsConfig, channel: 'both', bulk: true,
@@ -387,7 +394,15 @@ export async function GET(request: Request) {
           const clientGreeting = client.last_name
             ? `${clientFirst} ${(client.last_name as string)[0]}.`
             : clientFirst
-          const message = `Dear ${clientGreeting}, we missed you today at ${businessName}! 😊 Life happens — we'd love to help you rebook. Book your next visit → ${bookingUrl}`
+          const message = [
+            `Dear ${clientGreeting},`,
+            ``,
+            `We missed you today at ${businessName}! 😊`,
+            ``,
+            `Life happens — we'd love to help you rebook.`,
+            ``,
+            `Book your next visit → ${bookingUrl}`,
+          ].join('\n')
 
           await sendMessage({
             client, message, businessName, businessEmail, resendClient, smsConfig, channel: 'both',
@@ -437,7 +452,11 @@ export async function GET(request: Request) {
             ? `${clientFirst} ${(client.last_name as string)[0]}.`
             : clientFirst
           const googleReviewUrl = (settings.google_review_url as string) || ''
-          let message = `Thanks for visiting ${businessName} today, ${clientGreeting}! 🌟 We'd love a quick review — it means the world to us ❤️`
+          let message = [
+            `Thanks for visiting ${businessName} today, ${clientGreeting}! 🌟`,
+            ``,
+            `We'd love a quick review — it means the world to us ❤️`,
+          ].join('\n')
           if (googleReviewUrl) {
             message += `\n\nLeave a review → ${googleReviewUrl}`
           }

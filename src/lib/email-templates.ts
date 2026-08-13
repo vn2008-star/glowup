@@ -31,16 +31,28 @@ function emailShell(businessName: string, bodyContent: string, logoUrl?: string 
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!--
+    This card is dark by design. Without an explicit colour-scheme declaration,
+    the Gmail Android app force-inverts the message in dark theme: it flipped
+    our light body text to near-black while leaving the navy card background
+    alone, making the text almost unreadable on a phone. Declaring support tells
+    the client we handle our own colours and to leave them as authored.
+  -->
+  <meta name="color-scheme" content="light dark">
+  <meta name="supported-color-schemes" content="light dark">
+  <style>
+    :root { color-scheme: light dark; supported-color-schemes: light dark; }
+  </style>
   <title>${businessName}</title>
 </head>
-<body style="margin:0;padding:0;background-color:#1a1a2e;font-family:'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#1a1a2e;padding:32px 16px;">
+<body bgcolor="#1a1a2e" style="margin:0;padding:0;background-color:#1a1a2e;font-family:'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#1a1a2e" style="background-color:#1a1a2e;padding:32px 16px;">
     <tr>
       <td align="center">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background-color:#242444;border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.3);">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#242444" style="max-width:520px;background-color:#242444;border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.3);">
           <!-- Header bar -->
           <tr>
-            <td style="background-color:#6c5ce7;background:linear-gradient(135deg,#6c5ce7,#a855f7);padding:24px 32px;text-align:center;">
+            <td bgcolor="#6c5ce7" style="background-color:#6c5ce7;background:linear-gradient(135deg,#6c5ce7,#a855f7);padding:24px 32px;text-align:center;">
               ${logoBlock}
               <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:700;letter-spacing:0.5px;">${businessName}</h1>
             </td>
