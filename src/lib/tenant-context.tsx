@@ -1,6 +1,7 @@
 'use client'
 
 import { createClient } from '@/lib/supabase/client'
+import { clearDataCache } from '@/lib/data-cache'
 import { createContext, useContext, useEffect, useState, useRef, type ReactNode } from 'react'
 import type { Tenant, Staff } from '@/lib/types'
 
@@ -56,6 +57,10 @@ function setCachedTenant(tenant: Tenant, staff: Staff) {
 
 export function clearTenantCache() {
   try { sessionStorage.removeItem(CACHE_KEY) } catch { /* ignore */ }
+  // The per-page data cache is keyed by action, not by tenant, so it has to go
+  // with the tenant it was filled for — sign-out and impersonation both land
+  // here. See lib/data-cache.
+  clearDataCache()
 }
 
 export interface TenantInitialData {

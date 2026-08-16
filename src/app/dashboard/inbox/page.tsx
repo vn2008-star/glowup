@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
-import { queryData } from "@/lib/api";
+import { queryData, cachedQuery, cached, hasCached } from "@/lib/api";
 import styles from "./inbox.module.css";
 import type { Conversation, Message } from "@/lib/types";
 
@@ -48,10 +48,12 @@ const CHANNEL_DETAILS = [
 export default function InboxPage() {
   const { tenant } = useTenant();
   const t = useTranslations("inboxPage");
-  const [conversations, setConversations] = useState<Conversation[]>([]);
+  // Seeded from the data cache — see lib/data-cache. The unfiltered list is
+  // what the page opens on, so that is the key worth seeding.
+  const [conversations, setConversations] = useState<Conversation[]>(() => cached<Conversation[]>("conversations.list") ?? []);
   const [messages, setMessages] = useState<Message[]>([]);
   const [selectedConvo, setSelectedConvo] = useState<Conversation | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !hasCached("conversations.list"));
   const [messageText, setMessageText] = useState("");
   const [activeTab, setActiveTab] = useState<"inbox" | "config">("inbox");
   const [filter, setFilter] = useState<"all" | "open" | "closed">("all");
@@ -68,8 +70,11 @@ export default function InboxPage() {
 
   const fetchConversations = useCallback(async () => {
     if (!tenant) return;
-    setLoading(true);
-    const { data } = await queryData<Conversation[]>("conversations.list", filter === "all" ? {} : { status: filter });
+    const payload = filter === "all" ? {} : { status: filter };
+    // Only announce a load when there is nothing to show — switching filters
+    // with a cached answer swaps the list rather than emptying it first.
+    setLoading(!hasCached("conversations.list", payload));
+    const { data } = await cachedQuery<Conversation[]>("conversations.list", payload);
     setConversations(data || []);
     setLoading(false);
   }, [tenant, filter]);
@@ -452,7 +457,7 @@ export default function InboxPage() {
             </div>
 
             {loading ? (
-              <div className={styles.convoLoading}>Loading...</div>
+              <div className={`${styles.convoLoading} pending-fade`}>Loading...</div>
             ) : conversations.length === 0 ? (
               <div className={styles.convoEmpty}>
                 <p>No conversations yet</p>

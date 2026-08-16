@@ -3,7 +3,7 @@ import { useState, useRef } from 'react'
 // Dashboard layout v2 - updated nav items
 
 import styles from "./dashboard.module.css";
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTenant, TenantProvider, clearTenantCache, type TenantInitialData } from "@/lib/tenant-context";
 import { createClient } from "@/lib/supabase/client";
@@ -97,6 +97,31 @@ const navKeys = [
   { href: "/dashboard/referrals", icon: <MegaphoneIcon />, key: "referrals" },
   { href: "/dashboard/settings", icon: <SettingsIcon />, key: "settings" },
 ];
+
+/**
+ * Says "yes, I heard you" on a navigation that is taking a noticeable moment.
+ *
+ * The counterpart to removing the skeletons: those covered every navigation,
+ * including the ones that finish in about 200ms, where blanking a screenful of
+ * real content to grey rectangles reads as slower than doing nothing. This
+ * covers the other case — a cold server render, where doing nothing reads as a
+ * dead click.
+ *
+ * The delay lives in the stylesheet, not here: .navHint waits out a normal
+ * navigation before it begins to fade in, so the common case shows nothing
+ * whatsoever. See dashboard.module.css.
+ *
+ * Must be a child of the Link — useLinkStatus reads context that Link provides.
+ */
+function NavPendingHint() {
+  const { pending } = useLinkStatus();
+  return (
+    <span
+      aria-hidden
+      className={`${styles.navHint} ${pending ? styles.navHintPending : ""}`}
+    />
+  );
+}
 
 function ThemeToggle() {
   const { theme, toggleTheme } = useTheme();
@@ -268,6 +293,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
               className={`${styles.navItem} ${pathname === item.href ? styles.navItemActive : ''} ${item.key === 'quickStart' && pathname !== item.href ? styles.navItemQuickStart : ''}`}
               onClick={handleNavClick}
             >
+              <NavPendingHint />
               {item.icon}
               <span>{t(item.key as keyof typeof t)}</span>
             </Link>

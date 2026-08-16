@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
-import { queryData, uploadImage } from "@/lib/api";
+import { queryData, cachedQuery, cached, uploadImage } from "@/lib/api";
 import styles from "./services.module.css";
 import type { Service } from "@/lib/types";
 import { SERVICE_CATEGORIES, type ServiceTemplate, type ServiceCategory } from "./service-catalog";
@@ -14,8 +14,11 @@ const CATEGORY_OPTIONS = SERVICE_CATEGORIES.map((c) => c.label);
 export default function ServicesPage() {
   const { tenant } = useTenant();
   const t = useTranslations("servicesPage");
-  const [services, setServices] = useState<Service[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Seeded from the data cache so a return visit paints the list in the first
+  // render — no "Loading services…" between one sidebar click and the next.
+  // The effect below still re-reads and replaces it. See lib/data-cache.
+  const [services, setServices] = useState<Service[]>(() => cached<Service[]>("services.list") ?? []);
+  const [loading, setLoading] = useState(() => cached<Service[]>("services.list") === undefined);
   const [showModal, setShowModal] = useState(false);
   const [showCatalog, setShowCatalog] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
@@ -34,8 +37,9 @@ export default function ServicesPage() {
 
   const fetchServices = useCallback(async () => {
     if (!tenant) return;
-    setLoading(true);
-    const { data } = await queryData<Service[]>("services.list");
+    // Deliberately no setLoading(true): a refresh after an edit should update
+    // the list in place, not replace it with a loading message.
+    const { data } = await cachedQuery<Service[]>("services.list");
     setServices(data || []);
     setLoading(false);
   }, [tenant]);
@@ -274,7 +278,7 @@ export default function ServicesPage() {
       </div>
 
       {loading ? (
-        <div className={styles.loading}>Loading services...</div>
+        <div className={`${styles.loading} pending-fade`}>Loading services...</div>
       ) : services.length === 0 ? (
         <div className={styles.emptyState}>
           <div className={styles.emptyIcon}>✦</div>

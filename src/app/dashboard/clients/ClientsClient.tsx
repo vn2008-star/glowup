@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
-import { queryData, uploadImage } from "@/lib/api";
+import { queryData, cachedQuery, uploadImage } from "@/lib/api";
 import styles from "./clients.module.css";
 import type { Client, Service, Staff } from "@/lib/types";
 import { formatPhone, fmtDate, localeDateStr } from "@/lib/utils";
@@ -107,8 +107,8 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
 
   const fetchClients = useCallback(async () => {
     if (!tenant) return;
-    setLoading(true);
-    const { data } = await queryData<Client[]>("clients.list");
+    // No setLoading(true) on a refresh — see the note in services/page.tsx.
+    const { data } = await cachedQuery<Client[]>("clients.list");
     // Compute status dynamically from visit data
     const enriched = (data || []).map(c => ({ ...c, status: computeClientStatus(c) }));
     setClients(enriched);
@@ -374,8 +374,8 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
     if (!selectedClient) return;
     // Fetch services + staff for dropdowns
     const [svcRes, staffRes] = await Promise.all([
-      queryData<Service[]>("services.list"),
-      queryData<Staff[]>("staff.list"),
+      cachedQuery<Service[]>("services.list"),
+      cachedQuery<Staff[]>("staff.list"),
     ]);
     setServices((svcRes.data || []).filter(s => s.is_active));
     setStaffMembers(staffRes.data || []);
@@ -566,7 +566,7 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
 
       {/* Client List */}
       {loading ? (
-        <div className={styles.loading}>Loading clients...</div>
+        <div className={`${styles.loading} pending-fade`}>Loading clients...</div>
       ) : filtered.length === 0 ? (
         <div className={styles.empty}>
           <p>No clients found</p>
@@ -966,7 +966,7 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
             <div className={styles.profileSection}>
               <h3 className={styles.sectionTitle}>Appointments & History</h3>
               {historyLoading ? (
-                <div className={styles.emptyNote}>Loading appointments…</div>
+                <div className={`${styles.emptyNote} pending-fade`}>Loading appointments…</div>
               ) : historyApts.length === 0 ? (
                 <div className={styles.emptyNote}>
                   No appointments yet — book one with the button below.

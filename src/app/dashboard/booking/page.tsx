@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { useTenant } from "@/lib/tenant-context";
-import { queryData } from "@/lib/api";
+import { queryData, cachedQuery } from "@/lib/api";
 import { localeDateStr } from "@/lib/utils";
 import styles from "./booking.module.css";
 import type { Campaign, Staff, Appointment, Client } from "@/lib/types";
@@ -159,9 +159,9 @@ export default function BookingPage() {
   const loadFillData = useCallback(async () => {
     if (!tenant) return;
     const [staffRes, aptRes, clientRes] = await Promise.all([
-      queryData<Staff[]>("staff.list"),
-      queryData<Appointment[]>("appointments.list"),
-      queryData<Client[]>("clients.list"),
+      cachedQuery<Staff[]>("staff.list"),
+      cachedQuery<Appointment[]>("appointments.list"),
+      cachedQuery<Client[]>("clients.list"),
     ]);
     const staff = staffRes.data || [];
     const apts = aptRes.data || [];

@@ -148,6 +148,61 @@
   filter: drop-shadow(0 0 6px rgba(201, 160, 220, 0.4));
 }
 
+/*
+ * The sidebar's navigation hint — see NavPendingHint in DashboardLayoutClient.
+ *
+ * A click that is taking a noticeable moment says so; one that finishes in the
+ * usual ~200ms says nothing at all. The delay is what makes that work, and it
+ * lives here rather than in a timer in React: CSS can start an animation and
+ * have it not be visible yet. A normal navigation unmounts the pending state
+ * before navHintIn has begun, so nothing is ever drawn.
+ *
+ * It is a tint over the whole item rather than a dot in the row, so it cannot
+ * shift the label or collide with the Quick Start styling. `visibility` rather
+ * than `display` and always rendered, for the same reason — a hint that mounts
+ * on click is a hint that moves things on click.
+ */
+.navHint {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-md);
+  pointer-events: none;
+  background: var(--color-primary);
+  opacity: 0;
+  visibility: hidden;
+}
+
+.navHintPending {
+  visibility: visible;
+  /* Fade in, then breathe. Both wait out a normal navigation first. */
+  animation-name: navHintIn, navHintPulse;
+  animation-duration: 250ms, 1400ms;
+  animation-delay: 300ms, 550ms;
+  animation-timing-function: ease-out, ease-in-out;
+  animation-iteration-count: 1, infinite;
+  animation-fill-mode: forwards, none;
+}
+
+@keyframes navHintIn {
+  to { opacity: 0.16; }
+}
+
+@keyframes navHintPulse {
+  50% { opacity: 0.06; }
+}
+
+/* Someone who has asked for less motion still gets the acknowledgement, just
+   without the breathing. */
+@media (prefers-reduced-motion: reduce) {
+  .navHintPending {
+    animation-name: navHintIn;
+    animation-duration: 250ms;
+    animation-delay: 300ms;
+    animation-iteration-count: 1;
+    animation-fill-mode: forwards;
+  }
+}
+
 /* Quick Start attention animation — draws new users in */
 .navItemQuickStart {
   overflow: hidden;

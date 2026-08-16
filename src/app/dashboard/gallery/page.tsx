@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
-import { queryData, uploadImage } from "@/lib/api";
+import { queryData, cachedQuery, cached, uploadImage } from "@/lib/api";
 import { localeDateStr } from "@/lib/utils";
 import styles from "./gallery.module.css";
 
@@ -26,11 +26,15 @@ interface ServiceOption { id: string; name: string; category: string; price: num
 
 const CATEGORIES = ["All", "Hair", "Skin", "Nails", "Lashes", "Brows", "Makeup", "Waxing"];
 
+// One object, so the cache key is the same on the seed read and the refresh.
+const GALLERY_QUERY = { limit: 100 };
+
 export default function GalleryPage() {
   const { tenant } = useTenant();
   const t = useTranslations("galleryPage");
-  const [items, setItems] = useState<GalleryItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Seeded from the data cache — see lib/data-cache.
+  const [items, setItems] = useState<GalleryItem[]>(() => cached<GalleryItem[]>("gallery.list", GALLERY_QUERY) ?? []);
+  const [loading, setLoading] = useState(() => cached<GalleryItem[]>("gallery.list", GALLERY_QUERY) === undefined);
   const [filter, setFilter] = useState("All");
   const [selected, setSelected] = useState<GalleryItem | null>(null);
 
@@ -53,9 +57,9 @@ export default function GalleryPage() {
 
   const fetchGallery = useCallback(async () => {
     if (!tenant) return;
-    setLoading(true);
+    // No setLoading(true) on a refresh — see the note in services/page.tsx.
     try {
-      const { data } = await queryData<GalleryItem[]>("gallery.list", { limit: 100 });
+      const { data } = await cachedQuery<GalleryItem[]>("gallery.list", GALLERY_QUERY);
       setItems(data || []);
     } finally { setLoading(false); }
   }, [tenant]);
@@ -66,9 +70,9 @@ export default function GalleryPage() {
   useEffect(() => {
     if (!showAdd || !tenant) return;
     Promise.all([
-      queryData<ClientOption[]>("clients.list"),
-      queryData<StaffOption[]>("staff.list"),
-      queryData<ServiceOption[]>("services.list"),
+      cachedQuery<ClientOption[]>("clients.list"),
+      cachedQuery<StaffOption[]>("staff.list"),
+      cachedQuery<ServiceOption[]>("services.list"),
     ]).then(([c, s, sv]) => {
       setClients(c.data || []);
       setStaffList((s.data || []).filter((st: StaffOption & { is_active?: boolean }) => (st as StaffOption & { is_active?: boolean }).is_active !== false));
@@ -147,7 +151,7 @@ export default function GalleryPage() {
       </div>
 
       {loading ? (
-        <div style={{ padding: "3rem", textAlign: "center", color: "var(--text-secondary)" }}>Loading gallery...</div>
+        <div className="pending-fade" style={{ padding: "3rem", textAlign: "center", color: "var(--text-secondary)" }}>Loading gallery...</div>
       ) : filtered.length === 0 ? (
         <div className={`card ${styles.emptyState}`}>
           <h3>📸 No Transformations Yet</h3>

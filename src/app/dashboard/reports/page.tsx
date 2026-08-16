@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
-import { queryData } from "@/lib/api";
+import { cachedQuery, cached, hasCached } from "@/lib/api";
 import { localeDateStr } from "@/lib/utils";
 import styles from "./reports.module.css";
 
@@ -57,6 +57,11 @@ interface StaffRevenueData {
 
 const TABS = ["Overview", "Staff Performance", "Staff Revenue", "Client Retention", "Revenue Forecast", "Peak Hours", "Cancellations"] as const;
 
+type RetentionData = {
+  summary: { total: number; active: number; atRisk: number; lost: number; new: number; retentionRate: number };
+  clients: RetentionClient[];
+} | null;
+
 type CancellationData = {
   days: number;
   total: number;
@@ -75,14 +80,15 @@ export default function ReportsPage() {
   const { tenant, refetch: refetchTenant } = useTenant();
   const t = useTranslations("reportsPage");
   const [activeTab, setActiveTab] = useState<string>(TABS[0]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !hasCached("reports.overview"));
 
-  // Data for each tab
-  const [overview, setOverview] = useState<OverviewData | null>(null);
-  const [staffPerf, setStaffPerf] = useState<StaffPerf[]>([]);
-  const [retention, setRetention] = useState<{ summary: { total: number; active: number; atRisk: number; lost: number; new: number; retentionRate: number }; clients: RetentionClient[] } | null>(null);
-  const [forecast, setForecast] = useState<ForecastData | null>(null);
-  const [peakHours, setPeakHours] = useState<PeakHoursData | null>(null);
+  // Data for each tab, seeded from the data cache so a return visit paints
+  // whatever this browser last read. See lib/data-cache.
+  const [overview, setOverview] = useState<OverviewData | null>(() => cached<OverviewData>("reports.overview") ?? null);
+  const [staffPerf, setStaffPerf] = useState<StaffPerf[]>(() => cached<{ staffPerformance: StaffPerf[] }>("reports.staff-performance")?.staffPerformance ?? []);
+  const [retention, setRetention] = useState<RetentionData>(() => cached<RetentionData>("reports.retention") ?? null);
+  const [forecast, setForecast] = useState<ForecastData | null>(() => cached<ForecastData>("reports.forecast") ?? null);
+  const [peakHours, setPeakHours] = useState<PeakHoursData | null>(() => cached<PeakHoursData>("reports.peak-hours") ?? null);
   const [retFilter, setRetFilter] = useState<string>("all");
   const [cancels, setCancels] = useState<CancellationData | null>(null);
   const [cancelDays, setCancelDays] = useState(90);
@@ -93,49 +99,40 @@ export default function ReportsPage() {
   const [revOffset, setRevOffset] = useState(0);
   const [sendingEmail, setSendingEmail] = useState<string | null>(null);
 
+  // The read behind the active tab, named once. Having it separate from the
+  // dispatch below is what lets the fetch decide whether a loading state is
+  // even needed — a tab whose answer is already cached shows it instead.
+  const tabRequest = useCallback((): { action: string; payload?: Record<string, unknown> } => {
+    switch (activeTab) {
+      case "Staff Performance": return { action: "reports.staff-performance" };
+      case "Client Retention": return { action: "reports.retention" };
+      case "Revenue Forecast": return { action: "reports.forecast" };
+      case "Peak Hours": return { action: "reports.peak-hours" };
+      case "Staff Revenue": return { action: "reports.staff-revenue", payload: { period: revPeriodType, offset: revOffset } };
+      case "Cancellations": return { action: "reports.cancellations", payload: { days: cancelDays } };
+      default: return { action: "reports.overview" };
+    }
+  }, [activeTab, revPeriodType, revOffset, cancelDays]);
+
   const fetchTabData = useCallback(async () => {
     if (!tenant) return;
-    setLoading(true);
+    const { action, payload } = tabRequest();
+    // Only announce a load when there is nothing to show. A tab that has been
+    // opened before paints its last answer and is corrected when this returns.
+    setLoading(!hasCached(action, payload));
     try {
+      const { data } = await cachedQuery<unknown>(action, payload);
       switch (activeTab) {
-        case "Overview": {
-          const { data } = await queryData<OverviewData>("reports.overview");
-          setOverview(data);
-          break;
-        }
-        case "Staff Performance": {
-          const { data } = await queryData<{ staffPerformance: StaffPerf[] }>("reports.staff-performance");
-          setStaffPerf(data?.staffPerformance || []);
-          break;
-        }
-        case "Client Retention": {
-          const { data } = await queryData<typeof retention>("reports.retention");
-          setRetention(data);
-          break;
-        }
-        case "Revenue Forecast": {
-          const { data } = await queryData<ForecastData>("reports.forecast");
-          setForecast(data);
-          break;
-        }
-        case "Peak Hours": {
-          const { data } = await queryData<PeakHoursData>("reports.peak-hours");
-          setPeakHours(data);
-          break;
-        }
-        case "Staff Revenue": {
-          const { data } = await queryData<StaffRevenueData>("reports.staff-revenue", { period: revPeriodType, offset: revOffset });
-          setStaffRevData(data);
-          break;
-        }
-        case "Cancellations": {
-          const { data } = await queryData<CancellationData>("reports.cancellations", { days: cancelDays });
-          setCancels(data);
-          break;
-        }
+        case "Staff Performance": setStaffPerf((data as { staffPerformance: StaffPerf[] } | null)?.staffPerformance || []); break;
+        case "Client Retention": setRetention(data as RetentionData); break;
+        case "Revenue Forecast": setForecast(data as ForecastData); break;
+        case "Peak Hours": setPeakHours(data as PeakHoursData); break;
+        case "Staff Revenue": setStaffRevData(data as StaffRevenueData); break;
+        case "Cancellations": setCancels(data as CancellationData); break;
+        default: setOverview(data as OverviewData); break;
       }
     } finally { setLoading(false); }
-  }, [tenant, activeTab, revPeriodType, revOffset, cancelDays]);
+  }, [tenant, activeTab, tabRequest]);
 
   useEffect(() => { fetchTabData(); }, [fetchTabData]);
 
@@ -160,7 +157,7 @@ export default function ReportsPage() {
       </div>
 
       {loading ? (
-        <div style={{ padding: "3rem", textAlign: "center", color: "var(--text-secondary)" }}>Loading analytics...</div>
+        <div className="pending-fade" style={{ padding: "3rem", textAlign: "center", color: "var(--text-secondary)" }}>Loading analytics...</div>
       ) : (
         <>
           {/* ═══ OVERVIEW TAB ═══ */}

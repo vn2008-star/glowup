@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { cached, writeCache } from "@/lib/api";
 import { localeDateStr } from "@/lib/utils";
 import styles from "./referrals.module.css";
 
@@ -35,9 +36,13 @@ const REWARD_TIERS = [
   { min: 10, emoji: "💎", label: "10 Referrals", reward: "12 Free Months" },
 ];
 
+// This page reads /api/referrals rather than /api/data, so it caches under its
+// own key. Same purpose: a return visit paints immediately. See lib/data-cache.
+const CACHE_KEY = "referrals.overview";
+
 export default function ReferralsPage() {
-  const [data, setData] = useState<ReferralData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<ReferralData | null>(() => cached<ReferralData>(CACHE_KEY) ?? null);
+  const [loading, setLoading] = useState(() => cached<ReferralData>(CACHE_KEY) === undefined);
   const [generating, setGenerating] = useState(false);
   const [toast, setToast] = useState("");
 
@@ -46,6 +51,7 @@ export default function ReferralsPage() {
     if (res.ok) {
       const json = await res.json();
       setData(json);
+      writeCache(CACHE_KEY, undefined, json);
     }
     setLoading(false);
   }, []);
@@ -90,7 +96,7 @@ export default function ReferralsPage() {
     : "";
 
   if (loading) {
-    return <div className={styles.loading}>Loading referral data...</div>;
+    return <div className={`${styles.loading} pending-fade`}>Loading referral data...</div>;
   }
 
   return (

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
-import { queryData } from "@/lib/api";
+import { queryData, cachedQuery } from "@/lib/api";
 import styles from "./overview.module.css";
 import type { Appointment, Client } from "@/lib/types";
 import type { OverviewData } from "@/lib/overview-query";
@@ -81,8 +81,8 @@ export default function OverviewClient({ initialOverview }: { initialOverview: O
     if (!hasHours && metrics.todayAppointments === 0 && metrics.totalClients === 0) {
       // Likely a new subscriber — check staff/services count (in parallel)
       Promise.all([
-        queryData<{ id: string }[]>("staff.list"),
-        queryData<{ id: string }[]>("services.list"),
+        cachedQuery<{ id: string }[]>("staff.list"),
+        cachedQuery<{ id: string }[]>("services.list"),
       ]).then(([{ data: staffData }, { data: serviceData }]) => {
         const staffCount = staffData?.length || 0;
         const serviceCount = serviceData?.length || 0;
@@ -165,7 +165,7 @@ export default function OverviewClient({ initialOverview }: { initialOverview: O
             <a href="/dashboard/calendar" className={styles.viewAll}>{t("viewCalendar")}</a>
           </div>
           {loading ? (
-            <p className={styles.emptySchedule}>{t("loadingAppointments")}</p>
+            <p className={`${styles.emptySchedule} pending-fade`}>{t("loadingAppointments")}</p>
           ) : todayAppointments.length === 0 ? (
             <p className={styles.emptySchedule}>{t("noAppointments")}</p>
           ) : (
@@ -200,7 +200,7 @@ export default function OverviewClient({ initialOverview }: { initialOverview: O
               <a href="/dashboard/loyalty" className={styles.viewAll}>Birthday Special</a>
             </div>
             {loading ? (
-              <p className={styles.emptySchedule}>Loading...</p>
+              <p className={`${styles.emptySchedule} pending-fade`}>Loading...</p>
             ) : upcomingBirthdays.length === 0 ? (
               <p className={styles.emptySchedule}>No birthdays in the next 30 days</p>
             ) : (

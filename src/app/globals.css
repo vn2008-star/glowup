@@ -627,6 +627,35 @@ input[type="week"] {
   50% { opacity: 1; transform: scale(1) rotate(180deg); }
 }
 
+/* ================================================
+   Delayed loading states
+   ================================================ */
+/*
+ * Put this on the element a page renders while its own fetch is in flight —
+ * the "Loading services…" line and friends.
+ *
+ * It starts invisible and waits 260ms before it begins to fade in, so a fetch
+ * that comes back in the usual ~200ms is never announced at all: the page
+ * simply appears. Only a request slow enough to be worth acknowledging lasts
+ * long enough for anything to be drawn.
+ *
+ * The delay is in CSS rather than a timer in React on purpose — an animation
+ * can be running and not yet visible, which is exactly the behaviour wanted,
+ * and it costs no re-render. Most of the time the element is unmounted before
+ * it has drawn a single frame.
+ *
+ * On a return visit there is usually no loading state at all: the page seeds
+ * itself from the data cache and re-reads in the background. See lib/data-cache.
+ */
+.pending-fade {
+  opacity: 0;
+  animation: pendingFadeIn 200ms ease-out 260ms forwards;
+}
+
+@keyframes pendingFadeIn {
+  to { opacity: 1; }
+}
+
 .animate-fade-in { animation: fadeIn 0.5s ease-out; }
 .animate-fade-in-up { animation: fadeInUp 0.6s ease-out; }
 .animate-fade-in-down { animation: fadeInDown 0.5s ease-out; }

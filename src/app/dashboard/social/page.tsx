@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
-import { queryData } from "@/lib/api";
+import { queryData, cachedQuery, cached } from "@/lib/api";
 import styles from "./social.module.css";
 import { localeDateStr } from "@/lib/utils";
 import type { SocialPost } from "@/lib/types";
@@ -28,8 +28,9 @@ const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 export default function SocialPage() {
   const { tenant } = useTenant();
   const t = useTranslations("socialPage");
-  const [posts, setPosts] = useState<SocialPost[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Seeded from the data cache — see lib/data-cache.
+  const [posts, setPosts] = useState<SocialPost[]>(() => cached<SocialPost[]>("social.list") ?? []);
+  const [loading, setLoading] = useState(() => cached<SocialPost[]>("social.list") === undefined);
   const [activeTab, setActiveTab] = useState<"calendar" | "posts" | "templates" | "reviews" | "portfolio">("posts");
   const [showModal, setShowModal] = useState(false);
   const [editingPost, setEditingPost] = useState<SocialPost | null>(null);
@@ -46,8 +47,8 @@ export default function SocialPage() {
 
   const fetchPosts = useCallback(async () => {
     if (!tenant) return;
-    setLoading(true);
-    const { data } = await queryData<SocialPost[]>("social.list");
+    // No setLoading(true) on a refresh — see the note in services/page.tsx.
+    const { data } = await cachedQuery<SocialPost[]>("social.list");
     setPosts(data || []);
     setLoading(false);
   }, [tenant]);
@@ -191,7 +192,7 @@ export default function SocialPage() {
       </div>
 
       {loading ? (
-        <div className={styles.loading}>Loading posts...</div>
+        <div className={`${styles.loading} pending-fade`}>Loading posts...</div>
       ) : activeTab === "posts" ? (
         posts.length === 0 ? (
           <div className={styles.empty}>

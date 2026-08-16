@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useLocale } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
-import { queryData } from "@/lib/api";
+import { queryData, cachedQuery, cached } from "@/lib/api";
 import { locales, localeNames, localeFlags, type Locale } from "@/i18n/config";
 import { SERVICE_CATEGORIES } from "@/app/dashboard/services/service-catalog";
 import styles from "./quickstart.module.css";
@@ -163,13 +163,15 @@ const ADVANCED_FEATURES: AdvancedFeature[] = [
 export default function QuickStartPage() {
   const { tenant } = useTenant();
   const currentLocale = useLocale() as Locale;
-  const [setupCtx, setSetupCtx] = useState<SetupContext>({
-    tenant: null,
-    staffCount: 0,
-    serviceCount: 0,
-    clientCount: 0,
-  });
-  const [loading, setLoading] = useState(true);
+  // Seeded from the data cache, so the progress bar comes back to where it was
+  // rather than resetting to "..." on every visit. See lib/data-cache.
+  const [setupCtx, setSetupCtx] = useState<SetupContext>(() => ({
+    tenant: (tenant as unknown as Record<string, unknown>) ?? null,
+    staffCount: cached<{ id: string }[]>("staff.list")?.length ?? 0,
+    serviceCount: cached<{ id: string }[]>("services.list")?.length ?? 0,
+    clientCount: cached<{ id: string }[]>("clients.list")?.length ?? 0,
+  }));
+  const [loading, setLoading] = useState(() => cached("staff.list") === undefined);
 
   // Inline action states
   const [soloLoading, setSoloLoading] = useState(false);
@@ -180,12 +182,12 @@ export default function QuickStartPage() {
 
   const fetchCounts = useCallback(async () => {
     if (!tenant) return;
-    setLoading(true);
-
+    // No setLoading(true) on a refresh — the progress bar should move, not
+    // reset to "..." while the counts are re-read.
     const [staffRes, serviceRes, clientRes] = await Promise.all([
-      queryData<{ id: string }[]>("staff.list"),
-      queryData<{ id: string }[]>("services.list"),
-      queryData<{ id: string }[]>("clients.list"),
+      cachedQuery<{ id: string }[]>("staff.list"),
+      cachedQuery<{ id: string }[]>("services.list"),
+      cachedQuery<{ id: string }[]>("clients.list"),
     ]);
 
     setSetupCtx({

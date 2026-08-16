@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
-import { queryData, mutateData } from "@/lib/api";
+import { cachedQuery, cached, mutateData } from "@/lib/api";
 import { localeDateStr } from "@/lib/utils";
 import styles from "./packages.module.css";
 
@@ -29,10 +29,11 @@ export default function PackagesPage() {
   const { tenant } = useTenant();
   const t = useTranslations("packagesPage");
   const [tab, setTab] = useState<string>(TABS[0]);
-  const [packages, setPackages] = useState<Package[]>([]);
-  const [giftCards, setGiftCards] = useState<GiftCard[]>([]);
-  const [services, setServices] = useState<ServiceOption[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Seeded from the data cache — see lib/data-cache.
+  const [packages, setPackages] = useState<Package[]>(() => cached<Package[]>("packages.list") ?? []);
+  const [giftCards, setGiftCards] = useState<GiftCard[]>(() => cached<GiftCard[]>("giftcards.list") ?? []);
+  const [services, setServices] = useState<ServiceOption[]>(() => cached<ServiceOption[]>("services.list") ?? []);
+  const [loading, setLoading] = useState(() => cached("packages.list") === undefined || cached("giftcards.list") === undefined);
   const [showPkgModal, setShowPkgModal] = useState(false);
   const [showGCModal, setShowGCModal] = useState(false);
   const [editPkg, setEditPkg] = useState<Package | null>(null);
@@ -55,12 +56,12 @@ export default function PackagesPage() {
 
   const fetchData = useCallback(async () => {
     if (!tenant) return;
-    setLoading(true);
+    // No setLoading(true) on a refresh — see the note in services/page.tsx.
     try {
       const [pkgRes, gcRes, svcRes] = await Promise.all([
-        queryData<Package[]>("packages.list"),
-        queryData<GiftCard[]>("giftcards.list"),
-        queryData<ServiceOption[]>("services.list"),
+        cachedQuery<Package[]>("packages.list"),
+        cachedQuery<GiftCard[]>("giftcards.list"),
+        cachedQuery<ServiceOption[]>("services.list"),
       ]);
       setPackages(pkgRes.data || []);
       setGiftCards(gcRes.data || []);
@@ -165,7 +166,7 @@ export default function PackagesPage() {
       </div>
 
       {loading ? (
-        <div style={{ padding: "3rem", textAlign: "center", color: "var(--text-secondary)" }}>Loading...</div>
+        <div className="pending-fade" style={{ padding: "3rem", textAlign: "center", color: "var(--text-secondary)" }}>Loading...</div>
       ) : (
         <>
           {/* ═══ PACKAGES TAB ═══ */}

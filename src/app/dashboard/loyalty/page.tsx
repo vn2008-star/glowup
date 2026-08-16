@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
-import { queryData } from "@/lib/api";
+import { queryData, cachedQuery, cached } from "@/lib/api";
 import { localeDateStr } from "@/lib/utils";
 import { DEFAULT_BIRTHDAY_TEMPLATE } from "@/lib/schedule-utils";
 import styles from "./loyalty.module.css";
@@ -22,6 +22,15 @@ interface LoyaltyActivity {
   client: { first_name: string; last_name: string | null } | null;
 }
 
+interface LoyaltyOverview {
+  tiers: LoyaltyTier[];
+  recentActivity: LoyaltyActivity[];
+  totalPoints: number;
+}
+
+/** Whatever the last visit read, if it is still worth painting. */
+const cachedOverview = () => cached<LoyaltyOverview>("loyalty.overview");
+
 const TIER_COLORS: Record<string, string> = {
   Bronze: "#cd7f32",
   Silver: "#c0c0c0",
@@ -39,10 +48,11 @@ const DEFAULT_BDAY_MESSAGE = DEFAULT_BIRTHDAY_TEMPLATE;
 export default function LoyaltyPage() {
   const { tenant, refetch } = useTenant();
   const t = useTranslations("loyaltyPage");
-  const [tiers, setTiers] = useState<LoyaltyTier[]>([]);
-  const [recentActivity, setRecentActivity] = useState<LoyaltyActivity[]>([]);
-  const [totalPoints, setTotalPoints] = useState(0);
-  const [loading, setLoading] = useState(true);
+  // Seeded from the data cache — see lib/data-cache.
+  const [tiers, setTiers] = useState<LoyaltyTier[]>(() => cachedOverview()?.tiers ?? []);
+  const [recentActivity, setRecentActivity] = useState<LoyaltyActivity[]>(() => cachedOverview()?.recentActivity ?? []);
+  const [totalPoints, setTotalPoints] = useState(() => cachedOverview()?.totalPoints ?? 0);
+  const [loading, setLoading] = useState(() => cachedOverview() === undefined);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editTiers, setEditTiers] = useState<{ name: string; minPoints: number; perks: string }[]>([]);
 
@@ -55,12 +65,8 @@ export default function LoyaltyPage() {
 
   const fetchLoyalty = useCallback(async () => {
     if (!tenant) return;
-    setLoading(true);
-    const { data } = await queryData<{
-      tiers: LoyaltyTier[];
-      recentActivity: LoyaltyActivity[];
-      totalPoints: number;
-    }>("loyalty.overview");
+    // No setLoading(true) on a refresh — see the note in services/page.tsx.
+    const { data } = await cachedQuery<LoyaltyOverview>("loyalty.overview");
 
     if (data) {
       setTiers(data.tiers);
@@ -170,7 +176,7 @@ export default function LoyaltyPage() {
       <div className={styles.page}>
         <div className={styles.pageHeader}>
           <h1>{t("title")}</h1>
-          <p>Loading...</p>
+          <p className="pending-fade">Loading...</p>
         </div>
       </div>
     );

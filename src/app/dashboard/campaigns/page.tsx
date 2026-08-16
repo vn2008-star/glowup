@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { useTenant } from "@/lib/tenant-context";
-import { queryData } from "@/lib/api";
+import { queryData, cachedQuery, cached } from "@/lib/api";
 import { localeDateStr } from "@/lib/utils";
 import { PROMO_HOLIDAYS, getNextHolidayDate, type PromoHoliday } from "@/lib/schedule-utils";
 import styles from "./campaigns.module.css";
@@ -26,8 +26,10 @@ const SEND_DAYS_OPTIONS = [3, 5, 7, 10, 14];
 
 export default function HolidaysPage() {
   const { tenant, refetch } = useTenant();
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Seeded from the data cache, so coming back to Holidays paints the list in
+  // the first render instead of announcing itself. See lib/data-cache.
+  const [campaigns, setCampaigns] = useState<Campaign[]>(() => cached<Campaign[]>("campaigns.list") ?? []);
+  const [loading, setLoading] = useState(() => cached<Campaign[]>("campaigns.list") === undefined);
 
   // Inline holiday editing state
   const [editingHolidayName, setEditingHolidayName] = useState<string | null>(null);
@@ -39,8 +41,8 @@ export default function HolidaysPage() {
 
   const fetchData = useCallback(async () => {
     if (!tenant) return;
-    setLoading(true);
-    const { data } = await queryData<Campaign[]>("campaigns.list");
+    // No setLoading(true) on a refresh — see the note in services/page.tsx.
+    const { data } = await cachedQuery<Campaign[]>("campaigns.list");
     setCampaigns(data || []);
 
     // Load settings
@@ -175,7 +177,7 @@ export default function HolidaysPage() {
 
       {/* Holiday Grid */}
       {loading ? (
-        <div style={{ padding: "2rem", textAlign: "center", color: "var(--text-secondary)" }}>Loading holidays...</div>
+        <div className="pending-fade" style={{ padding: "2rem", textAlign: "center", color: "var(--text-secondary)" }}>Loading holidays...</div>
       ) : (
         <>
           <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginBottom: "var(--space-4)" }}>

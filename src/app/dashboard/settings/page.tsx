@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 import { useTenant } from "@/lib/tenant-context";
-import { queryData, uploadImage } from "@/lib/api";
+import { queryData, cachedQuery, uploadImage } from "@/lib/api";
 import { US_TIMEZONES, timezoneFromAddress } from "@/lib/tz";
 import { CLOSED_DAY_HOLIDAYS, getNextHolidayDate } from "@/lib/schedule-utils";
 import type { CustomClosedDate } from "@/lib/schedule-utils";
@@ -32,7 +32,10 @@ export default function SettingsPage() {
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [loading, setLoading] = useState(true);
+  // The form is filled from the tenant, which the dashboard layout resolves on
+  // the server — when it is already here there is nothing to wait for and no
+  // reason to say so.
+  const [loading, setLoading] = useState(!tenant);
   const [linkCopied, setLinkCopied] = useState(false);
   const [editingSlug, setEditingSlug] = useState(false);
   const [slugDraft, setSlugDraft] = useState('');
@@ -206,10 +209,10 @@ export default function SettingsPage() {
   // Fetch client count for cost estimator
   useEffect(() => {
     if (!tenant) return;
-    queryData<{ id: string }[]>("clients.list").then(({ data }) => {
+    cachedQuery<{ id: string }[]>("clients.list").then(({ data }) => {
       setClientCount(data?.length || 0);
     });
-    queryData<{ id: string }[]>("staff.list").then(({ data }) => {
+    cachedQuery<{ id: string }[]>("staff.list").then(({ data }) => {
       setStaffCount(data?.length || 0);
     });
   }, [tenant]);
@@ -296,7 +299,7 @@ export default function SettingsPage() {
       <div className={styles.page}>
         <div className={styles.pageHeader}>
           <h1>{t("title")}</h1>
-          <p>Loading...</p>
+          <p className="pending-fade">Loading...</p>
         </div>
       </div>
     );

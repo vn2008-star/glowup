@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
-import { queryData, uploadImage } from "@/lib/api";
+import { queryData, cachedQuery, cached, uploadImage } from "@/lib/api";
 import styles from "./staff.module.css";
 import type { Staff, Service } from "@/lib/types";
 import { PROFESSIONAL_TYPES, getProfessionalType } from "./staff-specialties";
@@ -17,8 +17,9 @@ import { formatPhone, localeDateStr } from "@/lib/utils";
 export default function StaffPage() {
   const { tenant } = useTenant();
   const t = useTranslations("staffPage");
-  const [staffMembers, setStaffMembers] = useState<Staff[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Seeded from the data cache — see lib/data-cache.
+  const [staffMembers, setStaffMembers] = useState<Staff[]>(() => cached<Staff[]>("staff.list") ?? []);
+  const [loading, setLoading] = useState(() => cached<Staff[]>("staff.list") === undefined);
   const [showModal, setShowModal] = useState(false);
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
@@ -51,8 +52,8 @@ export default function StaffPage() {
 
   const fetchStaff = useCallback(async () => {
     if (!tenant) return;
-    setLoading(true);
-    const { data } = await queryData<Staff[]>("staff.list");
+    // No setLoading(true) on a refresh — see the note in services/page.tsx.
+    const { data } = await cachedQuery<Staff[]>("staff.list");
     setStaffMembers(data || []);
     setLoading(false);
   }, [tenant]);
@@ -62,7 +63,7 @@ export default function StaffPage() {
   // Fetch services for custom durations modal
   const fetchServices = useCallback(async () => {
     if (!tenant) return;
-    const { data } = await queryData<Service[]>("services.list");
+    const { data } = await cachedQuery<Service[]>("services.list");
     setAllServices((data || []).filter(s => s.is_active));
   }, [tenant]);
 
@@ -454,7 +455,7 @@ export default function StaffPage() {
       </div>
 
       {loading ? (
-        <div className={styles.loading}>Loading staff...</div>
+        <div className={`${styles.loading} pending-fade`}>Loading staff...</div>
       ) : staffMembers.length === 0 ? (
         <div className={styles.empty}>
           <p>No staff members yet</p>
