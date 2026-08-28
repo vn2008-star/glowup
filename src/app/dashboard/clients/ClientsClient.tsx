@@ -168,7 +168,14 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
 
   const filtered = useMemo(() => {
     const list = clients.filter((c) => {
-      const matchesSearch = `${c.first_name} ${c.last_name || ""} ${c.email || ""} ${c.phone || ""}`.toLowerCase().includes(search.toLowerCase());
+      const needle = search.trim().toLowerCase();
+      const haystack = `${c.first_name} ${c.last_name || ""} ${c.email || ""} ${c.phone || ""}`.toLowerCase();
+      // Phones are stored formatted — "(916) 549-4088" — so typing the number
+      // the way it appears on a caller ID, or as bare digits, never matched.
+      const digits = search.replace(/\D/g, "");
+      const matchesSearch = !needle
+        || haystack.includes(needle)
+        || (digits.length >= 3 && (c.phone || "").replace(/\D/g, "").includes(digits));
       const matchesFilter = filter === "all" || c.status === filter;
       return matchesSearch && matchesFilter;
     });

@@ -450,23 +450,44 @@ export async function POST(request: Request) {
       case 'clients.search': {
         const q = String(payload?.q || '').trim()
         if (q.length < 2) return NextResponse.json({ data: [] })
-        // PostgREST parses `or=(a.ilike.x,b.ilike.y)` — commas and parens inside
-        // a value would split the filter list, so strip them from user input.
-        const safe = q.replace(/[(),*]/g, ' ').trim()
-        const digits = q.replace(/\D/g, '')
-        const filters = [
-          `first_name.ilike.%${safe}%`,
-          `last_name.ilike.%${safe}%`,
-          `email.ilike.%${safe}%`,
-          `phone.ilike.%${safe}%`,
-        ]
-        if (digits.length >= 3) filters.push(`phone.ilike.%${digits}%`)
 
-        const { data, error } = await svc
+        // Match each WORD separately and AND the results together. Testing the
+        // whole query against one column at a time meant "Lisa Moss Sallee"
+        // found nobody — no single column holds all three words — so searching
+        // by full name, the obvious thing to type, always came back empty.
+        // Chained .or() calls become separate PostgREST `or=` params, which are
+        // ANDed: every word must match something, in any column.
+        let search = svc
           .from('clients')
           .select('id, first_name, last_name, phone, email, photo_url, birthday, notes, allergies, loyalty_points, visit_count, lifetime_spend, last_visit, status')
           .eq('tenant_id', tenantId)
-          .or(filters.join(','))
+
+        for (const word of q.split(/\s+/).filter(Boolean)) {
+          // PostgREST parses `or=(a.ilike.x,b.ilike.y)` — commas and parens
+          // inside a value would split the filter list. % and \ are ilike
+          // metacharacters, so they go too.
+          const safe = word.replace(/[(),*%\\]/g, ' ').trim()
+          const digits = word.replace(/\D/g, '')
+          const filters: string[] = []
+          if (safe) {
+            filters.push(
+              `first_name.ilike.%${safe}%`,
+              `last_name.ilike.%${safe}%`,
+              `email.ilike.%${safe}%`,
+              `phone.ilike.%${safe}%`,
+            )
+          }
+          // Phone numbers are stored formatted — "(916) 549-4088" — so a
+          // digits-only search could never ilike-match, and a search typed WITH
+          // punctuation lost its parens to the sanitiser above and didn't match
+          // either. Between the two, looking a client up by phone never worked
+          // at all. Interleaving % lets the pattern step over the separators.
+          if (digits.length >= 3) filters.push(`phone.ilike.%${digits.split('').join('%')}%`)
+          if (filters.length === 0) continue
+          search = search.or(filters.join(','))
+        }
+
+        const { data, error } = await search
           .order('last_visit', { ascending: false, nullsFirst: false })
           .limit(payload?.limit || 20)
 
