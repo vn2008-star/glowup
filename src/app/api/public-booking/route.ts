@@ -3,7 +3,7 @@ import { waitUntil } from '@vercel/functions'
 import { createClient } from '@supabase/supabase-js'
 import { timezoneFromAddress, DEFAULT_TZ } from '@/lib/tz'
 import { toE164 } from '@/lib/utils'
-import { resolveTenantTz, resolveSpecialInstructions, appendInstructionsToSms, buildReminderRows, insertReminderRows } from '@/lib/notifications'
+import { resolveTenantTz, resolveSpecialInstructions, appendInstructionsToSms, buildReminderRows, insertReminderRows, resolveBookingBufferMinutes, padBookedSlot } from '@/lib/notifications'
 import { sendSms, smsProvider, smsConfigFromSettings } from '@/lib/sms'
 import { bookingConfirmationHtml, promoEmailHtml, googleCalendarUrl } from '@/lib/email-templates'
 
@@ -43,6 +43,7 @@ export async function GET(request: Request) {
     const tenantSettingsLite = (tenant.settings || {}) as Record<string, unknown>
     const bookingLite = (tenantSettingsLite.booking || {}) as Record<string, string>
     const lookAhead = parseInt(bookingLite.advanceBookingDays || '30', 10) || 30
+    const bufferLite = resolveBookingBufferMinutes(tenant)
     const nowLite = new Date()
     const { data: aptsLite } = await svc
       .from('appointments')
@@ -52,7 +53,10 @@ export async function GET(request: Request) {
       .lt('start_time', new Date(nowLite.getTime() + lookAhead * 24 * 60 * 60 * 1000).toISOString())
       .in('status', ['pending', 'confirmed', 'blocked'])
     return NextResponse.json({
-      bookedSlots: (aptsLite || []).map(a => ({ staff_id: a.staff_id, start: a.start_time, end: a.end_time })),
+      bookedSlots: (aptsLite || []).map(a => ({
+        staff_id: a.staff_id,
+        ...padBookedSlot(a.start_time, a.end_time, bufferLite),
+      })),
     })
   }
 
@@ -118,10 +122,11 @@ export async function GET(request: Request) {
         service_durations,
       }
     }),
+    // Padded by the salon's turnaround buffer so the picker greys out the time
+    // either side of a booking, not just the booking itself.
     bookedSlots: (appointments || []).map(a => ({
       staff_id: a.staff_id,
-      start: a.start_time,
-      end: a.end_time,
+      ...padBookedSlot(a.start_time, a.end_time, resolveBookingBufferMinutes(tenant)),
     })),
   })
 }
@@ -180,6 +185,14 @@ export async function POST(request: Request) {
   // customers picking "Any Available" for the same slot all used to succeed.
   // Resolving to a real staff member here puts every booking under the
   // constraint's protection.
+  // The salon's turnaround buffer widens every window we test for conflicts, so
+  // the server refuses the same back-to-back slots the picker greyed out.
+  // Padding the REQUESTED window (rather than each existing appointment) keeps
+  // the two sides symmetric without double-counting the gap.
+  const bufferMs = resolveBookingBufferMinutes(tenant) * 60 * 1000
+  const padStart = (d: Date) => new Date(d.getTime() - bufferMs)
+  const padEnd = (d: Date) => new Date(d.getTime() + bufferMs)
+
   if (windows.some(w => !w.staff_id)) {
     const { data: candidates } = await svc
       .from('staff')
@@ -193,15 +206,15 @@ export async function POST(request: Request) {
       .select('staff_id, start_time, end_time')
       .eq('tenant_id', tenant.id)
       .in('status', ['pending', 'confirmed', 'blocked'])
-      .lt('start_time', overallEnd.toISOString())
-      .gt('end_time', overallStart.toISOString())
+      .lt('start_time', padEnd(overallEnd).toISOString())
+      .gt('end_time', padStart(overallStart).toISOString())
 
     for (const w of windows) {
       if (w.staff_id) continue
       const free = (candidates || []).find(c =>
-        // no existing appointment overlapping this window...
+        // no existing appointment overlapping this window (plus buffer)...
         !(busy || []).some(b => b.staff_id === c.id &&
-          new Date(b.start_time) < w.end && new Date(b.end_time) > w.start) &&
+          new Date(b.start_time) < padEnd(w.end) && new Date(b.end_time) > padStart(w.start)) &&
         // ...and not already claimed by another window of this same booking
         !windows.some(o => o !== w && o.staff_id === c.id &&
           o.start < w.end && o.end > w.start)
@@ -234,8 +247,8 @@ export async function POST(request: Request) {
       .eq('tenant_id', tenant.id)
       .eq('staff_id', sid)
       .in('status', ['pending', 'confirmed', 'blocked'])
-      .lt('start_time', staffEnd.toISOString())
-      .gt('end_time', staffStart.toISOString())
+      .lt('start_time', padEnd(staffEnd).toISOString())
+      .gt('end_time', padStart(staffStart).toISOString())
       .limit(1)
 
     if (conflicts && conflicts.length > 0) {

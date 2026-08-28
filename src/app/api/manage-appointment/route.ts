@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { toE164 } from '@/lib/utils'
 import { formatDateInTz, formatInTz } from '@/lib/tz'
 import { isBusinessClosedOnDate, isStaffOffOnDate, type CustomClosedDate } from '@/lib/schedule-utils'
-import { resolveTenantTz, resolveSpecialInstructions, appendInstructionsToSms, buildReminderRows, insertReminderRows } from '@/lib/notifications'
+import { resolveTenantTz, resolveSpecialInstructions, appendInstructionsToSms, buildReminderRows, insertReminderRows, resolveBookingBufferMinutes, padBookedSlot, resolveCancellationPolicy, cancellationBlockedReason } from '@/lib/notifications'
 import { siteBaseUrl } from '@/lib/site-url'
 import { sendSms, smsProvider, smsConfigFromSettings } from '@/lib/sms'
 import { cancelAppointment } from '@/lib/cancel-appointment'
@@ -80,7 +80,8 @@ export async function GET(request: Request) {
       .in('status', ['pending', 'confirmed', 'blocked'])
       .gt('end_time', now.toISOString())
       .lt('start_time', futureLimit.toISOString())
-    bookedSlots = (existingApts || []).map(a => ({ start: a.start_time, end: a.end_time }))
+    const gBuffer = resolveBookingBufferMinutes(tenant)
+    bookedSlots = (existingApts || []).map(a => padBookedSlot(a.start_time, a.end_time, gBuffer))
   }
 
   return NextResponse.json({
@@ -106,6 +107,15 @@ export async function GET(request: Request) {
       closedHolidays: (gSettings.closed_holidays || []) as string[],
       customClosedDates: (gSettings.custom_closed_dates || []) as CustomClosedDate[],
     } : null,
+    // What the salon's cancellation policy allows for THIS appointment, so the
+    // page can explain it up front instead of letting the client hit a 403.
+    cancellation: (() => {
+      const policy = resolveCancellationPolicy(tenant)
+      return {
+        cutoffHours: policy.cutoffHours,
+        blockedReason: cancellationBlockedReason(policy, new Date(apt.start_time), tenant?.phone || ''),
+      }
+    })(),
     staffSchedule,
     bookedSlots,
   })
@@ -169,6 +179,18 @@ export async function PATCH(request: Request) {
   const tz = resolveTenantTz(tenant)
 
   if (action === 'cancel') {
+    // Honour the salon's cancellation policy. This select has existed in
+    // Settings since launch with nothing reading it — a salon set "48 hours
+    // before" and clients cancelled ten minutes out anyway.
+    const policyBlock = cancellationBlockedReason(
+      resolveCancellationPolicy(tenant),
+      new Date(apt.start_time),
+      businessPhone,
+    )
+    if (policyBlock) {
+      return NextResponse.json({ error: policyBlock }, { status: 403 })
+    }
+
     // Cancel the appointment, recording the client's reason if they gave one
     const clientReason = String(body.cancellation_reason || '').trim().slice(0, 500)
     const { error: updateErr } = await cancelAppointment(
@@ -394,7 +416,9 @@ export async function PATCH(request: Request) {
       }
     }
 
-    // Check for conflicts
+    // Check for conflicts, widened by the salon's turnaround buffer so this
+    // matches the slots the picker offered (GET pads bookedSlots the same way).
+    const bufferMs = resolveBookingBufferMinutes(tenant) * 60 * 1000
     if (apt.staff_id) {
       const { data: conflicts } = await svc
         .from('appointments')
@@ -403,8 +427,8 @@ export async function PATCH(request: Request) {
         .eq('staff_id', apt.staff_id)
         .neq('id', apt.id) // exclude current appointment
         .in('status', ['pending', 'confirmed', 'blocked'])
-        .lt('start_time', newEnd.toISOString())
-        .gt('end_time', newStart.toISOString())
+        .lt('start_time', new Date(newEnd.getTime() + bufferMs).toISOString())
+        .gt('end_time', new Date(newStart.getTime() - bufferMs).toISOString())
         .limit(1)
 
       if (conflicts && conflicts.length > 0) {

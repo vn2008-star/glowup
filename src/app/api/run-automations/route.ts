@@ -13,7 +13,38 @@ import { siteBaseUrl } from '@/lib/site-url'
 // - Rebooking Reminder (based on service cycle, default 30 days)
 // - No-Show Follow-Up (1 hour after missed appointment)
 // - Review Request (2 hours after completed service)
-// - Loyalty Milestone (when reaching point threshold)
+
+type Channel = 'sms' | 'email' | 'both'
+
+/**
+ * Is this automation switched on? Automations default ON — the app has always
+ * sent these unless a salon explicitly opted out.
+ *
+ * An automation may answer to more than one settings key. The Review Request
+ * toggle in Settings writes `auto_review_request`, but this route only ever
+ * read `auto_review`, so unticking the box did nothing and the review texts
+ * kept going out. Both are honoured; the first key carrying an explicit
+ * boolean wins, so the toggle a salon actually used is the one that counts.
+ */
+function automationOn(automations: Record<string, boolean | string>, ...keys: string[]): boolean {
+  for (const key of keys) {
+    if (typeof automations[key] === 'boolean') return automations[key] as boolean
+  }
+  return true
+}
+
+/**
+ * The delivery channel a salon picked for an automation, from the "Send via:"
+ * picker on the automation card. Anything unrecognised (or unset) falls back.
+ */
+function automationChannel(
+  automations: Record<string, boolean | string>,
+  key: string,
+  fallback: Channel = 'both',
+): Channel {
+  const value = String(automations[key] || '')
+  return (['sms', 'email', 'both'].includes(value) ? value : fallback) as Channel
+}
 
 export async function GET(request: Request) {
   // Auth: only allow Vercel Cron or manual call with CRON_SECRET
@@ -269,11 +300,10 @@ export async function GET(request: Request) {
     // Discount, lead time, channel, and message are per-business settings
     // (configured on the Loyalty page); the old 20%/7-day/both defaults apply
     // when the owner hasn't customized anything.
-    if (automations.auto_birthday !== false) {
+    if (automationOn(automations, 'auto_birthday')) {
       const bdayDiscount = String(automations.auto_birthday_discount || '20')
       const bdayDaysBefore = parseInt(String(automations.auto_birthday_days || '7'), 10) || 7
-      const bdayChannel = (['sms', 'email', 'both'].includes(String(automations.auto_birthday_channel))
-        ? String(automations.auto_birthday_channel) : 'both') as 'sms' | 'email' | 'both'
+      const bdayChannel = automationChannel(automations, 'auto_birthday_channel')
       const bdayTemplate = String(automations.auto_birthday_message || '') || DEFAULT_BIRTHDAY_TEMPLATE
 
       const today = new Date()
@@ -318,7 +348,7 @@ export async function GET(request: Request) {
     }
 
     // ── Rebooking Reminder (clients not seen in configured service cycle) ──
-    if (automations.auto_rebooking !== false) {
+    if (automationOn(automations, 'auto_rebooking')) {
       const cycleDays = parseInt(String(automations.auto_rebooking_cycle || '30'), 10)
       const cycleAgo = new Date()
       cycleAgo.setDate(cycleAgo.getDate() - cycleDays)
@@ -348,7 +378,8 @@ export async function GET(request: Request) {
           ].join('\n')
 
           await sendMessage({
-            client, message, businessName, businessEmail, resendClient, smsConfig, channel: 'both', bulk: true,
+            client, message, businessName, businessEmail, resendClient, smsConfig,
+            channel: automationChannel(automations, 'auto_rebooking_channel'), bulk: true,
             logoUrl: tenant.logo_url,
             subject: `💜 We miss you at ${businessName} — time for a refresh?`,
             ctaUrl: bookingUrl,
@@ -366,7 +397,7 @@ export async function GET(request: Request) {
     }
 
     // ── No-Show Follow-Up ──
-    if (automations.auto_noshow !== false) {
+    if (automationOn(automations, 'auto_noshow')) {
       const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000)
       const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000)
 
@@ -405,7 +436,8 @@ export async function GET(request: Request) {
           ].join('\n')
 
           await sendMessage({
-            client, message, businessName, businessEmail, resendClient, smsConfig, channel: 'both',
+            client, message, businessName, businessEmail, resendClient, smsConfig,
+            channel: automationChannel(automations, 'auto_noshow_channel'),
             logoUrl: tenant.logo_url,
             subject: `We missed you today at ${businessName} 😊`,
             ctaUrl: bookingUrl,
@@ -423,7 +455,7 @@ export async function GET(request: Request) {
     }
 
     // ── Review Request (2h after completed appointments) ──
-    if (automations.auto_review !== false) {
+    if (automationOn(automations, 'auto_review', 'auto_review_request')) {
       const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000)
       const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000)
 
@@ -461,7 +493,7 @@ export async function GET(request: Request) {
             message += `\n\nLeave a review → ${googleReviewUrl}`
           }
 
-          const reviewChannel = String(automations.auto_review_channel || 'sms') as 'sms' | 'email' | 'both'
+          const reviewChannel = automationChannel(automations, 'auto_review_channel', 'sms')
           await sendMessage({
             client, message, businessName, businessEmail, resendClient, smsConfig, channel: reviewChannel,
             logoUrl: tenant.logo_url,
@@ -481,7 +513,7 @@ export async function GET(request: Request) {
     }
 
     // ── Holiday Promo Auto-Send ──
-    if (automations.auto_holiday !== false) {
+    if (automationOn(automations, 'auto_holiday')) {
       const holidaySettings = (settings.holiday_settings || {}) as Record<string, number>
       const sendDaysBefore = holidaySettings.send_days_before ?? 7
       const today = new Date()

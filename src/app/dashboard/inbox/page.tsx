@@ -38,11 +38,15 @@ const BOT_CONFIG_DEFAULTS = {
 
 type BotConfig = typeof BOT_CONFIG_DEFAULTS;
 
+// `comingSoon` marks a channel with no integration behind it. Only web and SMS
+// reach the AI receptionist (the booking page widget and the Twilio webhook);
+// there is no Meta connection, so those two toggles were saving an "on" state
+// that could never route a message.
 const CHANNEL_DETAILS = [
-  { key: "web", icon: "🌐", name: "Website Widget", desc: "Embed a chat widget on your website" },
-  { key: "sms", icon: "💬", name: "SMS / Text", desc: "Auto-reply to incoming text messages" },
-  { key: "instagram", icon: "📸", name: "Instagram DMs", desc: "Respond to Instagram direct messages" },
-  { key: "facebook", icon: "📘", name: "Facebook Messenger", desc: "Handle Messenger conversations" },
+  { key: "web", icon: "🌐", name: "Website Widget", desc: "Embed a chat widget on your website", comingSoon: false },
+  { key: "sms", icon: "💬", name: "SMS / Text", desc: "Auto-reply to incoming text messages", comingSoon: false },
+  { key: "instagram", icon: "📸", name: "Instagram DMs", desc: "Respond to Instagram direct messages", comingSoon: true },
+  { key: "facebook", icon: "📘", name: "Facebook Messenger", desc: "Handle Messenger conversations", comingSoon: true },
 ] as const;
 
 export default function InboxPage() {
@@ -296,16 +300,17 @@ export default function InboxPage() {
             <p className={styles.configDesc}>Choose which channels your AI receptionist should monitor and respond on.</p>
             <div className={styles.channelGrid}>
               {CHANNEL_DETAILS.map((ch) => (
-                <div key={ch.key} className={`${styles.channelCard} ${botConfig.channels[ch.key as keyof typeof botConfig.channels] ? styles.channelActive : ""}`}>
+                <div key={ch.key} className={`${styles.channelCard} ${!ch.comingSoon && botConfig.channels[ch.key as keyof typeof botConfig.channels] ? styles.channelActive : ""}`} style={ch.comingSoon ? { opacity: 0.55 } : undefined}>
                   <div className={styles.channelIcon}>{ch.icon}</div>
                   <div className={styles.channelInfo}>
                     <div className={styles.channelName}>{ch.name}</div>
-                    <div className={styles.channelDesc}>{ch.desc}</div>
+                    <div className={styles.channelDesc}>{ch.comingSoon ? "🚧 Coming soon — not connected yet" : ch.desc}</div>
                   </div>
-                  <label className={styles.switchLabel}>
+                  <label className={styles.switchLabel} style={ch.comingSoon ? { cursor: "not-allowed" } : undefined}>
                     <input
                       type="checkbox"
-                      checked={botConfig.channels[ch.key as keyof typeof botConfig.channels]}
+                      checked={!ch.comingSoon && botConfig.channels[ch.key as keyof typeof botConfig.channels]}
+                      disabled={ch.comingSoon}
                       onChange={() => toggleChannel(ch.key)}
                     />
                     <span className={styles.switchTrack}><span className={styles.switchThumb} /></span>

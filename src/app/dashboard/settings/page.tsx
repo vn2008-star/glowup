@@ -19,6 +19,19 @@ interface BusinessHours {
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
+// Map a stored cancellation policy onto one of the options the select offers.
+// Live data holds shorthand like "24h", which matches no <option> and would
+// render the select blank — then save that blank back over the salon's policy.
+function normalizeCancellationPolicy(raw: unknown, fallback: string): string {
+  const value = String(raw ?? "").trim();
+  if (!value) return fallback;
+  if (/^no/i.test(value)) return "No cancellation";
+  const hours = parseInt(value, 10);
+  if (hours === 24) return "24 hours before";
+  if (hours === 48) return "48 hours before";
+  return fallback;
+}
+
 // Rows of the reminder grid. `key` must match a reminder type the sender knows
 // (REMINDER_TYPES in src/lib/notifications.ts) — the toggles are stored as
 // r{key}_sms / o{key}_email and read straight back by /api/send-reminders.
@@ -207,7 +220,18 @@ export default function SettingsPage() {
     if (tenant.settings && typeof tenant.settings === "object") {
       const s = tenant.settings as Record<string, unknown>;
       if (s.business_hours) setHours(s.business_hours as BusinessHours);
-      if (s.booking) setBookingSettings(s.booking as typeof bookingSettings);
+      // Coerce to strings — these back <select value>, and live data holds a
+      // numeric bufferMinutes (15) and a boolean depositRequired (false) from
+      // older writers, either of which renders as a blank select.
+      if (s.booking) {
+        const b = s.booking as Record<string, unknown>;
+        setBookingSettings(prev => ({
+          advanceBookingDays: b.advanceBookingDays != null ? String(b.advanceBookingDays) : prev.advanceBookingDays,
+          cancellationPolicy: normalizeCancellationPolicy(b.cancellationPolicy, prev.cancellationPolicy),
+          depositRequired: typeof b.depositRequired === "string" && b.depositRequired ? b.depositRequired : prev.depositRequired,
+          bufferMinutes: b.bufferMinutes != null ? String(b.bufferMinutes) : prev.bufferMinutes,
+        }));
+      }
       if (s.reminders) setReminderSettings({ ...reminderSettings, ...(s.reminders as Record<string, boolean>) });
       if (s.staff_reminders) {
         const sr = s.staff_reminders as Record<string, unknown>;
@@ -600,11 +624,15 @@ export default function SettingsPage() {
               <option>No cancellation</option>
             </select>
           </div>
+          {/* Deposits are not collected anywhere in the booking flow yet, so
+              this select is shown disabled rather than quietly recording a
+              policy the booking page never applies. */}
           <div className={styles.formGroup}>
             <label className="label">Deposit Required</label>
             <select
               className="input"
               value={bookingSettings.depositRequired}
+              disabled
               onChange={(e) => setBookingSettings({ ...bookingSettings, depositRequired: e.target.value })}
             >
               <option>No deposit</option>
@@ -612,6 +640,9 @@ export default function SettingsPage() {
               <option>20% of service</option>
               <option>50% of service</option>
             </select>
+            <small style={{ color: "var(--text-tertiary)" }}>
+              🚧 Coming soon — the booking page doesn&apos;t take payment yet, so no deposit is charged.
+            </small>
           </div>
           <div className={styles.formGroup}>
             <label className="label">Buffer Between Appointments</label>
@@ -1260,13 +1291,23 @@ export default function SettingsPage() {
         <label className={styles.protectionToggle}>
           <input
             type="checkbox"
-            checked={!!((tenant?.settings as Record<string, unknown>)?.automations as Record<string, boolean>)?.auto_review_request}
+            // Review requests send unless a salon opts out, so an absent key is
+            // ON — showing it unticked told owners the automation was off while
+            // it was busy texting their clients.
+            checked={((tenant?.settings as Record<string, unknown>)?.automations as Record<string, boolean>)?.auto_review_request !== false
+              && ((tenant?.settings as Record<string, unknown>)?.automations as Record<string, boolean>)?.auto_review !== false}
             onChange={(e) => {
               const settings = {
                 ...(typeof tenant?.settings === "object" && tenant.settings ? tenant.settings : {}),
               } as Record<string, unknown>;
               const existingAuto = (settings.automations || {}) as Record<string, boolean>;
-              settings.automations = { ...existingAuto, auto_review_request: e.target.checked };
+              // Write both spellings: the cron reads auto_review, this panel
+              // shipped writing auto_review_request, and salons carry either.
+              settings.automations = {
+                ...existingAuto,
+                auto_review: e.target.checked,
+                auto_review_request: e.target.checked,
+              };
               fetch("/api/save-settings", {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },

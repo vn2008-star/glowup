@@ -578,3 +578,15 @@
 }
 .reasonInput:focus { border-color: #c9a0dc; }
 .reasonInput::placeholder { color: #6d6578; }
+
+/* Why the Cancel button isn't offered — the salon's cancellation policy. */
+.policyNotice {
+  margin: 0.75rem 0 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid rgba(232, 168, 124, 0.35);
+  border-radius: 12px;
+  background: rgba(232, 168, 124, 0.08);
+  color: #e8d5c4;
+  font-size: 0.85rem;
+  line-height: 1.6;
+}

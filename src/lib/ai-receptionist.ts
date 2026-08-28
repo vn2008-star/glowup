@@ -147,6 +147,7 @@ ${slotStr}
 BOOKING:
 - Online booking page: ${bookingUrl}
 ${bookingRules}
+${(botConfig.booking_prompt || '').trim() ? `- When the moment is right to invite them to book, use the salon's own wording: "${(botConfig.booking_prompt || '').trim()}"` : ''}
 
 CUSTOM FAQ:
 ${faqList || '  No custom FAQ set up'}

@@ -45,6 +45,10 @@ export default function ManageClient({ token }: { token: string }) {
   const [staffSchedule, setStaffSchedule] = useState<Record<string, unknown> | null>(null);
   const [bookedSlots, setBookedSlots] = useState<{ start: string; end: string }[]>([]);
 
+  // The salon's cancellation policy, already applied to THIS appointment by the
+  // API — non-null means online cancellation isn't available and says why.
+  const [cancelBlocked, setCancelBlocked] = useState<string | null>(null);
+
   // Reschedule state
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
@@ -65,6 +69,7 @@ export default function ManageClient({ token }: { token: string }) {
         setBusiness(data.business);
         if (data.staffSchedule) setStaffSchedule(data.staffSchedule);
         if (data.bookedSlots) setBookedSlots(data.bookedSlots);
+        setCancelBlocked(data.cancellation?.blockedReason ?? null);
 
         // If already cancelled, show that state
         if (data.appointment?.status === "cancelled") {
@@ -566,10 +571,17 @@ export default function ManageClient({ token }: { token: string }) {
                 <button className={styles.rescheduleBtn} onClick={() => setView("reschedule")}>
                   🔄 Reschedule
                 </button>
-                <button className={styles.cancelBtn} onClick={() => setView("cancel-confirm")}>
-                  ✗ Cancel
-                </button>
+                {!cancelBlocked && (
+                  <button className={styles.cancelBtn} onClick={() => setView("cancel-confirm")}>
+                    ✗ Cancel
+                  </button>
+                )}
               </div>
+            )}
+            {/* Say why the Cancel button isn't there, rather than letting the
+                client find out from a 403 after they've committed to it. */}
+            {canModify && view === "details" && cancelBlocked && (
+              <p className={styles.policyNotice}>ℹ️ {cancelBlocked}</p>
             )}
 
             {/* Cancel Confirmation */}

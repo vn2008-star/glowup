@@ -38,9 +38,12 @@ const TIER_COLORS: Record<string, string> = {
   Platinum: "#e5e4e2",
 };
 
+// `comingSoon` marks a card whose automation nothing actually sends. The
+// run-automations cron has no loyalty-milestone step, so that toggle was
+// storing a preference that could never fire — and reporting itself as on.
 const LOYALTY_AUTOMATIONS = [
-  { key: "auto_birthday", name: "🎂 Birthday Auto-Send", trigger: "Before each client's birthday", channel: "Configurable" },
-  { key: "auto_loyalty", name: "🏆 Loyalty Milestone", trigger: "When reaching point threshold", channel: "SMS + Email" },
+  { key: "auto_birthday", name: "🎂 Birthday Auto-Send", trigger: "Before each client's birthday", channel: "Configurable", comingSoon: false },
+  { key: "auto_loyalty", name: "🏆 Loyalty Milestone", trigger: "When reaching point threshold", channel: "SMS + Email", comingSoon: true },
 ];
 
 const DEFAULT_BDAY_MESSAGE = DEFAULT_BIRTHDAY_TEMPLATE;
@@ -253,15 +256,20 @@ export default function LoyaltyPage() {
             <div key={a.key}>
               <div className={`card ${styles.automationCard}`}>
                 <div className={styles.automationInfo}>
-                  <h3>{a.name}</h3>
+                  <h3>{a.name}{a.comingSoon && <span style={{ marginLeft: 8, fontSize: "0.7rem", fontWeight: 700, color: "var(--text-tertiary)" }}>🚧 COMING SOON</span>}</h3>
                   <div className={styles.automationMeta}>
                     <span className={styles.trigger}>⚡ {a.key === "auto_birthday" ? `${bdayCfg.days} days before birthday` : a.trigger}</span>
                     <span className={styles.channel}>📱 {a.key === "auto_birthday" ? (bdayCfg.channel === "both" ? "SMS + Email" : bdayCfg.channel.toUpperCase()) : a.channel}</span>
                   </div>
                 </div>
                 <div>
-                  <label className={styles.toggleLabel}>
-                    <input type="checkbox" checked={automationStates[a.key] || false} onChange={() => handleToggleAutomation(a.key)} />
+                  <label className={styles.toggleLabel} style={a.comingSoon ? { opacity: 0.4, cursor: "not-allowed" } : undefined}>
+                    <input
+                      type="checkbox"
+                      checked={!a.comingSoon && (automationStates[a.key] || false)}
+                      disabled={a.comingSoon}
+                      onChange={() => handleToggleAutomation(a.key)}
+                    />
                     <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
                   </label>
                 </div>

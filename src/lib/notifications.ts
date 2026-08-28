@@ -82,6 +82,83 @@ export function appendInstructionsToSms(
   return `${body}\n\n📌 ${instructions.text}`
 }
 
+/**
+ * The salon's online-cancellation policy — Settings → Booking Policy →
+ * "Cancellation Policy". Governs what a CLIENT can do from their manage link;
+ * the salon can always cancel from the dashboard.
+ *
+ * `cutoffHours: null` means online cancellation is off entirely. The stored
+ * value is the literal option text the select offers, so it's matched loosely
+ * rather than by exact string.
+ */
+export function resolveCancellationPolicy(tenant: {
+  settings?: Record<string, unknown> | null
+} | null | undefined): { cutoffHours: number | null; label: string } {
+  const booking = ((tenant?.settings || {}) as Record<string, unknown>).booking as Record<string, string> | undefined
+  const raw = String(booking?.cancellationPolicy || '').trim()
+  if (/^no cancellation/i.test(raw)) return { cutoffHours: null, label: raw }
+  const hours = parseInt(raw, 10)
+  if (Number.isFinite(hours) && hours > 0) return { cutoffHours: hours, label: raw }
+  return { cutoffHours: 0, label: raw }
+}
+
+/**
+ * May the client still cancel this appointment online? Returns the reason to
+ * show them when they can't, so the page and the API say the same thing.
+ */
+export function cancellationBlockedReason(
+  policy: { cutoffHours: number | null; label: string },
+  start: Date,
+  businessPhone: string,
+): string | null {
+  const callUs = businessPhone ? ` Please call us at ${businessPhone}.` : ' Please contact the salon directly.'
+  if (policy.cutoffHours === null) {
+    return `Appointments can't be cancelled online.${callUs}`
+  }
+  if (policy.cutoffHours > 0) {
+    const cutoff = start.getTime() - policy.cutoffHours * 60 * 60 * 1000
+    if (Date.now() > cutoff) {
+      return `Our cancellation policy is ${policy.cutoffHours} hours before your appointment, so this one can no longer be cancelled online.${callUs}`
+    }
+  }
+  return null
+}
+
+/**
+ * Minutes of turnaround a salon wants between appointments — Settings →
+ * Booking Policy → "Buffer Between Appointments".
+ *
+ * This governs CLIENT-facing booking only (the public booking page and a
+ * client's own reschedule). Staff booking from the dashboard can still place
+ * appointments back to back on purpose; the buffer is about what the salon
+ * offers strangers, not a hard scheduling rule.
+ */
+export function resolveBookingBufferMinutes(tenant: {
+  settings?: Record<string, unknown> | null
+} | null | undefined): number {
+  const booking = ((tenant?.settings || {}) as Record<string, unknown>).booking as Record<string, string> | undefined
+  const minutes = parseInt(String(booking?.bufferMinutes ?? '0'), 10)
+  return Number.isFinite(minutes) && minutes > 0 ? minutes : 0
+}
+
+/**
+ * Widen a booked interval by the salon's buffer, so the time either side of an
+ * appointment reads as taken. Applied to what the booking page is told is
+ * booked AND to the server's conflict check, so the picker and the check agree.
+ */
+export function padBookedSlot(
+  startISO: string,
+  endISO: string,
+  bufferMinutes: number,
+): { start: string; end: string } {
+  if (bufferMinutes <= 0) return { start: startISO, end: endISO }
+  const ms = bufferMinutes * 60 * 1000
+  return {
+    start: new Date(new Date(startISO).getTime() - ms).toISOString(),
+    end: new Date(new Date(endISO).getTime() + ms).toISOString(),
+  }
+}
+
 /** Format an appointment start for messages, in the salon's timezone. */
 export function formatAptWhen(start: Date, tz: string): { dateStr: string; timeStr: string } {
   try {
