@@ -6,6 +6,11 @@ import { promoEmailHtml } from '@/lib/email-templates'
 import { sendSms, smsProvider, canSendBulkSms, smsConfigFromSettings, type TenantSmsConfig } from '@/lib/sms'
 import { PROMO_HOLIDAYS, getNextHolidayDate, DEFAULT_BIRTHDAY_TEMPLATE } from '@/lib/schedule-utils'
 import { siteBaseUrl } from '@/lib/site-url'
+import { resolveTenantTz } from '@/lib/notifications'
+import { nowInTz, formatInTz } from '@/lib/tz'
+
+/** Hour, in each salon's own timezone, when the once-a-day automations run. */
+const DAILY_AUTOMATION_HOUR = 9
 
 // ─── Automation Engine (Cron-triggered) ───
 // Runs daily. Checks each tenant's automation settings and fires:
@@ -69,7 +74,9 @@ export async function GET(request: Request) {
   // Fetch all tenants with automation settings
   const { data: tenants } = await supabase
     .from('tenants')
-    .select('id, name, email, slug, logo_url, settings')
+    // timezone + address feed resolveTenantTz — every schedule decision below
+    // is made in the salon's local time, not the server's UTC.
+    .select('id, name, email, slug, logo_url, settings, timezone, address')
 
   if (!tenants || tenants.length === 0) {
     return NextResponse.json({ message: 'No tenants found', processed: 0 })
@@ -96,18 +103,22 @@ export async function GET(request: Request) {
     const baseUrl = siteBaseUrl()
     const bookingUrl = `${baseUrl}/book/${tenant.slug}`
     const businessEmail = tenant.email || ''
+    // Every "what time is it" decision below is the SALON's local time. Judging
+    // by UTC meant a 9 AM send hour fired at 2 AM in California.
+    const tz = resolveTenantTz(tenant)
+    const localNow = nowInTz(tz)
+    const localDayName = formatInTz(new Date().toISOString(), tz, { weekday: 'long' })
 
     // ── Fill My Openings Auto-Blast ──
     if (automations.auto_fill_openings) {
-      // Schedule gate: only fire on configured days + hour
-      const DAY_NAMES_FULL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
-      const nowForSchedule = new Date()
-      const currentDayName = DAY_NAMES_FULL[nowForSchedule.getUTCDay()]
-      const currentHourUTC = nowForSchedule.getUTCHours()
+      // Schedule gate: only fire on the configured days + hour, read in the
+      // salon's own timezone. These were compared against UTC while the cron
+      // only ever ran at 09:00 UTC, so a salon whose send hour wasn't 9 never
+      // got a blast at all — and the salon whose was got it at 2 AM local.
       const scheduleDays = String(automations.auto_fill_openings_schedule_days || 'Monday').split(',').filter(Boolean)
       const sendHour = parseInt(String(automations.auto_fill_openings_send_hour || '9'), 10)
 
-      if (!scheduleDays.includes(currentDayName) || currentHourUTC !== sendHour) {
+      if (!scheduleDays.includes(localDayName) || localNow.hour !== sendHour) {
         // Not the right day/hour — skip FMO for this tenant
       } else {
 
@@ -291,10 +302,16 @@ export async function GET(request: Request) {
     }
 
     // ── Daily automations gate ──
-    // Since the cron now runs hourly (to support custom FMO schedules),
-    // run all daily automations only at 8 AM UTC to prevent duplicate sends.
-    const dailyGateHour = new Date().getUTCHours()
-    if (dailyGateHour === 8) {
+    // Birthday, rebooking and holiday promos should land once a day. The cron
+    // ticks hourly, so they fire on the tick where it is DAILY_AUTOMATION_HOUR
+    // in the salon's own timezone — the same shape as the daily digest in
+    // send-reminders.
+    //
+    // This gate previously compared against 8 AM *UTC* while vercel.json ran
+    // the cron at 09:00 UTC, so it was never once true: birthday, rebooking,
+    // no-show, review and holiday promos had never run in production. Only
+    // Fill My Openings worked, because it sits above the gate.
+    if (localNow.hour === DAILY_AUTOMATION_HOUR) {
 
     // ── Birthday Auto-Send ──
     // Discount, lead time, channel, and message are per-business settings
@@ -306,11 +323,12 @@ export async function GET(request: Request) {
       const bdayChannel = automationChannel(automations, 'auto_birthday_channel')
       const bdayTemplate = String(automations.auto_birthday_message || '') || DEFAULT_BIRTHDAY_TEMPLATE
 
-      const today = new Date()
-      const targetDate = new Date(today)
-      targetDate.setDate(targetDate.getDate() + bdayDaysBefore)
-      const targetMonth = targetDate.getMonth() + 1
-      const targetDay = targetDate.getDate()
+      // Work from the salon's local date. Date.UTC handles the month/year
+      // rollover when the lead time crosses a boundary.
+      const [ly, lm, ld] = localNow.dateStr.split('-').map(Number)
+      const targetDate = new Date(Date.UTC(ly, lm - 1, ld + bdayDaysBefore))
+      const targetMonth = targetDate.getUTCMonth() + 1
+      const targetDay = targetDate.getUTCDate()
 
       const { data: birthdayClients } = await supabase
         .from('clients')
@@ -321,8 +339,12 @@ export async function GET(request: Request) {
       if (birthdayClients) {
         for (const client of birthdayClients) {
           if (!client.birthday) continue
-          const bday = new Date(client.birthday)
-          if (bday.getMonth() + 1 !== targetMonth || bday.getDate() !== targetDay) continue
+          // Read the stored date as text. `new Date('1983-11-17')` is UTC
+          // midnight, and getMonth()/getDate() are local, so west of UTC every
+          // birthday read back a day early.
+          const bday = String(client.birthday).match(/^\d{4}-(\d{2})-(\d{2})/)
+          if (!bday) continue
+          if (Number(bday[1]) !== targetMonth || Number(bday[2]) !== targetDay) continue
 
           const clientFirst = `${client.first_name || ''}`.trim() || 'there'
           const clientGreeting = client.last_name
@@ -353,14 +375,23 @@ export async function GET(request: Request) {
       const cycleAgo = new Date()
       cycleAgo.setDate(cycleAgo.getDate() - cycleDays)
 
-      const { data: staleClients } = await supabase
+      const { data: staleCandidates } = await supabase
         .from('clients')
-        .select('id, first_name, last_name, phone, email, sms_opt_out, last_visit')
+        .select('id, first_name, last_name, phone, email, sms_opt_out, last_visit, preferences')
         .eq('tenant_id', tenant.id)
         .eq('status', 'active')
         .not('last_visit', 'is', null)
         .lte('last_visit', cycleAgo.toISOString())
-        .limit(50) // Process in batches
+        .limit(200)
+
+      // One nudge per client per cycle. Nothing used to filter on the "already
+      // reminded" marker, so every stale client would have been re-sent on
+      // every run — daily spam until they booked.
+      const staleClients = (staleCandidates || []).filter(c => {
+        const prefs = (c.preferences || {}) as Record<string, unknown>
+        const last = typeof prefs.last_rebooking_sent === 'string' ? Date.parse(prefs.last_rebooking_sent) : NaN
+        return Number.isNaN(last) || last < cycleAgo.getTime()
+      }).slice(0, 50) // batch
 
       if (staleClients) {
         for (const client of staleClients) {
@@ -387,16 +418,30 @@ export async function GET(request: Request) {
           })
           results.rebooking++
 
-          // Mark client as reminded to prevent duplicate sends
+          // Mark client as reminded to prevent duplicate sends.
+          // This used to write the marker into `notes`, REPLACING it — one run
+          // would have wiped the salon's own notes ("Classic size 12 — allergy
+          // gel") for up to 50 clients. The marker lives in the preferences
+          // blob instead, alongside whatever is already there.
           await supabase
             .from('clients')
-            .update({ notes: `[Auto] Rebooking reminder sent ${new Date().toLocaleDateString()}` })
+            .update({
+              preferences: {
+                ...((client.preferences || {}) as Record<string, unknown>),
+                last_rebooking_sent: new Date().toISOString(),
+              },
+            })
             .eq('id', client.id)
         }
       }
     }
 
+    } // end daily gate — no-show and review are hourly, see below
+
     // ── No-Show Follow-Up ──
+    // Hourly, not daily: this looks at appointments 2-4 hours old, a window a
+    // once-a-day run would step over almost every time. Safe to repeat because
+    // it skips anything already marked in the appointment's notes.
     if (automationOn(automations, 'auto_noshow')) {
       const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000)
       const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000)
@@ -513,6 +558,8 @@ export async function GET(request: Request) {
     }
 
     // ── Holiday Promo Auto-Send ──
+    // Back inside the daily gate: one promo per holiday, not one per hour.
+    if (localNow.hour === DAILY_AUTOMATION_HOUR) {
     if (automationOn(automations, 'auto_holiday')) {
       const holidaySettings = (settings.holiday_settings || {}) as Record<string, number>
       const sendDaysBefore = holidaySettings.send_days_before ?? 7
@@ -585,7 +632,7 @@ export async function GET(request: Request) {
       }
     }
     }
-    } // end dailyGateHour === 8
+    } // end daily gate (holiday promo)
 
   return NextResponse.json({
     message: 'Automations processed',
