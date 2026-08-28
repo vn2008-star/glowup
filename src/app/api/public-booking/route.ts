@@ -3,7 +3,7 @@ import { waitUntil } from '@vercel/functions'
 import { createClient } from '@supabase/supabase-js'
 import { timezoneFromAddress, DEFAULT_TZ } from '@/lib/tz'
 import { toE164 } from '@/lib/utils'
-import { resolveTenantTz, resolveSpecialInstructions, appendInstructionsToSms } from '@/lib/notifications'
+import { resolveTenantTz, resolveSpecialInstructions, appendInstructionsToSms, buildReminderRows, insertReminderRows } from '@/lib/notifications'
 import { sendSms, smsProvider, smsConfigFromSettings } from '@/lib/sms'
 import { bookingConfirmationHtml, promoEmailHtml, googleCalendarUrl } from '@/lib/email-templates'
 
@@ -400,26 +400,18 @@ export async function POST(request: Request) {
 
   // ── Create reminders for ALL appointments ──
   if (clientId) {
-    const reminderRows: { tenant_id: string; appointment_id: string; client_id: string; type: string; channel: string; status: string }[] = []
     // Only schedule SMS reminders when the client opted in; email always.
     const smsOk = smsConsent && !!client_phone
-    for (const apt of appointments) {
-      for (const type of ['24h', '2h', '1h']) {
-        if (smsOk) {
-          reminderRows.push({ tenant_id: tenant.id, appointment_id: apt.id, client_id: clientId, type, channel: 'sms', status: 'pending' })
-        }
-        if (client_email) {
-          reminderRows.push({ tenant_id: tenant.id, appointment_id: apt.id, client_id: clientId, type, channel: 'email', status: 'pending' })
-        }
-      }
-    }
-    if (reminderRows.length > 0) {
-      const { error: reminderErr } = await svc.from('appointment_reminders').insert(reminderRows)
-      if (reminderErr) {
-        console.error('[public-booking] Failed to create reminders:', reminderErr)
-      } else {
-        console.log(`[public-booking] ✅ Created ${reminderRows.length} reminder(s) for ${appointments.length} appointment(s)`)
-      }
+    const reminderRows = appointments.flatMap(apt => buildReminderRows({
+      tenantId: tenant.id,
+      appointmentId: apt.id,
+      clientId,
+      clientPhone: smsOk ? client_phone : null,
+      clientEmail: client_email || null,
+    }))
+    const created = await insertReminderRows(svc, reminderRows, 'public-booking')
+    if (created > 0) {
+      console.log(`[public-booking] ✅ Created ${created} reminder(s) for ${appointments.length} appointment(s)`)
     }
   }
 

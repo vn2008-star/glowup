@@ -4,17 +4,57 @@ import { toE164 } from '@/lib/utils'
 import { verifyCronRequest } from '@/lib/cron-auth'
 import { fillPlaceholders, resolveTenantTz, resolveSpecialInstructions, appendInstructionsToSms } from '@/lib/notifications'
 import { sendSms, smsProvider, smsConfigFromSettings } from '@/lib/sms'
-import { appointmentReminderHtml, dailyDigestHtml, googleCalendarUrl } from '@/lib/email-templates'
+import { appointmentReminderHtml, ownerAppointmentReminderHtml, dailyDigestHtml, googleCalendarUrl } from '@/lib/email-templates'
 import { localToUTC, nowInTz, formatInTz } from '@/lib/tz'
 
 // ─── Send Appointment Reminders (Cron-triggered) ───
-// Vercel Cron calls this hourly.
+// Vercel Cron calls this every 10 minutes (vercel.json). It used to run hourly,
+// but a "30 minutes before" reminder can't be placed to the nearest half hour
+// off an hourly tick.
+//
 // Finds pending reminders where the appointment falls within the send window,
 // sends SMS via Twilio + Email via Resend, and marks them as sent.
 //
-// Reminder types:
-//   24h — sent when appointment is 20-28 hours away
-//   1h  — sent when appointment is 45-90 minutes away
+// Each row is one (appointment, lead time, channel). Channels 'sms'/'email' go
+// to the client; 'owner_sms'/'owner_email' are the salon's own copy of the same
+// nudge. Rows exist for every lead time and channel — whether one actually
+// sends is decided here, from settings.reminders, so a salon that switches
+// "30 minutes before" on today also gets it on bookings already in the diary.
+
+const MIN = 60 * 1000
+
+/**
+ * Which settings.reminders key governs a row. Settings → Reminders writes
+ * r{type}_{channel} for the client column ("r24h_sms") and o{type}_{channel}
+ * for the owner column ("o30m_email").
+ */
+function toggleKey(type: string, channel: string): string {
+  return channel.startsWith('owner_')
+    ? `o${type}_${channel.slice('owner_'.length)}`
+    : `r${type}_${channel}`
+}
+
+/**
+ * Rows that send when the salon has no explicit preference stored.
+ *
+ * The client 24h/2h/1h toggles existed in Settings long before anything read
+ * them — every one of those reminders went out regardless. Defaulting them ON
+ * keeps that behaviour for salons that never touched the panel, while a salon
+ * that DID untick a box now finally gets what it asked for. Everything added
+ * with the owner column (30m, and every owner copy) is opt-in: nothing should
+ * start texting an owner because they upgraded.
+ */
+const DEFAULT_ON: ReadonlySet<string> = new Set([
+  'r24h_sms', 'r24h_email', 'r2h_sms', 'r2h_email', 'r1h_sms', 'r1h_email',
+])
+
+/** How each lead time is described in the message body. */
+const LEAD_LABEL: Record<string, string> = {
+  '24h': 'tomorrow',
+  '2h': 'in about 2 hours',
+  '1h': 'in about 1 hour',
+  '30m': 'in about 30 minutes',
+}
 
 export async function GET(request: Request) {
   // ── Auth: only allow Vercel Cron or manual call with CRON_SECRET ──
@@ -32,13 +72,24 @@ export async function GET(request: Request) {
   const now = new Date()
 
   // ── Define time windows for each reminder type ──
+  //
+  // A row fires on the FIRST tick that finds the appointment inside its window,
+  // so a window's far edge is when the message actually goes out. The old
+  // 20-28h / 105-150m / 45-90m spans were sized for an hourly tick, where that
+  // edge was rarely reached; at ten minutes it always is, and every "1 hour
+  // before" reminder would have gone out a full 90 minutes ahead. These are
+  // centred on their lead time instead, each still wide enough (2+ ticks) that
+  // a missed tick can't drop a reminder.
+  const at = (minutesFromNow: number) => new Date(now.getTime() + minutesFromNow * MIN)
   const windows: { type: string; start: Date; end: Date }[] = [
-    // 24h reminders: appointment is 20-28 hours away
-    { type: '24h', start: new Date(now.getTime() + 20 * 60 * 60 * 1000), end: new Date(now.getTime() + 28 * 60 * 60 * 1000) },
-    // 2h reminders: appointment is 105-150 minutes away
-    { type: '2h', start: new Date(now.getTime() + 105 * 60 * 1000), end: new Date(now.getTime() + 150 * 60 * 1000) },
-    // 1h reminders: appointment is 45-90 minutes away
-    { type: '1h', start: new Date(now.getTime() + 45 * 60 * 1000), end: new Date(now.getTime() + 90 * 60 * 1000) },
+    // 24h: appointment is 23h-24h30m away
+    { type: '24h', start: at(23 * 60), end: at(24 * 60 + 30) },
+    // 2h: appointment is 1h45m-2h30m away
+    { type: '2h', start: at(105), end: at(150) },
+    // 1h: appointment is 45-75 minutes away
+    { type: '1h', start: at(45), end: at(75) },
+    // 30m: appointment is 22-42 minutes away
+    { type: '30m', start: at(22), end: at(42) },
   ]
 
   let totalSent = 0
@@ -100,6 +151,15 @@ export async function GET(request: Request) {
         continue
       }
 
+      // Has this salon asked for this lead time on this channel?
+      const key = toggleKey(win.type, reminder.channel)
+      const toggle = reminderSettings[key]
+      if (typeof toggle === 'boolean' ? !toggle : !DEFAULT_ON.has(key)) {
+        await supabase.from('appointment_reminders').update({ status: 'skipped' }).eq('id', reminder.id)
+        totalSkipped++
+        continue
+      }
+
       // Skip cancelled appointments
       if (appointment.status === 'cancelled') {
         await supabase.from('appointment_reminders').update({ status: 'skipped' }).eq('id', reminder.id)
@@ -142,9 +202,11 @@ export async function GET(request: Request) {
       const manageLink = manageToken ? `${baseUrl}/manage/${manageToken}` : ''
 
       // Customize message based on reminder type
-      const isShortNotice = win.type === '1h' || win.type === '2h'
-      const urgencyLabel = win.type === '1h' ? 'in about 1 hour' : win.type === '2h' ? 'in about 2 hours' : 'tomorrow'
-      const subjectPrefix = isShortNotice ? '⏰ Coming Up Soon' : '🔔 Appointment Reminder'
+      const isShortNotice = win.type !== '24h'
+      const urgencyLabel = LEAD_LABEL[win.type] || 'soon'
+      const subjectPrefix = win.type === '30m' ? '⏰ Starting Soon'
+        : isShortNotice ? '⏰ Coming Up Soon'
+        : '🔔 Appointment Reminder'
 
       const calTitle = `${serviceName} — ${businessName}`
       const calLocation = businessAddress ? `${businessName}, ${businessAddress}` : businessName
@@ -261,6 +323,71 @@ export async function GET(request: Request) {
 
           await supabase.from('appointment_reminders').update({ status: 'sent', sent_at: new Date().toISOString() }).eq('id', reminder.id)
           totalSent++
+
+        } else if (reminder.channel === 'owner_sms' || reminder.channel === 'owner_email') {
+          // ── The salon's own copy: who's coming, for what, how soon ──
+          // Deliberately leaner than the client's: no calendar link, no manage
+          // link, and the client's number so the owner can call them.
+          const ownerPhone = (tenant?.phone as string) || ''
+          const ownerEmail = (tenant?.email as string) || (settings.owner_email as string) || ''
+          const clientPhone = (client.phone as string) || ''
+
+          if (reminder.channel === 'owner_sms') {
+            const ownerE164 = ownerPhone ? toE164(ownerPhone) : null
+            if (!ownerE164) {
+              await supabase.from('appointment_reminders').update({ status: 'skipped' }).eq('id', reminder.id)
+              totalSkipped++
+              continue
+            }
+            const ownerSms = [
+              `🔔 ${businessName}: ${clientName} — ${serviceName} ${urgencyLabel}`,
+              `📅 ${dateStr} at ${timeStr}`,
+              staffName ? `💇 With: ${staffName}` : '',
+              clientPhone ? `📞 ${clientPhone}` : '',
+            ].filter(Boolean).join('\n')
+
+            const tenantSms = smsConfigFromSettings(tenant?.settings)
+            if (hasSms || tenantSms) {
+              const ok = await sendSms(ownerE164, ownerSms, tenantSms)
+              if (!ok) throw new Error(`Owner SMS send failed via ${smsProvider(tenantSms)}`)
+              console.log(`[send-reminders] ✅ ${win.type} owner SMS sent to ${ownerE164}`)
+            } else {
+              console.log(`[DRY RUN] ${win.type} owner SMS to ${ownerPhone}: ${ownerSms}`)
+            }
+          } else {
+            if (!ownerEmail) {
+              await supabase.from('appointment_reminders').update({ status: 'skipped' }).eq('id', reminder.id)
+              totalSkipped++
+              continue
+            }
+            if (hasResend) {
+              const { Resend } = await import('resend')
+              const resend = new Resend(process.env.RESEND_API_KEY!)
+              await resend.emails.send({
+                from: `${businessName} <bookings@joinglowup.org>`,
+                to: [ownerEmail],
+                subject: `${subjectPrefix} — ${clientName}, ${serviceName} at ${timeStr}`,
+                html: ownerAppointmentReminderHtml({
+                  recipientName: businessName,
+                  clientName,
+                  clientPhone,
+                  serviceName,
+                  dateStr,
+                  timeStr,
+                  staffName,
+                  businessName,
+                  leadLabel: urgencyLabel,
+                  logoUrl: tenant?.logo_url || null,
+                }),
+              })
+              console.log(`[send-reminders] ✅ ${win.type} owner email sent to ${ownerEmail}`)
+            } else {
+              console.log(`[DRY RUN] ${win.type} owner email to ${ownerEmail}`)
+            }
+          }
+
+          await supabase.from('appointment_reminders').update({ status: 'sent', sent_at: new Date().toISOString() }).eq('id', reminder.id)
+          totalSent++
         }
       } catch (err) {
         console.error(`[send-reminders] Failed to send ${reminder.channel} ${win.type} reminder ${reminder.id}:`, err)
@@ -292,7 +419,10 @@ export async function GET(request: Request) {
         const tz = resolveTenantTz(tenant)
         const digestHour = parseInt(String(digestCfg.digest_hour ?? '7'), 10)
         const local = nowInTz(tz)
-        if (local.hour !== digestHour) continue
+        // Gate on the FIRST tick of the hour. The cron ticks every 10 minutes
+        // now (30m reminders need it) and nothing else dedupes the digest, so
+        // an hour-only check would mail the owner the same schedule six times.
+        if (local.hour !== digestHour || local.minute >= 10) continue
 
         // Today's salon-local day expressed as a UTC window
         const dayStart = localToUTC(local.dateStr, '00:00', tz)

@@ -413,6 +413,52 @@ export function appointmentReminderHtml(opts: {
   return emailShell(businessName, body, logoUrl)
 }
 
+// ─── Owner's copy of an appointment reminder ───
+// The salon owner's version of the nudge the client just got: who is coming,
+// for what, and how soon. Deliberately not appointmentReminderHtml — that one
+// opens "Dear <client>", offers a "Manage Appointment" button and closes with
+// "See you soon!", all of which read wrong to the person running the salon.
+export function ownerAppointmentReminderHtml(opts: {
+  recipientName: string
+  clientName: string
+  clientPhone?: string | null
+  serviceName: string
+  dateStr: string
+  timeStr: string
+  staffName: string
+  businessName: string
+  leadLabel: string
+  logoUrl?: string | null
+}): string {
+  const { recipientName, clientName, clientPhone, serviceName, dateStr, timeStr, staffName, businessName, leadLabel, logoUrl } = opts
+
+  const detailRows = [
+    detailRow('👤', 'Client', escapeHtml(clientName)),
+    clientPhone ? detailRow('📞', 'Phone', escapeHtml(clientPhone)) : '',
+    detailRow('📋', 'Service', escapeHtml(serviceName)),
+    detailRow('📅', 'Date', dateStr),
+    detailRow('🕐', 'Time', `<strong>${timeStr}</strong>`),
+    staffName ? detailRow('💇', 'Staff', escapeHtml(staffName)) : '',
+  ].filter(Boolean).join('\n')
+
+  const body = `
+    <p style="margin:0 0 4px;color:#e8e8f0;font-size:16px;">Hi ${escapeHtml(recipientName)},</p>
+    <p style="margin:0 0 24px;color:#a0a0c0;font-size:14px;">Heads up — you have an appointment <strong style="color:#e8e8f0;">${leadLabel}</strong>. 🔔</p>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#1e1e3a;border-radius:12px;padding:0;margin-bottom:8px;">
+      <tr><td style="padding:20px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+          ${detailRows}
+        </table>
+      </td></tr>
+    </table>
+
+    <p style="margin:24px 0 0;color:#a0a0c0;font-size:14px;">— ${businessName}</p>
+  `
+
+  return emailShell(businessName, body, logoUrl)
+}
+
 // ─── Reschedule Confirmation Email ───
 export function rescheduleConfirmationHtml(opts: {
   greeting: string

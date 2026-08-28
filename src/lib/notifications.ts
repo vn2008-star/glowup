@@ -8,7 +8,29 @@ import { toE164 } from '@/lib/utils'
 import { timezoneFromAddress, DEFAULT_TZ } from '@/lib/tz'
 import { bookingConfirmationHtml, rescheduleConfirmationHtml, cancellationConfirmationHtml, ownerNotificationHtml, googleCalendarUrl } from '@/lib/email-templates'
 
-const REMINDER_TYPES = ['24h', '2h', '1h'] as const
+/**
+ * Every reminder lead time the app schedules. A row is created for each of
+ * these regardless of the salon's settings — send-reminders decides at send
+ * time whether the owner has that timing/channel switched on, so flipping a
+ * toggle in Settings also applies to appointments that are already booked.
+ */
+export const REMINDER_TYPES = ['24h', '2h', '1h', '30m'] as const
+
+/**
+ * Values migration 006 allowed. Anything outside these needs
+ * 20260828_reminders_30m_owner.sql applied — see insertReminderRows.
+ */
+const LEGACY_TYPES: ReadonlySet<string> = new Set(['24h', '2h', '1h'])
+const LEGACY_CHANNELS: ReadonlySet<string> = new Set(['sms', 'email'])
+
+export type ReminderRow = {
+  tenant_id: string
+  appointment_id: string
+  client_id: string
+  type: string
+  channel: string
+  status: string
+}
 
 /**
  * Resolve a tenant's display timezone.
@@ -115,10 +137,81 @@ export { sendSms }
 export type { TenantSmsConfig }
 
 /**
- * Insert pending 24h/2h/1h reminder rows for a client appointment.
- * Only creates rows for channels the client can actually receive on
- * (phone → sms, email → email). The hourly send-reminders cron picks these up
- * and skips them if the tenant has reminders disabled or the client opted out.
+ * Build the pending reminder rows for one appointment — every lead time in
+ * REMINDER_TYPES, on every channel that could carry it:
+ *
+ *   sms / email         → the client, but only where we can reach them
+ *                         (phone → sms, email → email)
+ *   owner_sms / owner_email → the salon owner's copy of the same nudge
+ *
+ * Owner rows are always built, even for salons that have owner reminders
+ * switched off; send-reminders reads settings.reminders and skips the ones the
+ * owner didn't ask for. Scheduling them unconditionally is what lets a salon
+ * turn "30 minutes before" on today and have tomorrow's existing bookings
+ * honour it.
+ */
+export function buildReminderRows(opts: {
+  tenantId: string
+  appointmentId: string
+  clientId: string
+  clientPhone: string | null
+  clientEmail: string | null
+}): ReminderRow[] {
+  const { tenantId, appointmentId, clientId, clientPhone, clientEmail } = opts
+  const base = { tenant_id: tenantId, appointment_id: appointmentId, client_id: clientId, status: 'pending' }
+  const rows: ReminderRow[] = []
+  for (const type of REMINDER_TYPES) {
+    if (clientPhone) rows.push({ ...base, type, channel: 'sms' })
+    if (clientEmail) rows.push({ ...base, type, channel: 'email' })
+    rows.push({ ...base, type, channel: 'owner_sms' })
+    rows.push({ ...base, type, channel: 'owner_email' })
+  }
+  return rows
+}
+
+/**
+ * Insert reminder rows in two batches: the types/channels migration 006 always
+ * allowed, then the ones added by 20260828_reminders_30m_owner.sql.
+ *
+ * They must not share an INSERT. A multi-row INSERT is atomic, so on a database
+ * where that migration hasn't run yet the CHECK violation on a single '30m' row
+ * would roll back the 24h/2h/1h rows with it and the appointment would end up
+ * with no reminders at all — exactly the failure migration 006's own notes
+ * describe. Split, the worst case is losing the new rows and logging why.
+ */
+export async function insertReminderRows(
+  svc: SupabaseClient,
+  rows: ReminderRow[],
+  tag = 'notifications',
+): Promise<number> {
+  const isLegacy = (r: ReminderRow) => LEGACY_TYPES.has(r.type) && LEGACY_CHANNELS.has(r.channel)
+  const batches: [string, ReminderRow[]][] = [
+    ['legacy', rows.filter(isLegacy)],
+    ['30m/owner', rows.filter(r => !isLegacy(r))],
+  ]
+  let inserted = 0
+  for (const [label, batch] of batches) {
+    if (batch.length === 0) continue
+    const { error } = await svc.from('appointment_reminders').insert(batch)
+    if (error) {
+      console.error(
+        `[${tag}] Failed to create ${label} reminders`,
+        label === '30m/owner'
+          ? '— is supabase/migrations/20260828_reminders_30m_owner.sql applied?'
+          : '',
+        error,
+      )
+      continue
+    }
+    inserted += batch.length
+  }
+  return inserted
+}
+
+/**
+ * Schedule every reminder for a client appointment (client copies + the
+ * owner's copies). The send-reminders cron picks these up and skips the ones
+ * the tenant has switched off or the client opted out of.
  */
 export async function scheduleClientReminders(
   svc: SupabaseClient,
@@ -130,19 +223,7 @@ export async function scheduleClientReminders(
     clientEmail: string | null
   }
 ): Promise<number> {
-  const { tenantId, appointmentId, clientId, clientPhone, clientEmail } = opts
-  const rows: { tenant_id: string; appointment_id: string; client_id: string; type: string; channel: string; status: string }[] = []
-  for (const type of REMINDER_TYPES) {
-    if (clientPhone) rows.push({ tenant_id: tenantId, appointment_id: appointmentId, client_id: clientId, type, channel: 'sms', status: 'pending' })
-    if (clientEmail) rows.push({ tenant_id: tenantId, appointment_id: appointmentId, client_id: clientId, type, channel: 'email', status: 'pending' })
-  }
-  if (rows.length === 0) return 0
-  const { error } = await svc.from('appointment_reminders').insert(rows)
-  if (error) {
-    console.error('[notifications] Failed to create reminders:', error)
-    return 0
-  }
-  return rows.length
+  return insertReminderRows(svc, buildReminderRows(opts))
 }
 
 /**

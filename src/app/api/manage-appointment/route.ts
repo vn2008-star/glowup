@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { toE164 } from '@/lib/utils'
 import { formatDateInTz, formatInTz } from '@/lib/tz'
 import { isBusinessClosedOnDate, isStaffOffOnDate, type CustomClosedDate } from '@/lib/schedule-utils'
-import { resolveTenantTz, resolveSpecialInstructions, appendInstructionsToSms } from '@/lib/notifications'
+import { resolveTenantTz, resolveSpecialInstructions, appendInstructionsToSms, buildReminderRows, insertReminderRows } from '@/lib/notifications'
 import { siteBaseUrl } from '@/lib/site-url'
 import { sendSms, smsProvider, smsConfigFromSettings } from '@/lib/sms'
 import { cancelAppointment } from '@/lib/cancel-appointment'
@@ -447,21 +447,15 @@ export async function PATCH(request: Request) {
       .eq('appointment_id', apt.id)
 
     // Create new reminders (SMS only if the client hasn't opted out)
-    const reminderRows: { tenant_id: string; appointment_id: string; client_id: string; type: string; channel: string; status: string }[] = []
     if (apt.client_id) {
       const smsOk = !!client?.phone && !client?.sms_opt_out
-      for (const type of ['24h', '2h', '1h']) {
-        if (smsOk) {
-          reminderRows.push({ tenant_id: apt.tenant_id, appointment_id: apt.id, client_id: apt.client_id, type, channel: 'sms', status: 'pending' })
-        }
-        if (client?.email) {
-          reminderRows.push({ tenant_id: apt.tenant_id, appointment_id: apt.id, client_id: apt.client_id, type, channel: 'email', status: 'pending' })
-        }
-      }
-    }
-    if (reminderRows.length > 0) {
-      const { error: remErr } = await svc.from('appointment_reminders').insert(reminderRows)
-      if (remErr) console.error('[manage-appointment] Failed to recreate reminders:', remErr)
+      await insertReminderRows(svc, buildReminderRows({
+        tenantId: apt.tenant_id,
+        appointmentId: apt.id,
+        clientId: apt.client_id,
+        clientPhone: smsOk ? (client?.phone as string) : null,
+        clientEmail: client?.email || null,
+      }), 'manage-appointment')
     }
 
     // Notify business owner

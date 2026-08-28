@@ -71,18 +71,29 @@ CRON_SECRET=your-random-secret-here
 
 ## 5. Deploy
 
-Push to GitHub → Vercel auto-deploys. The `vercel.json` configures the daily cron job automatically.
+Push to GitHub → Vercel auto-deploys. The `vercel.json` configures the cron job automatically.
+
+Reminder types and channels are guarded by CHECK constraints, so run
+`supabase/migrations/20260828_reminders_30m_owner.sql` before deploying the
+30-minute / owner reminders — without it those rows are rejected (the app keeps
+the 24h/2h/1h ones by inserting them in a separate batch, and logs the reason).
 
 ---
 
 ## How It Works
 
-1. **Appointment booked** → Database trigger creates 2 reminder rows: `24h/sms` + `24h/email`
-2. **Daily at 8 AM UTC** → Vercel Cron calls `/api/send-reminders`
-3. **API route** checks for pending reminders where appointment is 20-28 hours away
+1. **Appointment booked** → the app creates a pending row for every lead time
+   (`24h`, `2h`, `1h`, `30m`) on every channel: `sms`/`email` for the client,
+   `owner_sms`/`owner_email` for the salon's own copy
+2. **Every 10 minutes** → Vercel Cron calls `/api/send-reminders`
+3. **API route** finds pending rows whose appointment is inside that lead time's
+   window, and drops the ones the salon has switched off in Settings
 4. **Sends SMS** via Twilio (skips opted-out clients)
 5. **Sends Email** via Resend
 6. **Marks reminders** as `sent`, `skipped`, or `failed`
+
+Rows are created for every timing whether or not it's enabled, so turning a
+timing on applies to bookings that are already in the diary.
 
 ### Client Opt-Out
 - When a client replies **STOP** to an SMS, the `/api/twilio-webhook` marks them as opted out
