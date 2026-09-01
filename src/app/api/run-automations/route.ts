@@ -4,7 +4,7 @@ import { toE164 } from '@/lib/utils'
 import { verifyCronRequest } from '@/lib/cron-auth'
 import { promoEmailHtml } from '@/lib/email-templates'
 import { sendSms, smsProvider, canSendBulkSms, smsConfigFromSettings, type TenantSmsConfig } from '@/lib/sms'
-import { PROMO_HOLIDAYS, getNextHolidayDate, DEFAULT_BIRTHDAY_TEMPLATE } from '@/lib/schedule-utils'
+import { PROMO_HOLIDAYS, getNextHolidayDate, DEFAULT_BIRTHDAY_TEMPLATE, isSalonClosedOnDate, isStaffOffOnDate } from '@/lib/schedule-utils'
 import { siteBaseUrl } from '@/lib/site-url'
 import { resolveTenantTz } from '@/lib/notifications'
 import { nowInTz, formatInTz } from '@/lib/tz'
@@ -161,12 +161,23 @@ export async function GET(request: Request) {
         date.setDate(date.getDate() + d)
         const dayName = DAY_NAMES[date.getDay()]
         const dateStr = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`
+        // Openings found on THIS day only — the summary below used to read the
+        // running total, so once any day had an opening every later day got
+        // listed too, closed Wednesdays included.
+        let daySlots = 0
+
+        // Salon shut that day (Business Hours "Closed", a closed holiday, or a
+        // custom closed date) — nothing to advertise no matter what the staff
+        // schedules say.
+        if (isSalonClosedOnDate(settings, dateStr)) continue
 
         for (const s of (staffList || [])) {
           const sched = (s.schedule && typeof s.schedule === 'object' && Object.keys(s.schedule).length > 0)
             ? s.schedule as Record<string, { open?: string; close?: string; start?: string; end?: string; off?: boolean; useSlots?: boolean; slots?: { start: string; end: string }[] }>
             : null
           const dayConfig = sched?.[dayName]
+          // Day off, every-other-week phase, vacation, or a holiday they take off
+          if (isStaffOffOnDate(s.schedule as Record<string, unknown> | null, dateStr)) continue
           if (dayConfig?.off) continue
           if (!dayConfig && date.getDay() === 0) continue
 
@@ -206,15 +217,18 @@ export async function GET(request: Request) {
             for (const b of booked) {
               if (b.end <= win.start || b.start >= win.end) continue
               const bStart = Math.max(b.start, win.start)
-              if (bStart > cursor && (bStart - cursor) >= 0.5) totalOpenSlots++
+              if (bStart > cursor && (bStart - cursor) >= 0.5) daySlots++
               cursor = Math.max(cursor, Math.min(b.end, win.end))
             }
-            if (win.end > cursor && (win.end - cursor) >= 0.5) totalOpenSlots++
+            if (win.end > cursor && (win.end - cursor) >= 0.5) daySlots++
           }
         }
 
-        // Build a human-readable summary for the first few days
-        if (totalOpenSlots > 0 && slotDescriptions.length < 3) {
+        totalOpenSlots += daySlots
+
+        // Build a human-readable summary for the first few days that actually
+        // have an opening.
+        if (daySlots > 0 && slotDescriptions.length < 3) {
           const dateLabel = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
           slotDescriptions.push(dateLabel)
         }

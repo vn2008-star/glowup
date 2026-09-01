@@ -12,6 +12,25 @@ import { getISOWeekNumber, CLOSED_DAY_HOLIDAYS, getNextHolidayDate } from "@/lib
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
+/**
+ * What a day looks like for a staff member who has no saved entry for it.
+ * Falls back to the salon's own Business Hours (Settings → Business Hours), so
+ * a salon closed on Wednesday doesn't show every technician working 9–6 that
+ * day. Only used to fill the blanks — a saved staff entry always wins.
+ */
+function businessHoursDefault(
+  settings: Record<string, unknown> | null | undefined,
+  day: string,
+): { open: string; close: string; off: boolean } {
+  const hours = (settings?.business_hours || null) as Record<string, { open?: string; close?: string; closed?: boolean }> | null;
+  const key = hours ? Object.keys(hours).find(k => k.toLowerCase() === day.toLowerCase()) : undefined;
+  const biz = key && hours ? hours[key] : undefined;
+  if (biz) {
+    return { open: biz.open || "09:00", close: biz.close || "18:00", off: !!biz.closed };
+  }
+  return { open: "09:00", close: "18:00", off: day === "Sunday" };
+}
+
 import { formatPhone, localeDateStr } from "@/lib/utils";
 
 export default function StaffPage() {
@@ -111,11 +130,13 @@ export default function StaffPage() {
     setSelectedStaff(s);
     const sched = (s.schedule || {}) as Record<string, { open: string; close: string; off: boolean; alternating?: boolean; alternatingPhase?: 'even' | 'odd'; useSlots?: boolean; slots?: { start: string; end: string }[] }>;
     const filled: Record<string, { open: string; close: string; off: boolean; alternating?: boolean; alternatingPhase?: 'even' | 'odd'; useSlots?: boolean; slots?: { start: string; end: string }[] }> = {};
+    const tenantSettings = (tenant?.settings || null) as Record<string, unknown> | null;
     DAYS.forEach((d) => {
       const existing = sched[d];
+      const fallback = businessHoursDefault(tenantSettings, d);
       filled[d] = existing
-        ? { open: existing.open || "09:00", close: existing.close || "18:00", off: !!existing.off, alternating: !!existing.alternating, alternatingPhase: existing.alternatingPhase || 'even', useSlots: !!existing.useSlots, slots: existing.slots || [] }
-        : { open: "09:00", close: "18:00", off: d === "Sunday", alternating: false, alternatingPhase: 'even', useSlots: false, slots: [] };
+        ? { open: existing.open || fallback.open, close: existing.close || fallback.close, off: !!existing.off, alternating: !!existing.alternating, alternatingPhase: existing.alternatingPhase || 'even', useSlots: !!existing.useSlots, slots: existing.slots || [] }
+        : { ...fallback, alternating: false, alternatingPhase: 'even', useSlots: false, slots: [] };
     });
     setScheduleData(filled);
     setShowScheduleModal(true);
@@ -637,7 +658,10 @@ export default function StaffPage() {
                 <h3>Weekly Schedule</h3>
                 <div className={styles.scheduleGrid}>
                   {DAYS.map((day) => {
-                    const sched = (selectedStaff.schedule as Record<string, { open: string; close: string; off: boolean; useSlots?: boolean; slots?: { start: string; end: string }[] }>)?.[day];
+                    const saved = (selectedStaff.schedule as Record<string, { open: string; close: string; off: boolean; useSlots?: boolean; slots?: { start: string; end: string }[] }>)?.[day];
+                    // No saved entry for this day → show what the salon's own
+                    // Business Hours say, not a hardcoded 9–6.
+                    const sched = saved || { ...businessHoursDefault((tenant?.settings || null) as Record<string, unknown> | null, day), useSlots: false, slots: [] as { start: string; end: string }[] };
                     const formatSlotTime = (t: string) => {
                       const [h, m] = t.split(':').map(Number);
                       const ampm = h >= 12 ? 'PM' : 'AM';

@@ -228,6 +228,42 @@ export function isBusinessClosedOnDate(
   return !!findHolidayOnDate(closedHolidays, dateStr)
 }
 
+/** Case-insensitive day lookup — schedules store "Monday", some legacy rows "monday". */
+function dayEntry<T>(obj: Record<string, unknown> | null | undefined, dayName: string): T | undefined {
+  if (!obj) return undefined
+  const key = Object.keys(obj).find(k => k.toLowerCase() === dayName.toLowerCase())
+  return key ? (obj[key] as T) : undefined
+}
+
+/**
+ * Is the SALON closed on this date? Folds together every business-wide reason:
+ *   - Settings → Business Hours has that weekday marked Closed
+ *   - the date is a closed holiday or a custom closed date
+ *
+ * Staff schedules are checked separately with `isStaffOffOnDate` — a day is
+ * only bookable when both say yes. Anything that offers a date to a client
+ * (the booking picker, Fill My Openings, blast copy) must call this; skipping
+ * it is how a closed Wednesday ends up in a "we have openings" text.
+ */
+export function isSalonClosedOnDate(
+  settings: Record<string, unknown> | null | undefined,
+  dateStr: string,
+): boolean {
+  const s = settings || {}
+  const dayName = localeDateStr(new Date(dateStr + 'T00:00:00'), { weekday: 'long' })
+  const bizDay = dayEntry<{ closed?: boolean }>(
+    (s.business_hours || null) as Record<string, unknown> | null,
+    dayName,
+  )
+  if (bizDay?.closed) return true
+
+  return isBusinessClosedOnDate(
+    (s.closed_holidays || []) as string[],
+    (s.custom_closed_dates || []) as CustomClosedDate[],
+    dateStr,
+  )
+}
+
 interface DaySchedule {
   off?: boolean
   alternating?: boolean

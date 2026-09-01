@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData, cachedQuery } from "@/lib/api";
 import { localeDateStr } from "@/lib/utils";
+import { isSalonClosedOnDate, isStaffOffOnDate } from "@/lib/schedule-utils";
 import styles from "./booking.module.css";
 import type { Campaign, Staff, Appointment, Client } from "@/lib/types";
 
@@ -27,7 +28,12 @@ function parseTimeToHours(t: string): number {
   return h + (m || 0) / 60;
 }
 
-function detectOpenSlots(staff: Staff[], appointments: Appointment[], days: number): OpenSlot[] {
+function detectOpenSlots(
+  staff: Staff[],
+  appointments: Appointment[],
+  days: number,
+  settings?: Record<string, unknown> | null,
+): OpenSlot[] {
   const slots: OpenSlot[] = [];
   const now = new Date();
   const DAY_NAMES = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
@@ -38,12 +44,21 @@ function detectOpenSlots(staff: Staff[], appointments: Appointment[], days: numb
     const dayName = DAY_NAMES[date.getDay()];
     const dateStr = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;
 
+    // The salon is shut that day (Business Hours says Closed, a closed holiday,
+    // or a custom closed date) — it has no openings to offer, whatever the
+    // staff schedules say.
+    if (isSalonClosedOnDate(settings, dateStr)) continue;
+
     for (const s of staff) {
       if (!s.is_active) continue;
       const sched = (s.schedule && typeof s.schedule === 'object' && Object.keys(s.schedule).length > 0)
         ? s.schedule as Record<string, { open?: string; close?: string; start?: string; end?: string; off?: boolean; useSlots?: boolean; slots?: { start: string; end: string }[] }>
         : null;
       const dayConfig = sched?.[dayName];
+
+      // Off for this staff member — day off, every-other-week phase, vacation,
+      // or a holiday they take off.
+      if (isStaffOffOnDate(s.schedule as Record<string, unknown> | null, dateStr)) continue;
 
       const isSunday = date.getDay() === 0;
       if (dayConfig) {
@@ -132,6 +147,9 @@ const BOOKING_AUTOMATIONS = [
 
 export default function BookingPage() {
   const { tenant, refetch } = useTenant();
+  // Business Hours / closed holidays / custom closed dates — every openings
+  // scan below has to skip the days these mark closed.
+  const tenantSettings = (tenant?.settings || null) as Record<string, unknown> | null;
 
   const [fillStep, setFillStep] = useState(1);
   const [fillDays, setFillDays] = useState(3);
@@ -169,7 +187,7 @@ export default function BookingPage() {
     setAllStaff(staff);
     setAllAppointments(apts);
     setAllClients(clients);
-    setAllSlots(detectOpenSlots(staff, apts, fillDays));
+    setAllSlots(detectOpenSlots(staff, apts, fillDays, tenantSettings));
 
     // Load automation states
     const settings = (tenant?.settings || {}) as Record<string, unknown>;
@@ -194,15 +212,15 @@ export default function BookingPage() {
     // Load saved client lists
     const lists = (settings.savedClientLists || []) as { name: string; clientIds: string[] }[];
     setSavedLists(lists);
-  }, [tenant, fillDays]);
+  }, [tenant, fillDays, tenantSettings]);
 
   useEffect(() => { loadFillData(); }, [loadFillData]);
 
   useEffect(() => {
     if (allStaff.length > 0) {
-      setAllSlots(detectOpenSlots(allStaff, allAppointments, fillDays));
+      setAllSlots(detectOpenSlots(allStaff, allAppointments, fillDays, tenantSettings));
     }
-  }, [fillDays, allStaff, allAppointments]);
+  }, [fillDays, allStaff, allAppointments, tenantSettings]);
 
   function toggleSlot(id: string) {
     setSelectedSlots(prev => {
@@ -865,7 +883,7 @@ export default function BookingPage() {
                     {/* Message Preview */}
                     {(() => {
                       // Detect real openings for preview
-                      const previewSlots = detectOpenSlots(allStaff, allAppointments, fmoDays);
+                      const previewSlots = detectOpenSlots(allStaff, allAppointments, fmoDays, tenantSettings);
                       // Group by staff
                       const byStaff = new Map<string, OpenSlot[]>();
                       previewSlots.forEach(slot => {
