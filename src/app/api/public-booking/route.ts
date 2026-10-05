@@ -3,7 +3,7 @@ import { waitUntil } from '@vercel/functions'
 import { createClient } from '@supabase/supabase-js'
 import { timezoneFromAddress, DEFAULT_TZ } from '@/lib/tz'
 import { toE164 } from '@/lib/utils'
-import { resolveTenantTz, resolveSpecialInstructions, appendInstructionsToSms, buildReminderRows, insertReminderRows, resolveBookingBufferMinutes, padBookedSlot } from '@/lib/notifications'
+import { resolveTenantTz, resolveSpecialInstructions, resolveOwnerCopyEmail, sendOwnerCopy,appendInstructionsToSms, buildReminderRows, insertReminderRows, resolveBookingBufferMinutes, padBookedSlot } from '@/lib/notifications'
 import { sendSms, smsProvider, smsConfigFromSettings } from '@/lib/sms'
 import { bookingConfirmationHtml, promoEmailHtml, googleCalendarUrl } from '@/lib/email-templates'
 
@@ -600,8 +600,9 @@ async function sendBookingConfirmations(opts: {
     }
   }
 
-  // ── 2. Email to client ──
-  if (clientEmail) {
+  // ── 2. Email to client (and the owner's copy, if they opted in) ──
+  const ownerCopyEmail = resolveOwnerCopyEmail(tenant, businessEmail)
+  if (clientEmail || ownerCopyEmail) {
     const clientEmailHtml = bookingConfirmationHtml({
       greeting,
       serviceName,
@@ -618,21 +619,25 @@ async function sendBookingConfirmations(opts: {
       specialInstructions: specialInstructions.text,
     })
 
-    if (resendClient) {
+    const clientSubject = `✅ Booking Confirmed — ${serviceName} on ${dateStr}`
+    if (resendClient && clientEmail) {
       try {
         await resendClient.emails.send({
           from: `${businessName} <bookings@joinglowup.org>`,
           replyTo: businessEmail || undefined,
           to: [clientEmail],
-          subject: `✅ Booking Confirmed — ${serviceName} on ${dateStr}`,
+          subject: clientSubject,
           html: clientEmailHtml,
         })
         console.log(`[public-booking] ✅ Confirmation email sent to client ${clientEmail}`)
       } catch (err) {
         console.error(`[public-booking] Email to client failed:`, err)
       }
-    } else {
+    } else if (clientEmail) {
       console.log(`[DRY RUN] Client email to ${clientEmail}`)
+    }
+    if (resendClient && ownerCopyEmail) {
+      await sendOwnerCopy(ownerCopyEmail, clientSubject, clientEmailHtml, clientName, clientEmail)
     }
   }
 

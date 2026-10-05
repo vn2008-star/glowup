@@ -115,6 +115,7 @@ export default function SettingsPage() {
     enabled: true,
     digest_hour: "7",
     owner_sms: false,
+    owner_copies: false,
   });
   const [reminderTemplates, setReminderTemplates] = useState({
     sms: "Hi {client_name}! This is a reminder that your {service} appointment at {business_name} is tomorrow, {date} at {time}. 📍 {address}\n\nReply C to Confirm, M to Modify, X to Cancel. Reply STOP to opt out.",
@@ -239,6 +240,7 @@ export default function SettingsPage() {
           enabled: sr.enabled !== false,
           digest_hour: String(sr.digest_hour ?? "7"),
           owner_sms: sr.owner_sms === true,
+          owner_copies: sr.owner_copies === true,
         });
       }
       if (s.reminder_templates) setReminderTemplates({ ...reminderTemplates, ...(s.reminder_templates as Record<string, string>) });
@@ -1101,6 +1103,15 @@ export default function SettingsPage() {
             />
             <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
             <span>📅 Daily schedule digest (owner & staff)</span>
+          </label>
+          <label className={styles.protectionToggle} title="You get the same confirmation, reschedule and cancellation emails your clients get, calendar buttons included">
+            <input
+              type="checkbox"
+              checked={staffReminderSettings.owner_copies}
+              onChange={(e) => setStaffReminderSettings({ ...staffReminderSettings, owner_copies: e.target.checked })}
+            />
+            <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
+            <span>📨 Email me a copy of client confirmations & changes</span>
           </label>
         </div>
 

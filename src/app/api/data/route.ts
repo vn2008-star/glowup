@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient, type SupabaseClient } from '@supabase/supabase-js'
 import { getImpersonationOverride, isAdminEmail } from '@/lib/admin'
 import { resolveStaffRecord } from '@/lib/api-auth'
-import { scheduleClientReminders, sendClientBookingConfirmation, sendClientChangeNotice, resolveTenantTz, resolveSpecialInstructions, sendSms, greetingName } from '@/lib/notifications'
+import { scheduleClientReminders, sendClientBookingConfirmation, sendClientChangeNotice, resolveTenantTz, resolveSpecialInstructions, resolveOwnerCopyEmail, sendSms, greetingName } from '@/lib/notifications'
 import { getTenantSmsConfig, sendSmsVerbose, smsProvider, type StoredSmsGateway } from '@/lib/sms'
 import { cancelAppointment } from '@/lib/cancel-appointment'
 import { promoEmailHtml } from '@/lib/email-templates'
@@ -829,6 +829,7 @@ export async function POST(request: Request) {
                   timezone: tz,
                   logoUrl: t?.logo_url || null,
                   specialInstructions: resolveSpecialInstructions(t),
+                  ownerCopyEmail: resolveOwnerCopyEmail(t, ownerEmail),
                 })
               } catch (err) {
                 console.error('[appointments.add] notification error:', err)
@@ -917,6 +918,7 @@ export async function POST(request: Request) {
                 timezone: resolveTenantTz(t),
                 logoUrl: t?.logo_url || null,
                 specialInstructions: resolveSpecialInstructions(t),
+                ownerCopyEmail: resolveOwnerCopyEmail(t),
               })
             } catch (err) {
               console.error('[appointments.update] reschedule notice error:', err)
@@ -976,6 +978,7 @@ export async function POST(request: Request) {
                   end: new Date(apt.end_time),
                   timezone: resolveTenantTz(t),
                   logoUrl: t?.logo_url || null,
+                  ownerCopyEmail: resolveOwnerCopyEmail(t),
                 })
               } catch (err) {
                 console.error('[appointments.cancel] notice error:', err)

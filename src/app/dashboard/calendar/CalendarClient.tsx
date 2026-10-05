@@ -44,6 +44,9 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
   const [loading, setLoading] = useState(!initialCalendar);
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState({ client_id: "", service_id: "", staff_id: "", start_time: "", notes: "" });
+  // Appointment length in minutes when it differs from the service's standard
+  // duration (ran long, extra time added). null = use the service duration.
+  const [durationMin, setDurationMin] = useState<number | null>(null);
   const [clientSearch, setClientSearch] = useState("");
   const [clientDropdownOpen, setClientDropdownOpen] = useState(false);
   const [selectedApt, setSelectedApt] = useState<FullAppointment | null>(null);
@@ -88,6 +91,8 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
   // ── Block Time state ──
   const [showBlockModal, setShowBlockModal] = useState(false);
   const [blockData, setBlockData] = useState({ staff_id: "", date: "", start_time: "09:00", end_time: "10:00", notes: "" });
+  // Set when the block modal is editing an existing block rather than adding one
+  const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
 
   // ── Closed days / holidays / vacations from tenant settings ──
   const closedHolidays = useMemo(() => {
@@ -380,7 +385,7 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
     const dateStr = toDateStr(selectedDate);
     const staffApts = appointments.filter(a => {
       const match = staffId === "unassigned" ? !a.staff_id : a.staff_id === staffId;
-      return match && a.start_time.startsWith(dateStr);
+      return match && toDateStr(new Date(a.start_time)) === dateStr;
     });
     let bookedHours = 0;
     for (const apt of staffApts) {
@@ -396,7 +401,7 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
     const staffApts = appointments
       .filter(a => {
         const match = staffId === "unassigned" ? !a.staff_id : a.staff_id === staffId;
-        return match && a.start_time.startsWith(dateStr);
+        return match && toDateStr(new Date(a.start_time)) === dateStr;
       })
       .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
 
@@ -427,6 +432,19 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
     return apt.status === "blocked";
   }
 
+  // ── Appointment length / end time (form) ──
+  function formDuration() {
+    if (durationMin != null) return durationMin;
+    return services.find(s => s.id === formData.service_id)?.duration_minutes || 60;
+  }
+
+  // "HH:mm" + minutes → "HH:mm", clamped to the same day
+  function addMinutesHHMM(hhmm: string, mins: number) {
+    const [h, m] = hhmm.split(":").map(Number);
+    const total = Math.min(h * 60 + (m || 0) + mins, 23 * 60 + 59);
+    return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+  }
+
   // ── Add appointment ──
   async function handleAddAppointment(e: React.FormEvent) {
     e.preventDefault();
@@ -437,7 +455,7 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
     // to shift the stored time.
     const [aptDate, aptTime] = formData.start_time.split("T");
     const start = localToUTC(aptDate, aptTime, salonTz);
-    const end = new Date(start.getTime() + (service?.duration_minutes || 60) * 60 * 1000);
+    const end = new Date(start.getTime() + formDuration() * 60 * 1000);
     const { data, error } = await queryData<FullAppointment>("appointments.add", {
       client_id: formData.client_id || null,
       service_id: formData.service_id,
@@ -458,6 +476,7 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
       setClientSearch("");
       setClientDropdownOpen(false);
       setFormData({ client_id: "", service_id: "", staff_id: "", start_time: "", notes: "" });
+      setDurationMin(null);
     }
   }
 
@@ -465,6 +484,7 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
   function openBlockTimeModal(date?: Date, hour?: number) {
     const d = date || selectedDate;
     const h = hour ?? 9;
+    setEditingBlockId(null);
     setBlockData({
       staff_id: staffMembers.length === 1 ? staffMembers[0].id : "",
       date: toDateStr(d),
@@ -482,6 +502,25 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
     const end = localToUTC(blockData.date, blockData.end_time, salonTz);
     if (end <= start) {
       alert("End time must be after start time");
+      return;
+    }
+    if (editingBlockId) {
+      const { data, error } = await queryData<FullAppointment>("appointments.update", {
+        id: editingBlockId,
+        staff_id: blockData.staff_id,
+        start_time: start.toISOString(),
+        end_time: end.toISOString(),
+        notes: blockData.notes || "Personal time",
+      });
+      if (error) {
+        alert(`Failed to update blocked time: ${error}`);
+        return;
+      }
+      if (data) {
+        setAppointments(prev => prev.map(a => a.id === editingBlockId ? data : a));
+        setShowBlockModal(false);
+        setEditingBlockId(null);
+      }
       return;
     }
     const { data, error } = await queryData<FullAppointment>("appointments.add", {
@@ -509,6 +548,7 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
     const h = hour ?? 9;
     const dateStr = toDateStr(d);
     setFormData({ client_id: "", service_id: "", staff_id: "", start_time: `${dateStr}T${String(h).padStart(2, "0")}:00`, notes: "" });
+    setDurationMin(null);
     setClientSearch("");
     setClientDropdownOpen(false);
     fetchClientsIfNeeded(); // lazy-load clients on first modal open
@@ -774,6 +814,7 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
                           const dateStr = toDateStr(selectedDate);
                           const h = Math.floor(slot.start);
                           setFormData({ client_id: "", service_id: "", staff_id: staff.id === "unassigned" ? "" : staff.id, start_time: `${dateStr}T${String(h).padStart(2, "0")}:00`, notes: "" });
+                          setDurationMin(null);
                           setClientSearch("");
                           setClientDropdownOpen(false);
                           setShowModal(true);
@@ -1179,7 +1220,25 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
                   const startLocal = new Date(apt.start_time);
                   const dateStr = toDateStr(startLocal);
                   const timeStr = `${String(startLocal.getHours()).padStart(2, "0")}:${String(startLocal.getMinutes()).padStart(2, "0")}`;
+                  // A time block has no client or service — edit it in the Block
+                  // Time form, which has an end time. The appointment form used
+                  // to demand a service and snapped the block back to 60 min.
+                  if (isBlocked(apt)) {
+                    const endLocal = new Date(apt.end_time);
+                    setBlockData({
+                      staff_id: apt.staff_id || "",
+                      date: dateStr,
+                      start_time: timeStr,
+                      end_time: `${String(endLocal.getHours()).padStart(2, "0")}:${String(endLocal.getMinutes()).padStart(2, "0")}`,
+                      notes: apt.notes || "",
+                    });
+                    setEditingBlockId(apt.id);
+                    setSelectedApt(null);
+                    setShowBlockModal(true);
+                    return;
+                  }
                   setEditingApt(apt);
+                  setDurationMin(Math.round((new Date(apt.end_time).getTime() - startLocal.getTime()) / 60000));
                   setFormData({
                     client_id: apt.client_id || "",
                     service_id: apt.service_id || "",
@@ -1236,7 +1295,7 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
                 const service = services.find(s => s.id === formData.service_id);
                 const [editDate, editTime] = formData.start_time.split("T");
                 const start = localToUTC(editDate, editTime, salonTz);
-                const end = new Date(start.getTime() + (service?.duration_minutes || 60) * 60000);
+                const end = new Date(start.getTime() + formDuration() * 60000);
                 const res = await queryData<FullAppointment>("appointments.update", {
                   id: editingApt.id,
                   client_id: formData.client_id || null,
@@ -1244,7 +1303,11 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
                   staff_id: formData.staff_id || null,
                   start_time: start.toISOString(),
                   end_time: end.toISOString(),
-                  total_price: service?.price || 0,
+                  // Re-price only when the service changed — adding time or
+                  // moving the slot shouldn't wipe a custom price.
+                  total_price: formData.service_id === editingApt.service_id && editingApt.total_price != null
+                    ? editingApt.total_price
+                    : service?.price || 0,
                   notes: formData.notes || null,
                 });
                 // Keep the modal open on failure — this used to swallow the
@@ -1339,7 +1402,7 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
                 </div>
                 <div className={styles.formGroup}>
                   <label className="label">Service *</label>
-                  <select className="input" value={formData.service_id} onChange={(e) => setFormData({ ...formData, service_id: e.target.value })} required>
+                  <select className="input" value={formData.service_id} onChange={(e) => { setFormData({ ...formData, service_id: e.target.value }); setDurationMin(null); }} required>
                     <option value="">{t("selectService")}</option>
                     {services.map(s => <option key={s.id} value={s.id}>{s.name} — ${s.price} ({s.duration_minutes}min)</option>)}
                   </select>
@@ -1365,6 +1428,29 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
                     setFormData({ ...formData, start_time: `${date}T${e.target.value}` });
                   }} required />
                 </div>
+                <div className={styles.formGroup}>
+                  <label className="label">End Time</label>
+                  <input className="input" type="time" value={formData.start_time.split("T")[1] ? addMinutesHHMM(formData.start_time.split("T")[1], formDuration()) : ""} onChange={(e) => {
+                    const startHHMM = formData.start_time.split("T")[1];
+                    if (!startHHMM || !e.target.value) return;
+                    const [sh, sm] = startHHMM.split(":").map(Number);
+                    const [eh, em] = e.target.value.split(":").map(Number);
+                    const mins = eh * 60 + em - (sh * 60 + sm);
+                    if (mins > 0) setDurationMin(mins);
+                  }} />
+                </div>
+              </div>
+              {/* Ran long? Extend without re-picking the service */}
+              <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)', flexWrap: 'wrap', alignItems: 'center' }}>
+                <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Add time:</span>
+                {[15, 30, 60].map(m => (
+                  <button key={m} type="button" className={styles.presetBtn} onClick={() => setDurationMin(formDuration() + m)}>
+                    +{m} min
+                  </button>
+                ))}
+                {durationMin != null && (
+                  <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{formDuration()} min total</span>
+                )}
               </div>
               <div className={styles.formGroup}>
                 <label className="label">Notes</label>
@@ -1380,9 +1466,9 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
       )}
       {/* ── Block Time Modal ── */}
       {showBlockModal && (
-        <div className={styles.modalOverlay} onClick={() => setShowBlockModal(false)}>
+        <div className={styles.modalOverlay} onClick={() => { setShowBlockModal(false); setEditingBlockId(null); }}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <h2>🚫 Block Time</h2>
+            <h2>{editingBlockId ? "🚫 Edit Blocked Time" : "🚫 Block Time"}</h2>
             <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: 'var(--space-4)' }}>Block off time for personal appointments. Clients won&apos;t be able to book during this time.</p>
             <form onSubmit={handleBlockTime}>
               <div className={styles.formGrid}>
@@ -1440,8 +1526,8 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
                 <input className="input" type="text" placeholder="e.g. Doctor appointment, Lunch break..." value={blockData.notes} onChange={(e) => setBlockData({ ...blockData, notes: e.target.value })} />
               </div>
               <div className={styles.modalActions}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowBlockModal(false)}>Cancel</button>
-                <button type="submit" className={styles.blockSubmitBtn}>🚫 Block Time</button>
+                <button type="button" className="btn btn-secondary" onClick={() => { setShowBlockModal(false); setEditingBlockId(null); }}>Cancel</button>
+                <button type="submit" className={styles.blockSubmitBtn}>{editingBlockId ? "💾 Save Changes" : "🚫 Block Time"}</button>
               </div>
             </form>
           </div>

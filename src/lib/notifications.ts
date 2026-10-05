@@ -73,6 +73,43 @@ export function resolveSpecialInstructions(tenant: {
   return { text, includeInSms: !!text && settings.special_instructions_sms === true }
 }
 
+/**
+ * Where to send the owner's copy of client-facing booking emails, or null when
+ * the salon hasn't opted in (settings.staff_reminders.owner_copies). Opt-in
+ * because online bookings already send the owner a "New Booking" summary — the
+ * copy is for owners who want the client's exact email, calendar buttons and
+ * all, including for appointments they booked or moved themselves.
+ */
+export function resolveOwnerCopyEmail(tenant: {
+  email?: string | null
+  settings?: Record<string, unknown> | null
+} | null | undefined, fallbackEmail?: string | null): string | null {
+  const settings = (tenant?.settings || {}) as Record<string, unknown>
+  const sr = (settings.staff_reminders || {}) as Record<string, unknown>
+  if (sr.owner_copies !== true) return null
+  return tenant?.email || (settings.owner_email as string) || fallbackEmail || null
+}
+
+/** Mail the owner a copy of an email that went (or would have gone) to a client. */
+export async function sendOwnerCopy(
+  to: string, subject: string, html: string, clientName: string, clientEmail: string | null,
+): Promise<void> {
+  try {
+    const { Resend } = await import('resend')
+    const resend = new Resend(process.env.RESEND_API_KEY)
+    await resend.emails.send({
+      from: `GlowUp <bookings@joinglowup.org>`,
+      replyTo: clientEmail || undefined,
+      to: [to],
+      // Say whose copy this is — the body greets the client, not the owner.
+      subject: `📋 Copy (${clientName}${clientEmail ? '' : ', no email on file'}): ${subject}`,
+      html,
+    })
+  } catch (err) {
+    console.error(`[notifications] Owner copy email failed:`, err)
+  }
+}
+
 /** Append arrival instructions to an SMS body, if this salon opted in. */
 export function appendInstructionsToSms(
   body: string,
@@ -326,12 +363,14 @@ export async function sendClientBookingConfirmation(opts: {
   logoUrl?: string | null
   /** From resolveSpecialInstructions(tenant) — arrival notes for the client. */
   specialInstructions?: { text: string; includeInSms: boolean }
+  /** From resolveOwnerCopyEmail(tenant) — the owner also gets the email. */
+  ownerCopyEmail?: string | null
 }): Promise<void> {
   const {
     businessName, businessAddress, businessPhone, businessEmail,
     serviceName, staffName, clientName, clientEmail, clientPhone,
     manageLink, start, end, timezone, smsConfig, logoUrl,
-    specialInstructions = { text: '', includeInSms: false },
+    specialInstructions = { text: '', includeInSms: false }, ownerCopyEmail,
   } = opts
 
   const greeting = greetingName(clientName)
@@ -377,22 +416,23 @@ export async function sendClientBookingConfirmation(opts: {
     }
   }
 
-  // ── Email to client ──
+  // ── Email to client (and the owner's copy) ──
+  const subject = `✅ Booking Confirmed — ${serviceName} on ${dateStr}`
+  const html = bookingConfirmationHtml({
+    greeting, serviceName, dateStr, timeStr, staffName,
+    businessName, businessAddress, businessPhone, manageLink,
+    startISO: start.toISOString(), endISO: end.toISOString(),
+    logoUrl, specialInstructions: specialInstructions.text,
+  })
   if (clientEmail && process.env.RESEND_API_KEY) {
     try {
       const { Resend } = await import('resend')
       const resend = new Resend(process.env.RESEND_API_KEY)
-      const html = bookingConfirmationHtml({
-        greeting, serviceName, dateStr, timeStr, staffName,
-        businessName, businessAddress, businessPhone, manageLink,
-        startISO: start.toISOString(), endISO: end.toISOString(),
-        logoUrl, specialInstructions: specialInstructions.text,
-      })
       await resend.emails.send({
         from: `${businessName} <bookings@joinglowup.org>`,
         replyTo: businessEmail || undefined,
         to: [clientEmail],
-        subject: `✅ Booking Confirmed — ${serviceName} on ${dateStr}`,
+        subject,
         html,
       })
       console.log(`[notifications] ✅ Confirmation email sent to client ${clientEmail}`)
@@ -401,6 +441,9 @@ export async function sendClientBookingConfirmation(opts: {
     }
   } else if (clientEmail) {
     console.log(`[notifications] [DRY RUN] Client email to ${clientEmail}`)
+  }
+  if (ownerCopyEmail && process.env.RESEND_API_KEY) {
+    await sendOwnerCopy(ownerCopyEmail, subject, html, clientName, clientEmail)
   }
 }
 
@@ -510,12 +553,14 @@ export async function sendClientChangeNotice(opts: {
   logoUrl?: string | null
   /** From resolveSpecialInstructions(tenant) — arrival notes for the client. */
   specialInstructions?: { text: string; includeInSms: boolean }
+  /** From resolveOwnerCopyEmail(tenant) — the owner also gets the email. */
+  ownerCopyEmail?: string | null
 }): Promise<void> {
   const {
     type, businessName, businessAddress, businessPhone, businessEmail,
     serviceName, staffName, clientName, clientEmail, clientPhone,
     actionLink, start, end, timezone, smsConfig, logoUrl,
-    specialInstructions = { text: '', includeInSms: false },
+    specialInstructions = { text: '', includeInSms: false }, ownerCopyEmail,
   } = opts
 
   const greeting = greetingName(clientName)
@@ -552,34 +597,38 @@ export async function sendClientChangeNotice(opts: {
     }
   }
 
-  // ── Email ──
+  // ── Email (and the owner's copy) ──
+  const subject = isCancel
+    ? `❌ Appointment Cancelled — ${serviceName} on ${dateStr}`
+    : `🔄 Appointment Rescheduled — ${serviceName} on ${dateStr}`
+  const html = isCancel
+    ? cancellationConfirmationHtml({
+        greeting, serviceName, dateStr, timeStr, staffName,
+        businessName, businessAddress, businessPhone, bookingLink: actionLink,
+        logoUrl,
+      })
+    : rescheduleConfirmationHtml({
+        greeting, serviceName, dateStr, timeStr, staffName,
+        businessName, businessAddress, businessPhone, manageLink: actionLink,
+        startISO: start.toISOString(), endISO: end.toISOString(),
+        logoUrl, specialInstructions: specialInstructions.text,
+      })
   if (clientEmail && process.env.RESEND_API_KEY) {
     try {
       const { Resend } = await import('resend')
       const resend = new Resend(process.env.RESEND_API_KEY)
-      const html = isCancel
-        ? cancellationConfirmationHtml({
-            greeting, serviceName, dateStr, timeStr, staffName,
-            businessName, businessAddress, businessPhone, bookingLink: actionLink,
-            logoUrl,
-          })
-        : rescheduleConfirmationHtml({
-            greeting, serviceName, dateStr, timeStr, staffName,
-            businessName, businessAddress, businessPhone, manageLink: actionLink,
-            startISO: start.toISOString(), endISO: end.toISOString(),
-            logoUrl, specialInstructions: specialInstructions.text,
-          })
       await resend.emails.send({
         from: `${businessName} <bookings@joinglowup.org>`,
         replyTo: businessEmail || undefined,
         to: [clientEmail],
-        subject: isCancel
-          ? `❌ Appointment Cancelled — ${serviceName} on ${dateStr}`
-          : `🔄 Appointment Rescheduled — ${serviceName} on ${dateStr}`,
+        subject,
         html,
       })
     } catch (err) {
       console.error(`[notifications] ${type} email to client failed:`, err)
     }
+  }
+  if (ownerCopyEmail && process.env.RESEND_API_KEY) {
+    await sendOwnerCopy(ownerCopyEmail, subject, html, clientName, clientEmail)
   }
 }

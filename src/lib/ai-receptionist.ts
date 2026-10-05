@@ -5,7 +5,7 @@
 // appointments directly.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { resolveTenantTz, resolveSpecialInstructions, sendClientBookingConfirmation, scheduleClientReminders, sendOwnerChangeNotice, formatAptWhen } from '@/lib/notifications'
+import { resolveTenantTz, resolveSpecialInstructions, resolveOwnerCopyEmail, sendClientBookingConfirmation, scheduleClientReminders, sendOwnerChangeNotice, formatAptWhen } from '@/lib/notifications'
 import { localToUTC, nowInTz, formatInTz } from '@/lib/tz'
 import { phoneVariants } from '@/lib/utils'
 
@@ -530,6 +530,7 @@ export async function handleAiChat(opts: {
                 start: startTime, end: endTime, timezone: tz,
                 logoUrl: tenant.logo_url || null,
                 specialInstructions: resolveSpecialInstructions(tenant),
+                ownerCopyEmail: resolveOwnerCopyEmail(tenant),
               })
             } catch (err) {
               console.error('[ai-receptionist] booking confirmation failed:', err)
