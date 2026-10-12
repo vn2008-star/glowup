@@ -12,6 +12,7 @@ import { DEFAULT_BIRTHDAY_TEMPLATE, isSalonClosedOnDate, isStaffOffOnDate } from
 import { getDashboardOverview } from '@/lib/overview-query'
 import { getClientsList, getCalendarLoad } from '@/lib/dashboard-queries'
 import { toE164 } from '@/lib/utils'
+import { siteBaseUrl } from '@/lib/site-url'
 import { dayRangeInTz, todayInTz, payPeriodInTz, partsInTz, daysInMonth, localToUTC, addDays } from '@/lib/tz'
 import { notifyWaitlistForOpening } from '@/lib/waitlist-openings'
 import { scryptSync, randomBytes, timingSafeEqual } from 'node:crypto'
@@ -1523,6 +1524,22 @@ export async function POST(request: Request) {
           .eq('id', payload.id)
           .eq('tenant_id', tenantId)
         return NextResponse.json({ success: !error, error: error?.message })
+      }
+
+      // Private subscribe link for Google/Apple/Outlook calendars. Owners and
+      // managers can get anyone's (or the whole salon's); a technician only
+      // their own.
+      case 'staff.calendar-feed': {
+        const target = payload.staff_id === 'all' ? 'all' : String(payload.staff_id || staffId || '')
+        if (!target) return NextResponse.json({ data: null, error: 'Missing staff' }, { status: 400 })
+        if (staffRole === 'technician' && target !== staffId) return staffWriteForbidden
+        if (target !== 'all') {
+          const { data: st } = await svc.from('staff').select('id').eq('id', target).eq('tenant_id', tenantId).maybeSingle()
+          if (!st) return NextResponse.json({ data: null, error: 'Staff member not found' }, { status: 404 })
+        }
+        const { feedToken } = await import('@/app/api/calendar-feed/route')
+        const url = `${siteBaseUrl()}/api/calendar-feed?tenant=${tenantId}&staff=${target}&token=${feedToken(tenantId, target)}`
+        return NextResponse.json({ data: { url, webcal: url.replace(/^https?:/, 'webcal:') } })
       }
 
       case 'staff.verify-pin': {

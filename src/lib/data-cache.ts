@@ -63,6 +63,7 @@ const READ_ACTIONS = new Set([
   'service_history.list',
   'services.list',
   'social.list',
+  'staff.calendar-feed', // read: a signed URL, no state change
   'staff.list',
   'staff.verify-pin', // a read: treating it as a write dropped the staff cache on every PIN entry
   'waitlist.list',

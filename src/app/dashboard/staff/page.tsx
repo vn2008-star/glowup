@@ -1,6 +1,7 @@
 "use client";
 
 import { useToast } from "@/components/ui/Toast";
+import { Dialog } from "@/components/ui/Dialog";
 import { useState, useEffect, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
@@ -237,6 +238,16 @@ export default function StaffPage() {
       const filtered = prev.specialties.filter(sp => validSpecs.has(sp));
       return { ...prev, professional_titles: next, specialties: filtered };
     });
+  }
+
+  // Private .ics subscribe link for a staff member's calendar app
+  const [feedFor, setFeedFor] = useState<{ staff: Staff; url: string; webcal: string } | null>(null);
+  const [feedCopied, setFeedCopied] = useState(false);
+  async function openFeed(s: Staff) {
+    const { data, error } = await queryData<{ url: string; webcal: string }>("staff.calendar-feed", { staff_id: s.id });
+    if (error || !data) { toast.error(error || "Could not create the calendar link"); return; }
+    setFeedCopied(false);
+    setFeedFor({ staff: s, ...data });
   }
 
   // In-flight guard: a double click on Save added the same technician twice
@@ -576,6 +587,7 @@ export default function StaffPage() {
                   <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); openVacation(s); }}>🏖️ Vacation / Holidays</button>
                   <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); openDurations(s); }}>{getCustomDurationCount(s) > 0 ? `⏱️ Durations (${getCustomDurationCount(s)})` : '⏱️ Durations'}</button>
                   <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); setAgreementStaff(s); }}>{(s as any).agreement_signed_at ? '✅' : '📝'} Agreement</button>
+                  <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); openFeed(s); }}>🔗 Calendar feed</button>
                   <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); openEdit(s); }}>✏️ Edit</button>
                   <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(s.id); }} style={{ color: "var(--color-danger)" }}>🗑️</button>
                 </div>
@@ -1339,6 +1351,41 @@ export default function StaffPage() {
           </div>
         </div>
       )}
+
+      {/* Private calendar subscribe link */}
+      <Dialog
+        open={!!feedFor}
+        onClose={() => setFeedFor(null)}
+        title={feedFor ? `Calendar feed for ${feedFor.staff.name}` : ""}
+        description="Subscribe to this link in Google Calendar, Apple Calendar or Outlook and the appointments show up there, refreshed every few minutes. Treat it like a password: anyone with the link can read the schedule."
+        size="md"
+        footer={<button type="button" className="btn btn-secondary" onClick={() => setFeedFor(null)}>Done</button>}
+      >
+        {feedFor && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+            <div style={{ display: "flex", gap: "var(--space-2)" }}>
+              <input className="input" readOnly value={feedFor.url} onFocus={(e) => e.currentTarget.select()} aria-label="Calendar feed URL" />
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={async () => {
+                  try { await navigator.clipboard.writeText(feedFor.url); setFeedCopied(true); }
+                  catch { toast.error("Copy failed; select the link and copy it"); }
+                }}
+              >
+                {feedCopied ? "Copied" : "Copy"}
+              </button>
+            </div>
+            <ul style={{ margin: 0, paddingLeft: "1.2em", fontSize: "var(--text-sm)", color: "var(--text-secondary)", lineHeight: 1.6 }}>
+              <li><strong>Google Calendar:</strong> Other calendars → + → From URL → paste the link.</li>
+              <li><strong>Apple Calendar (Mac):</strong> File → New Calendar Subscription → paste the link.</li>
+              <li><strong>iPhone:</strong> Settings → Calendar → Accounts → Add Account → Other → Add Subscribed Calendar.</li>
+              <li><strong>Outlook:</strong> Add calendar → Subscribe from web.</li>
+            </ul>
+            <a href={feedFor.webcal} className="btn btn-ghost btn-sm" style={{ alignSelf: "flex-start" }}>Open in my calendar app (webcal)</a>
+          </div>
+        )}
+      </Dialog>
     </div>
   );
 }
