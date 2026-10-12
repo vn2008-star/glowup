@@ -29,8 +29,9 @@ export default function CheckoutPage() {
   const [selectedDate, setSelectedDate] = useState(() => {
     return todayInTz(salonTz);
   });
-  // Stamped once so the "Today" shortcut doesn't read the clock every render
-  const [todayStr] = useState(() => todayInTz(salonTz));
+  // Kept in state (not read every render) and rolled over by the minute
+  // timer below, so a tablet left on overnight follows the date.
+  const [todayStr, setTodayStr] = useState(() => todayInTz(salonTz));
   const dateInputRef = useRef<HTMLInputElement>(null);
 
   // Checkout state
@@ -135,6 +136,36 @@ export default function CheckoutPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Background refresh of the day's appointments (no spinner), so online
+  // bookings and check-ins made elsewhere show up without a reload.
+  const refreshAppointments = useCallback(async () => {
+    if (!tenant) return;
+    const { start, end } = dayRangeInTz(selectedDate, salonTz);
+    const { data } = await queryData<FullAppointment[]>("appointments.list", { startDate: start, endDate: end });
+    if (data) {
+      setAppointments(data.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()));
+    }
+  }, [tenant, selectedDate, salonTz]);
+
+  useEffect(() => {
+    const iv = setInterval(() => { if (!document.hidden) refreshAppointments(); }, 60000);
+    const onVisible = () => { if (!document.hidden) refreshAppointments(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { clearInterval(iv); document.removeEventListener("visibilitychange", onVisible); };
+  }, [refreshAppointments]);
+
+  // Midnight rollover: if the kiosk was showing today, move it to the new day.
+  useEffect(() => {
+    const iv = setInterval(() => {
+      const now = todayInTz(salonTz);
+      if (now !== todayStr) {
+        setSelectedDate((prev) => (prev === todayStr ? now : prev));
+        setTodayStr(now);
+      }
+    }, 60000);
+    return () => clearInterval(iv);
+  }, [salonTz, todayStr]);
 
   // Fetch tally data
   const fetchTally = useCallback(async () => {

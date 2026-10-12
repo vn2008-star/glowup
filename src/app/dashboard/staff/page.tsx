@@ -321,8 +321,12 @@ export default function StaffPage() {
     e.preventDefault();
     if (!selectedStaff) return;
     // preserve existing vacations and service_durations when saving schedule
+    // Start from what's stored so keys this editor doesn't touch survive.
+    // Rebuilding from scratch dropped holidays_off, so nudging Tuesday's hours
+    // made the technician bookable on Christmas again.
     const existingSchedule = (selectedStaff.schedule || {}) as Record<string, unknown>;
     const merged: Record<string, unknown> = {
+      ...existingSchedule,
       ...scheduleData,
       vacations: existingSchedule.vacations || [],
       service_durations: existingSchedule.service_durations || {},

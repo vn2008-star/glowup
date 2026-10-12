@@ -254,7 +254,12 @@ export default function ManageClient({ token }: { token: string }) {
     if (isStaffOff(dateStr) || isBizClosed(dateStr)) return [];
     const dayKey = localeDateStr(new Date(dateStr + "T12:00:00"), { weekday: "long" }).toLowerCase();
     const dayHours = effectiveHours[dayKey];
-    const duration = appointment?.service?.duration_minutes || 60;
+    // The booked length, not the service default: a per-staff override (a
+    // 120-min full set on a 90-min service) was lost on every reschedule.
+    const bookedMin = appointment
+      ? Math.round((new Date(appointment.end_time).getTime() - new Date(appointment.start_time).getTime()) / 60000)
+      : 0;
+    const duration = bookedMin > 0 ? bookedMin : (appointment?.service?.duration_minutes || 60);
     const toMin = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + (m || 0); };
 
     // Candidate start times: the staff member's fixed slot grid when they use

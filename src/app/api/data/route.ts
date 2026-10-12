@@ -915,6 +915,11 @@ export async function POST(request: Request) {
           query = query.gte('start_time', payload.startDate).lte('start_time', payload.endDate)
         }
 
+        // Cancelled rows are history, not the day's work: the Front Desk was
+        // drawing them, counting them in "N total" and treating the slot as
+        // busy. calendar.load already excludes them.
+        if (!payload?.includeCancelled) query = query.neq('status', 'cancelled')
+
         const { data, error } = await query.limit(payload?.limit || 200)
 
         if (await shouldMaskContacts()) {

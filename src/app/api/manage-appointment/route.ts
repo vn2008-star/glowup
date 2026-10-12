@@ -350,7 +350,9 @@ export async function PATCH(request: Request) {
     }
 
     const newStart = new Date(new_start_time)
-    const duration = service?.duration_minutes || 60
+    // Keep the booked length (per-staff overrides), not the service default
+    const bookedMin = Math.round((new Date(apt.end_time).getTime() - new Date(apt.start_time).getTime()) / 60000)
+    const duration = bookedMin > 0 ? bookedMin : (service?.duration_minutes || 60)
     const newEnd = new Date(newStart.getTime() + duration * 60 * 1000)
 
     if (isNaN(newStart.getTime())) {
