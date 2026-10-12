@@ -11,6 +11,8 @@ import type { Appointment, Client } from "@/lib/types";
 import type { OverviewData } from "@/lib/overview-query";
 import { localeDateStr } from "@/lib/utils";
 import { DEFAULT_TZ } from "@/lib/tz";
+import { Icon } from "@/components/ui/Icon";
+import { StatusBadge } from "@/components/ui/StatusBadge";
 
 export default function OverviewClient({ initialOverview }: { initialOverview: OverviewData | null }) {
   const { tenant, currentStaff } = useTenant();
@@ -125,7 +127,7 @@ export default function OverviewClient({ initialOverview }: { initialOverview: O
       {/* KPI Cards */}
       <div className={styles.metricsGrid}>
         <div className={`card ${styles.metricCard}`}>
-          <span className={styles.metricIcon}>💰</span>
+          <span className={styles.metricIcon}><Icon name="dollar" size={22} /></span>
           <div className={styles.metricInfo}>
             <span className={styles.metricLabel}>{t("todaysRevenue")}</span>
             <span className={styles.metricValue}>{loading ? "..." : `$${metrics.todayRevenue}`}</span>
@@ -133,7 +135,7 @@ export default function OverviewClient({ initialOverview }: { initialOverview: O
           </div>
         </div>
         <div className={`card ${styles.metricCard}`}>
-          <span className={styles.metricIcon}>📅</span>
+          <span className={styles.metricIcon}><Icon name="calendar" size={22} /></span>
           <div className={styles.metricInfo}>
             <span className={styles.metricLabel}>{t("appointmentsLabel")}</span>
             <span className={styles.metricValue}>{loading ? "..." : metrics.todayAppointments}</span>
@@ -141,7 +143,7 @@ export default function OverviewClient({ initialOverview }: { initialOverview: O
           </div>
         </div>
         <div className={`card ${styles.metricCard}`}>
-          <span className={styles.metricIcon}>✨</span>
+          <span className={styles.metricIcon}><Icon name="sparkles" size={22} /></span>
           <div className={styles.metricInfo}>
             <span className={styles.metricLabel}>{t("newClientsWeek")}</span>
             <span className={styles.metricValue}>{loading ? "..." : metrics.newClientsWeek}</span>
@@ -149,7 +151,7 @@ export default function OverviewClient({ initialOverview }: { initialOverview: O
           </div>
         </div>
         <div className={`card ${styles.metricCard}`}>
-          <span className={styles.metricIcon}>💜</span>
+          <span className={styles.metricIcon}><Icon name="heart" size={22} /></span>
           <div className={styles.metricInfo}>
             <span className={styles.metricLabel}>{t("retentionRate")}</span>
             <span className={styles.metricValue}>{loading ? "..." : `${metrics.retentionRate}%`}</span>
@@ -183,9 +185,7 @@ export default function OverviewClient({ initialOverview }: { initialOverview: O
                       </span>
                       <span className={styles.aptService}>{apt.service?.name || "Service"}</span>
                     </div>
-                    <span className={`badge ${apt.status === "confirmed" ? "badge-success" : apt.status === "pending" ? "badge-warning" : "badge-primary"}`}>
-                      {apt.status}
-                    </span>
+                    <StatusBadge status={apt.status} />
                   </div>
                 );
               })}

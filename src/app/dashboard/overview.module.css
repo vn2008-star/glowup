@@ -50,8 +50,15 @@
   padding: var(--space-5);
 }
 .metricIcon {
-  font-size: var(--text-2xl);
-  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: var(--color-primary-50);
+  color: var(--color-primary);
+  flex-shrink: 0;
 }
 .metricInfo {
   display: flex;

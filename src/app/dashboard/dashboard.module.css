@@ -57,7 +57,6 @@
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  animation: sidebarSparkle 5s ease-in-out infinite;
   filter: drop-shadow(0 0 0 transparent);
 }
 @keyframes sidebarSparkle {
@@ -85,7 +84,6 @@
 .logo svg {
   color: var(--color-primary);
   filter: drop-shadow(0 0 8px rgba(201, 160, 220, 0.5));
-  animation: logoGlow 3s ease-in-out infinite;
 }
 @keyframes logoGlow {
   0%, 100% { filter: drop-shadow(0 0 6px rgba(201, 160, 220, 0.4)); transform: scale(1); }
@@ -211,7 +209,6 @@
 .navItemQuickStart svg {
   opacity: 1 !important;
   color: var(--color-primary);
-  animation: qsRocket 3s ease-in-out infinite;
 }
 .navItemQuickStart span {
   font-weight: 600;

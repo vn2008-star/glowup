@@ -428,11 +428,12 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
   // ── Appointment status colors ──
   function aptColor(status: string) {
     switch (status) {
-      case "confirmed": return "var(--color-primary)";
-      case "completed": return "var(--color-success)";
-      case "cancelled": return "var(--color-danger)";
-      case "blocked": return "#6b7280";
-      default: return "var(--color-warning)";
+      case "confirmed": return "var(--status-confirmed)";
+      case "completed": return "var(--status-completed)";
+      case "cancelled": return "var(--status-cancelled)";
+      case "blocked": return "var(--status-blocked)";
+      case "no_show": return "var(--status-no-show)";
+      default: return "var(--status-pending)";
     }
   }
 

@@ -1364,9 +1364,12 @@ export default function CheckoutPage() {
 
                   const aptColor = (status: string) => {
                     switch (status) {
-                      case "completed": return "var(--color-success)";
-                      case "cancelled": return "#ef4444";
-                      default: return "var(--color-primary)";
+                      case "completed": return "var(--status-completed)";
+                      case "cancelled": return "var(--status-cancelled)";
+                      case "pending": return "var(--status-pending)";
+                      case "no_show": return "var(--status-no-show)";
+                      case "blocked": return "var(--status-blocked)";
+                      default: return "var(--status-confirmed)";
                     }
                   };
 

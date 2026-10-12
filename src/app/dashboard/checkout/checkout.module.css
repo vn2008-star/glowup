@@ -32,7 +32,6 @@
   align-items: center;
   justify-content: center;
   margin: 0 auto var(--space-4);
-  animation: welcomeFloat 3s ease-in-out infinite;
 }
 .welcomeLogo {
   width: 140px;
@@ -52,7 +51,6 @@
   background: linear-gradient(135deg, #D4A0D4, #E8B4CB, #C8B8E0);
   color: white;
   box-shadow: 0 8px 32px rgba(212, 160, 212, 0.3);
-  animation: welcomeFloat 3s ease-in-out infinite;
 }
 @keyframes welcomeFloat {
   0%, 100% { transform: translateY(0); }
@@ -76,9 +74,7 @@
   -webkit-text-fill-color: transparent;
   background-clip: text;
   margin-bottom: var(--space-2);
-  animation:
-    titleShimmer 4s ease-in-out infinite,
-    titleGlow 3s ease-in-out infinite;
+  /* The shimmer + glow loops ran all day on a kiosk; one static gradient now */
   letter-spacing: 0.02em;
   position: relative;
 }

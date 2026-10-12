@@ -13,6 +13,7 @@ import { US_TIMEZONES, timezoneFromAddress } from "@/lib/tz";
 import { CLOSED_DAY_HOLIDAYS, getNextHolidayDate } from "@/lib/schedule-utils";
 import type { CustomClosedDate } from "@/lib/schedule-utils";
 import styles from "./settings.module.css";
+import { Icon } from "@/components/ui/Icon";
 import { formatPhone, localeDateStr } from "@/lib/utils";
 
 interface BusinessHours {
@@ -491,7 +492,7 @@ export default function SettingsPage() {
       {/* Booking Link */}
       {tenant?.slug && (
         <div id="booking-link" className={`card ${styles.section}`}>
-          <h2>🔗 Booking Link</h2>
+          <h2><Icon name="link" /> Booking Link</h2>
           <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginBottom: "var(--space-4)" }}>
             Share this link with clients so they can book appointments online. Add it to your Instagram bio, website, or Google profile.
           </p>
@@ -767,7 +768,7 @@ export default function SettingsPage() {
 
       {/* Special Instructions */}
       <div id="special-instructions" className={`card ${styles.section}`}>
-        <h2>📌 Special Instructions</h2>
+        <h2><Icon name="map-pin" /> Special Instructions</h2>
         <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginBottom: "var(--space-4)" }}>
           Arrival details for your clients — how to find your suite, where to park, what to do
           when they get there. This appears in every booking confirmation, reminder, and
@@ -800,7 +801,7 @@ export default function SettingsPage() {
 
       {/* Business Closed Days */}
       <div id="closed-days" className={`card ${styles.section}`}>
-        <h2>🏖️ Business Closed Days</h2>
+        <h2><Icon name="calendar" /> Business Closed Days</h2>
         <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginBottom: "var(--space-4)" }}>
           Select holidays when your business is closed. These dates will be blocked on your public booking page for all staff.
         </p>
@@ -889,7 +890,7 @@ export default function SettingsPage() {
 
       {/* Text Messaging — this salon's own phone sends its texts */}
       <div className={`card ${styles.section}`} id="sms">
-        <h2>💬 Text Messaging (SMS)</h2>
+        <h2><Icon name="message" /> Text Messaging (SMS)</h2>
         <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginBottom: "var(--space-4)" }}>
           Send reminders, confirmations and payment requests from <strong>your own salon phone</strong> —
           clients see your real number, and there&apos;s no carrier registration to wait on.
@@ -991,7 +992,7 @@ export default function SettingsPage() {
 
       {/* Payment Methods */}
       <div className={`card ${styles.section}`}>
-        <h2>💰 Payment Methods</h2>
+        <h2><Icon name="dollar" /> Payment Methods</h2>
         <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginBottom: "var(--space-4)" }}>
           Upload your Venmo and Zelle QR codes. Staff can show these to clients during checkout.
           Add your username and Zelle contact below to also text or email clients a payment request from the checkout screen.
@@ -1113,7 +1114,7 @@ export default function SettingsPage() {
 
       {/* AI Receptionist */}
       <div className={`card ${styles.section}`}>
-        <h2>🤖 AI Receptionist</h2>
+        <h2><Icon name="sparkles" /> AI Receptionist</h2>
         <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginBottom: "var(--space-4)" }}>
           Your 24/7 virtual front desk. Automatically answers questions, suggests available times, and books appointments across Website, SMS, Instagram, and Facebook.
         </p>
@@ -1144,7 +1145,7 @@ export default function SettingsPage() {
 
       {/* Appointment Reminders */}
       <div id="reminders" className={`card ${styles.section}`}>
-        <h2>🔔 Appointment Reminders</h2>
+        <h2><Icon name="bell" /> Appointment Reminders</h2>
         <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginBottom: "var(--space-4)" }}>
           Automatically send reminders before appointments. Reduces no-shows by up to 60%.
         </p>
@@ -1331,7 +1332,7 @@ export default function SettingsPage() {
 
       {/* Client Protection */}
       <div className={`card ${styles.section}`}>
-        <h2>🛡️ Client Protection</h2>
+        <h2><Icon name="shield" /> Client Protection</h2>
         <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginBottom: "var(--space-4)" }}>
           When enabled, technician-level staff will see masked phone numbers and email addresses. Owners and managers always see full contact info.
         </p>
@@ -1355,7 +1356,7 @@ export default function SettingsPage() {
 
       {/* Review Request Auto-Send */}
       <div id="review-request" className={`card ${styles.section}`}>
-        <h2>⭐ Review Request</h2>
+        <h2><Icon name="star" /> Review Request</h2>
         <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginBottom: "var(--space-4)" }}>
           Automatically ask clients for a Google or Yelp review after their appointment. Builds your online reputation on autopilot.
         </p>
@@ -1484,7 +1485,7 @@ export default function SettingsPage() {
       </div>
       {/* Billing & Subscription */}
       <div className={`card ${styles.section}`}>
-        <h2>💳 Billing & Subscription</h2>
+        <h2><Icon name="credit-card" /> Billing & Subscription</h2>
         <div className={styles.billingCard}>
           <div className={styles.billingInfo}>
             <div className={styles.billingPlan}>
@@ -1647,7 +1648,7 @@ export default function SettingsPage() {
 
       {/* ── Danger Zone ── */}
       <div className={`card ${styles.section} ${styles.dangerZone}`}>
-        <h2>⚠️ Danger Zone</h2>
+        <h2><Icon name="warning" /> Danger Zone</h2>
 
         {/* Suspend / Reactivate */}
         <div className={styles.dangerItem}>

@@ -10,6 +10,7 @@ import { queryData, cachedQuery, uploadImage } from "@/lib/api";
 import styles from "./clients.module.css";
 import type { Client, Service, Staff } from "@/lib/types";
 import { formatPhone, fmtDate, localeDateStr } from "@/lib/utils";
+import { StatusBadge } from "@/components/ui/StatusBadge";
 import { localToUTC, todayInTz, DEFAULT_TZ } from "@/lib/tz";
 
 /* ── Masking helpers (mirrors API logic for "View as Technician" preview) ── */
@@ -1031,9 +1032,7 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
                             : ""}
                         </small>
                       </span>
-                      <span className={`badge ${a.status === "completed" ? "badge-success" : a.status === "cancelled" ? "badge-danger" : "badge-info"}`}>
-                        {a.status}
-                      </span>
+                      <StatusBadge status={a.status} />
                       <span className={styles.aptHistoryPrice}>
                         {a.total_price != null
                           ? `$${(Number(a.total_price) + Number(a.tip_amount || 0)).toFixed(2)}`
