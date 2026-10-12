@@ -1,5 +1,6 @@
 "use client";
 
+import { useToast } from "@/components/ui/Toast";
 import { useState, useEffect, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
@@ -50,6 +51,12 @@ const DEFAULT_BDAY_MESSAGE = DEFAULT_BIRTHDAY_TEMPLATE;
 
 export default function LoyaltyPage() {
   const { tenant, refetch } = useTenant();
+  const toast = useToast();
+  // Points per dollar at checkout (settings.loyalty_redeem_rate; default 20 = 100 pts for $5)
+  const [redeemRateDraft, setRedeemRateDraft] = useState<string>(() =>
+    String(Number((tenant?.settings as Record<string, unknown> | undefined)?.loyalty_redeem_rate) || 20)
+  );
+  const [redeemSaving, setRedeemSaving] = useState(false);
   const t = useTranslations("loyaltyPage");
   // Seeded from the data cache — see lib/data-cache.
   const [tiers, setTiers] = useState<LoyaltyTier[]>(() => cachedOverview()?.tiers ?? []);
@@ -210,6 +217,48 @@ export default function LoyaltyPage() {
             <p className={styles.tierPerks}>{t.perks}</p>
           </div>
         ))}
+      </div>
+
+      {/* Redemption rate: what points are worth at checkout */}
+      <div className={`card ${styles.activityCard}`}>
+        <h2>Redeeming Points</h2>
+        <p style={{ color: "var(--text-secondary)", fontSize: "var(--text-sm)", marginBottom: "var(--space-3)" }}>
+          Clients earn 1 point per $5 spent. At checkout, staff can apply points as a discount at this rate.
+        </p>
+        <form
+          style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", flexWrap: "wrap" }}
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const rate = Math.round(Number(redeemRateDraft));
+            if (!rate || rate < 1 || rate > 1000) { toast.error("Enter between 1 and 1000 points per dollar"); return; }
+            setRedeemSaving(true);
+            const res = await fetch("/api/save-settings", {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ settings: { loyalty_redeem_rate: rate } }),
+            });
+            setRedeemSaving(false);
+            if (res.ok) { toast.success("Redemption rate saved"); refetch(); } else toast.error("Could not save the rate");
+          }}
+        >
+          <span>100 points =</span>
+          <span>$</span>
+          <input
+            className="input"
+            type="number"
+            min="0.1"
+            step="0.5"
+            style={{ width: 90 }}
+            aria-label="Dollar value of 100 points"
+            value={redeemRateDraft ? (Math.round((100 / Number(redeemRateDraft)) * 100) / 100).toString() : ""}
+            onChange={(e) => {
+              const dollars = Number(e.target.value);
+              setRedeemRateDraft(dollars > 0 ? String(Math.round(100 / dollars)) : "");
+            }}
+          />
+          <span style={{ color: "var(--text-tertiary)", fontSize: "var(--text-xs)" }}>({redeemRateDraft || "–"} points per $1)</span>
+          <button type="submit" className="btn btn-primary btn-sm" disabled={redeemSaving}>{redeemSaving ? "Saving…" : "Save"}</button>
+        </form>
       </div>
 
       {/* Recent Activity */}

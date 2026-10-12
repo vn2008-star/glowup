@@ -74,6 +74,20 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
   async function confirmCancel() {
     if (!cancelTarget) return;
     setCancelling(true);
+    // "Client no-show" is a different outcome from a cancellation: the row
+    // keeps its slot in history as no_show (reports and the follow-up text
+    // read that status) and the client is NOT sent a cancellation notice.
+    if (cancelReason.trim() === "Client no-show") {
+      const res = await queryData<FullAppointment>("appointments.no-show", { id: cancelTarget.id });
+      setCancelling(false);
+      if (res.error || !res.data) { toast.error(`${t("noShowFailed")}: ${res.error || ""}`); return; }
+      const updated = res.data;
+      setAppointments(prev => prev.map(a => a.id === updated.id ? { ...a, ...updated } : a));
+      setCancelTarget(null);
+      setCancelReason("");
+      toast.success(t("noShowMarked"));
+      return;
+    }
     const res = await queryData<{ id: string }>("appointments.cancel", {
       id: cancelTarget.id,
       cancellation_reason: cancelReason.trim(),

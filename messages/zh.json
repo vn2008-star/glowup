@@ -204,7 +204,9 @@
     "seriesBooked": "已预约 {count} 次",
     "seriesSkipped": "跳过 {count} 次：{dates}",
     "seriesFailed": "无法创建重复预约",
-    "seriesNoneBooked": "没有空闲的日期，请换个时间。"
+    "seriesNoneBooked": "没有空闲的日期，请换个时间。",
+    "noShowMarked": "已标记为爽约",
+    "noShowFailed": "无法标记爽约"
   },
   "overviewPage": {
     "goodMorning": "早上好",
@@ -511,7 +513,13 @@
     "withStaff": "与",
     "changeService": "更改",
     "requestPayment": "请求 {method} 付款",
-    "requestPaymentHint": "以短信/邮件将总额和付款方式发给客户。客户付款后仍需由你完成结账。"
+    "requestPaymentHint": "以短信/邮件将总额和付款方式发给客户。客户付款后仍需由你完成结账。",
+    "redeemPoints": "使用积分",
+    "pointsAvailable": "可用 {n} 分",
+    "markNoShow": "标记爽约",
+    "noShowDescription": "将该预约记录为爽约并停止提醒。不会通知客户。",
+    "noShowMarked": "已标记为爽约",
+    "noShowFailed": "无法标记爽约"
   },
   "booking": {
     "stepService": "服务",

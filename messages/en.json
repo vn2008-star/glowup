@@ -204,7 +204,9 @@
     "seriesBooked": "Booked {count} appointments",
     "seriesSkipped": "{count} skipped: {dates}",
     "seriesFailed": "Could not book the series",
-    "seriesNoneBooked": "None of the dates were free. Try a different time."
+    "seriesNoneBooked": "None of the dates were free. Try a different time.",
+    "noShowMarked": "Marked as no-show",
+    "noShowFailed": "Could not mark as no-show"
   },
   "overviewPage": {
     "goodMorning": "Good morning",
@@ -511,7 +513,13 @@
     "withStaff": "with",
     "changeService": "Change",
     "requestPayment": "Request {method} Payment",
-    "requestPaymentHint": "Texts/emails the client the total and how to pay. You still complete the checkout once they've paid."
+    "requestPaymentHint": "Texts/emails the client the total and how to pay. You still complete the checkout once they've paid.",
+    "redeemPoints": "Redeem points",
+    "pointsAvailable": "{n} available",
+    "markNoShow": "Mark no-show",
+    "noShowDescription": "Keeps the appointment in history as a no-show and stops its reminders. The client is not notified.",
+    "noShowMarked": "Marked as no-show",
+    "noShowFailed": "Could not mark as no-show"
   },
   "booking": {
     "stepService": "Service",

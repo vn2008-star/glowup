@@ -204,7 +204,9 @@
     "seriesBooked": "예약 {count}건 완료",
     "seriesSkipped": "{count}건 건너뜀: {dates}",
     "seriesFailed": "반복 예약을 만들 수 없습니다",
-    "seriesNoneBooked": "비어 있는 날짜가 없습니다. 다른 시간을 시도하세요."
+    "seriesNoneBooked": "비어 있는 날짜가 없습니다. 다른 시간을 시도하세요.",
+    "noShowMarked": "노쇼로 처리됨",
+    "noShowFailed": "노쇼 처리에 실패했습니다"
   },
   "overviewPage": {
     "goodMorning": "좋은 아침입니다",
@@ -511,7 +513,13 @@
     "withStaff": "담당",
     "changeService": "변경",
     "requestPayment": "{method} 결제 요청",
-    "requestPaymentHint": "총액과 결제 방법을 고객에게 문자/이메일로 보냅니다. 결제 후에는 직접 체크아웃을 완료하세요."
+    "requestPaymentHint": "총액과 결제 방법을 고객에게 문자/이메일로 보냅니다. 결제 후에는 직접 체크아웃을 완료하세요.",
+    "redeemPoints": "포인트 사용",
+    "pointsAvailable": "{n}점 사용 가능",
+    "markNoShow": "노쇼 처리",
+    "noShowDescription": "예약을 노쇼로 기록에 남기고 알림을 중단합니다. 고객에게는 알리지 않습니다.",
+    "noShowMarked": "노쇼로 처리됨",
+    "noShowFailed": "노쇼 처리에 실패했습니다"
   },
   "booking": {
     "stepService": "서비스",

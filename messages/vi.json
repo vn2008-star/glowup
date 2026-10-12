@@ -204,7 +204,9 @@
     "seriesBooked": "Đã đặt {count} lịch hẹn",
     "seriesSkipped": "Bỏ qua {count}: {dates}",
     "seriesFailed": "Không thể đặt chuỗi lịch hẹn",
-    "seriesNoneBooked": "Không có ngày nào trống. Hãy thử giờ khác."
+    "seriesNoneBooked": "Không có ngày nào trống. Hãy thử giờ khác.",
+    "noShowMarked": "Đã đánh dấu vắng mặt",
+    "noShowFailed": "Không thể đánh dấu vắng mặt"
   },
   "overviewPage": {
     "goodMorning": "Chào buổi sáng",
@@ -511,7 +513,13 @@
     "withStaff": "với",
     "changeService": "Đổi",
     "requestPayment": "Yêu cầu thanh toán {method}",
-    "requestPaymentHint": "Gửi tin nhắn/email cho khách tổng tiền và cách thanh toán. Bạn vẫn hoàn tất thanh toán sau khi khách trả tiền."
+    "requestPaymentHint": "Gửi tin nhắn/email cho khách tổng tiền và cách thanh toán. Bạn vẫn hoàn tất thanh toán sau khi khách trả tiền.",
+    "redeemPoints": "Dùng điểm",
+    "pointsAvailable": "Còn {n} điểm",
+    "markNoShow": "Đánh dấu vắng mặt",
+    "noShowDescription": "Giữ lịch hẹn trong lịch sử là vắng mặt và dừng nhắc lịch. Khách không được thông báo.",
+    "noShowMarked": "Đã đánh dấu vắng mặt",
+    "noShowFailed": "Không thể đánh dấu vắng mặt"
   },
   "booking": {
     "stepService": "Dịch vụ",

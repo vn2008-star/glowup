@@ -117,6 +117,10 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
   const [bookingSaving, setBookingSaving] = useState(false);
   // In-flight guard for the add/edit forms: a double click created two clients
   const [clientSaving, setClientSaving] = useState(false);
+  // Manual loyalty-point correction in the profile drawer (owner/manager)
+  const [adjustOpen, setAdjustOpen] = useState(false);
+  const [adjustDelta, setAdjustDelta] = useState("");
+  const [adjusting, setAdjusting] = useState(false);
 
   const fetchClients = useCallback(async () => {
     if (!tenant) return;
@@ -939,8 +943,34 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
               <div className={styles.profileKpi}>
                 <span className={styles.kpiValue}>{selectedClient.loyalty_points}</span>
                 <span className={styles.kpiLabel}>Loyalty Points</span>
+                {currentStaff?.role !== "technician" && (
+                  <button type="button" className="btn btn-ghost btn-sm" style={{ marginTop: 4 }} onClick={() => { setAdjustOpen((o) => !o); setAdjustDelta(""); }}>
+                    {adjustOpen ? "Close" : "Adjust"}
+                  </button>
+                )}
               </div>
             </div>
+            {adjustOpen && (
+              <form
+                style={{ display: "flex", gap: "var(--space-2)", alignItems: "center", flexWrap: "wrap", marginTop: "var(--space-2)" }}
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  const delta = Math.round(Number(adjustDelta));
+                  if (!delta) return;
+                  setAdjusting(true);
+                  const { data, error } = await queryData<{ id: string; loyalty_points: number }>("clients.adjust_points", { id: selectedClient.id, delta });
+                  setAdjusting(false);
+                  if (error || !data) { toast.error(error || "Could not adjust points"); return; }
+                  setClients((prev) => prev.map((c) => (c.id === data.id ? { ...c, loyalty_points: data.loyalty_points } : c)));
+                  setSelectedClient({ ...selectedClient, loyalty_points: data.loyalty_points });
+                  setAdjustOpen(false);
+                  toast.success(`${delta > 0 ? "+" : ""}${delta} points → ${data.loyalty_points}`);
+                }}
+              >
+                <input className="input" type="number" step="1" value={adjustDelta} onChange={(e) => setAdjustDelta(e.target.value)} placeholder="+50 or -20" aria-label="Points to add or remove" style={{ width: 120 }} />
+                <button type="submit" className="btn btn-primary btn-sm" disabled={adjusting || !adjustDelta}>{adjusting ? "Saving…" : "Apply"}</button>
+              </form>
+            )}
 
             {/* Contact Info */}
             <div className={styles.profileSection}>

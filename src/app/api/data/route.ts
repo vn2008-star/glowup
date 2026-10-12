@@ -135,7 +135,7 @@ const MANAGEMENT_ACTIONS = new Set([
   'services.add', 'services.bulkAdd', 'services.update', 'services.delete', 'services.reorder',
   'packages.add', 'packages.update', 'packages.delete',
   'social.add', 'social.update', 'social.delete',
-  'clients.delete', 'clients.send_birthday_promo',
+  'clients.delete', 'clients.send_birthday_promo', 'clients.adjust_points',
   'appointments.delete',
   'payments.request',
   'sms.gateway-status',
@@ -956,7 +956,7 @@ export async function POST(request: Request) {
       case 'appointments.list': {
         let query = svc
           .from('appointments')
-          .select('id, tenant_id, client_id, staff_id, service_id, start_time, end_time, status, total_price, notes, payment_method, tip_amount, checked_out_at, checked_in_at, created_at, client:clients(id, first_name, last_name, phone, email, photo_url), staff_member:staff!staff_id(id, name, photo_url, role), service:services(id, name, category, duration_minutes, price, commission_rate)')
+          .select('id, tenant_id, client_id, staff_id, service_id, start_time, end_time, status, total_price, notes, payment_method, tip_amount, checked_out_at, checked_in_at, created_at, client:clients(id, first_name, last_name, phone, email, photo_url, loyalty_points), staff_member:staff!staff_id(id, name, photo_url, role), service:services(id, name, category, duration_minutes, price, commission_rate)')
           .eq('tenant_id', tenantId)
           .order('start_time', { ascending: true })
 
@@ -1316,6 +1316,58 @@ export async function POST(request: Request) {
       // Cancel (keeps the row for history/reporting and notifies the client).
       // The dashboard used to hard-DELETE, which silently erased the booking:
       // no client notice, no owner record, no no-show analytics.
+      // The client didn't turn up. Reports and the follow-up automation have
+      // always read status = 'no_show', but nothing ever wrote it: the
+      // calendar's "Client no-show" chip cancelled the row instead, which
+      // also texted the client a cancellation notice.
+      case 'appointments.no-show': {
+        const { data: before } = await svc
+          .from('appointments')
+          .select('id, status, staff_id, start_time')
+          .eq('id', payload.id)
+          .eq('tenant_id', tenantId)
+          .maybeSingle()
+        if (!before) return NextResponse.json({ data: null, error: 'Appointment not found' }, { status: 404 })
+        if (staffRole === 'technician' && before.staff_id !== staffId) {
+          return NextResponse.json({ error: 'You can only change your own appointments' }, { status: 403 })
+        }
+        if (before.status === 'completed' || before.status === 'cancelled' || before.status === 'blocked') {
+          return NextResponse.json({ data: null, error: `This appointment is ${before.status}` }, { status: 409 })
+        }
+        const { data, error } = await svc
+          .from('appointments')
+          .update({ status: 'no_show' })
+          .eq('id', payload.id)
+          .eq('tenant_id', tenantId)
+          .select('id, tenant_id, client_id, staff_id, service_id, start_time, end_time, status, total_price, notes, payment_method, tip_amount, checked_out_at, checked_in_at, created_at, client:clients(id, first_name, last_name, phone, email, photo_url, loyalty_points), staff_member:staff!staff_id(id, name, photo_url, role), service:services(id, name, category, duration_minutes, price, commission_rate)')
+          .single()
+        if (data) {
+          // No reminders for a visit that already didn't happen
+          await svc.from('appointment_reminders').update({ status: 'skipped' }).eq('appointment_id', data.id).eq('status', 'pending')
+        }
+        return NextResponse.json({ data, error: friendlyWriteError(error) })
+      }
+
+      // Owner/manager correction of a client's points (goodwill, a missed
+      // checkout, a mistaken redemption). Never below zero.
+      case 'clients.adjust_points': {
+        const delta = Math.round(Number(payload.delta))
+        if (!Number.isFinite(delta) || delta === 0 || Math.abs(delta) > 100000) {
+          return NextResponse.json({ data: null, error: 'Enter a whole number of points' }, { status: 400 })
+        }
+        const { data: row } = await svc.from('clients').select('loyalty_points').eq('id', payload.id).eq('tenant_id', tenantId).maybeSingle()
+        if (!row) return NextResponse.json({ data: null, error: 'Client not found' }, { status: 404 })
+        const next = Math.max(0, (row.loyalty_points || 0) + delta)
+        const { data, error } = await svc
+          .from('clients')
+          .update({ loyalty_points: next })
+          .eq('id', payload.id)
+          .eq('tenant_id', tenantId)
+          .select('id, loyalty_points')
+          .single()
+        return NextResponse.json({ data, error: error?.message })
+      }
+
       case 'appointments.cancel': {
         const reason = String(payload.cancellation_reason || '').trim().slice(0, 500)
         const { data, error } = await cancelAppointment(svc, tenantId, payload.id, reason, 'salon')
@@ -2595,6 +2647,26 @@ export async function POST(request: Request) {
           return NextResponse.json({ data: null, error: 'Gift card amount exceeds the total' }, { status: 400 })
         }
 
+        // Loyalty redemption: N points off the bill at the salon's rate
+        // (settings.loyalty_redeem_rate = points per dollar, default 20, i.e.
+        // 100 points = $5). Validated against the client's balance; recorded
+        // as a negative charge line so the itemised bill still adds up.
+        const redeemPoints = Math.round(Number(payload.redeem_points) || 0)
+        let loyaltyDiscount = 0
+        let clientForRedeem: { id: string; loyalty_points: number | null } | null = null
+        if (redeemPoints > 0) {
+          const { data: aptForRedeem } = await svc.from('appointments').select('client_id').eq('id', id).eq('tenant_id', tenantId).maybeSingle()
+          if (!aptForRedeem?.client_id) return NextResponse.json({ data: null, error: 'No client on this appointment to redeem points for' }, { status: 400 })
+          const { data: c } = await svc.from('clients').select('id, loyalty_points').eq('id', aptForRedeem.client_id).eq('tenant_id', tenantId).maybeSingle()
+          if (!c || (c.loyalty_points || 0) < redeemPoints) {
+            return NextResponse.json({ data: null, error: `The client has ${c?.loyalty_points || 0} points` }, { status: 400 })
+          }
+          const { data: tRow } = await svc.from('tenants').select('settings').eq('id', tenantId).single()
+          const rate = Number(((tRow?.settings || {}) as Record<string, unknown>).loyalty_redeem_rate) || 20
+          loyaltyDiscount = Math.min(total_price, Math.floor((redeemPoints / rate) * 100) / 100)
+          clientForRedeem = c
+        }
+
         // Idempotency: a double click or a network retry used to re-debit the
         // card and re-award loyalty points, visit count and lifetime spend.
         // Cheap read first so a retry doesn't debit-then-refund; the
@@ -2619,13 +2691,14 @@ export async function POST(request: Request) {
           redeemed = result
         }
 
+        const finalTotal = Math.round((total_price - loyaltyDiscount) * 100) / 100
         const { data, error } = await svc
           .from('appointments')
           .update({
             status: 'completed',
             payment_method,
             tip_amount,
-            total_price,
+            total_price: finalTotal,
             checked_out_at: new Date().toISOString(),
             checked_out_by: staffId,
           })
@@ -2664,9 +2737,26 @@ export async function POST(request: Request) {
 
         if (redeemed) await compensateCreditRedemption(svc, tenantId, redeemed)
 
-        // Award loyalty points & update client stats ($5 = 1 point)
+        if (clientForRedeem && loyaltyDiscount > 0) {
+          await svc.from('clients')
+            .update({ loyalty_points: Math.max(0, (clientForRedeem.loyalty_points || 0) - redeemPoints) })
+            .eq('id', clientForRedeem.id)
+            .eq('tenant_id', tenantId)
+          await svc.from('appointment_charges').insert({
+            tenant_id: tenantId,
+            appointment_id: id,
+            staff_id: data.staff_id,
+            service_id: null,
+            description: `Loyalty reward (${redeemPoints} pts)`,
+            amount: -loyaltyDiscount,
+            is_upsell: false,
+          })
+        }
+
+        // Award loyalty points & update client stats ($5 = 1 point), on what
+        // was actually paid
         if (data && !error && data.client_id) {
-          const pointsEarned = Math.round(total_price / 5)
+          const pointsEarned = Math.round(finalTotal / 5)
           // Tenant-filtered even though client_id came off a tenant-scoped
           // appointment: an appointment can only be created or moved onto a
           // client in its own tenant now, but this write hands out loyalty
@@ -2684,7 +2774,7 @@ export async function POST(request: Request) {
               .update({
                 loyalty_points: (clientRow.loyalty_points || 0) + pointsEarned,
                 visit_count: (clientRow.visit_count || 0) + 1,
-                lifetime_spend: (clientRow.lifetime_spend || 0) + total_price,
+                lifetime_spend: (clientRow.lifetime_spend || 0) + finalTotal,
                 last_visit: new Date().toISOString(),
                 status: 'active',
               })

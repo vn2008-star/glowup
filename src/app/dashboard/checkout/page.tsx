@@ -1,6 +1,7 @@
 "use client";
 
 import { useToast } from "@/components/ui/Toast";
+import { useConfirm } from "@/components/ui/Dialog";
 import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "react";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
@@ -21,6 +22,7 @@ type FullAppointment = Appointment & {
 export default function CheckoutPage() {
   const { tenant } = useTenant();
   const toast = useToast();
+  const confirmDialog = useConfirm();
   const t = useTranslations("checkoutPage");
   const [loading, setLoading] = useState(true);
   const [appointments, setAppointments] = useState<FullAppointment[]>([]);
@@ -89,6 +91,21 @@ export default function CheckoutPage() {
   const [walkInBirthday, setWalkInBirthday] = useState("");
   const [creatingWalkIn, setCreatingWalkIn] = useState(false);
   const [addingCharge, setAddingCharge] = useState(false);
+  // Loyalty points the cashier is applying to this checkout (as typed)
+  const [redeemPoints, setRedeemPoints] = useState("");
+  const [markingNoShow, setMarkingNoShow] = useState(false);
+
+  async function handleNoShow() {
+    if (!selectedApt || markingNoShow) return;
+    if (!(await confirmDialog({ title: t("markNoShow") + "?", description: t("noShowDescription"), confirmLabel: t("markNoShow") }))) return;
+    setMarkingNoShow(true);
+    const { data, error } = await queryData<FullAppointment>("appointments.no-show", { id: selectedApt.id });
+    setMarkingNoShow(false);
+    if (error || !data) { toast.error(error || t("noShowFailed")); return; }
+    setAppointments((prev) => prev.map((a) => (a.id === data.id ? { ...a, ...data } : a)));
+    setSelectedApt(null);
+    toast.success(t("noShowMarked"));
+  }
 
   // Welcome screen panels
   const [waitlistQueue, setWaitlistQueue] = useState<{ id: string; position: number; client_name: string; service_name: string; staff_name: string; staff_id: string | null; estimated_wait_minutes: number }[]>([]);
@@ -337,6 +354,7 @@ export default function CheckoutPage() {
       setCharges(data || []);
     })();
     setTipAmount(String(selectedApt.tip_amount || ""));
+    setRedeemPoints("");
     setPaymentMethod((selectedApt.payment_method as "cash" | "card" | "mixed" | "venmo" | "zelle" | "gift_card") || "");
   }, [selectedApt]);
 
@@ -676,6 +694,7 @@ export default function CheckoutPage() {
       tip_amount: tip,
       total_price: chargeTotal,
       ...(redeemGiftCard ? { gift_card_code: gcCard.code, gift_card_amount: gcApplied } : {}),
+      ...(redeemPts > 0 ? { redeem_points: redeemPts } : {}),
     });
 
     if (checkoutErr) {
@@ -718,7 +737,13 @@ export default function CheckoutPage() {
 
   const chargesTotal = charges.reduce((sum, c) => sum + Number(c.amount), 0);
   const tip = Number(tipAmount) || 0;
-  const grandTotal = chargesTotal + tip;
+  // Loyalty: points off the bill at the salon's rate (points per dollar)
+  const redeemRate = Number((tenant?.settings as Record<string, unknown> | undefined)?.loyalty_redeem_rate) || 20;
+  const clientPoints = selectedApt?.client?.loyalty_points || 0;
+  const redeemPts = Math.min(clientPoints, Math.max(0, Math.round(Number(redeemPoints) || 0)));
+  const baseForDiscount = charges.length > 0 ? chargesTotal : Number(selectedApt?.service?.price || 0);
+  const loyaltyDiscount = Math.min(baseForDiscount, Math.floor((redeemPts / redeemRate) * 100) / 100);
+  const grandTotal = chargesTotal + tip - loyaltyDiscount;
   const isCheckedOut = selectedApt?.status === "completed" && selectedApt?.checked_out_at && !editingCheckout;
 
   // Reset editing state when selecting a different appointment
@@ -737,6 +762,7 @@ export default function CheckoutPage() {
     if (!selectedApt) return;
     setEditingCheckout(true);
     setTipAmount(String(selectedApt.tip_amount || ""));
+    setRedeemPoints("");
     setPaymentMethod((selectedApt.payment_method as "cash" | "card" | "mixed" | "venmo" | "zelle" | "gift_card") || "");
   }
 
@@ -1583,8 +1609,13 @@ export default function CheckoutPage() {
                   {/* Header */}
                   <div className={styles.checkoutHeader}>
                     <h2>{t("checkoutTitle")}</h2>
-                    <span style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)" }}>
+                    <span style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)", display: "inline-flex", alignItems: "center", gap: "var(--space-2)" }}>
                       {formatTime(selectedApt.start_time)}
+                      {(selectedApt.status === "confirmed" || selectedApt.status === "pending") && new Date(selectedApt.start_time).getTime() < Date.now() && (
+                        <button type="button" className="btn btn-ghost btn-sm" onClick={handleNoShow} disabled={markingNoShow}>
+                          {markingNoShow ? "…" : t("markNoShow")}
+                        </button>
+                      )}
                     </span>
                   </div>
 
@@ -1738,9 +1769,29 @@ export default function CheckoutPage() {
                         />
                       </div>
 
+                      {clientPoints > 0 && (
+                        <div className={styles.tipRow}>
+                          <label htmlFor="redeem-points">{t("redeemPoints")}</label>
+                          <input
+                            id="redeem-points"
+                            type="number"
+                            className={styles.tipInput}
+                            value={redeemPoints}
+                            onChange={(e) => setRedeemPoints(e.target.value)}
+                            placeholder="0"
+                            min="0"
+                            max={clientPoints}
+                            step={redeemRate}
+                          />
+                          <span style={{ fontSize: "var(--text-xs)", color: "var(--text-secondary)" }}>
+                            {t("pointsAvailable", { n: clientPoints })}{loyaltyDiscount > 0 ? ` · −$${loyaltyDiscount.toFixed(2)}` : ""}
+                          </span>
+                        </div>
+                      )}
+
                       <div className={styles.totalRow}>
                         <span>{t("total")}</span>
-                        <span>${(charges.length > 0 ? grandTotal : Number(selectedApt.service?.price || 0) + tip).toFixed(2)}</span>
+                        <span>${(charges.length > 0 ? grandTotal : Number(selectedApt.service?.price || 0) + tip - loyaltyDiscount).toFixed(2)}</span>
                       </div>
 
                       <div className={styles.paymentMethods}>
