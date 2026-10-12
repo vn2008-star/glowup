@@ -99,16 +99,12 @@ export default function LoyaltyPage() {
 
   async function handleSaveBirthdayConfig() {
     setBdaySaved("saving");
-    const settings = (tenant?.settings || {}) as Record<string, unknown>;
-    const existingAuto = (settings.automations || {}) as Record<string, unknown>;
     const res = await fetch("/api/save-settings", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         settings: {
-          ...settings,
           automations: {
-            ...existingAuto,
             auto_birthday_discount: bdayCfg.discount,
             auto_birthday_days: bdayCfg.days,
             auto_birthday_channel: bdayCfg.channel,
@@ -154,20 +150,12 @@ export default function LoyaltyPage() {
   }
 
   async function handleToggleAutomation(key: string) {
-    const newStates = { ...automationStates, [key]: !automationStates[key] };
-    setAutomationStates(newStates);
-
-    const settings = (tenant?.settings || {}) as Record<string, unknown>;
-    const existingAuto = (settings.automations || {}) as Record<string, boolean>;
+    const value = !automationStates[key];
+    setAutomationStates(prev => ({ ...prev, [key]: value }));
     const res = await fetch("/api/save-settings", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        settings: {
-          ...settings,
-          automations: { ...existingAuto, ...newStates },
-        },
-      }),
+      body: JSON.stringify({ settings: { automations: { [key]: value } } }),
     });
     if (res.ok) refetch();
   }

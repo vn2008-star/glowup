@@ -594,12 +594,10 @@ export default function ReportsPage() {
                     type="checkbox"
                     checked={!!((tenant?.settings as Record<string, unknown>)?.automations as Record<string, boolean> | undefined)?.auto_staff_reports}
                     onChange={async (e) => {
-                      const settings = (tenant?.settings || {}) as Record<string, unknown>;
-                      const automations = (settings.automations || {}) as Record<string, unknown>;
                       await fetch('/api/save-settings', {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ settings: { ...settings, automations: { ...automations, auto_staff_reports: e.target.checked } } }),
+                        body: JSON.stringify({ settings: { automations: { auto_staff_reports: e.target.checked } } }),
                       });
                       refetchTenant();
                     }}

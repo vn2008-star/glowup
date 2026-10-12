@@ -111,12 +111,7 @@ export default function HolidaysPage() {
     await fetch("/api/save-settings", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        settings: {
-          ...((tenant?.settings || {}) as Record<string, unknown>),
-          holiday_settings: { send_days_before: newDays },
-        },
-      }),
+      body: JSON.stringify({ settings: { holiday_settings: { send_days_before: newDays } } }),
     });
     refetch();
   }
@@ -124,17 +119,10 @@ export default function HolidaysPage() {
   async function handleToggleAutoHoliday() {
     const newVal = !autoHolidayEnabled;
     setAutoHolidayEnabled(newVal);
-    const settings = (tenant?.settings || {}) as Record<string, unknown>;
-    const autoSettings = (settings.automations || {}) as Record<string, boolean>;
     await fetch("/api/save-settings", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        settings: {
-          ...settings,
-          automations: { ...autoSettings, auto_holiday: newVal },
-        },
-      }),
+      body: JSON.stringify({ settings: { automations: { auto_holiday: newVal } } }),
     });
     refetch();
   }

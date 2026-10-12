@@ -182,12 +182,7 @@ export default function InboxPage() {
     const res = await fetch("/api/save-settings", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        settings: {
-          ...((tenant?.settings || {}) as Record<string, unknown>),
-          bot_config: botConfig,
-        },
-      }),
+      body: JSON.stringify({ settings: { bot_config: botConfig } }),
     });
     if (res.ok) {
       setConfigSaved(true);

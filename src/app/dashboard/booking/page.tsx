@@ -352,16 +352,14 @@ export default function BookingPage() {
   }
 
   async function handleToggleAutomation(key: string) {
-    const newStates = { ...automationStates, [key]: !automationStates[key] };
-    setAutomationStates(newStates);
-    const settings = (tenant?.settings || {}) as Record<string, unknown>;
-    const existingAuto = (settings.automations || {}) as Record<string, boolean>;
+    const value = !automationStates[key];
+    setAutomationStates(prev => ({ ...prev, [key]: value }));
+    // Just this key: the server merges it. Sending the page's whole stale
+    // copy of `automations` reverted toggles made on other pages.
     const res = await fetch("/api/save-settings", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        settings: { ...settings, automations: { ...existingAuto, ...newStates } },
-      }),
+      body: JSON.stringify({ settings: { automations: { [key]: value } } }),
     });
     if (res.ok) refetch();
   }
@@ -682,11 +680,10 @@ export default function BookingPage() {
                           setSavedLists(updated);
                           setSaveListName("");
                           setShowSaveList(false);
-                          const s = (tenant?.settings || {}) as Record<string, unknown>;
                           await fetch("/api/save-settings", {
                             method: "PUT",
                             headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ settings: { ...s, savedClientLists: updated } }),
+                            body: JSON.stringify({ settings: { savedClientLists: updated } }),
                           });
                         }}
                       >
@@ -777,12 +774,10 @@ export default function BookingPage() {
 
             async function saveFmoSetting(key: string, value: string) {
               setAutomationStates(prev => ({ ...prev, [key]: value }));
-              const s = (tenant?.settings || {}) as Record<string, unknown>;
-              const a = (s.automations || {}) as Record<string, unknown>;
               await fetch("/api/save-settings", {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ settings: { ...s, automations: { ...a, [key]: value } } }),
+                body: JSON.stringify({ settings: { automations: { [key]: value } } }),
               });
             }
 
@@ -1062,12 +1057,10 @@ export default function BookingPage() {
 
             async function saveRebookingCycle(days: string) {
               setAutomationStates(prev => ({ ...prev, auto_rebooking_cycle: days }));
-              const s = (tenant?.settings || {}) as Record<string, unknown>;
-              const a = (s.automations || {}) as Record<string, unknown>;
               await fetch("/api/save-settings", {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ settings: { ...s, automations: { ...a, auto_rebooking_cycle: days } } }),
+                body: JSON.stringify({ settings: { automations: { auto_rebooking_cycle: days } } }),
               });
             }
 
@@ -1107,12 +1100,10 @@ export default function BookingPage() {
                       className={`${styles.channelBtnSm} ${currentChannel === ch ? styles.channelBtnSmActive : ""}`}
                       onClick={async () => {
                         setAutomationStates(prev => ({ ...prev, [a.channelKey]: ch }));
-                        const s = (tenant?.settings || {}) as Record<string, unknown>;
-                        const au = (s.automations || {}) as Record<string, unknown>;
                         await fetch("/api/save-settings", {
                           method: "PUT",
                           headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ settings: { ...s, automations: { ...au, [a.channelKey]: ch } } }),
+                          body: JSON.stringify({ settings: { automations: { [a.channelKey]: ch } } }),
                         });
                       }}
                     >

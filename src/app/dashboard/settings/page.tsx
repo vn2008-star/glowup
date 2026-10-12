@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -202,6 +202,11 @@ export default function SettingsPage() {
   const [newClosedLabel, setNewClosedLabel] = useState("");
 
   // Load current settings from tenant
+  // Held locally and saved on blur. Saving on every keystroke sent the whole
+  // settings object per character and dropped letters.
+  const [reviewUrl, setReviewUrl] = useState("");
+  const [reviewUrlSaved, setReviewUrlSaved] = useState<string | null>(null);
+
   const loadSettings = useCallback(() => {
     if (!tenant) return;
     setName(tenant.name || "");
@@ -249,14 +254,21 @@ export default function SettingsPage() {
       if (s.custom_closed_dates) setCustomClosedDates(s.custom_closed_dates as CustomClosedDate[]);
       if (typeof s.special_instructions === "string") setSpecialInstructions(s.special_instructions);
       setSpecialInstructionsSms(s.special_instructions_sms === true);
+      setReviewUrl(typeof s.google_review_url === "string" ? s.google_review_url : "");
     }
 
     setLoading(false);
   }, [tenant]);
 
+  // Seed the form once per tenant. It used to re-run on every tenant refetch,
+  // and the inline toggles below refetch after saving, so flipping one wiped
+  // ten minutes of unsaved edits in the other sections.
+  const seededFor = useRef<string | null>(null);
   useEffect(() => {
+    if (!tenant || seededFor.current === tenant.id) return;
+    seededFor.current = tenant.id;
     loadSettings();
-  }, [loadSettings]);
+  }, [tenant, loadSettings]);
 
   // Fetch client count for cost estimator
   useEffect(() => {
@@ -308,8 +320,10 @@ export default function SettingsPage() {
     setSaving(true);
     setSaved(false);
 
+    // Only the keys this page owns; the server merges them into what's
+    // stored. Spreading tenant.settings here sent a stale copy of every other
+    // page's keys and reverted anything they'd saved since this page loaded.
     const settings = {
-      ...(typeof tenant.settings === "object" && tenant.settings ? tenant.settings : {}),
       business_hours: hours,
       booking: bookingSettings,
       reminders: reminderSettings,
@@ -1275,16 +1289,11 @@ export default function SettingsPage() {
             type="checkbox"
             checked={!!((tenant?.settings as Record<string, unknown>)?.client_protection)}
             onChange={(e) => {
-              // Will be persisted via the save button below
-              const settings = {
-                ...(typeof tenant?.settings === "object" && tenant.settings ? tenant.settings : {}),
-                client_protection: e.target.checked,
-              };
-              // Immediately save this toggle
+              // Saved immediately; the server merges this one key
               fetch("/api/save-settings", {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ settings }),
+                body: JSON.stringify({ settings: { client_protection: e.target.checked } }),
               }).then(() => refetch());
             }}
           />
@@ -1308,21 +1317,12 @@ export default function SettingsPage() {
             checked={((tenant?.settings as Record<string, unknown>)?.automations as Record<string, boolean>)?.auto_review_request !== false
               && ((tenant?.settings as Record<string, unknown>)?.automations as Record<string, boolean>)?.auto_review !== false}
             onChange={(e) => {
-              const settings = {
-                ...(typeof tenant?.settings === "object" && tenant.settings ? tenant.settings : {}),
-              } as Record<string, unknown>;
-              const existingAuto = (settings.automations || {}) as Record<string, boolean>;
               // Write both spellings: the cron reads auto_review, this panel
               // shipped writing auto_review_request, and salons carry either.
-              settings.automations = {
-                ...existingAuto,
-                auto_review: e.target.checked,
-                auto_review_request: e.target.checked,
-              };
               fetch("/api/save-settings", {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ settings }),
+                body: JSON.stringify({ settings: { automations: { auto_review: e.target.checked, auto_review_request: e.target.checked } } }),
               }).then(() => refetch());
             }}
           />
@@ -1340,13 +1340,10 @@ export default function SettingsPage() {
                   key={ch}
                   type="button"
                   onClick={() => {
-                    const s = { ...(typeof tenant?.settings === "object" && tenant.settings ? tenant.settings : {}) } as Record<string, unknown>;
-                    const a = (s.automations || {}) as Record<string, unknown>;
-                    s.automations = { ...a, auto_review_channel: ch };
                     fetch("/api/save-settings", {
                       method: "PUT",
                       headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ settings: s }),
+                      body: JSON.stringify({ settings: { automations: { auto_review_channel: ch } } }),
                     }).then(() => refetch());
                   }}
                   style={{
@@ -1379,15 +1376,18 @@ export default function SettingsPage() {
           <input
             type="url"
             placeholder="https://g.page/r/your-salon/review"
-            value={((tenant?.settings as Record<string, unknown>)?.google_review_url as string) || ""}
-            onChange={(e) => {
-              const s = { ...(typeof tenant?.settings === "object" && tenant.settings ? tenant.settings : {}) } as Record<string, unknown>;
-              s.google_review_url = e.target.value;
-              fetch("/api/save-settings", {
+            value={reviewUrl}
+            onChange={(e) => { setReviewUrl(e.target.value); setReviewUrlSaved(null); }}
+            onBlur={async () => {
+              const url = reviewUrl.trim();
+              if (url === (((tenant?.settings as Record<string, unknown>)?.google_review_url as string) || "")) return;
+              const res = await fetch("/api/save-settings", {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ settings: s }),
-              }).then(() => refetch());
+                body: JSON.stringify({ settings: { google_review_url: url } }),
+              });
+              setReviewUrlSaved(res.ok ? "Saved" : "Could not save the link");
+              if (res.ok) refetch();
             }}
             style={{
               width: "100%",
@@ -1399,6 +1399,7 @@ export default function SettingsPage() {
               fontSize: "var(--text-sm)",
             }}
           />
+          {reviewUrlSaved && <span role="status" style={{ fontSize: "var(--text-xs)", color: reviewUrlSaved === "Saved" ? "var(--color-success)" : "var(--color-danger)", marginTop: "4px", display: "block" }}>{reviewUrlSaved}</span>}
         </div>
 
         {/* Message Preview */}
