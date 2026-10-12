@@ -24,6 +24,7 @@ interface BusinessData {
   phone: string | null;
   address: string | null;
   logo_url: string | null;
+  brand_color?: string | null;
   timezone: string;
   hours: Record<string, { open: string; close: string }> | null;
   advanceBookingDays?: number;
@@ -324,6 +325,15 @@ export default function ManageClient({ token, initialData = null, initialError =
   const canModify = appointment && !isPast && appointment.status !== "cancelled" && appointment.status !== "completed";
 
   // ── Render ──
+  // Salon accent for buttons and highlights (see --booking-brand in the CSS)
+  const brandStyle = (() => {
+    const hex = business?.brand_color;
+    if (!hex) return undefined;
+    const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+    const luma = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return { "--booking-brand": hex, "--booking-brand-ink": luma > 0.62 ? "#1e1528" : "#ffffff" } as React.CSSProperties;
+  })();
+
   if (loading) {
     return (
       <div className={styles.page}>
@@ -358,7 +368,7 @@ export default function ManageClient({ token, initialData = null, initialError =
   }[appointment.status] || styles.statusPending;
 
   return (
-    <div className={styles.page}>
+    <div className={styles.page} style={brandStyle}>
       <div className={styles.container}>
         {/* Header */}
         {business && (

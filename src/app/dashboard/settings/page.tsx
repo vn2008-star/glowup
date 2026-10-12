@@ -210,6 +210,9 @@ export default function SettingsPage() {
   // settings object per character and dropped letters.
   const [reviewUrl, setReviewUrl] = useState("");
   const [reviewUrlSaved, setReviewUrlSaved] = useState<string | null>(null);
+  // Accent colour for the public booking/manage pages ("" = app default)
+  const [brandColor, setBrandColor] = useState("");
+  const [brandSaving, setBrandSaving] = useState(false);
 
   const loadSettings = useCallback(() => {
     if (!tenant) return;
@@ -259,6 +262,7 @@ export default function SettingsPage() {
       if (typeof s.special_instructions === "string") setSpecialInstructions(s.special_instructions);
       setSpecialInstructionsSms(s.special_instructions_sms === true);
       setReviewUrl(typeof s.google_review_url === "string" ? s.google_review_url : "");
+      setBrandColor(typeof s.brand_color === "string" ? s.brand_color : "");
     }
 
     setLoading(false);
@@ -616,6 +620,45 @@ export default function SettingsPage() {
             >
               Preview booking page →
             </a>
+          </div>
+
+          {/* The accent colour on the client-facing booking and manage pages */}
+          <div style={{ marginTop: "var(--space-5)", paddingTop: "var(--space-4)", borderTop: "1px solid var(--border-subtle)" }}>
+            <label className="label" htmlFor="brand-color">Booking page colour</label>
+            <p style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)", marginBottom: "var(--space-2)" }}>
+              Buttons and highlights on your booking page use this colour. Leave it blank for the default.
+            </p>
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", flexWrap: "wrap" }}>
+              <input
+                id="brand-color"
+                type="color"
+                value={brandColor || "#a87cc4"}
+                onChange={(e) => setBrandColor(e.target.value)}
+                style={{ width: 44, height: 44, padding: 2, border: "1px solid var(--border-default)", borderRadius: "var(--radius-sm)", background: "var(--bg-input)", cursor: "pointer" }}
+              />
+              <code style={{ fontFamily: "var(--font-mono)", fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>{brandColor || "default"}</code>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                disabled={brandSaving || brandColor === ((tenant.settings as Record<string, unknown>)?.brand_color || "")}
+                onClick={async () => {
+                  setBrandSaving(true);
+                  const res = await fetch("/api/save-settings", {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ settings: { brand_color: brandColor || null } }),
+                  });
+                  setBrandSaving(false);
+                  if (res.ok) { toast.success("Booking page colour saved"); refetch(); }
+                  else toast.error("Could not save the colour");
+                }}
+              >
+                {brandSaving ? "Saving…" : "Use this colour"}
+              </button>
+              {brandColor && (
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => setBrandColor("")}>Reset to default</button>
+              )}
+            </div>
           </div>
         </div>
       )}

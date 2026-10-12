@@ -101,6 +101,7 @@ export async function GET(request: Request) {
       phone: tenant.phone,
       address: tenant.address,
       logo_url: tenant.logo_url,
+      brand_color: typeof gSettings.brand_color === 'string' && /^#[0-9a-fA-F]{6}$/.test(gSettings.brand_color) ? gSettings.brand_color : null,
       timezone: tenant.timezone,
       hours: (tenant.settings as Record<string, unknown>)?.business_hours || null,
       advanceBookingDays,

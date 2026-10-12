@@ -13,7 +13,7 @@ import type { CustomClosedDate } from '@/lib/schedule-utils'
 interface ServiceInfo { id: string; name: string; category: string; description: string | null; duration_minutes: number; price: number; sort_order: number; image_url: string | null }
 interface StaffInfo { id: string; name: string; specialties: string[]; schedule: Record<string, unknown>; service_durations: Record<string, number> }
 interface BookedSlot { staff_id: string | null; start: string; end: string }
-interface BusinessInfo { name: string; slug: string; phone: string | null; logo_url: string | null; address: string | null; timezone: string; hours: Record<string, { open: string; close: string; closed: boolean }> | null; advanceBookingDays?: number; closedHolidays?: string[]; customClosedDates?: CustomClosedDate[]; chatEnabled?: boolean; chatGreeting?: string | null }
+interface BusinessInfo { name: string; slug: string; phone: string | null; logo_url: string | null; address: string | null; timezone: string; hours: Record<string, { open: string; close: string; closed: boolean }> | null; advanceBookingDays?: number; closedHolidays?: string[]; customClosedDates?: CustomClosedDate[]; chatEnabled?: boolean; chatGreeting?: string | null; brand_color?: string | null; cancellationCutoffHours?: number | null }
 
 /** What GET /api/public-booking returns; the server page passes it in as initialData. */
 export interface BookingPayload { business: BusinessInfo; services: ServiceInfo[]; staff: StaffInfo[]; bookedSlots: BookedSlot[] }
@@ -34,6 +34,9 @@ export default function BookingClient({ slug, initialData = null, initialError =
   const [submitting, setSubmitting] = useState(false)
   const [booked, setBooked] = useState(false)
   const [bookedTime, setBookedTime] = useState('')
+  // From the POST response: drives the calendar and manage links on the
+  // confirmation screen
+  const [bookedInfo, setBookedInfo] = useState<{ start: string; end: string; manageToken: string | null } | null>(null)
   const [birthdaySaved, setBirthdaySaved] = useState(false)
 
   // Data from API (seeded from the server render when available)
@@ -207,10 +210,25 @@ export default function BookingClient({ slug, initialData = null, initialError =
         const wStartUTC = localToUTC(selectedDate, `${String(Math.floor(w.startMin / 60)).padStart(2, '0')}:${String(w.startMin % 60).padStart(2, '0')}`, salonTz).getTime()
         const wEndUTC = localToUTC(selectedDate, `${String(Math.floor(w.endMin / 60)).padStart(2, '0')}:${String(w.endMin % 60).padStart(2, '0')}`, salonTz).getTime()
 
+        // "Any Available": the slot is open if SOME staff member is free for
+        // this window. Skipping the check here showed slots where every
+        // stylist was booked, and the client only found out at Confirm (409).
+        if (!w.staffMember) {
+          const anyoneFree = staff.some(member =>
+            !isStaffOffOnDate(member.schedule as Record<string, unknown>, selectedDate) &&
+            !bookedSlots.some(b => {
+              if (b.staff_id !== member.id) return false
+              const bs = new Date(b.start).getTime(), be = new Date(b.end).getTime()
+              return wStartUTC < be && wEndUTC > bs
+            })
+          )
+          if (!anyoneFree) return false
+          continue
+        }
+
         const hasConflict = bookedSlots.some(b => {
           // Only check bookings for this specific staff member
-          if (w.staffMember && b.staff_id !== w.staffMember.id) return false
-          if (!w.staffMember) return false // "Any Available" — skip conflict check (simplified)
+          if (b.staff_id !== w.staffMember!.id) return false
           const bStartMs = new Date(b.start).getTime()
           const bEndMs = new Date(b.end).getTime()
           return wStartUTC < bEndMs && wEndUTC > bStartMs
@@ -368,6 +386,13 @@ export default function BookingClient({ slug, initialData = null, initialError =
       })
 
       if (res.ok) {
+        try {
+          const data = await res.json() as { appointments?: { start_time: string; end_time: string; manage_token?: string | null }[] }
+          const rows = data.appointments || []
+          if (rows.length > 0) {
+            setBookedInfo({ start: rows[0].start_time, end: rows[rows.length - 1].end_time, manageToken: rows[0].manage_token || null })
+          }
+        } catch { /* links are a bonus; the booking itself succeeded */ }
         // Display confirmation in the salon's timezone so the client sees the correct local time
         const confirmDate = new Date(selectedDate + 'T12:00:00') // just for the date portion
         const dateDisplay = localeDateStr(confirmDate, { weekday: 'long', month: 'long', day: 'numeric' })
@@ -406,6 +431,17 @@ export default function BookingClient({ slug, initialData = null, initialError =
     return `${h12}:${String(m).padStart(2, '0')} ${ampm}`
   }
 
+  // The salon's accent colour drives every button and highlight on this page
+  // (see --booking-brand in booking.module.css). White text on it needs a dark
+  // enough colour; pastel brands get dark ink instead.
+  const brandStyle = (() => {
+    const hex = business?.brand_color
+    if (!hex) return undefined
+    const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16)
+    const luma = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+    return { '--booking-brand': hex, '--booking-brand-ink': luma > 0.62 ? '#1e1528' : '#ffffff' } as React.CSSProperties
+  })()
+
   // ── Loading / Error States ──
   if (loading) return (
     <div className={styles.page}>
@@ -427,7 +463,7 @@ export default function BookingClient({ slug, initialData = null, initialError =
 
   // ── Success State ──
   if (booked) return (
-    <div className={styles.page}>
+    <div className={styles.page} style={brandStyle}>
       <div className={styles.successCard}>
         <div className={styles.successIcon}>✓</div>
         <h2>Booking Confirmed!</h2>
@@ -496,7 +532,33 @@ export default function BookingClient({ slug, initialData = null, initialError =
         {birthdaySaved && (
           <p className={styles.birthdayConfirmed}>🎂 Birthday saved — expect a special surprise!</p>
         )}
+        {bookedInfo && (
+          <div className={styles.successLinks}>
+            <a
+              className={styles.successLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              href={`https://calendar.google.com/calendar/render?${new URLSearchParams({
+                action: 'TEMPLATE',
+                text: `${selectedServices.map(s => s.name).join(', ')} at ${business.name}`,
+                dates: `${bookedInfo.start.replace(/[-:]/g, '').replace(/\.\d{3}/, '')}/${bookedInfo.end.replace(/[-:]/g, '').replace(/\.\d{3}/, '')}`,
+                location: business.address || business.name,
+                details: business.phone ? `Questions? Call ${business.phone}` : '',
+              }).toString()}`}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
+              Add to calendar
+            </a>
+            {bookedInfo.manageToken && (
+              <a className={styles.successLink} href={`/manage/${bookedInfo.manageToken}`}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                Reschedule or cancel
+              </a>
+            )}
+          </div>
+        )}
         <p className={styles.successNote}>
+          {clientEmail || clientPhone ? 'A confirmation is on its way. ' : ''}
           {business.phone ? `Questions? Call ${business.phone}` : 'We look forward to seeing you!'}
         </p>
         <button
@@ -512,25 +574,15 @@ export default function BookingClient({ slug, initialData = null, initialError =
             setStep(0)
           }}
         >
-          📅 Book Another Appointment
+          Book another appointment
         </button>
-
-        {/* Ambassador Nudge */}
-        <a href="https://glowup-jade.vercel.app" className={styles.ambassadorCard} target="_blank" rel="noopener noreferrer">
-          <span className={styles.ambassadorIcon}>✨</span>
-          <div>
-            <strong>Love easy online booking?</strong>
-            <p>Get GlowUp free for your salon — smart booking, automated reminders, and more.</p>
-          </div>
-          <span className={styles.ambassadorArrow}>→</span>
-        </a>
       </div>
     </div>
   )
 
   // ── Main Booking Flow ──
   return (
-    <div className={styles.page}>
+    <div className={styles.page} style={brandStyle}>
       <div className={styles.container}>
         {/* Header */}
         <div className={styles.header}>
@@ -848,6 +900,18 @@ export default function BookingClient({ slug, initialData = null, initialError =
                 {clientEmail && <p>{clientEmail}</p>}
               </div>
 
+              {/* The policy, before the client commits, not after they try to cancel */}
+              <p className={styles.policyNote}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0, marginTop: 2 }}><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
+                <span>
+                  {business.cancellationCutoffHours == null
+                    ? `Online cancellations aren't available for this salon${business.phone ? `; call ${business.phone} if your plans change` : ''}.`
+                    : business.cancellationCutoffHours === 0
+                      ? 'You can reschedule or cancel online any time before your appointment.'
+                      : `You can reschedule or cancel online up to ${business.cancellationCutoffHours} hours before your appointment.`}
+                </span>
+              </p>
+
               <div className={`${styles.stepActions} ${styles.stickyActions}`}>
                 <button className={styles.backBtn} onClick={() => setStep(3)}>← Back</button>
                 <button className={styles.confirmBtn} onClick={handleSubmit} disabled={submitting}>
@@ -858,10 +922,10 @@ export default function BookingClient({ slug, initialData = null, initialError =
           )}
         </div>
 
-        {/* Footer */}
+        {/* Footer: the salon's page, so GlowUp is a credit line, not an ad */}
         <div className={styles.footer}>
           <a href="https://glowup-jade.vercel.app" target="_blank" rel="noopener noreferrer" className={styles.footerCta}>
-            Powered by <strong>GlowUp</strong> — <span className={styles.footerCtaHighlight}>Get it free for your salon →</span>
+            Powered by <strong>GlowUp</strong>
           </a>
         </div>
       </div>

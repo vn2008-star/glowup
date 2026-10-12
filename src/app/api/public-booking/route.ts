@@ -4,7 +4,7 @@ import { waitUntil } from '@vercel/functions'
 import { createClient } from '@supabase/supabase-js'
 import { timezoneFromAddress, DEFAULT_TZ } from '@/lib/tz'
 import { toE164 } from '@/lib/utils'
-import { resolveTenantTz, resolveSpecialInstructions, resolveOwnerCopyEmail, sendOwnerCopy, ownerCc, appendInstructionsToSms, buildReminderRows, insertReminderRows, resolveBookingBufferMinutes, padBookedSlot } from '@/lib/notifications'
+import { resolveTenantTz, resolveSpecialInstructions, resolveOwnerCopyEmail, sendOwnerCopy, ownerCc, appendInstructionsToSms, buildReminderRows, insertReminderRows, resolveBookingBufferMinutes, padBookedSlot, resolveCancellationPolicy } from '@/lib/notifications'
 import { sendSms, smsProvider, smsConfigFromSettings } from '@/lib/sms'
 import { bookingConfirmationHtml, promoEmailHtml, googleCalendarUrl } from '@/lib/email-templates'
 
@@ -110,6 +110,10 @@ export async function GET(request: Request) {
       customClosedDates: (tenantSettings.custom_closed_dates || []) as { date: string; label: string }[],
       chatEnabled: ((tenantSettings.bot_config as { enabled?: boolean } | undefined)?.enabled) !== false,
       chatGreeting: (tenantSettings.bot_config as { greeting?: string } | undefined)?.greeting || null,
+      // The salon's own accent on its booking page (Settings → Booking Link)
+      brand_color: typeof tenantSettings.brand_color === 'string' && /^#[0-9a-fA-F]{6}$/.test(tenantSettings.brand_color) ? tenantSettings.brand_color : null,
+      // Shown before Confirm so the client isn't surprised by it later
+      cancellationCutoffHours: resolveCancellationPolicy(tenant).cutoffHours,
     },
     services: services || [],
     staff: (staff || []).map(s => {
