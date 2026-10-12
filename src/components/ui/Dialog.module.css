@@ -1,0 +1,114 @@
+.dialog {
+  /* The element is the backdrop-catching layer; the panel inside is the box */
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-primary);
+}
+.dialog[open] { display: flex; }
+.dialog::backdrop { background: var(--bg-overlay); backdrop-filter: blur(2px); }
+
+.panel {
+  width: 100%;
+  max-width: var(--dialog-width, 560px);
+  max-height: calc(100dvh - 32px);
+  margin: 16px;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+  overflow: hidden;
+  animation: dialogIn 180ms ease-out;
+}
+.sm { --dialog-width: 420px; }
+.md { --dialog-width: 560px; }
+.lg { --dialog-width: 760px; }
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 18px 16px 12px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.titles { flex: 1; min-width: 0; }
+.title {
+  font-family: var(--font-heading);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  line-height: 1.25;
+  margin: 0;
+}
+.description { margin: 4px 0 0; font-size: var(--text-sm); color: var(--text-secondary); }
+
+.close {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin: -6px -4px 0 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+.close:hover { background: var(--bg-surface); color: var(--text-primary); }
+
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px 20px;
+  overscroll-behavior: contain;
+}
+.body:empty { padding: 0; }
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 20px calc(12px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+}
+
+/* Phone: bottom sheet */
+@media (max-width: 640px) {
+  .dialog[open] { align-items: flex-end; }
+  .panel {
+    max-width: none;
+    max-height: calc(100dvh - 24px);
+    margin: 0;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    animation: sheetIn 220ms ease-out;
+  }
+  .footer { flex-direction: column-reverse; }
+  .footer > * { width: 100%; }
+}
+
+@keyframes dialogIn {
+  from { opacity: 0; transform: translateY(6px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes sheetIn {
+  from { transform: translateY(24px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .panel { animation: none; }
+}

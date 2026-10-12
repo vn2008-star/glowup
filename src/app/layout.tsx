@@ -9,6 +9,7 @@ const inter = Inter({ subsets: ["latin", "vietnamese"], weight: ["400", "500", "
 const outfit = Outfit({ subsets: ["latin"], weight: ["400", "500", "600", "700", "800"], variable: "--font-outfit", display: "swap" });
 const playfair = Playfair_Display({ subsets: ["latin", "vietnamese"], weight: ["400", "600", "700"], style: ["normal", "italic"], variable: "--font-playfair", display: "swap" });
 import { ThemeProvider } from "@/lib/theme-context";
+import { ToastProvider } from "@/components/ui/Toast";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
 
@@ -35,11 +36,20 @@ export default async function RootLayout({
   const messages = await getMessages();
 
   return (
-    <html lang={locale} className={`${inter.variable} ${outfit.variable} ${playfair.variable}`}>
+    <html lang={locale} className={`${inter.variable} ${outfit.variable} ${playfair.variable}`} suppressHydrationWarning>
       <head>
+        {/* Theme before first paint. The provider used to set data-theme in an
+            effect, so every page painted light and then flipped to dark. Saved
+            choice first, otherwise the OS preference. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var s=localStorage.getItem('glowup_theme');var t=(s==='dark'||s==='light')?s:(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t)}catch(e){}})()`,
+          }}
+        />
         <link rel="icon" type="image/png" href="/favicon.png" />
         <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#c9a0dc" />
+        <meta name="theme-color" media="(prefers-color-scheme: light)" content="#faf7f5" />
+        <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0e0b14" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="GlowUp" />
@@ -49,7 +59,7 @@ export default async function RootLayout({
       </head>
       <body>
         <NextIntlClientProvider messages={messages}>
-          <ThemeProvider>{children}</ThemeProvider>
+          <ThemeProvider><ToastProvider>{children}</ToastProvider></ThemeProvider>
         </NextIntlClientProvider>
         <script
           dangerouslySetInnerHTML={{

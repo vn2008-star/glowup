@@ -16,6 +16,7 @@
 
 /* --- Design Tokens — LIGHT MODE (default) --- */
 :root {
+  color-scheme: light;
   /* Brand Colors — Orchid meets Blush Pink */
   --color-primary: #a87cc4;
   --color-primary-light: #c9a0dc;
@@ -152,6 +153,49 @@
   --z-modal-backdrop: 300;
   --z-modal: 400;
   --z-toast: 500;
+
+  /* Appointment status — one meaning everywhere. Confirmed was purple on the
+     calendar and Front Desk but green on Home and the manage page; completed
+     was green in the dashboard and blue on the manage page. These are the
+     only colours a status may use; see .badge-status-* and <StatusBadge>. */
+  --status-pending: #8a6d17;
+  --status-pending-bg: rgba(197, 160, 53, 0.14);
+  --status-confirmed: #8c5fad;
+  --status-confirmed-bg: rgba(168, 124, 196, 0.16);
+  --status-completed: #1e7a50;
+  --status-completed-bg: rgba(45, 157, 106, 0.14);
+  --status-cancelled: #c0303b;
+  --status-cancelled-bg: rgba(212, 78, 88, 0.12);
+  --status-no-show: #9a3a3a;
+  --status-no-show-bg: rgba(154, 58, 58, 0.12);
+  --status-blocked: #5e5270;
+  --status-blocked-bg: rgba(94, 82, 112, 0.14);
+
+  /* Aliases for names used across the modules but never defined (22 of them,
+     found by diffing var(--x) uses against this file). Each is an alias of
+     the canonical token so the two can't drift; new code should use the
+     canonical name. */
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  --space-7: 1.75rem;
+  --transition-normal: var(--transition-base);
+  --surface-primary: var(--bg-card);
+  --surface-secondary: var(--bg-surface);
+  --bg-primary: var(--bg-base);
+  --bg-hover: var(--bg-surface-hover);
+  --bg-muted: var(--bg-surface);
+  --border: var(--border-default);
+  --border-primary: var(--border-default);
+  --border-secondary: var(--border-subtle);
+  --border-hover: var(--border-strong);
+  --primary: var(--color-primary);
+  --primary-rgb: 168, 124, 196;
+  --color-primary-rgb: 168, 124, 196;
+  --color-primary-600: var(--color-primary-dark);
+  --color-orchid: var(--color-primary);
+  --color-blush: var(--color-accent);
+  --accent-primary: var(--color-primary);
+  --accent-secondary: var(--color-accent);
+  --text-quaternary: var(--text-tertiary);
 }
 
 /* --- DARK MODE --- */
@@ -214,6 +258,25 @@
   --shadow-glow: 0 0 30px rgba(201, 160, 220, 0.18);
   --shadow-glow-primary: 0 0 30px rgba(240, 163, 181, 0.18);
   --shadow-glow-soft: 0 4px 20px rgba(201, 160, 220, 0.12);
+
+  --status-pending: #f5d76e;
+  --status-pending-bg: rgba(245, 215, 110, 0.14);
+  --status-confirmed: #d4a0e3;
+  --status-confirmed-bg: rgba(201, 160, 220, 0.18);
+  --status-completed: #72d5a0;
+  --status-completed-bg: rgba(114, 213, 160, 0.14);
+  --status-cancelled: #f27983;
+  --status-cancelled-bg: rgba(242, 121, 131, 0.14);
+  --status-no-show: #e89aa0;
+  --status-no-show-bg: rgba(232, 154, 160, 0.12);
+  --status-blocked: #9990ad;
+  --status-blocked-bg: rgba(153, 144, 173, 0.16);
+
+  --primary-rgb: 201, 160, 220;
+  --color-primary-rgb: 201, 160, 220;
+
+  /* Native controls (date pickers, selects, scrollbars) follow the theme */
+  color-scheme: dark;
 }
 
 /* --- Base Styles --- */
@@ -258,26 +321,33 @@ img { max-width: 100%; display: block; }
   color: white;
 }
 
-/* --- Dropdown / Select --- */
-select,
-select option {
-  color: #1a1a2e;
-  background-color: #ffffff;
-}
+/* --- Dropdown / Select ---
+   Themed through tokens. This used to force white/#1a1a2e on every <select>
+   and option, reference two undefined variables (so the box had a transparent
+   background and a currentColor border) and draw a grey chevron. */
 select {
   color: var(--text-primary);
-  background-color: var(--surface-secondary);
-  border: 1px solid var(--border-primary);
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   padding: var(--space-2) var(--space-3);
+  min-height: 40px;
+  font-family: var(--font-body);
   font-size: var(--text-sm);
   cursor: pointer;
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236d6578' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 10px center;
   padding-right: var(--space-7, 2rem);
   transition: border-color var(--transition-fast);
+}
+[data-theme="dark"] select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239990ad' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+}
+select option {
+  color: var(--text-primary);
+  background-color: var(--bg-elevated);
 }
 select:focus {
   outline: none;
@@ -348,6 +418,25 @@ select option {
   box-shadow: var(--shadow-lg), 0 0 40px rgba(240, 163, 181, 0.3), 0 0 80px rgba(201, 160, 220, 0.15);
 }
 .btn-primary:active { transform: translateY(0) scale(1); }
+
+/* A disabled button must look disabled and must not lift on hover, or the
+   in-flight guards read as "the app ignored my click". */
+.btn:disabled, .btn[aria-disabled="true"] {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* 44px is the floor for a touch target. Desktop keeps the compact sizes. */
+@media (pointer: coarse) {
+  .btn { min-height: 44px; }
+  .btn-sm { min-height: 40px; }
+  .btn-icon { width: 44px; height: 44px; }
+}
+
+/* Digits in columns (prices, times, counts) line up only with tabular figures */
+.tabular { font-variant-numeric: tabular-nums; }
 
 .btn-secondary {
   background: var(--bg-surface);
@@ -430,11 +519,15 @@ select option {
   transition: opacity var(--transition-base);
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
 }
-.card:hover {
+/* Hover lift and the gradient hairline belong to cards you can click. They
+   used to fire on all 85 cards, KPI tiles and settings sections included,
+   which made static content look interactive. Anchor/button cards and
+   .card-interactive opt in. */
+a.card:hover, button.card:hover, .card-interactive:hover {
   border-color: var(--border-default);
   box-shadow: var(--shadow-md), var(--shadow-glow-soft);
 }
-.card:hover::before {
+a.card:hover::before, button.card:hover::before, .card-interactive:hover::before {
   opacity: 0.6;
 }
 
@@ -548,13 +641,13 @@ select option {
   padding-right: 36px !important;
 }
 
-/* Light mode — ensure pickers stay light scheme */
+/* Pickers follow the theme's color-scheme (set on :root per theme) */
 input[type="time"],
 input[type="date"],
 input[type="datetime-local"],
 input[type="month"],
 input[type="week"] {
-  color-scheme: light;
+  color-scheme: inherit;
 }
 
 .label {
@@ -580,6 +673,17 @@ input[type="week"] {
 .badge-warning { background: var(--color-warning-bg); color: var(--color-warning); }
 .badge-danger { background: var(--color-danger-bg); color: var(--color-danger); }
 .badge-info { background: var(--color-info-bg); color: var(--color-info); }
+
+/* Appointment status badges — the only place status colours are assigned */
+.badge-status-pending { background: var(--status-pending-bg); color: var(--status-pending); }
+.badge-status-confirmed { background: var(--status-confirmed-bg); color: var(--status-confirmed); }
+.badge-status-completed { background: var(--status-completed-bg); color: var(--status-completed); }
+.badge-status-cancelled { background: var(--status-cancelled-bg); color: var(--status-cancelled); }
+.badge-status-no_show { background: var(--status-no-show-bg); color: var(--status-no-show); }
+.badge-status-blocked { background: var(--status-blocked-bg); color: var(--status-blocked); }
+
+/* Scroll lock while a <dialog> is open (see components/ui/Dialog) */
+body:has(dialog[open]) { overflow: hidden; }
 
 /* --- Animations --- */
 @keyframes fadeIn {
