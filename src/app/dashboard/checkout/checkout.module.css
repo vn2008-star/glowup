@@ -148,7 +148,7 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 .welcomeStaffGridCompact .welcomeCardName {
-  font-size: 11px;
+  font-size: 12px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -327,7 +327,7 @@
   line-height: 1.4;
 }
 .dateNav .dateLabel:hover { background: var(--bg-surface-hover); }
-.dateCaret { font-size: 10px; color: var(--text-tertiary); margin-left: 2px; }
+.dateCaret { font-size: 12px; color: var(--text-tertiary); margin-left: 2px; }
 .dateInputHidden {
   position: absolute;
   left: 0;
@@ -403,7 +403,7 @@
   border-radius: 50%;
 }
 .avatarName {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-secondary);
   white-space: nowrap;
@@ -420,7 +420,7 @@
   right: 6px;
   background: var(--color-accent);
   color: white;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 800;
   width: 18px;
   height: 18px;
@@ -475,7 +475,7 @@
   border: none;
   border-radius: var(--radius-md);
   padding: var(--space-1) var(--space-2);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   cursor: pointer;
   transition: opacity 0.15s;
@@ -548,7 +548,7 @@
   color: var(--text-secondary);
 }
 .aptStatus {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
   padding: 2px 8px;
@@ -657,7 +657,7 @@
 }
 .chargeName { font-size: var(--text-sm); color: var(--text-primary); font-weight: 500; }
 .chargeUpsell {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--color-accent);
   background: color-mix(in srgb, var(--color-accent) 12%, transparent);
@@ -693,7 +693,7 @@
   cursor: pointer;
   padding: 1px 8px;
   margin-left: var(--space-2);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -1086,7 +1086,7 @@
   align-items: center;
   justify-content: center;
   color: white;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   flex-shrink: 0;
   overflow: hidden;
@@ -1097,7 +1097,7 @@
   object-fit: cover;
 }
 .calColName {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--text-primary);
   white-space: nowrap;
@@ -1105,7 +1105,7 @@
   text-overflow: ellipsis;
 }
 .calColCount {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--text-tertiary);
   background: var(--bg-card);
@@ -1231,7 +1231,7 @@
   line-height: 1.3;
 }
 .calAptService {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--text-tertiary);
   white-space: nowrap;
   overflow: hidden;
@@ -1242,7 +1242,7 @@
   color: var(--text-tertiary);
 }
 .calAptTime {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--text-secondary);
   line-height: 1.3;
@@ -1251,7 +1251,7 @@
   position: absolute;
   top: var(--space-2);
   right: var(--space-2);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--color-success);
   background: color-mix(in srgb, var(--color-success) 15%, transparent);
@@ -1326,7 +1326,7 @@
   line-height: 1;
 }
 .photoPlaceholder small {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -1353,7 +1353,7 @@
   background: rgba(0,0,0,0.7);
   color: white;
   border: none;
-  font-size: 10px;
+  font-size: 12px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -1801,7 +1801,7 @@
   margin-bottom: var(--space-3);
 }
 .panelLabel {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-tertiary);
   text-transform: uppercase;
@@ -1861,7 +1861,7 @@
 
 /* Queue list */
 .queueDivider {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--text-tertiary);
   text-transform: uppercase;
@@ -1916,11 +1916,11 @@
   text-overflow: ellipsis;
 }
 .queueService {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-tertiary);
 }
 .queueWait {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--color-warning);
   white-space: nowrap;
@@ -1965,7 +1965,7 @@
   line-height: 1.2;
 }
 .checkinTimePeriod {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--text-tertiary);
   font-weight: 600;
 }
@@ -1979,7 +1979,7 @@
   color: var(--text-primary);
 }
 .checkinService {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-tertiary);
 }
 .checkinAction {
@@ -2169,7 +2169,7 @@
 }
 .birthdayHint {
   display: block;
-  font-size: 11px;
+  font-size: 12px;
   color: #F59E0B;
   margin-top: 4px;
   font-style: italic;
@@ -2359,10 +2359,10 @@
   .avatarCircle {
     width: 36px;
     height: 36px;
-    font-size: 11px;
+    font-size: 12px;
   }
   .avatarName {
-    font-size: 9px;
+    font-size: 12px;
     max-width: 48px;
   }
   .avatarBadge {
@@ -2391,7 +2391,7 @@
     font-size: var(--text-xs);
   }
   .aptService {
-    font-size: 10px;
+    font-size: 12px;
   }
 
   /* ── Checkout Panel ── */
@@ -2408,7 +2408,7 @@
   .clientAvatar {
     width: 36px;
     height: 36px;
-    font-size: 11px;
+    font-size: 12px;
   }
   .chargesSection {
     padding: var(--space-3) var(--space-4);
@@ -2466,42 +2466,48 @@
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
-  .calStaffHeader {
-    font-size: 9px;
+  /* These rules used to target .calStaffHeader, .dailyRevenue, .walkInModal,
+     .checkInModal, .waitlistModal, .signOutModal and .signOutBtn — none of
+     which exist in the markup — so phones got no modal or table treatment. */
+  .calStaffCol {
+    font-size: 12px;
     padding: var(--space-1);
   }
 
-  /* ── Revenue Table ── */
-  .dailyRevenue {
+  /* ── Daily tally table ── */
+  .tallyTable {
+    display: block;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
+    font-size: 12px;
   }
-  .dailyRevenue table {
-    font-size: 11px;
-    min-width: 600px;
-  }
-  .dailyRevenue th,
-  .dailyRevenue td {
+  .tallyTable th,
+  .tallyTable td {
     padding: var(--space-1) var(--space-2);
     white-space: nowrap;
   }
 
-  /* ── Modals & Overlays ── */
-  .walkInModal,
-  .checkInModal,
-  .waitlistModal,
-  .signOutModal {
-    width: 95vw !important;
-    max-width: 95vw !important;
-    max-height: 85vh;
+  /* ── Modals → bottom sheets ── */
+  .modalOverlay, .wlModalOverlay, .pinOverlay { align-items: flex-end; }
+  .modal, .wlModal, .pinModal, .qrModal {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 92dvh;
     overflow-y: auto;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom, 0px));
   }
+  .modalFooter { flex-direction: column-reverse; }
+  .modalFooter > * { width: 100%; min-height: 44px; }
+}
 
-  /* ── Sign Out button ── */
-  .signOutBtn {
-    padding: var(--space-2) var(--space-3);
-    font-size: var(--text-xs);
-  }
+/* The 340px fixed sidebar left ~380px for the checkout panel on a 720px
+   tablet in portrait; stack instead. */
+@media (max-width: 900px) {
+  .mainLayout { grid-template-columns: 1fr; }
+}
+@media (pointer: coarse) {
+  .walkInBtn { min-height: 40px; padding: var(--space-2) var(--space-3); }
 }
 
 /* Extra-small phones */

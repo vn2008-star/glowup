@@ -73,6 +73,11 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
   const [filter, setFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<'name' | 'recent' | 'spent' | 'visits' | 'birthday'>('name');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('table');
+  // An 8-column table has no phone layout; open in card view there. The
+  // toggle still works, and widening the window keeps whatever was chosen.
+  useEffect(() => {
+    if (window.matchMedia?.('(max-width: 768px)').matches) setViewMode('cards');
+  }, []);
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [formData, setFormData] = useState({ first_name: "", last_name: "", phone: "", email: "", birthday: "", notes: "", photo_url: "" });

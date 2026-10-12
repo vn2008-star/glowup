@@ -1409,3 +1409,9 @@
   margin: var(--space-3) 0;
   line-height: 1.5;
 }
+
+/* 44px targets on touch screens (the 32px arrows were the smallest thing
+   a receptionist had to hit on a tablet) */
+@media (pointer: coarse) {
+  .navBtn { width: 44px; height: 44px; }
+}
