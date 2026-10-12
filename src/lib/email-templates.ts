@@ -301,12 +301,14 @@ export function bookingConfirmationHtml(opts: {
   businessAddress: string
   businessPhone: string
   manageLink: string
+  /** Salon uses a consent form: a "complete before your visit" button */
+  consentLink?: string
   startISO?: string
   endISO?: string
   logoUrl?: string | null
   specialInstructions?: string | null
 }): string {
-  const { greeting, serviceName, dateStr, timeStr, staffName, businessName, businessAddress, businessPhone, manageLink, startISO, endISO, logoUrl, specialInstructions } = opts
+  const { greeting, serviceName, dateStr, timeStr, staffName, businessName, businessAddress, businessPhone, manageLink, consentLink, startISO, endISO, logoUrl, specialInstructions } = opts
 
   const detailRows = [
     detailRow('📋', 'Service', serviceName),
@@ -319,6 +321,11 @@ export function bookingConfirmationHtml(opts: {
 
   const calendarSection = (startISO && endISO)
     ? calendarButtonsHtml({ serviceName, startISO, endISO, businessName, businessAddress })
+    : ''
+
+  const consentSection = consentLink
+    ? `<p style="margin:24px 0 16px;color:#a0a0c0;font-size:14px;text-align:center;">Please complete your consent form before your visit — it takes about two minutes.</p>
+       ${emailButton('Complete Consent Form', consentLink)}`
     : ''
 
   const manageSection = manageLink
@@ -344,6 +351,7 @@ export function bookingConfirmationHtml(opts: {
     </table>
 
     ${specialInstructionsHtml(specialInstructions)}
+    ${consentSection}
     ${calendarSection}
     ${manageSection}
     ${contactLine}

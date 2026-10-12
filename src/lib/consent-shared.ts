@@ -70,6 +70,15 @@ export function resolveConsentForm(settings: Record<string, unknown> | null | un
   }
 }
 
+/**
+ * The consent link to put next to a manage link in confirmations: same
+ * token, different page. Empty when the salon hasn't turned the form on.
+ */
+export function consentLinkFromManage(manageLink: string, settings: Record<string, unknown> | null | undefined): string {
+  if (!manageLink || !resolveConsentForm(settings).enabled) return ''
+  return manageLink.replace('/manage/', '/consent/')
+}
+
 export function readSignedConsent(preferences: unknown): SignedConsent | null {
   const c = (preferences && typeof preferences === 'object' ? (preferences as Record<string, unknown>).consent : null) as SignedConsent | null | undefined
   return c && typeof c === 'object' && typeof c.signed_at === 'string' ? c : null

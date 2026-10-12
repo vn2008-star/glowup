@@ -445,7 +445,29 @@
     "emailCost": "Costo Email",
     "free": "Gratis",
     "perMonth": "/mes",
-    "basedOn": "Basado en"
+    "basedOn": "Basado en",
+    "consent": {
+      "title": "Formulario de consentimiento",
+      "intro": "Preguntas de salud, alergias y una firma antes de servicios con adhesivos o químicos. Los clientes reciben un enlace en la confirmación de su reserva; el personal también puede pasarles la tableta desde Recepción o el perfil del cliente.",
+      "enable": "Pedir a los clientes que firmen un formulario de consentimiento",
+      "questions": "Preguntas de salud (sí / no)",
+      "questionN": "Pregunta {n}",
+      "removeQuestion": "Quitar pregunta",
+      "addQuestion": "+ Añadir pregunta",
+      "terms": "Lo que acepta el cliente",
+      "photo": "Pedir permiso para publicar fotos de antes/después",
+      "resign": "Pedir que firmen de nuevo",
+      "resignNever": "Nunca (con una vez basta)",
+      "resign6": "Cada 6 meses",
+      "resign12": "Cada 12 meses",
+      "resign24": "Cada 2 años",
+      "save": "Guardar formulario",
+      "saving": "Guardando…",
+      "reset": "↻ Restablecer el modelo de pestañas y belleza",
+      "needQuestion": "Añade al menos una pregunta o desactiva el formulario",
+      "saved": "Formulario de consentimiento guardado",
+      "saveFailed": "No se pudo guardar el formulario"
+    }
   },
   "checkoutPage": {
     "title": "Recepción",

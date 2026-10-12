@@ -1361,9 +1361,9 @@ export default function SettingsPage() {
 
       {/* Consent / intake form */}
       <div id="consent-form" className={`card ${styles.section}`}>
-        <h2><Icon name="shield" /> Consent form</h2>
+        <h2><Icon name="shield" /> {t("consent.title")}</h2>
         <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginBottom: "var(--space-4)" }}>
-          Health questions, allergies and a signature before adhesive or chemical services. Clients get a link on their booking confirmation; staff can also hand them the tablet from Front Desk or a client&apos;s profile.
+          {t("consent.intro")}
         </p>
         <label className={styles.protectionToggle}>
           <input
@@ -1372,23 +1372,23 @@ export default function SettingsPage() {
             onChange={(e) => setConsentForm({ ...consentForm, enabled: e.target.checked })}
           />
           <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
-          <span>Ask clients to sign a consent form</span>
+          <span>{t("consent.enable")}</span>
         </label>
 
         {consentForm.enabled && (
           <div style={{ marginTop: "var(--space-4)", display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
             <div>
-              <span className="label">Health questions (yes / no)</span>
+              <span className="label">{t("consent.questions")}</span>
               <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
                 {consentForm.questions.map((q, i) => (
                   <div key={q.id} style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
                     <input
                       className="input"
                       value={q.label}
-                      aria-label={`Question ${i + 1}`}
+                      aria-label={t("consent.questionN", { n: i + 1 })}
                       onChange={(e) => setConsentForm({ ...consentForm, questions: consentForm.questions.map((x, j) => j === i ? { ...x, label: e.target.value } : x) })}
                     />
-                    <button type="button" className="btn btn-ghost btn-sm" aria-label="Remove question" onClick={() => setConsentForm({ ...consentForm, questions: consentForm.questions.filter((_, j) => j !== i) })}>✕</button>
+                    <button type="button" className="btn btn-ghost btn-sm" aria-label={t("consent.removeQuestion")} onClick={() => setConsentForm({ ...consentForm, questions: consentForm.questions.filter((_, j) => j !== i) })}>✕</button>
                   </div>
                 ))}
               </div>
@@ -1399,12 +1399,12 @@ export default function SettingsPage() {
                 disabled={consentForm.questions.length >= 30}
                 onClick={() => setConsentForm({ ...consentForm, questions: [...consentForm.questions, { id: `q${Date.now().toString(36)}`, label: "" }] })}
               >
-                + Add question
+                {t("consent.addQuestion")}
               </button>
             </div>
 
             <div>
-              <label className="label" htmlFor="consent-terms">What the client agrees to</label>
+              <label className="label" htmlFor="consent-terms">{t("consent.terms")}</label>
               <textarea
                 id="consent-terms"
                 className="input"
@@ -1418,16 +1418,16 @@ export default function SettingsPage() {
             <label className={styles.protectionToggle}>
               <input type="checkbox" checked={consentForm.photo_consent} onChange={(e) => setConsentForm({ ...consentForm, photo_consent: e.target.checked })} />
               <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
-              <span>Ask for permission to post before/after photos</span>
+              <span>{t("consent.photo")}</span>
             </label>
 
             <div>
-              <label className="label" htmlFor="consent-resign">Ask clients to sign again</label>
+              <label className="label" htmlFor="consent-resign">{t("consent.resign")}</label>
               <select id="consent-resign" className="input" style={{ maxWidth: 240 }} value={consentForm.resign_months} onChange={(e) => setConsentForm({ ...consentForm, resign_months: Number(e.target.value) })}>
-                <option value={0}>Never (once is enough)</option>
-                <option value={6}>Every 6 months</option>
-                <option value={12}>Every 12 months</option>
-                <option value={24}>Every 2 years</option>
+                <option value={0}>{t("consent.resignNever")}</option>
+                <option value={6}>{t("consent.resign6")}</option>
+                <option value={12}>{t("consent.resign12")}</option>
+                <option value={24}>{t("consent.resign24")}</option>
               </select>
             </div>
           </div>
@@ -1440,7 +1440,7 @@ export default function SettingsPage() {
             disabled={consentSaving}
             onClick={async () => {
               const questions = consentForm.questions.map(q => ({ ...q, label: q.label.trim() })).filter(q => q.label);
-              if (consentForm.enabled && questions.length === 0) { toast.error("Add at least one question, or turn the form off"); return; }
+              if (consentForm.enabled && questions.length === 0) { toast.error(t("consent.needQuestion")); return; }
               setConsentSaving(true);
               const res = await fetch("/api/save-settings", {
                 method: "PUT",
@@ -1448,15 +1448,15 @@ export default function SettingsPage() {
                 body: JSON.stringify({ settings: { consent_form: { ...consentForm, questions } } }),
               });
               setConsentSaving(false);
-              if (res.ok) { setConsentForm({ ...consentForm, questions }); toast.success("Consent form saved"); refetch(); }
-              else toast.error("Could not save the consent form");
+              if (res.ok) { setConsentForm({ ...consentForm, questions }); toast.success(t("consent.saved")); refetch(); }
+              else toast.error(t("consent.saveFailed"));
             }}
           >
-            {consentSaving ? "Saving…" : "Save consent form"}
+            {consentSaving ? t("consent.saving") : t("consent.save")}
           </button>
           {consentForm.enabled && (
             <button type="button" className="btn btn-ghost btn-sm" onClick={() => setConsentForm({ ...DEFAULT_CONSENT_FORM, enabled: true })}>
-              ↻ Reset to the lash &amp; beauty default
+              {t("consent.reset")}
             </button>
           )}
         </div>

@@ -7,6 +7,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { resolveTenantTz, resolveSpecialInstructions, resolveOwnerCopyEmail, sendClientBookingConfirmation, scheduleClientReminders, sendOwnerChangeNotice, formatAptWhen } from '@/lib/notifications'
 import { localToUTC, nowInTz, formatInTz } from '@/lib/tz'
+import { consentLinkFromManage } from '@/lib/consent-shared'
 import { phoneVariants } from '@/lib/utils'
 
 // Try models in order — Google retires free-tier quota per model without
@@ -547,6 +548,7 @@ export async function handleAiChat(opts: {
                 serviceName: service.name, staffName,
                 clientName: knownClient ? `${knownClient.first_name}${knownClient.last_name ? ' ' + knownClient.last_name : ''}` : intent.clientName,
                 clientEmail, clientPhone: bookingPhone, manageLink,
+                consentLink: consentLinkFromManage(manageLink, tenant.settings as Record<string, unknown> | null),
                 start: startTime, end: endTime, timezone: tz,
                 logoUrl: tenant.logo_url || null,
                 specialInstructions: resolveSpecialInstructions(tenant),

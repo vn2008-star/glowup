@@ -15,7 +15,7 @@ import { toE164 } from '@/lib/utils'
 import { siteBaseUrl } from '@/lib/site-url'
 import { dayRangeInTz, todayInTz, payPeriodInTz, partsInTz, daysInMonth, localToUTC, addDays } from '@/lib/tz'
 import { notifyWaitlistForOpening } from '@/lib/waitlist-openings'
-import { resolveConsentForm, readSignedConsent, consentState, clientConsentToken, SIGNATURE_BUCKET } from '@/lib/consent'
+import { resolveConsentForm, readSignedConsent, consentState, clientConsentToken, consentLinkFromManage, SIGNATURE_BUCKET } from '@/lib/consent'
 import { scryptSync, randomBytes, timingSafeEqual } from 'node:crypto'
 
 // ─── Front Desk PINs ───
@@ -1138,6 +1138,7 @@ export async function POST(request: Request) {
                   clientEmail: apt.client!.email || null,
                   clientPhone: smsPhone,
                   manageLink,
+                  consentLink: consentLinkFromManage(manageLink, t?.settings as Record<string, unknown> | null),
                   start: new Date(apt.start_time),
                   end: new Date(apt.end_time),
                   timezone: tz,
@@ -1268,6 +1269,7 @@ export async function POST(request: Request) {
                 clientEmail: first.client!.email || null,
                 clientPhone: smsPhone,
                 manageLink: first.manage_token ? `${baseUrl}/manage/${first.manage_token}` : '',
+                consentLink: consentLinkFromManage(first.manage_token ? `${baseUrl}/manage/${first.manage_token}` : '', settings),
                 start: new Date(first.start_time),
                 end: new Date(first.end_time),
                 timezone: tz,

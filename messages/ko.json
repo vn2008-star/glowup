@@ -445,7 +445,29 @@
     "emailCost": "이메일 비용",
     "free": "무료",
     "perMonth": "/월",
-    "basedOn": "기준"
+    "basedOn": "기준",
+    "consent": {
+      "title": "동의서",
+      "intro": "접착제나 화학 시술 전 건강 질문, 알레르기, 서명을 받습니다. 고객은 예약 확인에서 링크를 받고, 직원은 프런트 데스크나 고객 프로필에서 태블릿을 건넬 수도 있습니다.",
+      "enable": "고객에게 동의서 서명 요청",
+      "questions": "건강 질문 (예 / 아니요)",
+      "questionN": "질문 {n}",
+      "removeQuestion": "질문 삭제",
+      "addQuestion": "+ 질문 추가",
+      "terms": "고객이 동의하는 내용",
+      "photo": "시술 전후 사진 게시 허락 요청",
+      "resign": "다시 서명 받는 주기",
+      "resignNever": "없음 (한 번이면 충분)",
+      "resign6": "6개월마다",
+      "resign12": "12개월마다",
+      "resign24": "2년마다",
+      "save": "동의서 저장",
+      "saving": "저장 중…",
+      "reset": "↻ 속눈썹·뷰티 기본값으로 되돌리기",
+      "needQuestion": "질문을 하나 이상 추가하거나 동의서를 끄세요",
+      "saved": "동의서가 저장되었습니다",
+      "saveFailed": "동의서를 저장하지 못했습니다"
+    }
   },
   "checkoutPage": {
     "title": "프론트 데스크",

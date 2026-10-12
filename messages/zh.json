@@ -445,7 +445,29 @@
     "emailCost": "邮件费",
     "free": "免费",
     "perMonth": "/月",
-    "basedOn": "基于"
+    "basedOn": "基于",
+    "consent": {
+      "title": "服务同意书",
+      "intro": "在使用胶水或化学品的服务前收集健康问题、过敏情况和签名。客户在预约确认中收到链接；员工也可在前台或客户资料中把平板递给客户。",
+      "enable": "要求客户签署同意书",
+      "questions": "健康问题（是 / 否）",
+      "questionN": "问题 {n}",
+      "removeQuestion": "删除问题",
+      "addQuestion": "+ 添加问题",
+      "terms": "客户同意的内容",
+      "photo": "征求发布前后对比照片的许可",
+      "resign": "要求客户重新签署",
+      "resignNever": "从不（签一次即可）",
+      "resign6": "每 6 个月",
+      "resign12": "每 12 个月",
+      "resign24": "每 2 年",
+      "save": "保存同意书",
+      "saving": "保存中…",
+      "reset": "↻ 恢复美睫与美容默认模板",
+      "needQuestion": "请至少添加一个问题，或关闭同意书",
+      "saved": "同意书已保存",
+      "saveFailed": "无法保存同意书"
+    }
   },
   "checkoutPage": {
     "title": "前台",

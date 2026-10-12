@@ -377,6 +377,8 @@ export async function sendClientBookingConfirmation(opts: {
   clientEmail: string | null
   clientPhone: string | null
   manageLink: string
+  /** From consentLinkFromManage(manageLink, settings) — '' when the salon has no consent form. */
+  consentLink?: string
   start: Date
   end: Date
   timezone: string
@@ -391,7 +393,7 @@ export async function sendClientBookingConfirmation(opts: {
   const {
     businessName, businessAddress, businessPhone, businessEmail,
     serviceName, staffName, clientName, clientEmail, clientPhone,
-    manageLink, start, end, timezone, smsConfig, logoUrl,
+    manageLink, consentLink = '', start, end, timezone, smsConfig, logoUrl,
     specialInstructions = { text: '', includeInSms: false }, ownerCopyEmail,
   } = opts
 
@@ -426,6 +428,7 @@ export async function sendClientBookingConfirmation(opts: {
         `📅 Add to Calendar: ${gcalLink}`,
         ``,
         manageLink ? `Manage your appointment: ${manageLink}` : `Need to change? Contact us at ${businessPhone || 'the salon'}.`,
+        consentLink ? `📝 Please complete your consent form before your visit: ${consentLink}` : '',
       ].filter(Boolean).join('\n')
       try {
         const ok = await sendSms(clientE164, appendInstructionsToSms(clientSms, specialInstructions), smsConfig)
@@ -442,7 +445,7 @@ export async function sendClientBookingConfirmation(opts: {
   const subject = `✅ Booking Confirmed — ${serviceName} on ${dateStr}`
   const html = bookingConfirmationHtml({
     greeting, serviceName, dateStr, timeStr, staffName,
-    businessName, businessAddress, businessPhone, manageLink,
+    businessName, businessAddress, businessPhone, manageLink, consentLink,
     startISO: start.toISOString(), endISO: end.toISOString(),
     logoUrl, specialInstructions: specialInstructions.text,
   })

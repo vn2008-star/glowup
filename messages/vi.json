@@ -445,7 +445,29 @@
     "emailCost": "Chi phí Email",
     "free": "Miễn phí",
     "perMonth": "/tháng",
-    "basedOn": "Dựa trên"
+    "basedOn": "Dựa trên",
+    "consent": {
+      "title": "Phiếu đồng ý dịch vụ",
+      "intro": "Câu hỏi sức khỏe, dị ứng và chữ ký trước các dịch vụ dùng keo hoặc hóa chất. Khách nhận link trong xác nhận đặt lịch; nhân viên cũng có thể đưa máy tính bảng cho khách từ Quầy lễ tân hoặc hồ sơ khách.",
+      "enable": "Yêu cầu khách ký phiếu đồng ý",
+      "questions": "Câu hỏi sức khỏe (có / không)",
+      "questionN": "Câu hỏi {n}",
+      "removeQuestion": "Xóa câu hỏi",
+      "addQuestion": "+ Thêm câu hỏi",
+      "terms": "Nội dung khách đồng ý",
+      "photo": "Xin phép đăng ảnh trước/sau",
+      "resign": "Yêu cầu khách ký lại",
+      "resignNever": "Không bao giờ (một lần là đủ)",
+      "resign6": "Mỗi 6 tháng",
+      "resign12": "Mỗi 12 tháng",
+      "resign24": "Mỗi 2 năm",
+      "save": "Lưu phiếu đồng ý",
+      "saving": "Đang lưu…",
+      "reset": "↻ Đặt lại mẫu mặc định cho tiệm mi & làm đẹp",
+      "needQuestion": "Thêm ít nhất một câu hỏi, hoặc tắt phiếu",
+      "saved": "Đã lưu phiếu đồng ý",
+      "saveFailed": "Không lưu được phiếu đồng ý"
+    }
   },
   "checkoutPage": {
     "title": "Quầy Tiếp Tân",

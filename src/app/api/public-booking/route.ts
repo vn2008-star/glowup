@@ -5,6 +5,7 @@ import { createClient } from '@supabase/supabase-js'
 import { timezoneFromAddress, DEFAULT_TZ } from '@/lib/tz'
 import { toE164 } from '@/lib/utils'
 import { resolveTenantTz, resolveSpecialInstructions, resolveOwnerCopyEmail, sendOwnerCopy, ownerCc, appendInstructionsToSms, buildReminderRows, insertReminderRows, resolveBookingBufferMinutes, padBookedSlot, resolveCancellationPolicy } from '@/lib/notifications'
+import { consentLinkFromManage } from '@/lib/consent-shared'
 import { sendSms, smsProvider, smsConfigFromSettings } from '@/lib/sms'
 import { bookingConfirmationHtml, promoEmailHtml, googleCalendarUrl } from '@/lib/email-templates'
 
@@ -555,6 +556,7 @@ async function sendBookingConfirmations(opts: {
     || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null)
     || 'https://glowup-jade.vercel.app'
   const manageLink = appointment.manage_token ? `${baseUrl}/manage/${appointment.manage_token}` : ''
+  const consentLink = consentLinkFromManage(manageLink, tenant.settings as Record<string, unknown> | null)
 
   // Fallback: if tenant doesn't have email/phone, look up the owner staff member
   let ownerFallbackEmail = ''
@@ -637,6 +639,7 @@ async function sendBookingConfirmations(opts: {
       `📅 Add to Calendar: ${gcalLink}`,
       ``,
       manageLink ? `Manage your appointment: ${manageLink}` : `Need to change? Contact us at ${businessPhone || 'the salon'}.`,
+      consentLink ? `📝 Please complete your consent form before your visit: ${consentLink}` : '',
     ].filter(Boolean).join('\n')
 
     const clientE164 = toE164(clientPhone)
@@ -668,6 +671,7 @@ async function sendBookingConfirmations(opts: {
       businessAddress,
       businessPhone,
       manageLink,
+      consentLink,
       startISO: start.toISOString(),
       endISO: opts.end.toISOString(),
       logoUrl: tenant.logo_url || null,

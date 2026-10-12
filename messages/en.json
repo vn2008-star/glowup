@@ -445,7 +445,29 @@
     "emailCost": "Email Cost",
     "free": "Free",
     "perMonth": "/mo",
-    "basedOn": "Based on"
+    "basedOn": "Based on",
+    "consent": {
+      "title": "Consent form",
+      "intro": "Health questions, allergies and a signature before adhesive or chemical services. Clients get a link on their booking confirmation; staff can also hand them the tablet from Front Desk or a client's profile.",
+      "enable": "Ask clients to sign a consent form",
+      "questions": "Health questions (yes / no)",
+      "questionN": "Question {n}",
+      "removeQuestion": "Remove question",
+      "addQuestion": "+ Add question",
+      "terms": "What the client agrees to",
+      "photo": "Ask for permission to post before/after photos",
+      "resign": "Ask clients to sign again",
+      "resignNever": "Never (once is enough)",
+      "resign6": "Every 6 months",
+      "resign12": "Every 12 months",
+      "resign24": "Every 2 years",
+      "save": "Save consent form",
+      "saving": "Saving…",
+      "reset": "↻ Reset to the lash & beauty default",
+      "needQuestion": "Add at least one question, or turn the form off",
+      "saved": "Consent form saved",
+      "saveFailed": "Could not save the consent form"
+    }
   },
   "checkoutPage": {
     "title": "Front Desk",
