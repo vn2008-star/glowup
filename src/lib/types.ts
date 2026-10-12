@@ -46,7 +46,9 @@ export interface Staff {
   schedule: Record<string, unknown>
   commission_rate: number
   is_active: boolean
-  pin: string | null
+  /** Never sent to the browser; see has_pin. */
+  pin?: never
+  has_pin?: boolean
   agreement_signature: string | null
   agreement_signed_at: string | null
   created_at: string

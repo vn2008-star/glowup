@@ -695,7 +695,7 @@ export default function CheckoutPage() {
     if (staffId === "all") {
       // Owner view — find the owner staff member
       const owner = staffMembers.find((s) => s.role === "owner" || s.role === "manager");
-      if (owner?.pin) {
+      if (owner?.has_pin) {
         setPinModalStaffId("all");
         setPinInput("");
         setPinError(false);
@@ -710,7 +710,7 @@ export default function CheckoutPage() {
     }
 
     const staff = staffMembers.find((s) => s.id === staffId);
-    if (staff?.pin) {
+    if (staff?.has_pin) {
       // PIN required — show keypad
       setPinModalStaffId(staffId);
       setPinInput("");
@@ -1051,7 +1051,7 @@ export default function CheckoutPage() {
             title="Back to Dashboard"
             onClick={() => {
               const owner = staffMembers.find((s) => s.role === "owner");
-              if (owner?.pin) {
+              if (owner?.has_pin) {
                 setDashboardExit(true);
                 setPinModalStaffId("dashboard-exit");
                 setPinInput("");
@@ -1074,7 +1074,7 @@ export default function CheckoutPage() {
           onClick={() => {
             const owner = staffMembers.find((s) => s.role === "owner");
             if (!owner) return; // Only owners can access dashboard
-            if (owner.pin) {
+            if (owner.has_pin) {
               setDashboardExit(true);
               setPinModalStaffId("dashboard-exit");
               setPinInput("");

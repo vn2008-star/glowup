@@ -13,6 +13,67 @@ import { getDashboardOverview } from '@/lib/overview-query'
 import { getClientsList, getCalendarLoad } from '@/lib/dashboard-queries'
 import { toE164 } from '@/lib/utils'
 import { dayRangeInTz, todayInTz } from '@/lib/tz'
+import { scryptSync, randomBytes, timingSafeEqual } from 'node:crypto'
+
+// ─── Front Desk PINs ───
+// Stored as `scrypt$<salt>$<hash>`. Rows written before this carry the
+// plain PIN; verify-pin accepts those once and rewrites them hashed.
+const PIN_RE = /^\d{4,6}$/
+function hashPin(pin: string): string {
+  const salt = randomBytes(16).toString('hex')
+  return `scrypt$${salt}$${scryptSync(pin, salt, 32).toString('hex')}`
+}
+function pinMatches(stored: string, pin: string): boolean {
+  const parts = stored.split('$')
+  if (parts.length === 3 && parts[0] === 'scrypt') {
+    const expected = Buffer.from(parts[2], 'hex')
+    const actual = scryptSync(pin, parts[1], expected.length)
+    return expected.length === actual.length && timingSafeEqual(expected, actual)
+  }
+  const a = Buffer.from(stored), b = Buffer.from(pin)
+  return a.length === b.length && timingSafeEqual(a, b)
+}
+// A 4-digit PIN is 10,000 guesses; without this, any role could probe any
+// staff_id unboundedly. Per warm instance (good enough to break a script;
+// not a substitute for a DB-backed counter).
+const pinAttempts = new Map<string, { count: number; until: number }>()
+const PIN_MAX_ATTEMPTS = 5, PIN_LOCK_MS = 60_000
+function pinLockedFor(staffId: string): number {
+  const a = pinAttempts.get(staffId)
+  if (!a) return 0
+  if (a.until && a.until > Date.now()) return Math.ceil((a.until - Date.now()) / 1000)
+  if (a.until && a.until <= Date.now()) pinAttempts.delete(staffId)
+  return 0
+}
+function notePinAttempt(staffId: string, ok: boolean): void {
+  if (ok) { pinAttempts.delete(staffId); return }
+  const a = pinAttempts.get(staffId) || { count: 0, until: 0 }
+  a.count += 1
+  if (a.count >= PIN_MAX_ATTEMPTS) { a.until = Date.now() + PIN_LOCK_MS; a.count = 0 }
+  pinAttempts.set(staffId, a)
+}
+/**
+ * Normalise a `pin` field on a staff write in place. Blank means "leave it
+ * alone" (the edit form always echoes the field, and an empty echo used to
+ * null the PIN when someone fixed a phone number); null clears; anything
+ * else must be 4–6 digits and is stored hashed. Returns a 400 on a bad PIN.
+ */
+function preparePin(fields: Record<string, unknown>): NextResponse | null {
+  if (!('pin' in fields)) return null
+  const pin = fields.pin
+  if (pin === '' || pin === undefined) { delete fields.pin; return null }
+  if (pin === null) return null
+  if (typeof pin !== 'string' || !PIN_RE.test(pin)) {
+    return NextResponse.json({ data: null, error: 'PIN must be 4 to 6 digits' }, { status: 400 })
+  }
+  fields.pin = hashPin(pin)
+  return null
+}
+/** The staff row as the browser may see it: no PIN, just whether one exists. */
+function publicStaff<T extends { pin?: string | null }>(row: T): Omit<T, 'pin'> & { has_pin: boolean } {
+  const { pin, ...rest } = row
+  return { ...rest, has_pin: !!pin }
+}
 
 // Columns a client is allowed to write on `staff`.
 //
@@ -972,7 +1033,7 @@ export async function POST(request: Request) {
           .eq('tenant_id', tenantId)
           .single()
 
-        let updates = pickWritable(stripImmutable(fields), APPOINTMENT_WRITABLE)
+        const updates = pickWritable(stripImmutable(fields), APPOINTMENT_WRITABLE)
 
         // A technician edits their own appointments only, and once one is
         // checked out its money and status belong to the manager.
@@ -1136,10 +1197,13 @@ export async function POST(request: Request) {
       case 'staff.list': {
         const { data, error } = await svc
           .from('staff')
-          .select('id, tenant_id, user_id, name, role, email, phone, photo_url, specialties, schedule, commission_rate, is_active')
+          .select('id, tenant_id, user_id, name, role, email, phone, photo_url, specialties, schedule, commission_rate, is_active, pin, agreement_signed_at')
           .eq('tenant_id', tenantId)
-        // Hide system "Admin" records used only for tenant-user linking
-        const visible = (data || []).filter((s: { name: string }) => s.name !== 'Admin')
+        // Hide system "Admin" records used only for tenant-user linking.
+        // `pin` is read only to report has_pin — the Front Desk gate keyed off
+        // `staff.pin` in the browser, which this list never sent, so the
+        // keypad never appeared.
+        const visible = (data || []).filter((s: { name: string }) => s.name !== 'Admin').map(publicStaff)
         const rolePriority: Record<string, number> = { owner: 0, manager: 1, technician: 2 }
         const sorted = visible.sort((a: { role: string; name: string }, b: { role: string; name: string }) => {
           const ra = rolePriority[a.role] ?? 3
@@ -1154,12 +1218,14 @@ export async function POST(request: Request) {
         if (staffRole === 'technician') return staffWriteForbidden
         const newStaff = pickWritable(payload, STAFF_WRITABLE)
         if (staffRole !== 'owner' && newStaff.role === 'owner') return staffWriteForbidden
+        const pinErr = preparePin(newStaff)
+        if (pinErr) return pinErr
         const { data, error } = await svc
           .from('staff')
           .insert({ ...newStaff, tenant_id: tenantId })
           .select()
           .single()
-        return NextResponse.json({ data, error: error?.message })
+        return NextResponse.json({ data: data ? publicStaff(data) : null, error: error?.message })
       }
 
       case 'staff.update': {
@@ -1175,6 +1241,8 @@ export async function POST(request: Request) {
           if (target === 'owner' || fields.role === 'owner') return staffWriteForbidden
           if (fields.role !== undefined && fields.role !== target) return staffWriteForbidden
         }
+        const pinErr = preparePin(fields)
+        if (pinErr) return pinErr
         if (Object.keys(fields).length === 0) {
           return NextResponse.json({ data: null, error: 'No updatable fields supplied' }, { status: 400 })
         }
@@ -1185,7 +1253,7 @@ export async function POST(request: Request) {
           .eq('tenant_id', tenantId)
           .select()
           .single()
-        return NextResponse.json({ data, error: error?.message })
+        return NextResponse.json({ data: data ? publicStaff(data) : null, error: error?.message })
       }
 
       case 'staff.delete': {
@@ -1201,6 +1269,11 @@ export async function POST(request: Request) {
 
       case 'staff.verify-pin': {
         const { staff_id, pin } = payload
+        if (typeof staff_id !== 'string') return NextResponse.json({ data: { valid: false }, error: 'Missing staff' })
+        const lockedFor = pinLockedFor(staff_id)
+        if (lockedFor > 0) {
+          return NextResponse.json({ data: { valid: false, locked_for: lockedFor }, error: `Too many attempts. Try again in ${lockedFor}s` })
+        }
         const { data, error } = await svc
           .from('staff')
           .select('id, pin')
@@ -1210,21 +1283,30 @@ export async function POST(request: Request) {
         if (error) return NextResponse.json({ data: { valid: false }, error: error.message })
         // If no PIN set, allow access
         if (!data.pin) return NextResponse.json({ data: { valid: true, no_pin: true } })
-        return NextResponse.json({ data: { valid: data.pin === pin } })
+        const valid = typeof pin === 'string' && pinMatches(data.pin, pin)
+        notePinAttempt(staff_id, valid)
+        // Legacy plaintext row: rewrite it hashed now that we know the PIN.
+        if (valid && !data.pin.startsWith('scrypt$')) {
+          await svc.from('staff').update({ pin: hashPin(pin) }).eq('id', staff_id).eq('tenant_id', tenantId)
+        }
+        return NextResponse.json({ data: { valid } })
       }
 
       case 'staff.set-pin': {
         const { id, pin } = payload
         if (staffRole === 'technician' && id !== staffId) return staffWriteForbidden
         if (staffRole === 'manager' && await isOwnerRow(id)) return staffWriteForbidden
+        const fields: Record<string, unknown> = { pin: pin || null }
+        const pinErr = preparePin(fields)
+        if (pinErr) return pinErr
         const { data, error } = await svc
           .from('staff')
-          .update({ pin: pin || null })
+          .update(fields)
           .eq('id', id)
           .eq('tenant_id', tenantId)
           .select()
           .single()
-        return NextResponse.json({ data, error: error?.message })
+        return NextResponse.json({ data: data ? publicStaff(data) : null, error: error?.message })
       }
 
       // ─── CAMPAIGNS ───

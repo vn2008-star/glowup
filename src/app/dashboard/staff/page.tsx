@@ -48,6 +48,9 @@ export default function StaffPage() {
     specialties: [] as string[], commission_rate: 0, is_active: true, photo_url: "", pin: "",
   });
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  // "Remove PIN" on the edit form. The field itself is blank on open, so
+  // saving with it blank keeps the current PIN rather than wiping it.
+  const [clearPin, setClearPin] = useState(false);
 
   // Schedule editor state
   const [showScheduleModal, setShowScheduleModal] = useState(false);
@@ -120,9 +123,10 @@ export default function StaffPage() {
       commission_rate: s.commission_rate,
       is_active: s.is_active,
       photo_url: s.photo_url || "",
-      pin: s.pin || "",
+      pin: "", // never sent down; blank means "keep the current PIN"
     });
     setPhotoPreview(s.photo_url || null);
+    setClearPin(false);
     setShowModal(true);
   }
 
@@ -247,8 +251,9 @@ export default function StaffPage() {
       specialties: allSpecialties,
       commission_rate: formData.commission_rate,
       is_active: formData.is_active,
-      pin: formData.pin || null,
     };
+    if (clearPin) payload.pin = null;
+    else if (formData.pin) payload.pin = formData.pin;
 
     // Only include photo_url if present (column may not exist yet)
     if (formData.photo_url) {
@@ -795,30 +800,41 @@ export default function StaffPage() {
                     <input className="input" type="number" value={formData.commission_rate} onChange={(e) => setFormData({ ...formData, commission_rate: Number(e.target.value) })} />
                   </div>
                   <div className={styles.formGroup}>
-                    <label className="label">{formData.pin ? "🔒" : "🔓"} Front Desk PIN</label>
+                    <label className="label">{(formData.pin || (editingStaff?.has_pin && !clearPin)) ? "🔒" : "🔓"} Front Desk PIN</label>
                     <input
                       className="input"
                       type="text"
                       inputMode="numeric"
                       pattern="[0-9]*"
-                      maxLength={4}
+                      maxLength={6}
                       value={formData.pin}
-                      placeholder="4-digit PIN"
+                      disabled={clearPin}
+                      placeholder={editingStaff?.has_pin ? "Enter a new PIN to change it" : "4-digit PIN"}
                       style={{
                         letterSpacing: "0.2em",
                         fontWeight: 600,
                       }}
                       onChange={(e) => {
-                        const v = e.target.value.replace(/\D/g, "").slice(0, 4);
+                        const v = e.target.value.replace(/\D/g, "").slice(0, 6);
                         setFormData({ ...formData, pin: v });
                       }}
                     />
-                    <span style={{ fontSize: "11px", color: formData.pin ? "rgb(16,185,129)" : "var(--text-tertiary)", marginTop: "3px" }}>
-                      {formData.pin
-                        ? "✓ PIN set — Front Desk protected"
-                        : "Recommended for Front Desk security"
+                    <span style={{ fontSize: "11px", color: (formData.pin || (editingStaff?.has_pin && !clearPin)) ? "rgb(16,185,129)" : "var(--text-tertiary)", marginTop: "3px" }}>
+                      {clearPin
+                        ? "PIN will be removed on save"
+                        : formData.pin
+                          ? "✓ New PIN will be saved"
+                          : editingStaff?.has_pin
+                            ? "✓ PIN set — leave blank to keep it"
+                            : "Recommended for Front Desk security"
                       }
                     </span>
+                    {editingStaff?.has_pin && (
+                      <label className={styles.checkLabel} style={{ marginTop: "6px" }}>
+                        <input type="checkbox" checked={clearPin} onChange={(e) => setClearPin(e.target.checked)} />
+                        Remove PIN
+                      </label>
+                    )}
                   </div>
                   {editingStaff && (
                     <div className={styles.formGroup}>
