@@ -912,15 +912,12 @@ export default function StaffPage() {
                     const dayData = scheduleData[day];
                     const isOff = dayData?.off;
                     const isAlternating = dayData?.alternating;
-                    const isWeekend = day === 'Saturday' || day === 'Sunday';
                     const effectivelyOff = isOff && !isAlternating; // fully off = off & not alternating
                     const useSlots = dayData?.useSlots;
                     const slots = dayData?.slots || [];
 
-                    // 3-state for weekends: 'every' | 'off' | 'alternate'
-                    const weekendMode = isWeekend
-                      ? (isAlternating ? 'alternate' : (isOff ? 'off' : 'every'))
-                      : undefined;
+                    // 3-state per day: 'every' | 'off' | 'alternate'
+                    const dayMode = isAlternating ? 'alternate' : (isOff ? 'off' : 'every');
 
                     return (
                       <div key={day} className={styles.schedDayBlock}>
@@ -941,32 +938,21 @@ export default function StaffPage() {
                                 />
                               </>
                             )}
-                            {isWeekend ? (
-                              /* Weekend: 3-option pill selector */
-                              <div className={styles.altWeekendsBtns}>
+                            <div className={styles.altWeekendsBtns}>
                                 <button type="button"
-                                  className={`${styles.altWeekendDayBtn} ${weekendMode === 'every' ? styles.altWeekendDayBtnActive : ''}`}
+                                  className={`${styles.altWeekendDayBtn} ${dayMode === 'every' ? styles.altWeekendDayBtnActive : ''}`}
                                   onClick={() => setScheduleData(prev => ({ ...prev, [day]: { ...prev[day], off: false, alternating: false } }))}
                                 >Every Week</button>
                                 <button type="button"
-                                  className={`${styles.altWeekendDayBtn} ${weekendMode === 'alternate' ? styles.altWeekendDayBtnActive : ''}`}
+                                  className={`${styles.altWeekendDayBtn} ${dayMode === 'alternate' ? styles.altWeekendDayBtnActive : ''}`}
                                   onClick={() => setScheduleData(prev => ({ ...prev, [day]: { ...prev[day], off: false, alternating: true, alternatingPhase: prev[day].alternatingPhase || 'even' } }))}
                                 >🔄 Every Other</button>
                                 <button type="button"
-                                  className={`${styles.altWeekendDayBtn} ${weekendMode === 'off' ? styles.altWeekendDayBtnActive : ''}`}
-                                  style={weekendMode === 'off' ? { background: 'var(--text-tertiary)', borderColor: 'var(--text-tertiary)', color: 'var(--text-inverse)' } : undefined}
+                                  className={`${styles.altWeekendDayBtn} ${dayMode === 'off' ? styles.altWeekendDayBtnActive : ''}`}
+                                  style={dayMode === 'off' ? { background: 'var(--text-tertiary)', borderColor: 'var(--text-tertiary)', color: 'var(--text-inverse)' } : undefined}
                                   onClick={() => setScheduleData(prev => ({ ...prev, [day]: { ...prev[day], off: true, alternating: false } }))}
                                 >Off</button>
-                              </div>
-                            ) : (
-                              /* Weekday: simple Off checkbox */
-                              <label className={styles.checkLabel}>
-                                <input type="checkbox" checked={isOff || false}
-                                  onChange={() => setScheduleData((prev) => ({ ...prev, [day]: { ...prev[day], off: !prev[day].off } }))}
-                                />
-                                Off
-                              </label>
-                            )}
+                            </div>
                           </div>
                         </div>
 
@@ -985,7 +971,7 @@ export default function StaffPage() {
                             </div>
                             {(() => {
                               const phase = dayData?.alternatingPhase || 'even';
-                              const dayOfWeek = day === 'Saturday' ? 6 : day === 'Sunday' ? 0 : 0;
+                              const dayOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].indexOf(day);
                               const today = new Date();
                               const d = new Date(today);
                               d.setDate(d.getDate() + ((dayOfWeek - d.getDay() + 7) % 7 || 7));
