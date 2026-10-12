@@ -46,9 +46,14 @@ export async function POST(request: Request) {
 
   const { data: staffRecord } = await svc
     .from('staff')
-    .select('tenant_id')
+    .select('tenant_id, role')
     .eq('user_id', userId)
     .single()
+
+  // A blast to the whole client list is a management action.
+  if (staffRecord?.role === 'technician' && !isAdminEmail(userEmail)) {
+    return NextResponse.json({ error: 'Only an owner or manager can send a campaign' }, { status: 403 })
+  }
 
   // ─── Admin impersonation override (skip DB query for non-admins) ───
   const overrideTenantId = isAdminEmail(userEmail)

@@ -60,6 +60,23 @@ const GIFT_CARD_WRITABLE = [
   'purchaser_name', 'purchaser_email', 'recipient_name', 'recipient_email', 'message', 'expires_at',
 ] as const
 
+// Owner/manager only. Money, reports, the catalog, marketing, settings, and
+// anything that deletes a record or messages clients at the salon's cost.
+const MANAGEMENT_ACTIONS = new Set([
+  'reports.overview', 'reports.staff-performance', 'reports.staff-revenue', 'reports.retention',
+  'reports.cancellations', 'reports.forecast', 'reports.peak-hours', 'reports.daily-tally',
+  'loyalty.update_tiers',
+  'campaigns.add', 'campaigns.update', 'campaigns.delete',
+  'services.add', 'services.bulkAdd', 'services.update', 'services.delete', 'services.reorder',
+  'packages.add', 'packages.update', 'packages.delete',
+  'social.add', 'social.update', 'social.delete',
+  'clients.delete', 'clients.send_birthday_promo',
+  'appointments.delete',
+  'payments.request',
+  'sms.gateway-status',
+  'feedback.update',
+])
+
 // The table each caller-supplied foreign key points at.
 const FK_TABLE: Record<string, string> = {
   client_id: 'clients',
@@ -432,6 +449,15 @@ export async function POST(request: Request) {
   function maskClientData(client: any) {
     if (!client) return client
     return { ...client, phone: maskPhone(client.phone), email: maskEmail(client.email), _masked: true }
+  }
+
+  // Actions a technician may not call at all. staffRole was computed for
+  // every request but only staff.* and sms.* consulted it, so a technician
+  // could read every colleague's commission, rewrite prices on completed
+  // appointments, delete clients, change the catalog, or blast the whole
+  // client list. Reads of their own calendar, clients and checkout stay open.
+  if (staffRole === 'technician' && MANAGEMENT_ACTIONS.has(action)) {
+    return NextResponse.json({ error: 'Only an owner or manager can do this' }, { status: 403 })
   }
 
   try {
@@ -941,12 +967,26 @@ export async function POST(request: Request) {
         // an ordinary edit (status change, price fix, notes).
         const { data: before } = await svc
           .from('appointments')
-          .select('start_time')
+          .select('start_time, staff_id, status')
           .eq('id', id)
           .eq('tenant_id', tenantId)
           .single()
 
-        const updates = pickWritable(stripImmutable(fields), APPOINTMENT_WRITABLE)
+        let updates = pickWritable(stripImmutable(fields), APPOINTMENT_WRITABLE)
+
+        // A technician edits their own appointments only, and once one is
+        // checked out its money and status belong to the manager.
+        if (staffRole === 'technician') {
+          if (!before || before.staff_id !== staffId) {
+            return NextResponse.json({ error: 'You can only change your own appointments' }, { status: 403 })
+          }
+          if (before.status === 'completed') {
+            for (const k of ['total_price', 'tip_amount', 'status', 'payment_method']) delete updates[k]
+          }
+          if (updates.staff_id !== undefined && updates.staff_id !== staffId) {
+            return NextResponse.json({ error: 'Only an owner or manager can reassign an appointment' }, { status: 403 })
+          }
+        }
         const badRef = await foreignKeyOutsideTenant(svc, tenantId, updates)
         if (badRef) return foreignRefError(badRef)
 
