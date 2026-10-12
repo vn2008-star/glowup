@@ -233,21 +233,29 @@ export async function handleAiChat(opts: {
     knownClient = await lookupClient(opts.clientPhone)
   }
   if (!knownClient && opts.conversationId) {
+    // Tenant-scoped: conversation_id comes off the public chat body, and an
+    // unscoped lookup resolved another salon's client into this chat.
     const { data: conv } = await svc
       .from('conversations')
       .select('client_id')
       .eq('id', opts.conversationId)
+      .eq('tenant_id', tenantId)
       .maybeSingle()
     if (conv?.client_id) {
       const { data } = await svc
         .from('clients')
         .select('id, first_name, last_name, phone, email, visit_count')
         .eq('id', conv.client_id)
+        .eq('tenant_id', tenantId)
         .maybeSingle()
       knownClient = (data as KnownClient) || null
     }
   }
-  if (!knownClient) {
+  // A phone number typed into the chat identifies the client only on SMS,
+  // where the carrier already vouches for the sender. On the web widget it
+  // let any visitor type a number and get "Hi Mary! (12 previous visits)"
+  // back — a way to enumerate the salon's client list.
+  if (!knownClient && channel === 'sms') {
     const typedPhone = phoneInText(message)
     if (typedPhone) knownClient = await lookupClient(typedPhone)
   }
@@ -325,7 +333,19 @@ export async function handleAiChat(opts: {
   })
 
   // ── Conversation persistence (chats land in the owner's Inbox) ──
+  // Only continue a conversation that belongs to THIS salon. A foreign id
+  // used to get this tenant's messages inserted under another salon's
+  // conversation and that conversation's last_message rewritten.
   let convId: string | null = opts.conversationId || null
+  if (convId) {
+    const { data: own } = await svc
+      .from('conversations')
+      .select('id')
+      .eq('id', convId)
+      .eq('tenant_id', tenantId)
+      .maybeSingle()
+    if (!own) convId = null
+  }
   if (!convId) {
     const { data: conv } = await svc
       .from('conversations')
