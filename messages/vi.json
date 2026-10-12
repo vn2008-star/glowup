@@ -194,7 +194,17 @@
     "previousWeek": "Tuần trước",
     "nextWeek": "Tuần sau",
     "previousDay": "Ngày trước",
-    "nextDay": "Ngày sau"
+    "nextDay": "Ngày sau",
+    "repeat": "Lặp lại",
+    "noRepeat": "Không lặp lại",
+    "everyWeek": "Mỗi tuần",
+    "everyWeeks": "Mỗi {n} tuần",
+    "visits": "{n} lần",
+    "repeatHint": "Đặt cùng giờ mỗi chu kỳ, đến {last}. Ngày đóng cửa, ngày nghỉ hoặc đã có lịch sẽ được bỏ qua.",
+    "seriesBooked": "Đã đặt {count} lịch hẹn",
+    "seriesSkipped": "Bỏ qua {count}: {dates}",
+    "seriesFailed": "Không thể đặt chuỗi lịch hẹn",
+    "seriesNoneBooked": "Không có ngày nào trống. Hãy thử giờ khác."
   },
   "overviewPage": {
     "goodMorning": "Chào buổi sáng",

@@ -194,7 +194,17 @@
     "previousWeek": "이전 주",
     "nextWeek": "다음 주",
     "previousDay": "이전 날",
-    "nextDay": "다음 날"
+    "nextDay": "다음 날",
+    "repeat": "반복",
+    "noRepeat": "반복 안 함",
+    "everyWeek": "매주",
+    "everyWeeks": "{n}주마다",
+    "visits": "{n}회",
+    "repeatHint": "{last}까지 매 주기 같은 시간에 예약합니다. 휴무일, 휴일, 이미 예약된 날은 건너뜁니다.",
+    "seriesBooked": "예약 {count}건 완료",
+    "seriesSkipped": "{count}건 건너뜀: {dates}",
+    "seriesFailed": "반복 예약을 만들 수 없습니다",
+    "seriesNoneBooked": "비어 있는 날짜가 없습니다. 다른 시간을 시도하세요."
   },
   "overviewPage": {
     "goodMorning": "좋은 아침입니다",

@@ -194,7 +194,17 @@
     "previousWeek": "Semana anterior",
     "nextWeek": "Semana siguiente",
     "previousDay": "Día anterior",
-    "nextDay": "Día siguiente"
+    "nextDay": "Día siguiente",
+    "repeat": "Repetir",
+    "noRepeat": "No se repite",
+    "everyWeek": "Cada semana",
+    "everyWeeks": "Cada {n} semanas",
+    "visits": "{n} visitas",
+    "repeatHint": "Reserva la misma hora en cada ciclo, hasta el {last}. Se omiten los días cerrados, libres o ya reservados.",
+    "seriesBooked": "Se reservaron {count} citas",
+    "seriesSkipped": "{count} omitidas: {dates}",
+    "seriesFailed": "No se pudo reservar la serie",
+    "seriesNoneBooked": "Ninguna fecha estaba libre. Prueba otra hora."
   },
   "overviewPage": {
     "goodMorning": "Buenos días",

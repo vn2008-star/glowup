@@ -4,15 +4,15 @@ import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient, type SupabaseClient } from '@supabase/supabase-js'
 import { getImpersonationOverride, isAdminEmail } from '@/lib/admin'
 import { resolveStaffRecord } from '@/lib/api-auth'
-import { scheduleClientReminders, sendClientBookingConfirmation, sendClientChangeNotice, resolveTenantTz, fetchTenantTz, resolveSpecialInstructions, resolveOwnerCopyEmail, sendSms, greetingName } from '@/lib/notifications'
+import { scheduleClientReminders, sendClientBookingConfirmation, sendClientChangeNotice, resolveTenantTz, fetchTenantTz, resolveSpecialInstructions, resolveOwnerCopyEmail, sendSms, greetingName, resolveBookingBufferMinutes } from '@/lib/notifications'
 import { getTenantSmsConfig, sendSmsVerbose, smsProvider, type StoredSmsGateway } from '@/lib/sms'
 import { cancelAppointment } from '@/lib/cancel-appointment'
 import { promoEmailHtml } from '@/lib/email-templates'
-import { DEFAULT_BIRTHDAY_TEMPLATE } from '@/lib/schedule-utils'
+import { DEFAULT_BIRTHDAY_TEMPLATE, isSalonClosedOnDate, isStaffOffOnDate } from '@/lib/schedule-utils'
 import { getDashboardOverview } from '@/lib/overview-query'
 import { getClientsList, getCalendarLoad } from '@/lib/dashboard-queries'
 import { toE164 } from '@/lib/utils'
-import { dayRangeInTz, todayInTz, payPeriodInTz, partsInTz, daysInMonth } from '@/lib/tz'
+import { dayRangeInTz, todayInTz, payPeriodInTz, partsInTz, daysInMonth, localToUTC, addDays } from '@/lib/tz'
 import { scryptSync, randomBytes, timingSafeEqual } from 'node:crypto'
 
 // ─── Front Desk PINs ───
@@ -1080,6 +1080,135 @@ export async function POST(request: Request) {
         }
 
         return NextResponse.json({ data, error: friendlyWriteError(error) })
+      }
+
+      // A standing appointment: the same slot every N weeks, M times. One
+      // row per occurrence (nothing new in the schema), each with its own
+      // manage link and reminders. Occurrences that collide with an existing
+      // booking, a closed day or the staff member's day off are skipped and
+      // reported, not silently dropped or double-booked.
+      case 'appointments.addSeries': {
+        const base = pickWritable(payload, APPOINTMENT_WRITABLE)
+        const badRef = await foreignKeyOutsideTenant(svc, tenantId, base)
+        if (badRef) return foreignRefError(badRef)
+        const everyWeeks = Math.min(8, Math.max(1, Math.round(Number(payload.repeat_every_weeks) || 1)))
+        const count = Math.min(24, Math.max(2, Math.round(Number(payload.repeat_count) || 2)))
+        const baseStart = new Date(String(base.start_time))
+        const baseEnd = new Date(String(base.end_time))
+        if (isNaN(baseStart.getTime()) || isNaN(baseEnd.getTime()) || baseEnd <= baseStart) {
+          return NextResponse.json({ data: null, error: 'Invalid start or end time' }, { status: 400 })
+        }
+        const durationMs = baseEnd.getTime() - baseStart.getTime()
+
+        const { data: tenantRow } = await svc
+          .from('tenants')
+          .select('name, email, phone, address, timezone, logo_url, settings')
+          .eq('id', tenantId)
+          .single()
+        const tz = resolveTenantTz(tenantRow)
+        const settings = (tenantRow?.settings || {}) as Record<string, unknown>
+        const bufferMs = resolveBookingBufferMinutes(tenantRow) * 60 * 1000
+        const { dateStr: baseDate, timeStr } = partsInTz(baseStart, tz)
+
+        let staffSchedule: Record<string, unknown> | null = null
+        if (base.staff_id) {
+          const { data: st } = await svc.from('staff').select('schedule').eq('id', base.staff_id as string).eq('tenant_id', tenantId).maybeSingle()
+          staffSchedule = (st?.schedule as Record<string, unknown>) || null
+        }
+
+        // One read covers every occurrence's conflict check
+        const lastStart = localToUTC(addDays(baseDate, everyWeeks * 7 * (count - 1)), timeStr, tz)
+        const { data: busy } = base.staff_id ? await svc
+          .from('appointments')
+          .select('start_time, end_time')
+          .eq('tenant_id', tenantId)
+          .eq('staff_id', base.staff_id as string)
+          .in('status', ['pending', 'confirmed', 'blocked'])
+          .gte('end_time', new Date(baseStart.getTime() - bufferMs).toISOString())
+          .lte('start_time', new Date(lastStart.getTime() + durationMs + bufferMs).toISOString())
+          : { data: [] as { start_time: string; end_time: string }[] }
+
+        const selectCols = 'id, tenant_id, client_id, staff_id, service_id, start_time, end_time, status, total_price, notes, payment_method, tip_amount, checked_out_at, checked_in_at, created_at, manage_token, client:clients(id, first_name, last_name, phone, email, photo_url, sms_opt_out), staff_member:staff!staff_id(id, name, photo_url, role), service:services(id, name, category, duration_minutes, price, commission_rate)'
+        const created: Record<string, unknown>[] = []
+        const skipped: { date: string; reason: string }[] = []
+        for (let i = 0; i < count; i++) {
+          const dateStr = addDays(baseDate, everyWeeks * 7 * i)
+          // Same wall-clock time each week, across DST changes
+          const start = localToUTC(dateStr, timeStr, tz)
+          const end = new Date(start.getTime() + durationMs)
+          if (isSalonClosedOnDate(settings, dateStr)) { skipped.push({ date: dateStr, reason: 'salon closed' }); continue }
+          if (staffSchedule && isStaffOffOnDate(staffSchedule, dateStr)) { skipped.push({ date: dateStr, reason: 'staff off' }); continue }
+          const clash = (busy || []).some(b =>
+            new Date(b.start_time).getTime() < end.getTime() + bufferMs && new Date(b.end_time).getTime() > start.getTime() - bufferMs)
+          if (clash) { skipped.push({ date: dateStr, reason: 'already booked' }); continue }
+
+          const { data: row, error } = await svc
+            .from('appointments')
+            .insert({ ...base, start_time: start.toISOString(), end_time: end.toISOString(), tenant_id: tenantId })
+            .select(selectCols)
+            .single()
+          if (error || !row) {
+            // 23P01 = the no-double-book constraint won a race with the check above
+            skipped.push({ date: dateStr, reason: (error as { code?: string } | null)?.code === '23P01' ? 'already booked' : (error?.message || 'could not save') })
+            continue
+          }
+          created.push(row as Record<string, unknown>)
+        }
+
+        // Reminders for every occurrence; ONE confirmation (for the first), so
+        // a six-visit series doesn't send six texts at once.
+        const first = created[0] as {
+          id: string; client_id: string | null; status: string; start_time: string; end_time: string; manage_token: string | null
+          client: { first_name?: string; last_name?: string; phone?: string | null; email?: string | null; sms_opt_out?: boolean } | null
+          service: { name?: string } | null; staff_member: { name?: string } | null
+        } | undefined
+        if (first && first.client_id && first.client && (first.client.phone || first.client.email) &&
+            (first.status === 'pending' || first.status === 'confirmed')) {
+          const notify = (async () => {
+            try {
+              const smsPhone = first.client!.sms_opt_out ? null : (first.client!.phone || null)
+              for (const row of created as { id: string; start_time: string }[]) {
+                if (new Date(row.start_time).getTime() > Date.now()) {
+                  await scheduleClientReminders(svc, { tenantId, appointmentId: row.id, clientId: first.client_id!, clientPhone: smsPhone, clientEmail: first.client!.email || null })
+                }
+              }
+              let ownerEmail = tenantRow?.email || ''
+              let ownerPhone = tenantRow?.phone || ''
+              if (!ownerEmail || !ownerPhone) {
+                const { data: owner } = await svc.from('staff').select('email, phone').eq('tenant_id', tenantId).eq('role', 'owner').limit(1).maybeSingle()
+                ownerEmail = ownerEmail || owner?.email || ''
+                ownerPhone = ownerPhone || owner?.phone || ''
+              }
+              const baseUrl = process.env.NEXT_PUBLIC_SITE_URL
+                || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null)
+                || 'https://glowup-jade.vercel.app'
+              const clientName = `${first.client!.first_name || ''}${first.client!.last_name ? ' ' + first.client!.last_name : ''}`.trim()
+              await sendClientBookingConfirmation({
+                businessName: tenantRow?.name || 'our salon',
+                businessAddress: (tenantRow?.address as string) || '',
+                businessPhone: ownerPhone,
+                businessEmail: ownerEmail || null,
+                serviceName: `${first.service?.name || 'your appointment'} (${created.length} visits, every ${everyWeeks === 1 ? 'week' : `${everyWeeks} weeks`})`,
+                staffName: first.staff_member?.name || '',
+                clientName,
+                clientEmail: first.client!.email || null,
+                clientPhone: smsPhone,
+                manageLink: first.manage_token ? `${baseUrl}/manage/${first.manage_token}` : '',
+                start: new Date(first.start_time),
+                end: new Date(first.end_time),
+                timezone: tz,
+                logoUrl: tenantRow?.logo_url || null,
+                specialInstructions: resolveSpecialInstructions(tenantRow),
+                ownerCopyEmail: resolveOwnerCopyEmail(tenantRow, ownerEmail),
+              })
+            } catch (err) {
+              console.error('[appointments.addSeries] notification error:', err)
+            }
+          })()
+          try { waitUntil(notify) } catch { /* local dev — no waitUntil */ }
+        }
+
+        return NextResponse.json({ data: { created, skipped } })
       }
 
       case 'appointments.update': {

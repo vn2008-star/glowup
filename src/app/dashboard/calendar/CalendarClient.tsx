@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData, cachedQuery } from "@/lib/api";
-import { localToUTC, todayInTz, partsInTz, DEFAULT_TZ } from "@/lib/tz";
+import { localToUTC, todayInTz, partsInTz, addDays, DEFAULT_TZ } from "@/lib/tz";
 import { findHolidayOnDate, isBusinessClosedOnDate, isStaffOffOnDate } from "@/lib/schedule-utils";
 import type { CustomClosedDate } from "@/lib/schedule-utils";
 import { localeDateStr } from "@/lib/utils";
@@ -57,6 +57,9 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
   // Appointment length in minutes when it differs from the service's standard
   // duration (ran long, extra time added). null = use the service duration.
   const [durationMin, setDurationMin] = useState<number | null>(null);
+  // Standing appointment: every N weeks (0 = single booking), M visits total
+  const [repeatWeeks, setRepeatWeeks] = useState(0);
+  const [repeatCount, setRepeatCount] = useState(6);
   const [clientSearch, setClientSearch] = useState("");
   const [clientDropdownOpen, setClientDropdownOpen] = useState(false);
   const [selectedApt, setSelectedApt] = useState<FullAppointment | null>(null);
@@ -466,7 +469,7 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
     const start = localToUTC(aptDate, aptTime, salonTz);
     const end = new Date(start.getTime() + formDuration() * 60 * 1000);
     setSaving(true);
-    const { data, error } = await queryData<FullAppointment>("appointments.add", {
+    const aptFields = {
       client_id: formData.client_id || null,
       service_id: formData.service_id,
       staff_id: formData.staff_id || null,
@@ -475,7 +478,38 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
       status: "confirmed",
       total_price: service?.price || 0,
       notes: formData.notes || null,
-    });
+    };
+
+    // Standing appointment: one request creates the whole series
+    if (repeatWeeks > 0) {
+      const res = await queryData<{ created: FullAppointment[]; skipped: { date: string; reason: string }[] }>(
+        "appointments.addSeries", { ...aptFields, repeat_every_weeks: repeatWeeks, repeat_count: repeatCount }
+      );
+      setSaving(false);
+      if (res.error || !res.data) {
+        toast.error(`${t("seriesFailed")}: ${res.error || ""}`);
+        return;
+      }
+      const { created, skipped } = res.data;
+      setAppointments(prev => [...prev, ...created]);
+      if (created.length === 0) {
+        toast.error(t("seriesNoneBooked"));
+        return;
+      }
+      const skippedText = skipped.length
+        ? ` ${t("seriesSkipped", { count: skipped.length, dates: skipped.map(s => `${localeDateStr(new Date(s.date + "T00:00:00"), { month: "short", day: "numeric" })} (${s.reason})`).join(", ") })}`
+        : "";
+      toast.success(`${t("seriesBooked", { count: created.length })}.${skippedText}`);
+      setShowModal(false);
+      setClientSearch("");
+      setClientDropdownOpen(false);
+      setFormData({ client_id: "", service_id: "", staff_id: "", start_time: "", notes: "" });
+      setDurationMin(null);
+      setRepeatWeeks(0);
+      return;
+    }
+
+    const { data, error } = await queryData<FullAppointment>("appointments.add", aptFields);
     setSaving(false);
     if (error) {
       toast.error(`Failed to book appointment: ${error}`);
@@ -1464,8 +1498,32 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
                 <label className="label">Notes</label>
                 <textarea className="input" rows={2} value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} />
               </div>
+              {!editingApt && (
+                <div className={styles.formGroup}>
+                  <label className="label" htmlFor="apt-repeat">{t("repeat")}</label>
+                  <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center", flexWrap: "wrap" }}>
+                    <select id="apt-repeat" value={repeatWeeks} onChange={(e) => setRepeatWeeks(Number(e.target.value))} style={{ flex: "1 1 160px" }}>
+                      <option value={0}>{t("noRepeat")}</option>
+                      <option value={1}>{t("everyWeek")}</option>
+                      {[2, 3, 4, 5, 6, 8].map(n => <option key={n} value={n}>{t("everyWeeks", { n })}</option>)}
+                    </select>
+                    {repeatWeeks > 0 && (
+                      <select aria-label={t("visits", { n: repeatCount })} value={repeatCount} onChange={(e) => setRepeatCount(Number(e.target.value))} style={{ flex: "0 1 130px" }}>
+                        {[2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 24].map(n => <option key={n} value={n}>{t("visits", { n })}</option>)}
+                      </select>
+                    )}
+                  </div>
+                  {repeatWeeks > 0 && formData.start_time && (
+                    <span style={{ fontSize: "13px", color: "var(--text-secondary)", marginTop: 4 }}>
+                      {t("repeatHint", {
+                        last: localeDateStr(new Date(addDays(formData.start_time.split("T")[0], repeatWeeks * 7 * (repeatCount - 1)) + "T00:00:00"), { month: "long", day: "numeric", year: "numeric" }),
+                      })}
+                    </span>
+                  )}
+                </div>
+              )}
               <div className={styles.modalActions}>
-                <button type="button" className="btn btn-secondary" onClick={() => { setShowModal(false); setEditingApt(null); }}>{t("cancel")}</button>
+                <button type="button" className="btn btn-secondary" onClick={() => { setShowModal(false); setEditingApt(null); setRepeatWeeks(0); }}>{t("cancel")}</button>
                 <button type="submit" className="btn btn-primary" disabled={saving}>{editingApt ? t("updateAppointment") : t("bookAppointment")}</button>
               </div>
             </form>

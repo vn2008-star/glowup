@@ -194,7 +194,17 @@
     "previousWeek": "上周",
     "nextWeek": "下周",
     "previousDay": "前一天",
-    "nextDay": "后一天"
+    "nextDay": "后一天",
+    "repeat": "重复",
+    "noRepeat": "不重复",
+    "everyWeek": "每周",
+    "everyWeeks": "每 {n} 周",
+    "visits": "{n} 次",
+    "repeatHint": "每个周期在同一时间预约，直到 {last}。休息日、员工休假或已有预约的日期会被跳过。",
+    "seriesBooked": "已预约 {count} 次",
+    "seriesSkipped": "跳过 {count} 次：{dates}",
+    "seriesFailed": "无法创建重复预约",
+    "seriesNoneBooked": "没有空闲的日期，请换个时间。"
   },
   "overviewPage": {
     "goodMorning": "早上好",

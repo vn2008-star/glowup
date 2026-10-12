@@ -194,7 +194,17 @@
     "previousWeek": "Previous week",
     "nextWeek": "Next week",
     "previousDay": "Previous day",
-    "nextDay": "Next day"
+    "nextDay": "Next day",
+    "repeat": "Repeat",
+    "noRepeat": "Does not repeat",
+    "everyWeek": "Every week",
+    "everyWeeks": "Every {n} weeks",
+    "visits": "{n} visits",
+    "repeatHint": "Books the same time each cycle, through {last}. Days that are closed, off or already booked are skipped.",
+    "seriesBooked": "Booked {count} appointments",
+    "seriesSkipped": "{count} skipped: {dates}",
+    "seriesFailed": "Could not book the series",
+    "seriesNoneBooked": "None of the dates were free. Try a different time."
   },
   "overviewPage": {
     "goodMorning": "Good morning",
