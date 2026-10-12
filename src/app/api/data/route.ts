@@ -33,6 +33,13 @@ const STAFF_WRITABLE = [
   'agreement_signature', 'agreement_signed_at',
 ] as const
 
+// The subset a technician may change on their OWN row. role, commission_rate,
+// is_active and pin are management decisions; see the staff.* role gate.
+const STAFF_SELF_WRITABLE = [
+  'name', 'email', 'phone', 'specialties', 'schedule', 'photo_url',
+  'agreement_signature', 'agreement_signed_at',
+] as const
+
 // Columns a client is allowed to write on `appointments` (add/update).
 // Spreading the payload let a caller set manage_token, checked_out_by, or a
 // foreign client_id — same class of hole as the staff mass-assignment above.
@@ -310,6 +317,30 @@ export async function POST(request: Request) {
     }
     return out
   }
+
+  // Who may write to `staff`. STAFF_WRITABLE guards which columns a request
+  // can set; it says nothing about who is asking. Without this, a technician
+  // could call staff.update with { id: <own row>, role: 'owner' } — or reset
+  // the owner's PIN, change anyone's commission, or delete the owner.
+  //   owner      → anything in STAFF_WRITABLE, on any row
+  //   manager    → any row except an owner's; cannot set `role`
+  //   technician → their own row only, STAFF_SELF_WRITABLE columns only
+  const staffWriteForbidden = NextResponse.json(
+    { error: 'Only an owner or manager can change this' }, { status: 403 }
+  )
+  // Role of the staff row being written; 'owner' when the row can't be found,
+  // so an unknown target is refused rather than guessed.
+  async function targetStaffRole(id: unknown): Promise<string> {
+    if (typeof id !== 'string') return 'owner'
+    const { data } = await svc
+      .from('staff')
+      .select('role')
+      .eq('id', id)
+      .eq('tenant_id', tenantId)
+      .maybeSingle()
+    return data?.role ?? 'owner'
+  }
+  const isOwnerRow = async (id: unknown) => (await targetStaffRole(id)) === 'owner'
 
   // Helper: mask contact info for technicians when client protection is enabled
   // Cached per-request to avoid re-querying tenant settings on every list call
@@ -1020,16 +1051,30 @@ export async function POST(request: Request) {
       }
 
       case 'staff.add': {
+        if (staffRole === 'technician') return staffWriteForbidden
+        const newStaff = pickWritable(payload, STAFF_WRITABLE)
+        if (staffRole !== 'owner' && newStaff.role === 'owner') return staffWriteForbidden
         const { data, error } = await svc
           .from('staff')
-          .insert({ ...pickWritable(payload, STAFF_WRITABLE), tenant_id: tenantId })
+          .insert({ ...newStaff, tenant_id: tenantId })
           .select()
           .single()
         return NextResponse.json({ data, error: error?.message })
       }
 
       case 'staff.update': {
-        const fields = pickWritable(payload, STAFF_WRITABLE)
+        let fields = pickWritable(payload, STAFF_WRITABLE)
+        if (staffRole === 'technician') {
+          // Only their own row, and only the self-service columns.
+          if (payload.id !== staffId) return staffWriteForbidden
+          fields = pickWritable(fields, STAFF_SELF_WRITABLE)
+        } else if (staffRole !== 'owner') {
+          // The edit form always echoes `role` back, so compare against the
+          // row rather than refusing every payload that carries the key.
+          const target = await targetStaffRole(payload.id)
+          if (target === 'owner' || fields.role === 'owner') return staffWriteForbidden
+          if (fields.role !== undefined && fields.role !== target) return staffWriteForbidden
+        }
         if (Object.keys(fields).length === 0) {
           return NextResponse.json({ data: null, error: 'No updatable fields supplied' }, { status: 400 })
         }
@@ -1044,6 +1089,8 @@ export async function POST(request: Request) {
       }
 
       case 'staff.delete': {
+        if (staffRole === 'technician') return staffWriteForbidden
+        if (staffRole !== 'owner' && await isOwnerRow(payload.id)) return staffWriteForbidden
         const { error } = await svc
           .from('staff')
           .delete()
@@ -1068,6 +1115,8 @@ export async function POST(request: Request) {
 
       case 'staff.set-pin': {
         const { id, pin } = payload
+        if (staffRole === 'technician' && id !== staffId) return staffWriteForbidden
+        if (staffRole === 'manager' && await isOwnerRow(id)) return staffWriteForbidden
         const { data, error } = await svc
           .from('staff')
           .update({ pin: pin || null })
