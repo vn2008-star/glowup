@@ -61,40 +61,40 @@ export async function GET(request: Request) {
     })
   }
 
-  // Get active services
-  const { data: services } = await svc
-    .from('services')
-    .select('id, name, category, description, duration_minutes, price, sort_order, image_url')
-    .eq('tenant_id', tenant.id)
-    .eq('is_active', true)
-    .order('sort_order', { ascending: true })
-
-  // Get active staff (include schedule for custom service durations)
-  const { data: staff } = await svc
-    .from('staff')
-    .select('id, name, role, specialties, schedule')
-    .eq('tenant_id', tenant.id)
-    .eq('is_active', true)
-    .neq('name', 'Admin')
-    .order('name')
-
   // Read advance booking limit from tenant settings (default 30 days)
   const tenantSettings = (tenant.settings || {}) as Record<string, unknown>
   const bookingConfig = (tenantSettings.booking || {}) as Record<string, string>
   const advanceBookingDays = parseInt(bookingConfig.advanceBookingDays || '30', 10) || 30
 
-  // Get existing appointments for availability checking
-  // Use end_time > now (not start_time >= now) to include in-progress appointments
-  // e.g., a 2hr appointment that started 30min ago still blocks the next 90min of slots
+  // Existing appointments for availability: end_time > now (not start_time >=
+  // now) so an in-progress 2hr appointment still blocks its remaining slots.
   const now = new Date()
   const futureLimit = new Date(now.getTime() + advanceBookingDays * 24 * 60 * 60 * 1000)
-  const { data: appointments } = await svc
-    .from('appointments')
-    .select('staff_id, start_time, end_time, status')
-    .eq('tenant_id', tenant.id)
-    .gt('end_time', now.toISOString())
-    .lt('start_time', futureLimit.toISOString())
-    .in('status', ['pending', 'confirmed', 'blocked'])
+
+  // Three independent reads; this page is now server-rendered, so each one
+  // run in series was time added to every client's first paint.
+  const [{ data: services }, { data: staff }, { data: appointments }] = await Promise.all([
+    svc
+      .from('services')
+      .select('id, name, category, description, duration_minutes, price, sort_order, image_url')
+      .eq('tenant_id', tenant.id)
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true }),
+    svc
+      .from('staff')
+      .select('id, name, role, specialties, schedule')
+      .eq('tenant_id', tenant.id)
+      .eq('is_active', true)
+      .neq('name', 'Admin')
+      .order('name'),
+    svc
+      .from('appointments')
+      .select('staff_id, start_time, end_time, status')
+      .eq('tenant_id', tenant.id)
+      .gt('end_time', now.toISOString())
+      .lt('start_time', futureLimit.toISOString())
+      .in('status', ['pending', 'confirmed', 'blocked']),
+  ])
 
   return NextResponse.json({
     business: {
