@@ -2964,12 +2964,19 @@ export async function POST(request: Request) {
           return NextResponse.json({ error: 'Waitlist entry not found or already claimed' }, { status: 404 })
         }
 
-        // Mark waitlist entry as seated (claimed)
-        await svc
+        // Mark waitlist entry as seated (claimed). Conditional on it still
+        // waiting: two staff tapping Claim together both passed the read
+        // above and created two appointments for one walk-in.
+        const { data: seated } = await svc
           .from('waitlist')
           .update({ status: 'seated', staff_id: claimStaffId })
           .eq('id', waitlist_id)
           .eq('tenant_id', tenantId)
+          .eq('status', 'waiting')
+          .select('id')
+        if (!seated || seated.length === 0) {
+          return NextResponse.json({ error: 'Someone else just claimed this walk-in' }, { status: 409 })
+        }
 
         // Auto-create a walk-in appointment for this client
         const now = new Date()

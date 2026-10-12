@@ -16,6 +16,9 @@ import { sendSms, canSendBulkSms } from '@/lib/sms'
 // caller's own staff record. tenant_id is never read from the request body — if
 // it were, any caller could blast another salon's entire client list.
 
+// One awaited send per client over an unbounded list; give it room.
+export const maxDuration = 60
+
 export async function POST(request: Request) {
   // Parse body and authenticate in parallel
   const [body, supabase] = await Promise.all([

@@ -21,6 +21,10 @@ const DAILY_AUTOMATION_HOUR = 9
 
 type Channel = 'sms' | 'email' | 'both'
 
+// Several hundred sends per tenant, sequentially. The platform default would
+// cut the run off mid-loop with the dedupe record not yet written.
+export const maxDuration = 60
+
 /**
  * Is this automation switched on? Automations default ON — the app has always
  * sent these unless a salon explicitly opted out.
@@ -245,20 +249,36 @@ export async function GET(request: Request) {
         if (fmoAudience === 'active') clientQuery = clientQuery.eq('status', 'active')
         else if (fmoAudience === 'at_risk') clientQuery = clientQuery.eq('status', 'at_risk')
         else if (fmoAudience === 'vip') clientQuery = clientQuery.or('visit_count.gte.10,lifetime_spend.gte.500')
-        else if (fmoAudience === 'saved_list' && fmoListName) {
+        // No recipients at all when the saved list is missing or empty. This
+        // used to `continue` the TENANT loop, which skipped every other
+        // automation (birthday, rebooking, no-show, review, holiday) for that
+        // salon on that tick.
+        let noRecipients = false
+        if (fmoAudience === 'saved_list' && fmoListName) {
           // Fetch saved list client IDs from settings
           const savedLists = (settings.savedClientLists || []) as { name: string; clientIds: string[] }[]
           const targetList = savedLists.find(l => l.name === fmoListName)
           if (targetList && targetList.clientIds.length > 0) {
             clientQuery = clientQuery.in('id', targetList.clientIds)
           } else {
-            continue // skip if saved list not found or empty
+            noRecipients = true
           }
         }
 
-        const { data: recipients } = await clientQuery
+        const { data: recipients } = noRecipients ? { data: [] } : await clientQuery
 
         if (recipients && recipients.length > 0) {
+          // Record the blast BEFORE sending so a timeout mid-loop leaves a
+          // trace and the next tick's schedule gate sees it. Metrics follow.
+          const { data: fmoCampaign } = await supabase.from('campaigns').insert({
+            tenant_id: tenant.id,
+            name: `[Auto] Fill My Openings — ${localNow.dateStr}`,
+            type: 'fill_openings',
+            status: 'sending',
+            template: { audience: fmoAudience, channel: fmoChannel, days: lookAheadDays, slots: totalOpenSlots },
+            metrics: { sent: 0, opened: 0, booked: 0, revenue: 0 },
+          }).select('id').single()
+          let fmoSent = 0
           // One date per line. Joining them with commas ran the day and date
           // together — "Mon, Aug 10, Tue, Aug 11" reads as six separate items.
           // Plain bullets, NOT 📅: Android draws that emoji as a calendar page
@@ -297,18 +317,17 @@ export async function GET(request: Request) {
               ctaText: 'Book Now',
             })
             results.fill_openings++
+            fmoSent++
           }
 
-          // Log as campaign
-          await supabase.from('campaigns').insert({
-            tenant_id: tenant.id,
-            name: `[Auto] Fill My Openings — ${localNow.dateStr}`,
-            type: 'fill_openings',
-            status: 'completed',
-            last_sent: new Date().toISOString(),
-            template: { audience: fmoAudience, channel: fmoChannel, days: lookAheadDays, slots: totalOpenSlots },
-            metrics: { sent: results.fill_openings, opened: 0, booked: 0, revenue: 0 },
-          })
+          // Per-tenant count: `results.fill_openings` is the running total
+          // across every salon, which is what used to land in each one's metrics.
+          if (fmoCampaign) {
+            await supabase.from('campaigns')
+              .update({ status: 'completed', last_sent: new Date().toISOString(), metrics: { sent: fmoSent, opened: 0, booked: 0, revenue: 0 } })
+              .eq('id', fmoCampaign.id)
+              .eq('tenant_id', tenant.id)
+          }
         }
       }
       } // end schedule gate else
@@ -603,6 +622,20 @@ export async function GET(request: Request) {
 
         if (existingCampaign) continue // Already sent
 
+        // The owner's own row for this holiday (Holidays page: "<name> <year>
+        // Special"). This sender used to ignore it entirely — a paused promo
+        // still went out, and edited copy was replaced by the stock text.
+        const { data: ownerRow } = await supabase
+          .from('campaigns')
+          .select('id, status, template')
+          .eq('tenant_id', tenant.id)
+          .eq('type', 'holiday')
+          .eq('name', `${holiday.name} ${holidayDate.getFullYear()} Special`)
+          .maybeSingle()
+        if (ownerRow && ownerRow.status !== 'active') continue // paused or draft
+        const ownerMessage = ((ownerRow?.template as Record<string, unknown> | null)?.message as string | undefined)?.trim()
+        const holidayTemplate = ownerMessage || holiday.template
+
         // Fetch all clients for this tenant
         const { data: holidayClients } = await supabase
           .from('clients')
@@ -612,13 +645,23 @@ export async function GET(request: Request) {
 
         if (!holidayClients || holidayClients.length === 0) continue
 
+        // Dedupe record first, so a timeout mid-loop can't re-send next tick
+        const { data: holidayCampaign } = await supabase.from('campaigns').insert({
+          tenant_id: tenant.id,
+          name: campaignName,
+          type: 'holiday',
+          status: 'sending',
+          template: { holiday: holiday.name, channel: 'both', days_before: sendDaysBefore },
+          metrics: { sent: 0, opened: 0, booked: 0, revenue: 0 },
+        }).select('id').single()
+
         let holidaySent = 0
         for (const client of holidayClients) {
           const clientFirst = `${client.first_name || ''}`.trim() || 'there'
           const clientGreeting = client.last_name
             ? `${clientFirst} ${(client.last_name as string)[0]}.`
             : clientFirst
-          const personalizedMsg = holiday.template
+          const personalizedMsg = holidayTemplate
             .replace(/\{name\}/g, clientGreeting)
             .replace(/\{booking_url\}/g, bookingUrl)
             .replace(/\{business_name\}/g, businessName)
@@ -635,16 +678,12 @@ export async function GET(request: Request) {
 
         results.holiday_promo += holidaySent
 
-        // Log as campaign
-        await supabase.from('campaigns').insert({
-          tenant_id: tenant.id,
-          name: campaignName,
-          type: 'holiday',
-          status: 'completed',
-          last_sent: new Date().toISOString(),
-          template: { holiday: holiday.name, channel: 'both', days_before: sendDaysBefore },
-          metrics: { sent: holidaySent, opened: 0, booked: 0, revenue: 0 },
-        })
+        if (holidayCampaign) {
+          await supabase.from('campaigns')
+            .update({ status: 'completed', last_sent: new Date().toISOString(), metrics: { sent: holidaySent, opened: 0, booked: 0, revenue: 0 } })
+            .eq('id', holidayCampaign.id)
+            .eq('tenant_id', tenant.id)
+        }
       }
     }
     }

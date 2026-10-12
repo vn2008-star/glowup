@@ -23,6 +23,10 @@ import { localToUTC, nowInTz, formatInTz } from '@/lib/tz'
 
 const MIN = 60 * 1000
 
+// Up to 200 rows per window, each an SMS or email round trip. The platform
+// default would cut a busy tick off mid-loop.
+export const maxDuration = 60
+
 /**
  * Which settings.reminders key governs a row. Settings → Reminders writes
  * r{type}_{channel} for the client column ("r24h_sms") and o{type}_{channel}
@@ -138,6 +142,25 @@ export async function GET(request: Request) {
     const tenantMap = new Map(tenants?.map(t => [t.id, t]) || [])
 
     for (const reminder of reminders) {
+      // Claim the row before touching it. The cron ticks every 10 minutes
+      // with windows wider than that and no claim, so a slow run or a Vercel
+      // retry overlapping the next tick sent the same reminder twice. The
+      // status CHECK only allows pending/sent/failed/skipped, so the claim
+      // is "pending → sent" up front; a send that then fails rewrites it to
+      // failed. A crash between claim and send leaves a row marked sent that
+      // wasn't — rarer, and cheaper, than duplicate texts billed per message.
+      const { data: claimed, error: claimErr } = await supabase
+        .from('appointment_reminders')
+        .update({ status: 'sent', sent_at: new Date().toISOString(), error: null })
+        .eq('id', reminder.id)
+        .eq('status', 'pending')
+        .select('id')
+      if (claimErr) {
+        console.error(`[send-reminders] claim failed for ${reminder.id}:`, claimErr.message)
+        continue
+      }
+      if (!claimed || claimed.length === 0) continue // another run has it
+
       const appointment = reminder.appointments as unknown as Record<string, unknown>
       const client = reminder.clients as unknown as Record<string, unknown>
       const tenant = tenantMap.get(reminder.tenant_id)
