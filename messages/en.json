@@ -206,7 +206,9 @@
     "seriesFailed": "Could not book the series",
     "seriesNoneBooked": "None of the dates were free. Try a different time.",
     "noShowMarked": "Marked as no-show",
-    "noShowFailed": "Could not mark as no-show"
+    "noShowFailed": "Could not mark as no-show",
+    "waitingForDay": "{n, plural, one {1 client waiting} other {# clients waiting}} for an opening this day",
+    "bookWaiting": "Book"
   },
   "overviewPage": {
     "goodMorning": "Good morning",
@@ -580,6 +582,11 @@
     "poweredBy": "Powered by",
     "slotTaken": "Sorry, that time slot was just booked by someone else. Please choose another time.",
     "bookingFailed": "Booking failed. Please try again.",
-    "networkError": "Network error. Please try again."
+    "networkError": "Network error. Please try again.",
+    "waitlistTitle": "Want this day?",
+    "waitlistText": "Leave your number and we'll text you if a spot opens up.",
+    "waitlistSubmit": "Notify me",
+    "waitlistDone": "You're on the list. We'll text you if this day opens up.",
+    "waitlistFailed": "Couldn't add you to the list. Please try again."
   }
 }

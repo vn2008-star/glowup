@@ -206,7 +206,9 @@
     "seriesFailed": "No se pudo reservar la serie",
     "seriesNoneBooked": "Ninguna fecha estaba libre. Prueba otra hora.",
     "noShowMarked": "Marcada como ausencia",
-    "noShowFailed": "No se pudo marcar la ausencia"
+    "noShowFailed": "No se pudo marcar la ausencia",
+    "waitingForDay": "{n, plural, one {1 cliente en espera} other {# clientes en espera}} de un hueco este día",
+    "bookWaiting": "Reservar"
   },
   "overviewPage": {
     "goodMorning": "Buenos días",
@@ -580,6 +582,11 @@
     "poweredBy": "Con tecnología de",
     "slotTaken": "Lo sentimos, alguien acaba de reservar esa hora. Elige otra.",
     "bookingFailed": "No se pudo completar la reserva. Inténtalo de nuevo.",
-    "networkError": "Error de conexión. Inténtalo de nuevo."
+    "networkError": "Error de conexión. Inténtalo de nuevo.",
+    "waitlistTitle": "¿Quieres este día?",
+    "waitlistText": "Déjanos tu número y te avisaremos por SMS si se libera un hueco.",
+    "waitlistSubmit": "Avísame",
+    "waitlistDone": "Estás en la lista. Te avisaremos si se libera este día.",
+    "waitlistFailed": "No pudimos añadirte a la lista. Inténtalo de nuevo."
   }
 }

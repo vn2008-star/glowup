@@ -66,6 +66,9 @@ export default function BookingClient({ slug, initialData = null, initialError =
   // Default UNCHECKED — the client must actively opt in (Twilio/CTIA best
   // practice). Booking still works if left unchecked; we just won't text them.
   const [smsConsent, setSmsConsent] = useState(false)
+  // "Notify me if a spot opens" on a full day: the date it was submitted for
+  const [waitlistDone, setWaitlistDone] = useState<string | null>(null)
+  const [waitlistSaving, setWaitlistSaving] = useState(false)
 
   // Helper: get staff assigned to a specific service (null = Any Available)
   const getStaffForService = (serviceId: string): StaffInfo | null => staffByService[serviceId] ?? null
@@ -791,7 +794,49 @@ export default function BookingClient({ slug, initialData = null, initialError =
                 <>
                   <h3 className={styles.timeSectionTitle}>{t('availableTimes')}</h3>
                   {timeSlots.length === 0 ? (
-                    <p className={styles.noSlots}>{t('noSlots')}</p>
+                    <div className={styles.noSlotsBox}>
+                      <p className={styles.noSlots}>{t('noSlots')}</p>
+                      {/* The day is full: take a number and text them if it opens up */}
+                      {waitlistDone === selectedDate ? (
+                        <p className={styles.waitlistDone}>{t('waitlistDone')}</p>
+                      ) : (
+                        <form
+                          className={styles.waitlistForm}
+                          onSubmit={async (e) => {
+                            e.preventDefault()
+                            if (!clientName.trim() || !clientPhone.trim() || waitlistSaving) return
+                            setWaitlistSaving(true)
+                            try {
+                              const res = await fetch('/api/public-waitlist', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  slug,
+                                  client_name: clientName.trim(),
+                                  client_phone: clientPhone.trim(),
+                                  service_id: selectedServices[0]?.id || null,
+                                  staff_id: primaryStaff?.id || null,
+                                  preferred_date: selectedDate,
+                                }),
+                              })
+                              if (res.ok) setWaitlistDone(selectedDate)
+                              else toast.error(t('waitlistFailed'))
+                            } catch { toast.error(t('networkError')) }
+                            setWaitlistSaving(false)
+                          }}
+                        >
+                          <p className={styles.waitlistTitle}>{t('waitlistTitle')}</p>
+                          <p className={styles.waitlistText}>{t('waitlistText')}</p>
+                          <div className={styles.waitlistFields}>
+                            <input type="text" value={clientName} onChange={e => setClientName(e.target.value)} placeholder={t('fullName')} aria-label={t('fullName')} required />
+                            <input type="tel" value={clientPhone} onChange={e => setClientPhone(formatPhone(e.target.value))} placeholder={t('phone')} aria-label={t('phone')} required />
+                            <button type="submit" className={styles.nextBtn} disabled={waitlistSaving || !clientName.trim() || !clientPhone.trim()}>
+                              {waitlistSaving ? '…' : t('waitlistSubmit')}
+                            </button>
+                          </div>
+                        </form>
+                      )}
+                    </div>
                   ) : (
                     <div className={styles.timeGrid}>
                       {timeSlots.map(t => (

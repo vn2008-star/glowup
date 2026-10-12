@@ -141,6 +141,17 @@ export async function POST(request: Request) {
   if (!slug || !client_name?.trim()) {
     return NextResponse.json({ error: 'Missing required fields (slug, client_name)' }, { status: 400 })
   }
+  // Optional future date ("tell me if Saturday opens up"); today otherwise.
+  // Capped at 90 days so a typo can't park a row a year out.
+  const todayUtc = new Date().toISOString().slice(0, 10)
+  let preferredDate = todayUtc
+  if (typeof body.preferred_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.preferred_date)) {
+    const daysOut = Math.round((Date.parse(body.preferred_date) - Date.parse(todayUtc)) / 86400000)
+    if (daysOut < -1 || daysOut > 90) {
+      return NextResponse.json({ error: 'Pick a date within the next 90 days' }, { status: 400 })
+    }
+    preferredDate = body.preferred_date
+  }
 
   // Resolve tenant
   const { data: tenant } = await svc
@@ -229,7 +240,9 @@ export async function POST(request: Request) {
       service_id: service_id || null,
       staff_id: staff_id || null, // null = "Any Staff"
       status: 'waiting',
-      preferred_date: new Date().toISOString().slice(0, 10),
+      // Today's walk-in queue by default; the booking page sends a future
+      // date when a client asks to hear about an opening on a full day.
+      preferred_date: preferredDate,
     })
     .select('id, created_at')
     .single()

@@ -206,7 +206,9 @@
     "seriesFailed": "无法创建重复预约",
     "seriesNoneBooked": "没有空闲的日期，请换个时间。",
     "noShowMarked": "已标记为爽约",
-    "noShowFailed": "无法标记爽约"
+    "noShowFailed": "无法标记爽约",
+    "waitingForDay": "{n} 位客户在等这一天的空位",
+    "bookWaiting": "预约"
   },
   "overviewPage": {
     "goodMorning": "早上好",
@@ -580,6 +582,11 @@
     "poweredBy": "技术支持",
     "slotTaken": "抱歉，该时段刚被他人预约，请选择其他时间。",
     "bookingFailed": "预约失败，请重试。",
-    "networkError": "网络错误，请重试。"
+    "networkError": "网络错误，请重试。",
+    "waitlistTitle": "想要这一天？",
+    "waitlistText": "留下电话，如有空位我们会短信通知您。",
+    "waitlistSubmit": "通知我",
+    "waitlistDone": "已加入等候名单。这一天有空位时我们会短信通知您。",
+    "waitlistFailed": "无法加入名单，请重试。"
   }
 }

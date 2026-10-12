@@ -13,6 +13,7 @@ import { getDashboardOverview } from '@/lib/overview-query'
 import { getClientsList, getCalendarLoad } from '@/lib/dashboard-queries'
 import { toE164 } from '@/lib/utils'
 import { dayRangeInTz, todayInTz, payPeriodInTz, partsInTz, daysInMonth, localToUTC, addDays } from '@/lib/tz'
+import { notifyWaitlistForOpening } from '@/lib/waitlist-openings'
 import { scryptSync, randomBytes, timingSafeEqual } from 'node:crypto'
 
 // ─── Front Desk PINs ───
@@ -1379,6 +1380,21 @@ export async function POST(request: Request) {
             .eq('appointment_id', data.id)
             .eq('status', 'pending')
 
+          // Anyone waiting for this day hears a spot opened
+          const openingNotify = (async () => {
+            try {
+              const { data: tr } = await svc.from('tenants').select('name, slug, timezone, address, settings').eq('id', tenantId).single()
+              const row = data as unknown as { start_time: string; staff_id: string | null }
+              await notifyWaitlistForOpening(svc, tenantId, {
+                dateStr: partsInTz(row.start_time, resolveTenantTz(tr)).dateStr,
+                staffId: row.staff_id,
+                tenantName: tr?.name || 'the salon',
+                slug: tr?.slug || null,
+              })
+            } catch (err) { console.error('[appointments.cancel] waitlist notify error:', err) }
+          })()
+          try { waitUntil(openingNotify) } catch { /* local dev */ }
+
           const apt = data as unknown as {
             id: string; client_id: string | null; start_time: string; end_time: string
             client: { first_name?: string; last_name?: string; phone?: string | null; email?: string | null; sms_opt_out?: boolean } | null
@@ -1980,14 +1996,21 @@ export async function POST(request: Request) {
       // ─── WAITLIST ───
       case 'waitlist.list': {
         const tz = await fetchTenantTz(svc, tenantId)
-        const todayStart = dayRangeInTz(todayInTz(tz), tz).start
-        const { data, error } = await svc
+        const today = todayInTz(tz)
+        // { date } = everyone waiting for THAT day (calendar day view);
+        // otherwise today's queue: walk-ins added today plus anyone who
+        // asked, earlier, to hear about an opening today.
+        const forDate = typeof payload?.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(payload.date) ? payload.date : null
+        let q = svc
           .from('waitlist')
           .select('*, client:clients(id, first_name, last_name, phone, email), service:services(id, name, price), staff_member:staff!staff_id(id, name)')
           .eq('tenant_id', tenantId)
           .eq('status', 'waiting')
-          .gte('created_at', todayStart)
           .order('created_at', { ascending: true })
+        q = forDate
+          ? q.eq('preferred_date', forDate)
+          : q.or(`preferred_date.eq.${today},and(preferred_date.is.null,created_at.gte.${dayRangeInTz(today, tz).start})`)
+        const { data, error } = await q
         return NextResponse.json({ data, error: error?.message })
       }
 

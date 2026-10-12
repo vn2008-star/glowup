@@ -206,7 +206,9 @@
     "seriesFailed": "Không thể đặt chuỗi lịch hẹn",
     "seriesNoneBooked": "Không có ngày nào trống. Hãy thử giờ khác.",
     "noShowMarked": "Đã đánh dấu vắng mặt",
-    "noShowFailed": "Không thể đánh dấu vắng mặt"
+    "noShowFailed": "Không thể đánh dấu vắng mặt",
+    "waitingForDay": "{n} khách đang chờ chỗ trống ngày này",
+    "bookWaiting": "Đặt lịch"
   },
   "overviewPage": {
     "goodMorning": "Chào buổi sáng",
@@ -580,6 +582,11 @@
     "poweredBy": "Cung cấp bởi",
     "slotTaken": "Rất tiếc, khung giờ này vừa có người đặt. Vui lòng chọn giờ khác.",
     "bookingFailed": "Đặt lịch không thành công. Vui lòng thử lại.",
-    "networkError": "Lỗi kết nối. Vui lòng thử lại."
+    "networkError": "Lỗi kết nối. Vui lòng thử lại.",
+    "waitlistTitle": "Muốn đặt ngày này?",
+    "waitlistText": "Để lại số điện thoại, chúng tôi sẽ nhắn tin nếu có chỗ trống.",
+    "waitlistSubmit": "Báo cho tôi",
+    "waitlistDone": "Bạn đã trong danh sách chờ. Chúng tôi sẽ nhắn tin nếu ngày này có chỗ.",
+    "waitlistFailed": "Không thể thêm bạn vào danh sách. Vui lòng thử lại."
   }
 }

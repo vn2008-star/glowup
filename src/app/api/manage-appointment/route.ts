@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server'
+import { waitUntil } from '@vercel/functions'
 import { createClient } from '@supabase/supabase-js'
 import { toE164 } from '@/lib/utils'
-import { formatDateInTz, formatInTz } from '@/lib/tz'
+import { formatDateInTz, formatInTz, partsInTz } from '@/lib/tz'
+import { notifyWaitlistForOpening } from '@/lib/waitlist-openings'
 import { isBusinessClosedOnDate, isStaffOffOnDate, type CustomClosedDate } from '@/lib/schedule-utils'
 import { resolveTenantTz, resolveSpecialInstructions, appendInstructionsToSms, buildReminderRows, insertReminderRows, resolveBookingBufferMinutes, padBookedSlot, resolveCancellationPolicy, cancellationBlockedReason } from '@/lib/notifications'
 import { siteBaseUrl } from '@/lib/site-url'
@@ -201,6 +203,20 @@ export async function PATCH(request: Request) {
     if (updateErr) {
       return NextResponse.json({ error: 'Failed to cancel appointment' }, { status: 500 })
     }
+
+    // The freed day may have clients waiting for it
+    const openingNotify = (async () => {
+      try {
+        const { data: tr } = await svc.from('tenants').select('name, slug, timezone, address, settings').eq('id', apt.tenant_id).single()
+        await notifyWaitlistForOpening(svc, apt.tenant_id, {
+          dateStr: partsInTz(apt.start_time, resolveTenantTz(tr)).dateStr,
+          staffId: apt.staff_id,
+          tenantName: tr?.name || 'the salon',
+          slug: tr?.slug || null,
+        })
+      } catch (err) { console.error('[manage-appointment] waitlist notify error:', err) }
+    })()
+    try { waitUntil(openingNotify) } catch { /* local dev */ }
 
     // Cancel pending reminders
     await svc

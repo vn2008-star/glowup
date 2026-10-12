@@ -57,6 +57,18 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
   // Appointment length in minutes when it differs from the service's standard
   // duration (ran long, extra time added). null = use the service duration.
   const [durationMin, setDurationMin] = useState<number | null>(null);
+  // Clients waiting for an opening on the day being viewed (day view only)
+  type WaitingRow = { id: string; client_id: string | null; service_id: string | null; staff_id: string | null; client: { first_name: string; last_name?: string | null } | null };
+  const [waitingForDay, setWaitingForDay] = useState<WaitingRow[]>([]);
+  useEffect(() => {
+    if (view !== "day" || !tenant) { setWaitingForDay([]); return; }
+    let cancelled = false;
+    cachedQuery<WaitingRow[]>("waitlist.list", { date: toDateStr(selectedDate) }).then((res) => {
+      if (!cancelled) setWaitingForDay(res.data || []);
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, selectedDate, tenant]);
   // Standing appointment: every N weeks (0 = single booking), M visits total
   const [repeatWeeks, setRepeatWeeks] = useState(0);
   const [repeatCount, setRepeatCount] = useState(6);
@@ -695,6 +707,35 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
             </button>
           </div>
+          {/* Clients who asked to hear about an opening on this day */}
+          {view === "day" && waitingForDay.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "var(--space-2)", marginTop: "var(--space-2)", fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>
+              <span>{t("waitingForDay", { n: waitingForDay.length })}:</span>
+              {waitingForDay.map((w) => (
+                <span key={w.id} className="badge badge-warning" style={{ gap: 6 }}>
+                  {w.client ? `${w.client.first_name} ${w.client.last_name || ""}`.trim() : "Walk-in"}
+                  {w.client_id && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      style={{ padding: "0 6px", minHeight: 0 }}
+                      onClick={() => {
+                        setEditingApt(null);
+                        setFormData({ client_id: w.client_id || "", service_id: w.service_id || "", staff_id: w.staff_id || "", start_time: `${toDateStr(selectedDate)}T09:00`, notes: "" });
+                        setClientSearch(w.client ? `${w.client.first_name} ${w.client.last_name || ""}`.trim() : "");
+                        setClientDropdownOpen(false);
+                        setDurationMin(null);
+                        setRepeatWeeks(0);
+                        setShowModal(true);
+                      }}
+                    >
+                      {t("bookWaiting")}
+                    </button>
+                  )}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
         <div className={styles.headerRight}>
           {/* Client lookup */}
