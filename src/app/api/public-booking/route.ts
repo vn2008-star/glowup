@@ -3,7 +3,7 @@ import { waitUntil } from '@vercel/functions'
 import { createClient } from '@supabase/supabase-js'
 import { timezoneFromAddress, DEFAULT_TZ } from '@/lib/tz'
 import { toE164 } from '@/lib/utils'
-import { resolveTenantTz, resolveSpecialInstructions, resolveOwnerCopyEmail, sendOwnerCopy,appendInstructionsToSms, buildReminderRows, insertReminderRows, resolveBookingBufferMinutes, padBookedSlot } from '@/lib/notifications'
+import { resolveTenantTz, resolveSpecialInstructions, resolveOwnerCopyEmail, sendOwnerCopy, ownerCc, appendInstructionsToSms, buildReminderRows, insertReminderRows, resolveBookingBufferMinutes, padBookedSlot } from '@/lib/notifications'
 import { sendSms, smsProvider, smsConfigFromSettings } from '@/lib/sms'
 import { bookingConfirmationHtml, promoEmailHtml, googleCalendarUrl } from '@/lib/email-templates'
 
@@ -626,6 +626,7 @@ async function sendBookingConfirmations(opts: {
           from: `${businessName} <bookings@joinglowup.org>`,
           replyTo: businessEmail || undefined,
           to: [clientEmail],
+          cc: ownerCc(ownerCopyEmail, clientEmail),
           subject: clientSubject,
           html: clientEmailHtml,
         })
@@ -636,7 +637,8 @@ async function sendBookingConfirmations(opts: {
     } else if (clientEmail) {
       console.log(`[DRY RUN] Client email to ${clientEmail}`)
     }
-    if (resendClient && ownerCopyEmail) {
+    // No client email → nothing to CC onto, so the owner gets a standalone copy.
+    if (resendClient && ownerCopyEmail && !clientEmail) {
       await sendOwnerCopy(ownerCopyEmail, clientSubject, clientEmailHtml, clientName, clientEmail)
     }
   }
@@ -670,8 +672,10 @@ async function sendBookingConfirmations(opts: {
 
   // ── 4. Email to business owner ──
   // Use tenant email column, or fall back to settings
+  // Skipped when the owner already got the confirmation itself (CC or copy) —
+  // otherwise every booking lands in their inbox twice.
   const ownerEmail = businessEmail || (tenantSettings.owner_email as string) || (tenantSettings.email as string) || null
-  if (ownerEmail) {
+  if (ownerEmail && !ownerCopyEmail) {
     const ownerEmailBody = [
       `New online booking received!`,
       ``,

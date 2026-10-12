@@ -90,7 +90,19 @@ export function resolveOwnerCopyEmail(tenant: {
   return tenant?.email || (settings.owner_email as string) || fallbackEmail || null
 }
 
-/** Mail the owner a copy of an email that went (or would have gone) to a client. */
+/**
+ * CC list for a client email when the salon opted into owner copies. The
+ * owner rides along on the client's own email instead of getting a separate
+ * "Copy" — one email, and Reply All reaches both. Undefined when there's no client
+ * address (use sendOwnerCopy then) or the client IS the owner.
+ */
+export function ownerCc(ownerCopyEmail: string | null | undefined, clientEmail: string | null | undefined): string[] | undefined {
+  if (!ownerCopyEmail || !clientEmail) return undefined
+  if (ownerCopyEmail.trim().toLowerCase() === clientEmail.trim().toLowerCase()) return undefined
+  return [ownerCopyEmail]
+}
+
+/** Mail the owner a copy of an email that would have gone to a client with no email on file. */
 export async function sendOwnerCopy(
   to: string, subject: string, html: string, clientName: string, clientEmail: string | null,
 ): Promise<void> {
@@ -432,6 +444,7 @@ export async function sendClientBookingConfirmation(opts: {
         from: `${businessName} <bookings@joinglowup.org>`,
         replyTo: businessEmail || undefined,
         to: [clientEmail],
+        cc: ownerCc(ownerCopyEmail, clientEmail),
         subject,
         html,
       })
@@ -442,7 +455,8 @@ export async function sendClientBookingConfirmation(opts: {
   } else if (clientEmail) {
     console.log(`[notifications] [DRY RUN] Client email to ${clientEmail}`)
   }
-  if (ownerCopyEmail && process.env.RESEND_API_KEY) {
+  // No client email → nothing to CC onto, so the owner gets a standalone copy.
+  if (ownerCopyEmail && !clientEmail && process.env.RESEND_API_KEY) {
     await sendOwnerCopy(ownerCopyEmail, subject, html, clientName, clientEmail)
   }
 }
@@ -621,6 +635,7 @@ export async function sendClientChangeNotice(opts: {
         from: `${businessName} <bookings@joinglowup.org>`,
         replyTo: businessEmail || undefined,
         to: [clientEmail],
+        cc: ownerCc(ownerCopyEmail, clientEmail),
         subject,
         html,
       })
@@ -628,7 +643,7 @@ export async function sendClientChangeNotice(opts: {
       console.error(`[notifications] ${type} email to client failed:`, err)
     }
   }
-  if (ownerCopyEmail && process.env.RESEND_API_KEY) {
+  if (ownerCopyEmail && !clientEmail && process.env.RESEND_API_KEY) {
     await sendOwnerCopy(ownerCopyEmail, subject, html, clientName, clientEmail)
   }
 }

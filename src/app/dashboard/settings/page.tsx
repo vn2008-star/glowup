@@ -1104,14 +1104,14 @@ export default function SettingsPage() {
             <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
             <span>📅 Daily schedule digest (owner & staff)</span>
           </label>
-          <label className={styles.protectionToggle} title="You get the same confirmation, reschedule and cancellation emails your clients get, calendar buttons included">
+          <label className={styles.protectionToggle} title="You are CC'd on the confirmation, reschedule and cancellation emails your clients get (it replaces the separate New Booking email)">
             <input
               type="checkbox"
               checked={staffReminderSettings.owner_copies}
               onChange={(e) => setStaffReminderSettings({ ...staffReminderSettings, owner_copies: e.target.checked })}
             />
             <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
-            <span>📨 Email me a copy of client confirmations & changes</span>
+            <span>📨 CC me on client confirmations & changes</span>
           </label>
         </div>
 
