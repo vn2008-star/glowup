@@ -273,8 +273,8 @@ export default function SettingsPage() {
   // Fetch client count for cost estimator
   useEffect(() => {
     if (!tenant) return;
-    cachedQuery<{ id: string }[]>("clients.list").then(({ data }) => {
-      setClientCount(data?.length || 0);
+    cachedQuery<{ count: number }>("clients.count").then(({ data }) => {
+      setClientCount(data?.count || 0);
     });
     cachedQuery<{ id: string }[]>("staff.list").then(({ data }) => {
       setStaffCount(data?.length || 0);
@@ -416,7 +416,7 @@ export default function SettingsPage() {
             {logoUrl ? (
               <div className={styles.logoPreview}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={logoUrl} alt="Business logo" />
+                <img loading="lazy" decoding="async" src={logoUrl} alt="Business logo" />
                 <div className={styles.logoOverlay}>Change</div>
               </div>
             ) : (
@@ -974,7 +974,7 @@ export default function SettingsPage() {
                 {paymentQr.venmo_qr ? (
                   <div className={styles.qrPreviewWrap}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={paymentQr.venmo_qr} alt="Venmo QR" className={styles.qrPreviewImg} />
+                    <img loading="lazy" decoding="async" src={paymentQr.venmo_qr} alt="Venmo QR" className={styles.qrPreviewImg} />
                     <div className={styles.qrPreviewOverlay}>Change</div>
                   </div>
                 ) : (
@@ -1030,7 +1030,7 @@ export default function SettingsPage() {
                 {paymentQr.zelle_qr ? (
                   <div className={styles.qrPreviewWrap}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={paymentQr.zelle_qr} alt="Zelle QR" className={styles.qrPreviewImg} />
+                    <img loading="lazy" decoding="async" src={paymentQr.zelle_qr} alt="Zelle QR" className={styles.qrPreviewImg} />
                     <div className={styles.qrPreviewOverlay}>Change</div>
                   </div>
                 ) : (

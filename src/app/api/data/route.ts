@@ -121,6 +121,10 @@ const GIFT_CARD_WRITABLE = [
   'purchaser_name', 'purchaser_email', 'recipient_name', 'recipient_email', 'message', 'expires_at',
 ] as const
 
+// What a CSV import row may set. Everything else (loyalty_points,
+// lifetime_spend, visit_count, status) is computed.
+const CLIENT_IMPORT_WRITABLE = ['first_name', 'last_name', 'phone', 'email', 'birthday', 'notes'] as const
+
 // Owner/manager only. Money, reports, the catalog, marketing, settings, and
 // anything that deletes a record or messages clients at the salon's cost.
 const MANAGEMENT_ACTIONS = new Set([
@@ -709,6 +713,58 @@ export async function POST(request: Request) {
           },
           error: error?.message,
         })
+      }
+
+      // Just the number. Settings and Quick Start used to pull 200 client rows
+      // (with contact masking) to show a count.
+      case 'clients.count': {
+        const { count, error } = await svc
+          .from('clients')
+          .select('id', { count: 'exact', head: true })
+          .eq('tenant_id', tenantId)
+        return NextResponse.json({ data: { count: count || 0 }, error: error?.message })
+      }
+
+      // CSV import. One request per row took minutes for a few hundred clients
+      // and re-importing the same file duplicated everyone; this inserts in
+      // one statement and skips rows whose phone or email is already on file.
+      case 'clients.bulkAdd': {
+        const rows = Array.isArray(payload?.clients) ? payload.clients.slice(0, 500) : []
+        if (rows.length === 0) return NextResponse.json({ data: { added: 0, skipped: 0, clients: [] } })
+        const { data: existing } = await svc
+          .from('clients')
+          .select('phone, email')
+          .eq('tenant_id', tenantId)
+          .limit(5000)
+        const seenPhones = new Set((existing || []).map(c => (c.phone || '').replace(/\D/g, '')).filter(p => p.length >= 7))
+        const seenEmails = new Set((existing || []).map(c => (c.email || '').toLowerCase()).filter(Boolean))
+        const toInsert: Record<string, unknown>[] = []
+        let skipped = 0
+        for (const raw of rows) {
+          const r = pickWritable(raw || {}, CLIENT_IMPORT_WRITABLE)
+          const first = String(r.first_name || '').trim()
+          if (!first) { skipped++; continue }
+          const phone = String(r.phone || '').trim()
+          const email = String(r.email || '').trim().toLowerCase()
+          const digits = phone.replace(/\D/g, '')
+          if ((digits.length >= 7 && seenPhones.has(digits)) || (email && seenEmails.has(email))) { skipped++; continue }
+          if (digits.length >= 7) seenPhones.add(digits)
+          if (email) seenEmails.add(email)
+          toInsert.push({
+            tenant_id: tenantId,
+            first_name: first,
+            last_name: String(r.last_name || '').trim() || null,
+            phone: phone || null,
+            email: email || null,
+            birthday: typeof r.birthday === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.birthday) ? r.birthday : null,
+            notes: String(r.notes || '').trim() || null,
+            status: 'active',
+          })
+        }
+        if (toInsert.length === 0) return NextResponse.json({ data: { added: 0, skipped, clients: [] } })
+        const { data, error } = await svc.from('clients').insert(toInsert).select()
+        if (error) return NextResponse.json({ data: null, error: error.message })
+        return NextResponse.json({ data: { added: data?.length || 0, skipped, clients: data || [] } })
       }
 
       case 'clients.add': {

@@ -169,7 +169,7 @@ export default function QuickStartPage() {
     tenant: (tenant as unknown as Record<string, unknown>) ?? null,
     staffCount: cached<{ id: string }[]>("staff.list")?.length ?? 0,
     serviceCount: cached<{ id: string }[]>("services.list")?.length ?? 0,
-    clientCount: cached<{ id: string }[]>("clients.list")?.length ?? 0,
+    clientCount: cached<{ count: number }>("clients.count")?.count ?? 0,
   }));
   const [loading, setLoading] = useState(() => cached("staff.list") === undefined);
 
@@ -187,14 +187,14 @@ export default function QuickStartPage() {
     const [staffRes, serviceRes, clientRes] = await Promise.all([
       cachedQuery<{ id: string }[]>("staff.list"),
       cachedQuery<{ id: string }[]>("services.list"),
-      cachedQuery<{ id: string }[]>("clients.list"),
+      cachedQuery<{ count: number }>("clients.count"),
     ]);
 
     setSetupCtx({
       tenant: tenant as unknown as Record<string, unknown>,
       staffCount: staffRes.data?.length || 0,
       serviceCount: serviceRes.data?.length || 0,
-      clientCount: clientRes.data?.length || 0,
+      clientCount: clientRes.data?.count || 0,
     });
     setLoading(false);
   }, [tenant]);

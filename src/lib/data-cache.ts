@@ -38,6 +38,7 @@ const READ_ACTIONS = new Set([
   'charges.list',
   'clients.birthdays',
   'clients.history',
+  'clients.count',
   'clients.list',
   'clients.search',
   'conversations.list',
@@ -63,6 +64,7 @@ const READ_ACTIONS = new Set([
   'services.list',
   'social.list',
   'staff.list',
+  'staff.verify-pin', // a read: treating it as a write dropped the staff cache on every PIN entry
   'waitlist.list',
 ]);
 

@@ -276,6 +276,10 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
     let added = 0;
     let skipped = 0;
 
+    // Build every row first, then insert in batches of 200. One request per
+    // row took minutes for a few hundred clients, and re-importing the same
+    // file duplicated everyone; the server now skips phones/emails on file.
+    const rows: Record<string, string>[] = [];
     for (const row of importData) {
       let firstName = firstNameCol ? row[firstNameCol] : '';
       let lastName = lastNameCol ? row[lastNameCol] : '';
@@ -289,27 +293,30 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
 
       if (!firstName) { skipped++; continue; }
 
-      const clientPayload = {
+      rows.push({
         first_name: firstName,
         last_name: lastName || '',
         phone: phoneCol ? row[phoneCol] : '',
         email: emailCol ? row[emailCol] : '',
         birthday: birthdayCol ? row[birthdayCol] : '',
         notes: notesCol ? row[notesCol] : '',
-        status: 'active' as const,
-      };
+      });
+    }
 
-      const { data } = await queryData<Client>('clients.add', clientPayload);
-      if (data) {
-        added++;
-        setClients(prev => [data, ...prev]);
-      } else {
-        skipped++;
-      }
+    let failed: string | null = null;
+    for (let i = 0; i < rows.length; i += 200) {
+      const { data, error } = await queryData<{ added: number; skipped: number; clients: Client[] }>(
+        'clients.bulkAdd', { clients: rows.slice(i, i + 200) }
+      );
+      if (error || !data) { failed = error || 'Import failed'; break; }
+      added += data.added;
+      skipped += data.skipped;
+      if (data.clients.length) setClients(prev => [...data.clients, ...prev]);
     }
 
     setImportResult({ added, skipped });
     setImportLoading(false);
+    if (failed) alert(`Import stopped: ${failed}. ${added} client(s) were added before the error.`);
   }
 
   async function handleDeleteClient(id: string) {
@@ -648,7 +655,7 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
                   <td style={{ padding: '10px 12px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       {c.photo_url ? (
-                        <img src={c.photo_url} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />
+                        <img loading="lazy" decoding="async" src={c.photo_url} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />
                       ) : (
                         <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--color-primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 700, flexShrink: 0 }}>
                           {c.first_name[0]}{c.last_name?.[0] || ''}
@@ -700,7 +707,7 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
                   onClick={(e) => e.stopPropagation()}
                 />
                 {c.photo_url ? (
-                  <img src={c.photo_url} alt="" className={styles.clientAvatarImg} />
+                  <img loading="lazy" decoding="async" src={c.photo_url} alt="" className={styles.clientAvatarImg} />
                 ) : (
                   <div className={styles.clientAvatar}>{c.first_name[0]}{c.last_name?.[0] || ""}</div>
                 )}
@@ -743,7 +750,7 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
               <div className={styles.photoUpload}>
                 <label className={styles.photoUploadLabel}>
                   {photoPreview ? (
-                    <img src={photoPreview} alt="Preview" className={styles.photoPreviewImg} />
+                    <img loading="lazy" decoding="async" src={photoPreview} alt="Preview" className={styles.photoPreviewImg} />
                   ) : (
                     <div className={styles.photoPlaceholder}>
                       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
@@ -797,7 +804,7 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
               <div className={styles.photoUpload}>
                 <label className={styles.photoUploadLabel}>
                   {editPhotoPreview ? (
-                    <img src={editPhotoPreview} alt="Preview" className={styles.photoPreviewImg} />
+                    <img loading="lazy" decoding="async" src={editPhotoPreview} alt="Preview" className={styles.photoPreviewImg} />
                   ) : (
                     <div className={styles.photoPlaceholder}>
                       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
@@ -897,7 +904,7 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
             <div className={styles.profileHeader}>
               <div className={styles.profileAvatar}>
                 {selectedClient.photo_url ? (
-                  <img src={selectedClient.photo_url} alt="" className={styles.profileAvatarImg} />
+                  <img loading="lazy" decoding="async" src={selectedClient.photo_url} alt="" className={styles.profileAvatarImg} />
                 ) : (
                   <>{selectedClient.first_name[0]}{selectedClient.last_name?.[0] || ""}</>
                 )}

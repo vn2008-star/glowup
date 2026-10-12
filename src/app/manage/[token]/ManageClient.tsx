@@ -32,30 +32,45 @@ interface BusinessData {
 
 type ViewState = "details" | "cancel-confirm" | "reschedule" | "cancelled" | "rescheduled";
 
-export default function ManageClient({ token }: { token: string }) {
-  const [appointment, setAppointment] = useState<AppointmentData | null>(null);
-  const [business, setBusiness] = useState<BusinessData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [view, setView] = useState<ViewState>("details");
+/** What GET /api/manage-appointment returns; the server page passes it in as initialData. */
+export interface ManagePayload {
+  appointment: AppointmentData;
+  business: BusinessData | null;
+  staffSchedule?: Record<string, unknown> | null;
+  bookedSlots?: { start: string; end: string }[];
+  cancellation?: { cutoffHours: number; blockedReason: string | null };
+}
+
+export default function ManageClient({ token, initialData = null, initialError = null }: {
+  token: string;
+  /** Server-prefetched payload; when present the mount fetch is skipped */
+  initialData?: ManagePayload | null;
+  initialError?: string | null;
+}) {
+  const [appointment, setAppointment] = useState<AppointmentData | null>(initialData?.appointment ?? null);
+  const [business, setBusiness] = useState<BusinessData | null>(initialData?.business ?? null);
+  const [loading, setLoading] = useState(!initialData && !initialError);
+  const [error, setError] = useState<string | null>(initialError);
+  const [view, setView] = useState<ViewState>(initialData?.appointment?.status === "cancelled" ? "cancelled" : "details");
   const [actionLoading, setActionLoading] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
 
   // Staff schedule & booked slots for reschedule calendar
-  const [staffSchedule, setStaffSchedule] = useState<Record<string, unknown> | null>(null);
-  const [bookedSlots, setBookedSlots] = useState<{ start: string; end: string }[]>([]);
+  const [staffSchedule, setStaffSchedule] = useState<Record<string, unknown> | null>(initialData?.staffSchedule ?? null);
+  const [bookedSlots, setBookedSlots] = useState<{ start: string; end: string }[]>(initialData?.bookedSlots ?? []);
 
   // The salon's cancellation policy, already applied to THIS appointment by the
   // API — non-null means online cancellation isn't available and says why.
-  const [cancelBlocked, setCancelBlocked] = useState<string | null>(null);
+  const [cancelBlocked, setCancelBlocked] = useState<string | null>(initialData?.cancellation?.blockedReason ?? null);
 
   // Reschedule state
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [calMonth, setCalMonth] = useState(new Date());
 
-  // Fetch appointment details
+  // Fetch appointment details (only when the server render didn't supply them)
   useEffect(() => {
+    if (initialData || initialError) return;
     async function load() {
       try {
         const res = await fetch(`/api/manage-appointment?token=${token}`);
@@ -81,7 +96,7 @@ export default function ManageClient({ token }: { token: string }) {
       setLoading(false);
     }
     load();
-  }, [token]);
+  }, [token, initialData, initialError]);
 
   // Cancel appointment
   async function handleCancel() {

@@ -513,7 +513,7 @@ export default function StaffPage() {
               <div key={s.id} className={`card ${styles.staffCard} ${!s.is_active ? styles.inactive : ""}`} onClick={() => setSelectedStaff(s)}>
                 <div className={styles.staffHeader}>
                   {s.photo_url ? (
-                    <img src={s.photo_url} alt={s.name} className={styles.staffAvatarImg} />
+                    <img loading="lazy" decoding="async" src={s.photo_url} alt={s.name} className={styles.staffAvatarImg} />
                   ) : (
                     <div className={styles.staffAvatar}>{s.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}</div>
                   )}
@@ -595,7 +595,7 @@ export default function StaffPage() {
 
               <div className={styles.profileHeader}>
                 {selectedStaff.photo_url ? (
-                  <img src={selectedStaff.photo_url} alt={selectedStaff.name} className={styles.profileAvatarImg} />
+                  <img loading="lazy" decoding="async" src={selectedStaff.photo_url} alt={selectedStaff.name} className={styles.profileAvatarImg} />
                 ) : (
                   <div className={styles.profileAvatar}>
                     {selectedStaff.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
@@ -779,7 +779,7 @@ export default function StaffPage() {
                 <div className={styles.photoUpload}>
                   <label className={styles.photoUploadLabel}>
                     {photoPreview ? (
-                      <img src={photoPreview} alt="Preview" className={styles.photoPreviewImg} />
+                      <img loading="lazy" decoding="async" src={photoPreview} alt="Preview" className={styles.photoPreviewImg} />
                     ) : (
                       <div className={styles.photoPlaceholder}>
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>

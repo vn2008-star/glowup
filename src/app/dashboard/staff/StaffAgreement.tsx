@@ -193,7 +193,7 @@ export default function StaffAgreement({ staff, onClose, onSigned }: Props) {
                   <span className={styles.signedBadge}>✓ Agreement Signed</span>
                   {agreement.signature && (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={agreement.signature} alt="Signature" />
+                    <img loading="lazy" decoding="async" src={agreement.signature} alt="Signature" />
                   )}
                   <div className={styles.signedDate}>
                     {/* signed_at is the chosen date stored as UTC midnight, so read it back in UTC or US zones show the day before */}

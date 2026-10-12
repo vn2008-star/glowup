@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
 import { useTenant } from '@/lib/tenant-context';
-import { queryData, mutateData } from '@/lib/api';
+import { queryData, cachedQuery, mutateData } from '@/lib/api';
 import { localeDateStr } from '@/lib/utils';
 import styles from './FeedbackWidget.module.css';
 
@@ -85,7 +85,7 @@ export function FeedbackWidget() {
     if (!tenant) return;
     (async () => {
       try {
-        const { data } = await queryData<FeedbackItem[]>('feedback.list', { limit: 50 });
+        const { data } = await cachedQuery<FeedbackItem[]>('feedback.list', { limit: 50 });
         if (data) {
           // Check if there are admin replies the user might not have seen
           const withReplies = data.filter(f => f.admin_notes && f.admin_notes.trim());
@@ -103,7 +103,7 @@ export function FeedbackWidget() {
     if (!tenant) return;
     setLoadingHistory(true);
     try {
-      const { data } = await queryData<FeedbackItem[]>('feedback.list', { limit: 50 });
+      const { data } = await cachedQuery<FeedbackItem[]>('feedback.list', { limit: 50 });
       setHistory(data || []);
 
       // Mark all items with admin_notes as "seen"

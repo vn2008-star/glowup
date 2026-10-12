@@ -167,7 +167,7 @@ export default function GalleryPage() {
                 <div className={styles.photoSide}>
                   {item.before_photo_urls?.[0] ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={item.before_photo_urls[0]} alt="Before" />
+                    <img loading="lazy" decoding="async" src={item.before_photo_urls[0]} alt="Before" />
                   ) : (
                     <span className={styles.noPhoto}>No photo</span>
                   )}
@@ -176,7 +176,7 @@ export default function GalleryPage() {
                 <div className={styles.photoSide}>
                   {item.after_photo_urls?.[0] ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={item.after_photo_urls[0]} alt="After" />
+                    <img loading="lazy" decoding="async" src={item.after_photo_urls[0]} alt="After" />
                   ) : (
                     <span className={styles.noPhoto}>No photo</span>
                   )}
@@ -219,7 +219,7 @@ export default function GalleryPage() {
                 <div className={styles.modalPhotoSide}>
                   {selected.before_photo_urls?.[0] ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={selected.before_photo_urls[0]} alt="Before" />
+                    <img loading="lazy" decoding="async" src={selected.before_photo_urls[0]} alt="Before" />
                   ) : (
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-tertiary)' }}>No Before Photo</div>
                   )}
@@ -228,7 +228,7 @@ export default function GalleryPage() {
                 <div className={styles.modalPhotoSide}>
                   {selected.after_photo_urls?.[0] ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={selected.after_photo_urls[0]} alt="After" />
+                    <img loading="lazy" decoding="async" src={selected.after_photo_urls[0]} alt="After" />
                   ) : (
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-tertiary)' }}>No After Photo</div>
                   )}
@@ -293,7 +293,7 @@ export default function GalleryPage() {
                   {addBefore ? (
                     <div className={styles.addPhotoPreview}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={addBefore} alt="Before" />
+                      <img loading="lazy" decoding="async" src={addBefore} alt="Before" />
                       <div className={styles.addPhotoOverlay}>Change</div>
                     </div>
                   ) : (
@@ -308,7 +308,7 @@ export default function GalleryPage() {
                   {addAfter ? (
                     <div className={styles.addPhotoPreview}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={addAfter} alt="After" />
+                      <img loading="lazy" decoding="async" src={addAfter} alt="After" />
                       <div className={styles.addPhotoOverlay}>Change</div>
                     </div>
                   ) : (

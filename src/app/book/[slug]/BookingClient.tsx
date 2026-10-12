@@ -14,23 +14,31 @@ interface StaffInfo { id: string; name: string; specialties: string[]; schedule:
 interface BookedSlot { staff_id: string | null; start: string; end: string }
 interface BusinessInfo { name: string; slug: string; phone: string | null; logo_url: string | null; address: string | null; timezone: string; hours: Record<string, { open: string; close: string; closed: boolean }> | null; advanceBookingDays?: number; closedHolidays?: string[]; customClosedDates?: CustomClosedDate[]; chatEnabled?: boolean; chatGreeting?: string | null }
 
+/** What GET /api/public-booking returns; the server page passes it in as initialData. */
+export interface BookingPayload { business: BusinessInfo; services: ServiceInfo[]; staff: StaffInfo[]; bookedSlots: BookedSlot[] }
+
 const STEPS = ['Service', 'Staff', 'Date & Time', 'Your Info', 'Confirm'] as const
 type Step = 0 | 1 | 2 | 3 | 4
 
-export default function BookingClient({ slug }: { slug: string }) {
+export default function BookingClient({ slug, initialData = null, initialError = null }: {
+  slug: string
+  /** Server-prefetched payload; when present the mount fetch is skipped */
+  initialData?: BookingPayload | null
+  initialError?: string | null
+}) {
   const [step, setStep] = useState<Step>(0)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(!initialData && !initialError)
+  const [error, setError] = useState<string | null>(initialError)
   const [submitting, setSubmitting] = useState(false)
   const [booked, setBooked] = useState(false)
   const [bookedTime, setBookedTime] = useState('')
   const [birthdaySaved, setBirthdaySaved] = useState(false)
 
-  // Data from API
-  const [business, setBusiness] = useState<BusinessInfo | null>(null)
-  const [services, setServices] = useState<ServiceInfo[]>([])
-  const [staff, setStaff] = useState<StaffInfo[]>([])
-  const [bookedSlots, setBookedSlots] = useState<BookedSlot[]>([])
+  // Data from API (seeded from the server render when available)
+  const [business, setBusiness] = useState<BusinessInfo | null>(initialData?.business ?? null)
+  const [services, setServices] = useState<ServiceInfo[]>(initialData?.services ?? [])
+  const [staff, setStaff] = useState<StaffInfo[]>(initialData?.staff ?? [])
+  const [bookedSlots, setBookedSlots] = useState<BookedSlot[]>(initialData?.bookedSlots ?? [])
 
   // Selections
   const [selectedServices, setSelectedServices] = useState<ServiceInfo[]>([])
@@ -90,8 +98,9 @@ export default function BookingClient({ slug }: { slug: string }) {
     return ` with ${names.join(' & ')}`
   }, [selectedServices, staffByService, allSameStaff, primaryStaff])
 
-  // Fetch business data
+  // Fetch business data (only when the server render didn't already supply it)
   useEffect(() => {
+    if (initialData || initialError) return
     async function load() {
       try {
         const res = await fetch(`/api/public-booking?slug=${encodeURIComponent(slug)}`)
@@ -105,7 +114,7 @@ export default function BookingClient({ slug }: { slug: string }) {
       setLoading(false)
     }
     load()
-  }, [slug])
+  }, [slug, initialData, initialError])
 
   // Re-fetch booked slots when entering date/time step to prevent stale data.
   // only=slots skips re-downloading the business/services/staff payload.
@@ -603,7 +612,7 @@ export default function BookingClient({ slug }: { slug: string }) {
                           {isInCart && <span className={styles.serviceCheck}>✓</span>}
                           {s.image_url && (
                             <div className={styles.serviceThumb}>
-                              <img src={s.image_url} alt={s.name} />
+                              <img loading="lazy" decoding="async" src={s.image_url} alt={s.name} />
                             </div>
                           )}
                           <div className={styles.serviceInfo}>

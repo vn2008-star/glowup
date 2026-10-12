@@ -112,9 +112,12 @@ export default function CheckoutPage() {
   const [claimingId, setClaimingId] = useState<string | null>(null);
 
   // ── Data fetching ──
+  // Spinner only on the very first load. Changing the date used to replace
+  // the whole grid with a spinner for every step.
+  const loadedOnce = useRef(false);
   const fetchData = useCallback(async () => {
     if (!tenant) return;
-    setLoading(true);
+    if (!loadedOnce.current) setLoading(true);
 
     const { start: dayStart, end: dayEnd } = dayRangeInTz(selectedDate, salonTz);
 
@@ -131,6 +134,7 @@ export default function CheckoutPage() {
     );
     setServices((svcRes.data || []).filter((s) => s.is_active));
     setStaffMembers(staffRes.data || []);
+    loadedOnce.current = true;
     setLoading(false);
   }, [tenant, selectedDate, salonTz]);
 
@@ -852,7 +856,7 @@ export default function CheckoutPage() {
             {tenant?.logo_url ? (
               <div className={styles.welcomeLogoWrap}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={tenant.logo_url} alt={tenant?.name || "Salon"} className={styles.welcomeLogo} />
+                <img loading="lazy" decoding="async" src={tenant.logo_url} alt={tenant?.name || "Salon"} className={styles.welcomeLogo} />
               </div>
             ) : (
               <div className={styles.welcomeLogoFallback}>✦</div>
@@ -885,7 +889,7 @@ export default function CheckoutPage() {
                   <div className={styles.welcomeCardAvatar} style={{ background: colors[i % colors.length] }}>
                     {s.photo_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={s.photo_url} alt={s.name} className={styles.welcomeCardImg} />
+                      <img loading="lazy" decoding="async" src={s.photo_url} alt={s.name} className={styles.welcomeCardImg} />
                     ) : (
                       <span className={styles.welcomeCardInitials}>{getInitials(s.name)}</span>
                     )}
@@ -1229,7 +1233,7 @@ export default function CheckoutPage() {
                 <div className={styles.avatarCircle} style={{ background: colors[i % colors.length] }}>
                   {s.photo_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={s.photo_url} alt={s.name} className={styles.avatarImg} />
+                    <img loading="lazy" decoding="async" src={s.photo_url} alt={s.name} className={styles.avatarImg} />
                   ) : (
                     getInitials(s.name)
                   )}
@@ -1428,7 +1432,7 @@ export default function CheckoutPage() {
                               <div className={styles.calColAvatar} style={{ background: color }}>
                                 {staff.photo_url ? (
                                   // eslint-disable-next-line @next/next/no-img-element
-                                  <img src={staff.photo_url} alt={staff.name} className={styles.avatarImg} />
+                                  <img loading="lazy" decoding="async" src={staff.photo_url} alt={staff.name} className={styles.avatarImg} />
                                 ) : (
                                   getInitials(staff.name)
                                 )}
@@ -1901,7 +1905,7 @@ export default function CheckoutPage() {
                           {beforePhoto ? (
                             <div className={styles.photoThumb}>
                               {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img src={beforePhoto} alt="Before" />
+                              <img loading="lazy" decoding="async" src={beforePhoto} alt="Before" />
                               <button className={styles.photoRemove} onClick={(e) => { e.preventDefault(); setBeforePhoto(null); }}>✕</button>
                             </div>
                           ) : (
@@ -1924,7 +1928,7 @@ export default function CheckoutPage() {
                           {afterPhoto ? (
                             <div className={styles.photoThumb}>
                               {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img src={afterPhoto} alt="After" />
+                              <img loading="lazy" decoding="async" src={afterPhoto} alt="After" />
                               <button className={styles.photoRemove} onClick={(e) => { e.preventDefault(); setAfterPhoto(null); }}>✕</button>
                             </div>
                           ) : (
@@ -2187,7 +2191,7 @@ export default function CheckoutPage() {
               <p className={styles.qrInstruction}>Show this QR code to the client</p>
               {qrImage ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={qrImage} alt={`${brandName} QR Code`} className={styles.qrImage} />
+                <img loading="lazy" decoding="async" src={qrImage} alt={`${brandName} QR Code`} className={styles.qrImage} />
               ) : (
                 <div className={styles.qrPlaceholder}>
                   <p>No QR code uploaded</p>

@@ -397,7 +397,7 @@ export default function ServicesPage() {
                 />
                 {formData.image_url ? (
                   <div className={styles.imagePreview}>
-                    <img src={formData.image_url} alt="Service" />
+                    <img loading="lazy" decoding="async" src={formData.image_url} alt="Service" />
                     <div className={styles.imageOverlay}>
                       <button type="button" className={styles.imageChangeBtn} onClick={() => fileInputRef.current?.click()}>
                         Change Photo
@@ -658,7 +658,7 @@ function ServiceCard({ s, getCategoryColor, openEdit, handleDelete, canMoveUp, c
       </div>
       {s.image_url && (
         <div className={styles.serviceImage}>
-          <img src={s.image_url} alt={s.name} />
+          <img loading="lazy" decoding="async" src={s.image_url} alt={s.name} />
         </div>
       )}
       <div className={styles.serviceCardBody}>

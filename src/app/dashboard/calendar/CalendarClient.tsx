@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
-import { queryData } from "@/lib/api";
+import { queryData, cachedQuery } from "@/lib/api";
 import { localToUTC, todayInTz, partsInTz, DEFAULT_TZ } from "@/lib/tz";
 import { findHolidayOnDate, isBusinessClosedOnDate, isStaffOffOnDate } from "@/lib/schedule-utils";
 import type { CustomClosedDate } from "@/lib/schedule-utils";
@@ -293,7 +293,7 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
       }
     }
 
-    const res = await queryData<{
+    const res = await cachedQuery<{
       staff: Staff[];
       services: Service[];
       appointments: FullAppointment[];
@@ -315,7 +315,7 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
   // pulling the full 20-column client table just for 🎂 markers
   useEffect(() => {
     if (!tenant || birthdayClients.length > 0) return;
-    queryData<Client[]>("clients.birthdays").then(res => {
+    cachedQuery<Client[]>("clients.birthdays").then(res => {
       setBirthdayClients((res.data || []).map(c => ({
         id: c.id, first_name: c.first_name, last_name: c.last_name, birthday: c.birthday,
       })));

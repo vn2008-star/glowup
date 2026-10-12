@@ -1,5 +1,13 @@
 import type { Metadata } from "next";
+import { Inter, Outfit, Playfair_Display } from "next/font/google";
 import "./globals.css";
+
+// Self-hosted through next/font: no render-blocking cross-origin stylesheet,
+// no FOUT, and 11 weights instead of the 24 the Google Fonts link pulled.
+// Only Inter and Playfair ship Vietnamese glyphs (Outfit is Latin-only).
+const inter = Inter({ subsets: ["latin", "vietnamese"], weight: ["400", "500", "600", "700"], variable: "--font-inter", display: "swap" });
+const outfit = Outfit({ subsets: ["latin"], weight: ["400", "500", "600", "700", "800"], variable: "--font-outfit", display: "swap" });
+const playfair = Playfair_Display({ subsets: ["latin", "vietnamese"], weight: ["400", "600", "700"], style: ["normal", "italic"], variable: "--font-playfair", display: "swap" });
 import { ThemeProvider } from "@/lib/theme-context";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
@@ -27,7 +35,7 @@ export default async function RootLayout({
   const messages = await getMessages();
 
   return (
-    <html lang={locale}>
+    <html lang={locale} className={`${inter.variable} ${outfit.variable} ${playfair.variable}`}>
       <head>
         <link rel="icon" type="image/png" href="/favicon.png" />
         <link rel="manifest" href="/manifest.json" />
@@ -38,9 +46,6 @@ export default async function RootLayout({
         <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192.png" />
         <link rel="apple-touch-icon" sizes="512x512" href="/icons/icon-512.png" />
         <meta name="mobile-web-app-capable" content="yes" />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Outfit:wght@300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,500;1,600;1,700&display=swap" rel="stylesheet" />
       </head>
       <body>
         <NextIntlClientProvider messages={messages}>

@@ -86,9 +86,9 @@
   --shadow-glow-soft: 0 4px 20px rgba(168, 124, 196, 0.08);
 
   /* Typography */
-  --font-display: 'Playfair Display', 'Outfit', serif;
-  --font-heading: 'Outfit', sans-serif;
-  --font-body: 'Inter', sans-serif;
+  --font-display: var(--font-playfair, 'Playfair Display'), var(--font-outfit, 'Outfit'), serif;
+  --font-heading: var(--font-outfit, 'Outfit'), sans-serif;
+  --font-body: var(--font-inter, 'Inter'), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 
   --text-xs: 0.75rem;
   --text-sm: 0.875rem;

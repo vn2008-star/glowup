@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { useTenant } from "@/lib/tenant-context";
-import { queryData, cachedQuery } from "@/lib/api";
+import { queryData, cachedQuery, cached } from "@/lib/api";
 import { localeDateStr } from "@/lib/utils";
 import { isSalonClosedOnDate, isStaffOffOnDate } from "@/lib/schedule-utils";
 import { dayRangeInTz, todayInTz, DEFAULT_TZ } from "@/lib/tz";
@@ -171,8 +171,9 @@ export default function BookingPage() {
   const [fillSent, setFillSent] = useState(false);
   const [fillResult, setFillResult] = useState<{ sent: number; skipped: number; failed: number } | null>(null);
   const [fillError, setFillError] = useState<string | null>(null);
-  const [allStaff, setAllStaff] = useState<Staff[]>([]);
-  const [allClients, setAllClients] = useState<Client[]>([]);
+  // Seeded from the cache so a return visit doesn't flash "Fully Booked!"
+  const [allStaff, setAllStaff] = useState<Staff[]>(() => cached<Staff[]>("staff.list") || []);
+  const [allClients, setAllClients] = useState<Client[]>(() => cached<Client[]>("clients.list") || []);
   const [allAppointments, setAllAppointments] = useState<Appointment[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
 

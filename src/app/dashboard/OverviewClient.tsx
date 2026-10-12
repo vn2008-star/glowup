@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData, cachedQuery } from "@/lib/api";
@@ -163,7 +164,7 @@ export default function OverviewClient({ initialOverview }: { initialOverview: O
         <div className={`card ${styles.scheduleCard}`}>
           <div className={styles.cardHeader}>
             <h2>{t("todaysSchedule")}</h2>
-            <a href="/dashboard/calendar" className={styles.viewAll}>{t("viewCalendar")}</a>
+            <Link href="/dashboard/calendar" className={styles.viewAll}>{t("viewCalendar")}</Link>
           </div>
           {loading ? (
             <p className={`${styles.emptySchedule} pending-fade`}>{t("loadingAppointments")}</p>
@@ -198,7 +199,7 @@ export default function OverviewClient({ initialOverview }: { initialOverview: O
           <div className={`card ${styles.recentCard}`} style={{ border: "1px solid var(--color-primary)" }}>
             <div className={styles.scheduleHeader}>
               <h2>🎂 Upcoming Birthdays</h2>
-              <a href="/dashboard/loyalty" className={styles.viewAll}>Birthday Special</a>
+              <Link href="/dashboard/loyalty" className={styles.viewAll}>Birthday Special</Link>
             </div>
             {loading ? (
               <p className={`${styles.emptySchedule} pending-fade`}>Loading...</p>
@@ -259,7 +260,7 @@ export default function OverviewClient({ initialOverview }: { initialOverview: O
           <div className={`card ${styles.atRiskCard}`}>
             <div className={styles.scheduleHeader}>
               <h2>{t("atRiskClients")}</h2>
-              <a href="/dashboard/campaigns" className={styles.viewAll}>{t("sendCampaign")}</a>
+              <Link href="/dashboard/campaigns" className={styles.viewAll}>{t("sendCampaign")}</Link>
             </div>
             {atRiskClients.length === 0 ? (
               <p className={styles.emptySchedule}>{t("noAtRisk")}</p>
@@ -283,7 +284,7 @@ export default function OverviewClient({ initialOverview }: { initialOverview: O
           </div>
 
           {/* Fill My Openings CTA */}
-          <a href="/dashboard/campaigns?tab=fill_openings" className={`card ${styles.fillCta}`} style={{ textDecoration: "none" }}>
+          <Link href="/dashboard/campaigns?tab=fill_openings" className={`card ${styles.fillCta}`} style={{ textDecoration: "none" }}>
             <div className={styles.fillCtaContent}>
               <span className={styles.fillCtaBolt}>⚡</span>
               <div>
@@ -292,7 +293,7 @@ export default function OverviewClient({ initialOverview }: { initialOverview: O
               </div>
               <span className={styles.fillCtaArrow}>→</span>
             </div>
-          </a>
+          </Link>
         </div>
       </div>
     </div>
