@@ -165,15 +165,63 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Business not found' }, { status: 404 })
   }
 
-  // ── Compute back-to-back time windows (with per-service staff) ──
+  // ── Resolve the requested services and staff INSIDE this salon ──
+  // The ids come straight off an unauthenticated body. Looking them up without
+  // the tenant filter let anyone book at salon A with salon B's technician:
+  // the row landed in A's calendar carrying B's staff_id, and the double-booking
+  // constraint (which has no tenant column) then blocked B's technician for
+  // B's real clients. Anything not found here is refused.
   const overallStart = new Date(start_time)
+  if (isNaN(overallStart.getTime())) {
+    return NextResponse.json({ error: 'Invalid start time' }, { status: 400 })
+  }
   // Fall back to top-level staff_id for legacy single-service requests
   const globalStaffId = body.staff_id || null
+  const requestedServiceIds = [...new Set(serviceItems.map(i => i.service_id).filter(Boolean))]
+  const requestedStaffIds = [...new Set(
+    serviceItems.map(i => i.staff_id || globalStaffId).filter(Boolean)
+  )] as string[]
+
+  const { data: serviceRows } = await svc
+    .from('services')
+    .select('id, name, price, duration_minutes')
+    .eq('tenant_id', tenant.id)
+    .eq('is_active', true)
+    .in('id', requestedServiceIds)
+  const serviceMap: Record<string, { name: string; price: number; duration_minutes: number | null }> = {}
+  for (const sr of serviceRows || []) {
+    serviceMap[sr.id] = { name: sr.name, price: sr.price, duration_minutes: sr.duration_minutes }
+  }
+  if (requestedServiceIds.length === 0 || requestedServiceIds.some(id => !serviceMap[id])) {
+    return NextResponse.json({ error: 'Service not available' }, { status: 400 })
+  }
+
+  const staffNameMap: Record<string, string> = {}
+  if (requestedStaffIds.length > 0) {
+    const { data: staffRows } = await svc
+      .from('staff')
+      .select('id, name')
+      .eq('tenant_id', tenant.id)
+      .eq('is_active', true)
+      .in('id', requestedStaffIds)
+    for (const sr of staffRows || []) staffNameMap[sr.id] = sr.name
+    if (requestedStaffIds.some(id => !staffNameMap[id])) {
+      return NextResponse.json({ error: 'Staff member not available' }, { status: 400 })
+    }
+  }
+
+  // ── Compute back-to-back time windows (with per-service staff) ──
+  // The picker sends the duration it showed (it may apply a per-staff
+  // override), so accept it within sane bounds and otherwise use the service's.
   const windows: { service_id: string; staff_id: string | null; start: Date; end: Date }[] = []
   let cursor = overallStart.getTime()
   for (const item of serviceItems) {
+    const sent = Number(item.duration_minutes)
+    const minutes = Number.isInteger(sent) && sent >= 5 && sent <= 600
+      ? sent
+      : (serviceMap[item.service_id].duration_minutes || 60)
     const s = new Date(cursor)
-    const e = new Date(cursor + (item.duration_minutes || 60) * 60 * 1000)
+    const e = new Date(cursor + minutes * 60 * 1000)
     windows.push({ service_id: item.service_id, staff_id: item.staff_id || globalStaffId, start: s, end: e })
     cursor = e.getTime()
   }
@@ -330,29 +378,18 @@ export async function POST(request: Request) {
   }
 
   // ── Create appointments (one per service, back-to-back) ──
-  // Fetch service details for all service_ids at once
-  const serviceIds = windows.map(w => w.service_id)
-  const { data: serviceRows } = await svc
-    .from('services')
-    .select('id, name, price')
-    .in('id', serviceIds)
-
-  const serviceMap: Record<string, { name: string; price: number }> = {}
-  for (const sr of serviceRows || []) {
-    serviceMap[sr.id] = { name: sr.name, price: sr.price }
-  }
-
-  // Get staff names for all unique staff_ids
-  const uniqueStaffIds = [...new Set(windows.map(w => w.staff_id).filter(Boolean))] as string[]
-  const staffNameMap: Record<string, string> = {}
-  if (uniqueStaffIds.length > 0) {
+  // "Any Available" may have assigned staff the request didn't name; pick up
+  // their names for the notifications. These ids came from our own tenant-
+  // scoped candidate query above, so no further validation is needed.
+  const assignedStaffIds = [...new Set(windows.map(w => w.staff_id).filter(Boolean))] as string[]
+  const unnamed = assignedStaffIds.filter(id => !staffNameMap[id])
+  if (unnamed.length > 0) {
     const { data: staffRows } = await svc
       .from('staff')
       .select('id, name')
-      .in('id', uniqueStaffIds)
-    for (const sr of staffRows || []) {
-      staffNameMap[sr.id] = sr.name
-    }
+      .eq('tenant_id', tenant.id)
+      .in('id', unnamed)
+    for (const sr of staffRows || []) staffNameMap[sr.id] = sr.name
   }
 
   // Insert all appointments (with per-service staff_id)
