@@ -575,7 +575,7 @@ export default function CheckoutPage() {
 
     let currentCharges = charges;
     if (currentCharges.length === 0 && selectedApt.service) {
-      const { data } = await queryData<AppointmentCharge>("charges.add", {
+      const { data, error: chargeErr } = await queryData<AppointmentCharge>("charges.add", {
         appointment_id: selectedApt.id,
         staff_id: selectedApt.staff_id,
         service_id: selectedApt.service.id,
@@ -583,10 +583,17 @@ export default function CheckoutPage() {
         amount: selectedApt.service.price,
         is_upsell: false,
       });
-      if (data) currentCharges = [data];
+      if (!data) {
+        // Proceeding here checked the client out at $0 and awarded loyalty
+        // points and lifetime spend from that zero.
+        alert(`Checkout failed: ${typeof chargeErr === 'string' ? chargeErr : 'could not record the service charge'}`);
+        setCheckingOut(false);
+        return;
+      }
+      currentCharges = [data];
     }
 
-    const chargeTotal = currentCharges.reduce((sum, c) => sum + Number(c.amount), 0);
+    const chargeTotal = Math.round(currentCharges.reduce((sum, c) => sum + Number(c.amount), 0) * 100) / 100;
     const tip = Number(tipAmount) || 0;
 
     // Redemption is part of the checkout call, not a separate step. Doing it

@@ -54,6 +54,12 @@ const APPOINTMENT_WRITABLE = [
 // checkout a line belongs to, and belong in the WHERE clause only.
 const CHARGE_WRITABLE = ['service_id', 'description', 'amount', 'is_upsell'] as const
 
+// Who the card is for. Money columns (initial_amount, balance, status) are
+// set by the server from a validated amount, never from the body.
+const GIFT_CARD_WRITABLE = [
+  'purchaser_name', 'purchaser_email', 'recipient_name', 'recipient_email', 'message', 'expires_at',
+] as const
+
 // The table each caller-supplied foreign key points at.
 const FK_TABLE: Record<string, string> = {
   client_id: 'clients',
@@ -199,6 +205,60 @@ async function redeemCard(
     previousBalance: Number(card.balance),
     previousStatus: card.status,
   }
+}
+
+/**
+ * A dollar amount off a request body, or null if it isn't one. Money fields
+ * used to be trusted as-is: `amount: -100` passed `balance < amount` and
+ * INCREASED a gift card's balance; "abc" produced a NaN balance.
+ */
+function moneyOrNull(v: unknown): number | null {
+  const n = typeof v === 'string' && v.trim() === '' ? NaN : Number(v)
+  if (!Number.isFinite(n) || n < 0) return null
+  return Math.round(n * 100) / 100
+}
+
+/**
+ * After a GlowUp Credit (GU-…) is redeemed at a salon, pay the salon back:
+ * a negative invoice item on their Stripe subscription plus a row in
+ * credit_redemptions for tracking. Never throws — a failed compensation is
+ * logged and the redemption stands (the client was already served).
+ */
+async function compensateCreditRedemption(
+  svc: SupabaseClient,
+  tenantId: string,
+  r: RedeemedCard
+): Promise<void> {
+  if (r.table !== 'glowup_credits') return
+  let stripeCredit: string | null = null
+  try {
+    const { data: salonTenant } = await svc
+      .from('tenants')
+      .select('stripe_customer_id')
+      .eq('id', tenantId)
+      .single()
+    if (salonTenant?.stripe_customer_id && process.env.STRIPE_SECRET_KEY) {
+      const stripe = (await import('stripe')).default
+      const stripeClient = new stripe(process.env.STRIPE_SECRET_KEY)
+      const invoiceItem = await stripeClient.invoiceItems.create({
+        customer: salonTenant.stripe_customer_id,
+        amount: -Math.round(r.amount * 100), // negative = credit, in cents
+        currency: 'usd',
+        description: `GlowUp Credit redemption (${r.code}) — compensation for referral reward`,
+      })
+      stripeCredit = invoiceItem.id
+    }
+  } catch (stripeErr) {
+    console.error('Failed to create Stripe credit for salon compensation:', stripeErr)
+  }
+  const { error } = await svc.from('credit_redemptions').insert({
+    credit_id: r.id,
+    tenant_id: tenantId,
+    amount: r.amount,
+    compensated: !!stripeCredit,
+    stripe_credit_id: stripeCredit,
+  })
+  if (error) console.error('[credits] failed to record redemption:', error.message)
 }
 
 /** Undo a redeemCard(), restoring the exact prior balance. Returns an error string on failure. */
@@ -1621,10 +1681,20 @@ export async function POST(request: Request) {
       }
 
       case 'giftcards.create': {
-        const code = 'GC-' + Array.from({ length: 6 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('')
+        // Issuing a card is issuing money. Spreading the payload let any
+        // signed-in staff member set balance/status directly.
+        if (staffRole === 'technician') return staffWriteForbidden
+        const amount = moneyOrNull(payload.initial_amount)
+        if (!amount || amount > 10000) {
+          return NextResponse.json({ data: null, error: 'Enter an amount between $0.01 and $10,000' }, { status: 400 })
+        }
+        const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+        const bytes = crypto.getRandomValues(new Uint8Array(8))
+        const code = 'GC-' + Array.from(bytes, b => alphabet[b % alphabet.length]).join('')
+        const details = pickWritable(payload, GIFT_CARD_WRITABLE)
         const { data, error } = await svc
           .from('gift_cards')
-          .insert({ ...payload, code, tenant_id: tenantId })
+          .insert({ ...details, initial_amount: amount, balance: amount, status: 'active', code, tenant_id: tenantId })
           .select()
           .single()
         return NextResponse.json({ data, error: error?.message })
@@ -1643,26 +1713,23 @@ export async function POST(request: Request) {
         return NextResponse.json({ data: card })
       }
 
-      case 'giftcards.redeem': {
-        const { code: redeemCode, amount } = payload
-        const { data: card, error: findErr } = await svc
-          .from('gift_cards')
-          .select('*')
-          .eq('code', redeemCode)
-          .eq('tenant_id', tenantId)
-          .eq('status', 'active')
-          .single()
-        if (findErr || !card) return NextResponse.json({ data: null, error: 'Gift card not found or inactive' })
-        if (card.balance < amount) return NextResponse.json({ data: null, error: `Insufficient balance. Available: $${card.balance}` })
-        const newBalance = card.balance - amount
-        const newStatus = newBalance <= 0 ? 'redeemed' : 'active'
-        const { data, error } = await svc
-          .from('gift_cards')
-          .update({ balance: newBalance, status: newStatus })
-          .eq('id', card.id)
-          .select()
-          .single()
-        return NextResponse.json({ data, error: error?.message })
+      // Standalone redemption (checkout folds its own redemption into
+      // appointments.checkout). Both go through redeemCard(): the old
+      // read-then-write here had no compare-and-set and took any `amount`.
+      case 'giftcards.redeem':
+      case 'credits.redeem': {
+        if (staffRole === 'technician') return staffWriteForbidden
+        const amount = moneyOrNull(payload.amount)
+        const code = String(payload.code || '').toUpperCase().trim()
+        if (!amount || !code) {
+          return NextResponse.json({ data: null, error: 'A code and an amount above $0 are required' }, { status: 400 })
+        }
+        const result = await redeemCard(svc, tenantId, code, amount)
+        if ('error' in result) return NextResponse.json({ data: null, error: result.error }, { status: 400 })
+        await compensateCreditRedemption(svc, tenantId, result)
+        return NextResponse.json({
+          data: { code, amount, balance: Math.round((result.previousBalance - amount) * 100) / 100 },
+        })
       }
 
       // ─── GLOWUP CREDITS (Universal, cross-salon) ───
@@ -1688,76 +1755,6 @@ export async function POST(request: Request) {
         }
 
         return NextResponse.json({ data: { ...credit, type: 'glowup_credit' } })
-      }
-
-      case 'credits.redeem': {
-        const { code: redeemCode, amount } = payload
-        const { data: credit, error: findErr } = await svc
-          .from('glowup_credits')
-          .select('*')
-          .eq('code', redeemCode)
-          .eq('status', 'active')
-          .single()
-
-        if (findErr || !credit) return NextResponse.json({ data: null, error: 'GlowUp Credit not found or inactive' })
-        if (credit.balance < amount) return NextResponse.json({ data: null, error: `Insufficient balance. Available: $${credit.balance}` })
-
-        // Check expiry
-        if (credit.expires_at && new Date(credit.expires_at) < new Date()) {
-          await svc.from('glowup_credits').update({ status: 'expired' }).eq('id', credit.id)
-          return NextResponse.json({ data: null, error: 'This GlowUp Credit has expired' })
-        }
-
-        const newBalance = credit.balance - amount
-        const newStatus = newBalance <= 0 ? 'redeemed' : 'active'
-
-        // Deduct from credit balance
-        const { data: updated, error: updateErr } = await svc
-          .from('glowup_credits')
-          .update({ balance: newBalance, status: newStatus })
-          .eq('id', credit.id)
-          .select()
-          .single()
-
-        if (updateErr) return NextResponse.json({ data: null, error: updateErr.message })
-
-        // Record the redemption for salon compensation tracking
-        let stripeCredit = null
-        try {
-          // Look up the salon's Stripe customer ID for auto-compensation
-          const { data: salonTenant } = await svc
-            .from('tenants')
-            .select('stripe_customer_id, name')
-            .eq('id', tenantId)
-            .single()
-
-          if (salonTenant?.stripe_customer_id && process.env.STRIPE_SECRET_KEY) {
-            // Create a Stripe invoice credit on the salon's account
-            // This will automatically reduce their next subscription invoice
-            const stripe = (await import('stripe')).default
-            const stripeClient = new stripe(process.env.STRIPE_SECRET_KEY)
-            const invoiceItem = await stripeClient.invoiceItems.create({
-              customer: salonTenant.stripe_customer_id,
-              amount: -Math.round(amount * 100), // negative = credit, in cents
-              currency: 'usd',
-              description: `GlowUp Credit redemption (${redeemCode}) — compensation for referral reward`,
-            })
-            stripeCredit = invoiceItem.id
-          }
-        } catch (stripeErr) {
-          console.error('Failed to create Stripe credit for salon compensation:', stripeErr)
-          // Don't fail the redemption if Stripe credit fails
-        }
-
-        await svc.from('credit_redemptions').insert({
-          credit_id: credit.id,
-          tenant_id: tenantId,
-          amount,
-          compensated: !!stripeCredit,
-          stripe_credit_id: stripeCredit,
-        })
-
-        return NextResponse.json({ data: updated })
       }
 
       // ─── SERVICE HISTORY ───
@@ -2274,11 +2271,35 @@ export async function POST(request: Request) {
         // card was debited, the checkout write failed, its error was dropped,
         // the button re-enabled, and the cashier clicked again. The retry
         // redeemed a second time. One call, server-side, closes that window.
-        const { id, payment_method, tip_amount, total_price, gift_card_code, gift_card_amount } = payload
+        const { id, payment_method, gift_card_code } = payload
+        const total_price = moneyOrNull(payload.total_price)
+        const tip_amount = moneyOrNull(payload.tip_amount ?? 0)
+        const gift_card_amount = moneyOrNull(payload.gift_card_amount ?? 0)
+        if (total_price === null || tip_amount === null || gift_card_amount === null) {
+          return NextResponse.json({ data: null, error: 'Amounts must be numbers of $0 or more' }, { status: 400 })
+        }
+        if (gift_card_amount > total_price + tip_amount) {
+          return NextResponse.json({ data: null, error: 'Gift card amount exceeds the total' }, { status: 400 })
+        }
+
+        // Idempotency: a double click or a network retry used to re-debit the
+        // card and re-award loyalty points, visit count and lifetime spend.
+        // Cheap read first so a retry doesn't debit-then-refund; the
+        // .neq('status','completed') on the UPDATE below is the real guard.
+        const { data: current } = await svc
+          .from('appointments')
+          .select('status')
+          .eq('id', id)
+          .eq('tenant_id', tenantId)
+          .maybeSingle()
+        if (!current) return NextResponse.json({ data: null, error: 'Appointment not found' }, { status: 404 })
+        if (current.status === 'completed') {
+          return NextResponse.json({ data: null, error: 'This appointment is already checked out' }, { status: 409 })
+        }
 
         let redeemed: RedeemedCard | null = null
-        if (gift_card_code && Number(gift_card_amount) > 0) {
-          const result = await redeemCard(svc, tenantId, String(gift_card_code), Number(gift_card_amount))
+        if (gift_card_code && gift_card_amount > 0) {
+          const result = await redeemCard(svc, tenantId, String(gift_card_code).toUpperCase().trim(), gift_card_amount)
           if ('error' in result) {
             return NextResponse.json({ data: null, error: result.error }, { status: 400 })
           }
@@ -2290,15 +2311,16 @@ export async function POST(request: Request) {
           .update({
             status: 'completed',
             payment_method,
-            tip_amount: tip_amount || 0,
+            tip_amount,
             total_price,
             checked_out_at: new Date().toISOString(),
             checked_out_by: staffId,
           })
           .eq('id', id)
           .eq('tenant_id', tenantId)
+          .neq('status', 'completed')
           .select('id, tenant_id, client_id, staff_id, service_id, start_time, end_time, status, total_price, notes, payment_method, tip_amount, checked_out_at, checked_in_at, created_at, client:clients(id, first_name, last_name, phone, email, loyalty_points, visit_count, lifetime_spend, last_visit), staff_member:staff!staff_id(id, name), service:services(id, name, price, commission_rate)')
-          .single()
+          .maybeSingle()
 
         // The card is already debited at this point. If the checkout write
         // failed, put the money back rather than leaving the client out of
@@ -2319,15 +2341,19 @@ export async function POST(request: Request) {
         }
 
         if (error || !data) {
+          // No error and no row means the guard fired: someone else completed
+          // it between our read and our write.
           return NextResponse.json(
-            { data: null, error: error?.message || 'Checkout failed' },
-            { status: 500 }
+            { data: null, error: error?.message || 'This appointment is already checked out' },
+            { status: error ? 500 : 409 }
           )
         }
 
+        if (redeemed) await compensateCreditRedemption(svc, tenantId, redeemed)
+
         // Award loyalty points & update client stats ($5 = 1 point)
         if (data && !error && data.client_id) {
-          const pointsEarned = Math.round((total_price || 0) / 5)
+          const pointsEarned = Math.round(total_price / 5)
           // Tenant-filtered even though client_id came off a tenant-scoped
           // appointment: an appointment can only be created or moved onto a
           // client in its own tenant now, but this write hands out loyalty
@@ -2345,7 +2371,7 @@ export async function POST(request: Request) {
               .update({
                 loyalty_points: (clientRow.loyalty_points || 0) + pointsEarned,
                 visit_count: (clientRow.visit_count || 0) + 1,
-                lifetime_spend: (clientRow.lifetime_spend || 0) + (total_price || 0),
+                lifetime_spend: (clientRow.lifetime_spend || 0) + total_price,
                 last_visit: new Date().toISOString(),
                 status: 'active',
               })
