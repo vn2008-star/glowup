@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
+import { DEFAULT_TZ } from "@/lib/tz";
 import { queryData, cachedQuery, cached, hasCached } from "@/lib/api";
 import styles from "./inbox.module.css";
 import type { Conversation, Message } from "@/lib/types";
@@ -493,7 +494,7 @@ export default function InboxPage() {
                     </div>
                     <div className={styles.convoMeta}>
                       <span className={styles.convoTime}>
-                        {c.last_message_at ? new Date(c.last_message_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : ""}
+                        {c.last_message_at ? new Date(c.last_message_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: tenant?.timezone || DEFAULT_TZ }) : ""}
                       </span>
                       {c.unread_count > 0 && <span className={styles.unreadBadge}>{c.unread_count}</span>}
                     </div>
@@ -534,7 +535,7 @@ export default function InboxPage() {
                         <span className={styles.messageTime}>
                           {m.sender_type === "bot" ? "🤖 AI" : m.sender_type === "staff" ? "You" : m.sender_name || "Client"}
                           {" · "}
-                          {new Date(m.created_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                          {new Date(m.created_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: tenant?.timezone || DEFAULT_TZ })}
                         </span>
                       </div>
                     ))

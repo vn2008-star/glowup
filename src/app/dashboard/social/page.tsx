@@ -6,6 +6,7 @@ import { useTenant } from "@/lib/tenant-context";
 import { queryData, cachedQuery, cached } from "@/lib/api";
 import styles from "./social.module.css";
 import { localeDateStr } from "@/lib/utils";
+import { localToUTC, partsInTz, DEFAULT_TZ } from "@/lib/tz";
 import type { SocialPost } from "@/lib/types";
 
 const PLATFORMS = [
@@ -27,6 +28,7 @@ const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export default function SocialPage() {
   const { tenant } = useTenant();
+  const salonTz = tenant?.timezone || DEFAULT_TZ;
   const t = useTranslations("socialPage");
   // Seeded from the data cache — see lib/data-cache.
   const [posts, setPosts] = useState<SocialPost[]>(() => cached<SocialPost[]>("social.list") ?? []);
@@ -83,7 +85,10 @@ export default function SocialPage() {
       platforms: p.platforms || [],
       status: p.status,
       template_type: p.template_type || "custom",
-      scheduled_at: p.scheduled_at ? new Date(p.scheduled_at).toISOString().slice(0, 16) : "",
+      // Salon wall-clock for the datetime-local input. Round-tripping through
+      // toISOString() shifted a 10 AM post by the browser's UTC offset on
+      // every edit.
+      scheduled_at: p.scheduled_at ? `${partsInTz(p.scheduled_at, salonTz).dateStr}T${partsInTz(p.scheduled_at, salonTz).timeStr}` : "",
     });
     setShowModal(true);
   }
@@ -95,7 +100,9 @@ export default function SocialPage() {
       platforms: formData.platforms,
       status: formData.status,
       template_type: formData.template_type,
-      scheduled_at: formData.scheduled_at ? new Date(formData.scheduled_at).toISOString() : null,
+      scheduled_at: formData.scheduled_at
+        ? localToUTC(formData.scheduled_at.split("T")[0], formData.scheduled_at.split("T")[1], salonTz).toISOString()
+        : null,
     };
 
     if (editingPost) {
@@ -133,8 +140,8 @@ export default function SocialPage() {
 
   function getPostsForDay(day: number) {
     return posts.filter((p) => {
-      const d = p.scheduled_at ? new Date(p.scheduled_at) : new Date(p.created_at);
-      return d.getFullYear() === calendarYear && d.getMonth() === calendarMonth && d.getDate() === day;
+      const d = partsInTz(p.scheduled_at || p.created_at, salonTz);
+      return d.year === calendarYear && d.month === calendarMonth + 1 && d.day === day;
     });
   }
 

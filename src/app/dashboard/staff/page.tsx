@@ -32,6 +32,7 @@ function businessHoursDefault(
 }
 
 import { formatPhone, localeDateStr } from "@/lib/utils";
+import { todayInTz, DEFAULT_TZ } from "@/lib/tz";
 
 export default function StaffPage() {
   const { tenant } = useTenant();
@@ -349,7 +350,7 @@ export default function StaffPage() {
   }
 
   function getUpcomingVacation(s: Staff): { start: string; end: string; note: string } | null {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayInTz(tenant?.timezone || DEFAULT_TZ);
     const vacs = getVacations(s).filter(v => v.end >= today).sort((a, b) => a.start.localeCompare(b.start));
     return vacs[0] || null;
   }
@@ -545,7 +546,7 @@ export default function StaffPage() {
                 </div>
                 {getUpcomingVacation(s) && (() => {
                   const v = getUpcomingVacation(s)!;
-                  const today = new Date().toISOString().slice(0, 10);
+                  const today = todayInTz(tenant?.timezone || DEFAULT_TZ);
                   const isOnVacation = v.start <= today && v.end >= today;
                   return (
                     <div className={styles.vacationBadge} style={isOnVacation ? { background: 'rgba(251,191,36,0.15)', color: '#f59e0b', borderColor: 'rgba(251,191,36,0.3)' } : undefined}>
@@ -698,7 +699,7 @@ export default function StaffPage() {
               {/* Vacations */}
               {(() => {
                 const vacs = getVacations(selectedStaff);
-                const today = new Date().toISOString().slice(0, 10);
+                const today = todayInTz(tenant?.timezone || DEFAULT_TZ);
                 const upcoming = vacs.filter(v => v.end >= today);
                 return (
                   <div className={styles.drawerSection}>
@@ -1163,7 +1164,7 @@ export default function StaffPage() {
               {/* Existing vacations */}
               {(() => {
                 const vacs = getVacations(vacationStaff);
-                const today = new Date().toISOString().slice(0, 10);
+                const today = todayInTz(tenant?.timezone || DEFAULT_TZ);
                 return vacs.length > 0 ? (
                   <div className={styles.vacationList} style={{ marginBottom: 'var(--space-4)' }}>
                     {vacs.map((v, i) => {
@@ -1200,11 +1201,11 @@ export default function StaffPage() {
                 <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap', alignItems: 'end' }}>
                   <div className={styles.formGroup} style={{ flex: 1, minWidth: 140 }}>
                     <label className="label">Start Date *</label>
-                    <input className="input" type="date" value={vacationStart} onChange={(e) => setVacationStart(e.target.value)} required min={new Date().toISOString().slice(0, 10)} />
+                    <input className="input" type="date" value={vacationStart} onChange={(e) => setVacationStart(e.target.value)} required min={todayInTz(tenant?.timezone || DEFAULT_TZ)} />
                   </div>
                   <div className={styles.formGroup} style={{ flex: 1, minWidth: 140 }}>
                     <label className="label">End Date *</label>
-                    <input className="input" type="date" value={vacationEnd} onChange={(e) => setVacationEnd(e.target.value)} required min={vacationStart || new Date().toISOString().slice(0, 10)} />
+                    <input className="input" type="date" value={vacationEnd} onChange={(e) => setVacationEnd(e.target.value)} required min={vacationStart || todayInTz(tenant?.timezone || DEFAULT_TZ)} />
                   </div>
                 </div>
                 <div className={styles.formGroup} style={{ marginTop: 'var(--space-3)' }}>

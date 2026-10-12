@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData } from "@/lib/api";
-import { localToUTC, todayInTz, DEFAULT_TZ } from "@/lib/tz";
+import { localToUTC, todayInTz, partsInTz, DEFAULT_TZ } from "@/lib/tz";
 import { findHolidayOnDate, isBusinessClosedOnDate, isStaffOffOnDate } from "@/lib/schedule-utils";
 import type { CustomClosedDate } from "@/lib/schedule-utils";
 import { localeDateStr } from "@/lib/utils";
@@ -33,7 +33,11 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
   const salonTz = tenant?.timezone || DEFAULT_TZ;
   const t = useTranslations("calendarPage");
   const [view, setView] = useState<"day" | "week" | "month">("week");
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  // `selectedDate` (and every day in the grids) is a plain calendar day held as
+  // local midnight. Only its Y/M/D matter; it never represents an instant.
+  // Appointment instants are read through partsInTz(…, salonTz), never with
+  // the browser-zone getters.
+  const [selectedDate, setSelectedDate] = useState(() => new Date(todayInTz(salonTz) + "T00:00:00"));
   // Server-prefetched week: paint immediately. If the browser's idea of "this
   // week" differs from the server's (timezone edge), the first fetch effect
   // detects the range mismatch and refetches.
@@ -126,7 +130,7 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
     return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
   }
 
-  const today = new Date();
+  const today = new Date(todayInTz(salonTz) + "T00:00:00");
 
   // ── Computed ranges ──
   const weekStart = new Date(selectedDate);
@@ -225,10 +229,10 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
     let earliest = DEFAULT_WORK_START;
     let latest = DEFAULT_WORK_END;
     for (const apt of appointments) {
-      const s = new Date(apt.start_time);
-      const e = new Date(apt.end_time);
-      const sH = s.getHours();
-      const eH = e.getHours() + (e.getMinutes() > 0 ? 1 : 0);
+      const s = partsInTz(apt.start_time, salonTz);
+      const e = partsInTz(apt.end_time, salonTz);
+      const sH = s.hour;
+      const eH = e.hour + (e.minute > 0 ? 1 : 0);
       if (sH < earliest) earliest = sH;
       if (eH > latest) latest = eH;
     }
@@ -363,9 +367,7 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
 
   // ── Day view helpers ──
   function getSlotPosition(startTime: string) {
-    const date = new Date(startTime);
-    const hourDecimal = date.getHours() + date.getMinutes() / 60;
-    return (hourDecimal - WORK_START) * SLOT_HEIGHT;
+    return (partsInTz(startTime, salonTz).hourDecimal - WORK_START) * SLOT_HEIGHT;
   }
 
   function getSlotHeight(startTime: string, endTime: string) {
@@ -385,7 +387,7 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
     const dateStr = toDateStr(selectedDate);
     const staffApts = appointments.filter(a => {
       const match = staffId === "unassigned" ? !a.staff_id : a.staff_id === staffId;
-      return match && toDateStr(new Date(a.start_time)) === dateStr;
+      return match && partsInTz(a.start_time, salonTz).dateStr === dateStr;
     });
     let bookedHours = 0;
     for (const apt of staffApts) {
@@ -401,15 +403,15 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
     const staffApts = appointments
       .filter(a => {
         const match = staffId === "unassigned" ? !a.staff_id : a.staff_id === staffId;
-        return match && toDateStr(new Date(a.start_time)) === dateStr;
+        return match && partsInTz(a.start_time, salonTz).dateStr === dateStr;
       })
       .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
 
     const slots: { start: number; end: number }[] = [];
     let cursor = WORK_START;
     for (const apt of staffApts) {
-      const aptStart = new Date(apt.start_time).getHours() + new Date(apt.start_time).getMinutes() / 60;
-      const aptEnd = new Date(apt.end_time).getHours() + new Date(apt.end_time).getMinutes() / 60;
+      const aptStart = partsInTz(apt.start_time, salonTz).hourDecimal;
+      const aptEnd = partsInTz(apt.end_time, salonTz).hourDecimal;
       if (aptStart > cursor) slots.push({ start: cursor, end: aptStart });
       cursor = Math.max(cursor, aptEnd);
     }
@@ -614,12 +616,8 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
 
   // ── Appointments for a specific day (timezone-safe) ──
   function aptsForDay(day: Date) {
-    return appointments.filter(a => {
-      const aptDate = new Date(a.start_time);
-      return aptDate.getFullYear() === day.getFullYear()
-        && aptDate.getMonth() === day.getMonth()
-        && aptDate.getDate() === day.getDate();
-    });
+    const dayStr = toDateStr(day);
+    return appointments.filter(a => partsInTz(a.start_time, salonTz).dateStr === dayStr);
   }
 
   return (
@@ -841,7 +839,7 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
                           {isBlocked(apt) ? `🚫 ${apt.notes || "Blocked"}` : (apt.client ? `${apt.client.first_name} ${apt.client.last_name || ""}`.trim() : t("walkin"))}
                         </span>
                         <span className={styles.aptTime}>
-                          {new Date(apt.start_time).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+                          {new Date(apt.start_time).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", timeZone: salonTz })}
                         </span>
                         {!isBlocked(apt) && apt.client?.birthday && (
                           <span className={styles.aptBirthday}>🎂 {localeDateStr(new Date(apt.client.birthday + 'T00:00:00'), { month: 'short', day: 'numeric' })}</span>
@@ -952,10 +950,7 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
               const dayDateStr = toDateStr(day);
               const weekMarkers = getDayMarkers(dayDateStr);
               const isBizClosed = isBusinessClosedOnDate(closedHolidays, customClosedDates, dayDateStr);
-              const dayApts = visibleApts.filter(a => {
-                const d = new Date(a.start_time);
-                return d.getFullYear() === day.getFullYear() && d.getMonth() === day.getMonth() && d.getDate() === day.getDate();
-              });
+              const dayApts = visibleApts.filter(a => partsInTz(a.start_time, salonTz).dateStr === dayDateStr);
               const laid = layoutOverlaps(dayApts);
               return (
                 <div key={dayDateStr} className={`${styles.weekCol} ${isToday ? styles.weekColToday : ""} ${isBizClosed ? styles.weekColClosed : ""}`}>
@@ -1008,9 +1003,8 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
                     {/* Appointment blocks — side-by-side with staff colors */}
                     {laid.map(({ apt, col, totalCols }) => {
                       const startD = new Date(apt.start_time);
-                      const endD = new Date(apt.end_time);
-                      const startH = startD.getHours() + startD.getMinutes() / 60;
-                      const endH = endD.getHours() + endD.getMinutes() / 60;
+                      const startH = partsInTz(apt.start_time, salonTz).hourDecimal;
+                      const endH = partsInTz(apt.end_time, salonTz).hourDecimal;
                       const top = (startH - WORK_START) * SLOT_HEIGHT;
                       const height = Math.max((endH - startH) * SLOT_HEIGHT, 56);
                       const staffColor = getStaffColor(apt.staff_id);
@@ -1039,7 +1033,7 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
                             <span className={styles.weekAptBirthday}>🎂 {localeDateStr(new Date(apt.client.birthday + 'T00:00:00'), { month: 'short', day: 'numeric' })}</span>
                           )}
                           <span className={styles.weekAptTime}>
-                            {startD.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+                            {startD.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", timeZone: salonTz })}
                           </span>
                           {!isBlocked(apt) && totalCols <= 3 && (
                             <span className={styles.weekAptStaff} style={{ color: staffColor }}>
@@ -1187,10 +1181,10 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
               <div className={styles.detailRow}>
                 <span className={styles.detailLabel}>{t("dateTime")}</span>
                 <span className={styles.detailValue}>
-                  {localeDateStr(new Date(selectedApt.start_time), { weekday: "short", month: "short", day: "numeric" })}{" "}
-                  {new Date(selectedApt.start_time).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+                  {localeDateStr(new Date(selectedApt.start_time), { weekday: "short", month: "short", day: "numeric", timeZone: salonTz })}{" "}
+                  {new Date(selectedApt.start_time).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", timeZone: salonTz })}
                   {" – "}
-                  {new Date(selectedApt.end_time).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+                  {new Date(selectedApt.end_time).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", timeZone: salonTz })}
                 </span>
               </div>
               <div className={styles.detailRow}>
@@ -1217,19 +1211,20 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
                 className="btn btn-secondary"
                 onClick={() => {
                   const apt = selectedApt;
-                  const startLocal = new Date(apt.start_time);
-                  const dateStr = toDateStr(startLocal);
-                  const timeStr = `${String(startLocal.getHours()).padStart(2, "0")}:${String(startLocal.getMinutes()).padStart(2, "0")}`;
+                  // Seed the form in the SALON's zone — the submit converts
+                  // back with localToUTC(…, salonTz). Seeding from the browser
+                  // zone meant "change the note" from another zone also moved
+                  // the appointment by the zone difference.
+                  const { dateStr, timeStr } = partsInTz(apt.start_time, salonTz);
                   // A time block has no client or service — edit it in the Block
                   // Time form, which has an end time. The appointment form used
                   // to demand a service and snapped the block back to 60 min.
                   if (isBlocked(apt)) {
-                    const endLocal = new Date(apt.end_time);
                     setBlockData({
                       staff_id: apt.staff_id || "",
                       date: dateStr,
                       start_time: timeStr,
-                      end_time: `${String(endLocal.getHours()).padStart(2, "0")}:${String(endLocal.getMinutes()).padStart(2, "0")}`,
+                      end_time: partsInTz(apt.end_time, salonTz).timeStr,
                       notes: apt.notes || "",
                     });
                     setEditingBlockId(apt.id);
@@ -1238,7 +1233,7 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
                     return;
                   }
                   setEditingApt(apt);
-                  setDurationMin(Math.round((new Date(apt.end_time).getTime() - startLocal.getTime()) / 60000));
+                  setDurationMin(Math.round((new Date(apt.end_time).getTime() - new Date(apt.start_time).getTime()) / 60000));
                   setFormData({
                     client_id: apt.client_id || "",
                     service_id: apt.service_id || "",
@@ -1552,9 +1547,9 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
                 </strong>
                 {" — "}{cancelTarget.service?.name || "appointment"}
                 <br />
-                {localeDateStr(new Date(cancelTarget.start_time), { weekday: "short", month: "short", day: "numeric" })}
+                {localeDateStr(new Date(cancelTarget.start_time), { weekday: "short", month: "short", day: "numeric", timeZone: salonTz })}
                 {" at "}
-                {new Date(cancelTarget.start_time).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+                {new Date(cancelTarget.start_time).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", timeZone: salonTz })}
               </p>
 
               <label className="label">Reason (optional)</label>
@@ -1618,8 +1613,8 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
               const row = (a: FullAppointment) => (
                 <button key={a.id} className={styles.historyRow} onClick={() => goToAppointment(a)}>
                   <span className={styles.historyDate}>
-                    {localeDateStr(new Date(a.start_time), { month: "short", day: "numeric", year: "numeric" })}
-                    <small>{new Date(a.start_time).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</small>
+                    {localeDateStr(new Date(a.start_time), { month: "short", day: "numeric", year: "numeric", timeZone: salonTz })}
+                    <small>{new Date(a.start_time).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", timeZone: salonTz })}</small>
                   </span>
                   <span className={styles.historyService}>
                     {a.service?.name || "—"}
@@ -1656,7 +1651,7 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
                     <div>
                       <strong>
                         {historyClient.last_visit
-                          ? localeDateStr(new Date(historyClient.last_visit), { month: "short", day: "numeric" })
+                          ? localeDateStr(new Date(historyClient.last_visit), { month: "short", day: "numeric", timeZone: salonTz })
                           : "—"}
                       </strong>
                       <span>Last visit</span>

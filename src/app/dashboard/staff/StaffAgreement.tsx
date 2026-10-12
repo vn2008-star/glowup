@@ -5,6 +5,7 @@ import { useTenant } from "@/lib/tenant-context";
 import { queryData } from "@/lib/api";
 import type { Staff } from "@/lib/types";
 import { localeDateStr } from "@/lib/utils";
+import { todayInTz, DEFAULT_TZ } from "@/lib/tz";
 import styles from "./agreement.module.css";
 
 interface Props {
@@ -18,7 +19,7 @@ export default function StaffAgreement({ staff, onClose, onSigned }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasSigned, setHasSigned] = useState(false);
-  const [signDate, setSignDate] = useState(new Date().toISOString().slice(0, 10));
+  const [signDate, setSignDate] = useState(() => todayInTz(tenant?.timezone || DEFAULT_TZ));
   const [saving, setSaving] = useState(false);
 
   // Check if already signed
@@ -195,7 +196,8 @@ export default function StaffAgreement({ staff, onClose, onSigned }: Props) {
                     <img src={agreement.signature} alt="Signature" />
                   )}
                   <div className={styles.signedDate}>
-                    Signed on {localeDateStr(new Date(agreement.signed_at), { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+                    {/* signed_at is the chosen date stored as UTC midnight, so read it back in UTC or US zones show the day before */}
+                    Signed on {localeDateStr(new Date(agreement.signed_at), { weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "UTC" })}
                   </div>
                 </div>
               ) : (

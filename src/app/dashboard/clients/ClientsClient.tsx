@@ -8,6 +8,7 @@ import { queryData, cachedQuery, uploadImage } from "@/lib/api";
 import styles from "./clients.module.css";
 import type { Client, Service, Staff } from "@/lib/types";
 import { formatPhone, fmtDate, localeDateStr } from "@/lib/utils";
+import { localToUTC, todayInTz, DEFAULT_TZ } from "@/lib/tz";
 
 /* ── Masking helpers (mirrors API logic for "View as Technician" preview) ── */
 function maskPhone(phone: string | null): string | null {
@@ -386,7 +387,7 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
     ]);
     setServices((svcRes.data || []).filter(s => s.is_active));
     setStaffMembers(staffRes.data || []);
-    const today = new Date().toISOString().split("T")[0];
+    const today = todayInTz(tenant?.timezone || DEFAULT_TZ);
     setBookData({ service_id: "", staff_id: "", start_time: `${today}T09:00`, notes: "" });
     setShowBookModal(true);
   }
@@ -397,7 +398,11 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
     setBookingSaving(true);
 
     const service = services.find(s => s.id === bookData.service_id);
-    const start = new Date(bookData.start_time);
+    // The datetime-local value is a salon wall-clock time, not the browser's.
+    // `new Date("2026-10-20T09:00")` read it in the browser zone, so a remote
+    // staffer typing 9:00 booked 6 AM Pacific.
+    const [bookDate, bookTime] = bookData.start_time.split("T");
+    const start = localToUTC(bookDate, bookTime, tenant?.timezone || DEFAULT_TZ);
     const end = new Date(start.getTime() + (service?.duration_minutes || 60) * 60 * 1000);
 
     const { data, error } = await queryData("appointments.add", {
@@ -983,8 +988,8 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
                   {historyApts.map((a) => (
                     <div key={a.id} className={styles.aptHistoryRow}>
                       <span className={styles.aptHistoryDate}>
-                        {localeDateStr(new Date(a.start_time), { month: "short", day: "numeric", year: "numeric" })}
-                        <small>{new Date(a.start_time).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</small>
+                        {localeDateStr(new Date(a.start_time), { month: "short", day: "numeric", year: "numeric", timeZone: tenant?.timezone || DEFAULT_TZ })}
+                        <small>{new Date(a.start_time).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", timeZone: tenant?.timezone || DEFAULT_TZ })}</small>
                       </span>
                       <span className={styles.aptHistoryService}>
                         {a.service?.name || "—"}

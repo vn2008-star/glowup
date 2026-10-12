@@ -9,6 +9,7 @@ import styles from "./overview.module.css";
 import type { Appointment, Client } from "@/lib/types";
 import type { OverviewData } from "@/lib/overview-query";
 import { localeDateStr } from "@/lib/utils";
+import { DEFAULT_TZ } from "@/lib/tz";
 
 export default function OverviewClient({ initialOverview }: { initialOverview: OverviewData | null }) {
   const { tenant, currentStaff } = useTenant();
@@ -171,7 +172,7 @@ export default function OverviewClient({ initialOverview }: { initialOverview: O
           ) : (
             <div className={styles.appointmentList}>
               {todayAppointments.map((apt) => {
-                const time = new Date(apt.start_time).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+                const time = new Date(apt.start_time).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: tenant?.timezone || DEFAULT_TZ });
                 return (
                   <div key={apt.id} className={styles.appointmentRow}>
                     <span className={styles.aptTime}>{time}</span>

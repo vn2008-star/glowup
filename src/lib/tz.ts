@@ -86,6 +86,36 @@ export function todayInTz(tz: string): string {
 }
 
 /**
+ * A UTC instant broken into the salon's wall-clock parts. This is what every
+ * grid, form and "which day is this on" check should read instead of
+ * Date#getHours()/getDate(), which answer in the BROWSER's zone — an owner
+ * opening the calendar from New York saw (and re-saved) Pacific appointments
+ * three hours off.
+ */
+export function partsInTz(date: Date | string, tz: string): {
+  year: number; month: number; day: number; hour: number; minute: number
+  /** "YYYY-MM-DD" */ dateStr: string
+  /** "HH:MM" (24h) */ timeStr: string
+  /** e.g. 13.5 for 1:30 PM */ hourDecimal: number
+} {
+  const d = typeof date === 'string' ? new Date(date) : date
+  const p = getDateParts(d, tz)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return {
+    ...p,
+    dateStr: `${p.year}-${pad(p.month)}-${pad(p.day)}`,
+    timeStr: `${pad(p.hour)}:${pad(p.minute)}`,
+    hourDecimal: p.hour + p.minute / 60,
+  }
+}
+
+/** Shift a "YYYY-MM-DD" by whole days (pure calendar arithmetic, no zone). */
+export function addDays(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10)
+}
+
+/**
  * UTC bounds of a salon-local calendar day, for `gte`/`lte` on start_time.
  * A bare `${date}T00:00:00` is read by Postgres as UTC — for a Pacific salon
  * that's a 5 PM–5 PM window, which drops evening appointments into tomorrow.

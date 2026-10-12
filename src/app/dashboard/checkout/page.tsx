@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "rea
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData, uploadImage } from "@/lib/api";
-import { todayInTz, dayRangeInTz, formatDateInTz, DEFAULT_TZ } from "@/lib/tz";
+import { todayInTz, nowInTz, partsInTz, dayRangeInTz, formatDateInTz, DEFAULT_TZ } from "@/lib/tz";
 import { GlowUpLogo } from "@/components/GlowUpLogo";
 import { localeDateStr } from "@/lib/utils";
 import styles from "./checkout.module.css";
@@ -306,7 +306,7 @@ export default function CheckoutPage() {
 
   // ── Helpers ──
   function formatTime(iso: string) {
-    return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", timeZone: salonTz });
   }
 
   function formatDate(dateStr: string) {
@@ -1003,9 +1003,9 @@ export default function CheckoutPage() {
                   <p className={styles.checkinEmpty}>{t("noMatchingAppts")}</p>
                 ) : (
                   ciResults.map((apt) => {
-                    const d = new Date(apt.start_time);
-                    const hours = d.getHours();
-                    const mins = String(d.getMinutes()).padStart(2, "0");
+                    const d = partsInTz(apt.start_time, salonTz);
+                    const hours = d.hour;
+                    const mins = String(d.minute).padStart(2, "0");
                     const ampm = hours >= 12 ? "PM" : "AM";
                     const h12 = hours % 12 || 12;
                     const alreadyCheckedIn = !!apt.checked_in_at;
@@ -1303,9 +1303,9 @@ export default function CheckoutPage() {
                   };
 
                   // Current time marker
-                  const now = new Date();
-                  const nowHDec = now.getHours() + now.getMinutes() / 60;
-                  const isToday = selectedDate === todayInTz(salonTz);
+                  const now = nowInTz(salonTz);
+                  const nowHDec = now.hour + now.minute / 60;
+                  const isToday = selectedDate === now.dateStr;
 
                   const staffColors = [
                     "linear-gradient(135deg, #8B5CF6, #EC4899)",
