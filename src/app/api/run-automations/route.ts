@@ -7,7 +7,7 @@ import { sendSms, smsProvider, canSendBulkSms, smsConfigFromSettings, type Tenan
 import { PROMO_HOLIDAYS, getNextHolidayDate, DEFAULT_BIRTHDAY_TEMPLATE, isSalonClosedOnDate, isStaffOffOnDate } from '@/lib/schedule-utils'
 import { siteBaseUrl } from '@/lib/site-url'
 import { resolveTenantTz } from '@/lib/notifications'
-import { nowInTz, formatInTz } from '@/lib/tz'
+import { nowInTz, formatInTz, partsInTz, addDays, dayRangeInTz } from '@/lib/tz'
 
 /** Hour, in each salon's own timezone, when the once-a-day automations run. */
 const DAILY_AUTOMATION_HOUR = 9
@@ -135,8 +135,8 @@ export async function GET(request: Request) {
         .eq('is_active', true)
 
       const now = new Date()
-      const lookAheadEnd = new Date(now)
-      lookAheadEnd.setDate(lookAheadEnd.getDate() + lookAheadDays)
+      // Through the end of the last offered day, in the salon's zone
+      const lookAheadEnd = dayRangeInTz(addDays(localNow.dateStr, lookAheadDays - 1), tz).end
 
       const { data: aptList } = await supabase
         .from('appointments')
@@ -144,7 +144,7 @@ export async function GET(request: Request) {
         .eq('tenant_id', tenant.id)
         .neq('status', 'cancelled')
         .gte('start_time', now.toISOString())
-        .lte('start_time', lookAheadEnd.toISOString())
+        .lte('start_time', lookAheadEnd)
 
       // Detect open slots (server-side version of the client-side detectOpenSlots)
       const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
@@ -157,10 +157,12 @@ export async function GET(request: Request) {
       }
 
       for (let d = 0; d < lookAheadDays; d++) {
-        const date = new Date(now)
-        date.setDate(date.getDate() + d)
-        const dayName = DAY_NAMES[date.getDay()]
-        const dateStr = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`
+        // Salon-local days. Built from the server clock (UTC), the day and the
+        // booked hours below were shifted against the 9–5 local work window.
+        const dateStr = addDays(localNow.dateStr, d)
+        const [dy, dm, dd] = dateStr.split('-').map(Number)
+        const dow = new Date(Date.UTC(dy, dm - 1, dd)).getUTCDay()
+        const dayName = DAY_NAMES[dow]
         // Openings found on THIS day only — the summary below used to read the
         // running total, so once any day had an opening every later day got
         // listed too, closed Wednesdays included.
@@ -179,19 +181,15 @@ export async function GET(request: Request) {
           // Day off, every-other-week phase, vacation, or a holiday they take off
           if (isStaffOffOnDate(s.schedule as Record<string, unknown> | null, dateStr)) continue
           if (dayConfig?.off) continue
-          if (!dayConfig && date.getDay() === 0) continue
+          if (!dayConfig && dow === 0) continue
 
           // Build booked intervals
           const booked: { start: number; end: number }[] = []
           for (const apt of (aptList || [])) {
             if (apt.staff_id !== s.id) continue
-            const aptDate = new Date(apt.start_time)
-            const aptDateStr = `${aptDate.getFullYear()}-${String(aptDate.getMonth()+1).padStart(2,'0')}-${String(aptDate.getDate()).padStart(2,'0')}`
-            if (aptDateStr !== dateStr) continue
-            const startH = aptDate.getHours() + aptDate.getMinutes() / 60
-            const endDate = new Date(apt.end_time)
-            const endH = endDate.getHours() + endDate.getMinutes() / 60
-            booked.push({ start: startH, end: endH })
+            const aptStart = partsInTz(apt.start_time, tz)
+            if (aptStart.dateStr !== dateStr) continue
+            booked.push({ start: aptStart.hourDecimal, end: partsInTz(apt.end_time, tz).hourDecimal })
           }
           booked.sort((a, b) => a.start - b.start)
 
@@ -229,7 +227,8 @@ export async function GET(request: Request) {
         // Build a human-readable summary for the first few days that actually
         // have an opening.
         if (daySlots > 0 && slotDescriptions.length < 3) {
-          const dateLabel = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+          const dateLabel = new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' })
+            .format(new Date(Date.UTC(dy, dm - 1, dd)))
           slotDescriptions.push(dateLabel)
         }
       }
@@ -303,7 +302,7 @@ export async function GET(request: Request) {
           // Log as campaign
           await supabase.from('campaigns').insert({
             tenant_id: tenant.id,
-            name: `[Auto] Fill My Openings — ${new Date().toLocaleDateString()}`,
+            name: `[Auto] Fill My Openings — ${localNow.dateStr}`,
             type: 'fill_openings',
             status: 'completed',
             last_sent: new Date().toISOString(),
@@ -507,7 +506,7 @@ export async function GET(request: Request) {
           // Mark as followed up
           await supabase
             .from('appointments')
-            .update({ notes: `${apt.notes || ''}\n[Auto] No-show follow-up sent ${new Date().toLocaleDateString()}` })
+            .update({ notes: `${apt.notes || ''}\n[Auto] No-show follow-up sent ${localNow.dateStr}` })
             .eq('id', apt.id)
         }
       }
@@ -565,7 +564,7 @@ export async function GET(request: Request) {
           // Mark as requested
           await supabase
             .from('appointments')
-            .update({ notes: `${apt.notes || ''}\n[Auto] Review request sent ${new Date().toLocaleDateString()}` })
+            .update({ notes: `${apt.notes || ''}\n[Auto] Review request sent ${localNow.dateStr}` })
             .eq('id', apt.id)
         }
       }
@@ -577,7 +576,10 @@ export async function GET(request: Request) {
     if (automationOn(automations, 'auto_holiday')) {
       const holidaySettings = (settings.holiday_settings || {}) as Record<string, number>
       const sendDaysBefore = holidaySettings.send_days_before ?? 7
-      const today = new Date()
+      // The salon's calendar date as a server-local Date, so getNextHolidayDate's
+      // local getters and the day count below line up with the salon.
+      const [hy, hm, hd] = localNow.dateStr.split('-').map(Number)
+      const today = new Date(hy, hm - 1, hd)
 
       for (const holiday of PROMO_HOLIDAYS) {
         // Next occurrence — floating holidays resolve per year, so this never

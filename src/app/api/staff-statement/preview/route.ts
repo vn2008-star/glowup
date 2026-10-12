@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
+import { fetchTenantTz } from '@/lib/notifications'
+import { payPeriodInTz } from '@/lib/tz'
 
 // ─── Preview Statement URL Generator ───
 // Generates a signed statement URL for owners/managers to preview
@@ -47,33 +49,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Only owners and managers can preview statements' }, { status: 403 })
   }
 
-  // Calculate period dates
-  const now = new Date()
-  const periodType = period || 'biweekly'
-  const off = offset || 0
-  let periodStart: Date, periodEnd: Date
-
-  if (periodType === 'monthly') {
-    const month = now.getMonth() + off
-    periodStart = new Date(now.getFullYear(), month, 1)
-    periodEnd = new Date(now.getFullYear(), month + 1, 0, 23, 59, 59)
-  } else {
-    const currentDay = now.getDate()
-    const isFirstHalf = currentDay <= 15
-    let halfIndex = (isFirstHalf ? 0 : 1) + off
-    const monthOffset = Math.floor(halfIndex / 2) + (halfIndex < 0 && halfIndex % 2 !== 0 ? -1 : 0)
-    const half = ((halfIndex % 2) + 2) % 2
-    const targetMonth = now.getMonth() + monthOffset
-    const targetDate = new Date(now.getFullYear(), targetMonth, 1)
-
-    if (half === 0) {
-      periodStart = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1)
-      periodEnd = new Date(targetDate.getFullYear(), targetDate.getMonth(), 15, 23, 59, 59)
-    } else {
-      periodStart = new Date(targetDate.getFullYear(), targetDate.getMonth(), 16)
-      periodEnd = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0, 23, 59, 59)
-    }
-  }
+  // Same period maths as reports.staff-revenue and send-staff-reports, in
+  // the salon's zone, so the preview link covers exactly what the email will.
+  const pp = payPeriodInTz(period === 'monthly' ? 'monthly' : 'biweekly', Number(offset) || 0, await fetchTenantTz(svc, staffRecord.tenant_id))
+  const periodStart = new Date(pp.start)
+  const periodEnd = new Date(pp.end)
 
   const startISO = periodStart.toISOString()
   const endISO = periodEnd.toISOString()

@@ -115,6 +115,55 @@ export function addDays(dateStr: string, days: number): string {
   return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10)
 }
 
+/** Last day of a month, 1–31. month is 1-based. */
+export function daysInMonth(year: number, month: number): number {
+  return new Date(Date.UTC(year, month, 0)).getUTCDate()
+}
+
+/**
+ * A reporting period in the salon's zone: the whole month, or the 1st–15th /
+ * 16th–end halves salons pay commission on. `offset` steps back (-1 = the
+ * previous period) from the period containing `now`. Both bounds are UTC
+ * instants for `gte`/`lte` on start_time; the strings and label are
+ * salon-local. Server-side period math used `new Date(y, m, 1)` in the
+ * server's zone (UTC on Vercel), so for a Pacific salon the "16th" began at
+ * 5 PM on the 15th and anything after 4 PM on the last day of a period was
+ * paid in the next one.
+ */
+export function payPeriodInTz(
+  type: 'monthly' | 'biweekly',
+  offset: number,
+  tz: string,
+  now: Date = new Date()
+): { start: string; end: string; startStr: string; endStr: string; label: string } {
+  const today = getDateParts(now, tz)
+  let y = today.year, m = today.month, startDay = 1, endDay: number
+  if (type === 'monthly') {
+    const idx = y * 12 + (m - 1) + offset
+    y = Math.floor(idx / 12); m = (idx % 12 + 12) % 12 + 1
+    endDay = daysInMonth(y, m)
+  } else {
+    // Index halves from year 0 so negative offsets stay exact.
+    const halfIdx = (y * 12 + (m - 1)) * 2 + (today.day <= 15 ? 0 : 1) + offset
+    const monthIdx = Math.floor(halfIdx / 2)
+    const half = ((halfIdx % 2) + 2) % 2
+    y = Math.floor(monthIdx / 12); m = (monthIdx % 12 + 12) % 12 + 1
+    startDay = half === 0 ? 1 : 16
+    endDay = half === 0 ? 15 : daysInMonth(y, m)
+  }
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const startStr = `${y}-${pad(m)}-${pad(startDay)}`
+  const endStr = `${y}-${pad(m)}-${pad(endDay)}`
+  const monthName = new Intl.DateTimeFormat('en-US', { month: type === 'monthly' ? 'long' : 'short', timeZone: 'UTC' })
+    .format(new Date(Date.UTC(y, m - 1, 1)))
+  const label = type === 'monthly' ? `${monthName} ${y}` : `${monthName} ${startDay}–${endDay}, ${y}`
+  return {
+    start: dayRangeInTz(startStr, tz).start,
+    end: dayRangeInTz(endStr, tz).end,
+    startStr, endStr, label,
+  }
+}
+
 /**
  * UTC bounds of a salon-local calendar day, for `gte`/`lte` on start_time.
  * A bare `${date}T00:00:00` is read by Postgres as UTC — for a Pacific salon

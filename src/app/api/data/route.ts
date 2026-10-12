@@ -12,7 +12,7 @@ import { DEFAULT_BIRTHDAY_TEMPLATE } from '@/lib/schedule-utils'
 import { getDashboardOverview } from '@/lib/overview-query'
 import { getClientsList, getCalendarLoad } from '@/lib/dashboard-queries'
 import { toE164 } from '@/lib/utils'
-import { dayRangeInTz, todayInTz } from '@/lib/tz'
+import { dayRangeInTz, todayInTz, payPeriodInTz, partsInTz, daysInMonth } from '@/lib/tz'
 import { scryptSync, randomBytes, timingSafeEqual } from 'node:crypto'
 
 // ─── Front Desk PINs ───
@@ -1402,8 +1402,11 @@ export async function POST(request: Request) {
         }
 
         if (payload?.month && payload?.year) {
-          const startOfMonth = new Date(payload.year, payload.month - 1, 1).toISOString()
-          const endOfMonth = new Date(payload.year, payload.month, 0, 23, 59, 59).toISOString()
+          const tz = await fetchTenantTz(svc, tenantId)
+          const y = Number(payload.year), mo = Number(payload.month)
+          const mm = String(mo).padStart(2, '0')
+          const startOfMonth = dayRangeInTz(`${y}-${mm}-01`, tz).start
+          const endOfMonth = dayRangeInTz(`${y}-${mm}-${String(daysInMonth(y, mo)).padStart(2, '0')}`, tz).end
           query = query.or(`scheduled_at.gte.${startOfMonth},created_at.gte.${startOfMonth}`)
             .or(`scheduled_at.lte.${endOfMonth},created_at.lte.${endOfMonth}`)
         }
@@ -1625,10 +1628,10 @@ export async function POST(request: Request) {
 
       // ─── REPORTS ───
       case 'reports.overview': {
-        const now = new Date()
-        const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-        const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString()
-        const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59).toISOString()
+        // Months in the salon's zone (the server's is UTC).
+        const tz = await fetchTenantTz(svc, tenantId)
+        const thisMonthStart = payPeriodInTz('monthly', 0, tz).start
+        const { start: lastMonthStart, end: lastMonthEnd } = payPeriodInTz('monthly', -1, tz)
 
         // Fire ALL queries in parallel instead of sequentially
         const [
@@ -1969,7 +1972,7 @@ export async function POST(request: Request) {
             staff_id: payload.staff_id || null,
             service_id: payload.service_id || null,
             appointment_id: payload.appointment_id || null,
-            date: payload.date || new Date().toISOString().split('T')[0],
+            date: payload.date || todayInTz(await fetchTenantTz(svc, tenantId)),
             notes: payload.notes || null,
             formula: payload.formula || null,
             before_photo_urls: payload.before_photo_urls || [],
@@ -1993,9 +1996,7 @@ export async function POST(request: Request) {
 
       // ─── ADVANCED REPORTS ───
       case 'reports.staff-performance': {
-        const now = new Date()
-        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-        const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString()
+        const { start: monthStart, end: monthEnd } = payPeriodInTz('monthly', 0, await fetchTenantTz(svc, tenantId))
 
         const [aptsRes, staffRes] = await Promise.all([
           svc.from('appointments').select('id, staff_id, client_id, status, total_price').eq('tenant_id', tenantId)
@@ -2045,46 +2046,14 @@ export async function POST(request: Request) {
       case 'reports.staff-revenue': {
         // payload: { period: 'biweekly' | 'monthly', offset?: number }
         // offset: 0 = current period, -1 = previous, etc.
-        const periodType = payload?.period || 'biweekly'
-        const offset = payload?.offset || 0
-        const now = new Date()
-
-        let periodStart: Date, periodEnd: Date, periodLabel: string
-
-        if (periodType === 'monthly') {
-          const month = now.getMonth() + offset
-          periodStart = new Date(now.getFullYear(), month, 1)
-          periodEnd = new Date(now.getFullYear(), month + 1, 0, 23, 59, 59)
-          periodLabel = periodStart.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-        } else {
-          // Biweekly: periods start on 1st and 16th of each month
-          const currentDay = now.getDate()
-          const isFirstHalf = currentDay <= 15
-          const baseMonth = now.getMonth()
-          const baseYear = now.getFullYear()
-
-          // Calculate biweekly offset
-          let halfIndex = isFirstHalf ? 0 : 1
-          halfIndex += offset
-
-          // Convert halfIndex back to actual period
-          const monthOffset = Math.floor(halfIndex / 2) + (halfIndex < 0 && halfIndex % 2 !== 0 ? -1 : 0)
-          const half = ((halfIndex % 2) + 2) % 2 // normalize to 0 or 1
-
-          const targetMonth = baseMonth + monthOffset
-          const targetDate = new Date(baseYear, targetMonth, 1)
-
-          if (half === 0) {
-            periodStart = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1)
-            periodEnd = new Date(targetDate.getFullYear(), targetDate.getMonth(), 15, 23, 59, 59)
-          } else {
-            periodStart = new Date(targetDate.getFullYear(), targetDate.getMonth(), 16)
-            periodEnd = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0, 23, 59, 59)
-          }
-
-          const monthName = periodStart.toLocaleDateString('en-US', { month: 'short' })
-          periodLabel = `${monthName} ${periodStart.getDate()}–${periodEnd.getDate()}, ${periodStart.getFullYear()}`
-        }
+        const periodType = payload?.period === 'monthly' ? 'monthly' : 'biweekly'
+        const offset = Number(payload?.offset) || 0
+        // Same period maths as send-staff-reports and the statement preview,
+        // in the salon's zone, so the emailed statement and this report agree.
+        const period = payPeriodInTz(periodType, offset, await fetchTenantTz(svc, tenantId))
+        const periodStart = new Date(period.start)
+        const periodEnd = new Date(period.end)
+        const periodLabel = period.label
 
         const [aptsRes, staffRes] = await Promise.all([
           svc.from('appointments').select('id, staff_id, client_id, total_price, tip_amount').eq('tenant_id', tenantId)
@@ -2276,8 +2245,9 @@ export async function POST(request: Request) {
           .lte('start_time', forecastEnd)
           .in('status', ['pending', 'confirmed'])
 
-        // Past 6 months for historical trend
-        const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 6, 1).toISOString()
+        // Past 6 months for historical trend, bucketed by the salon's months
+        const tz = await fetchTenantTz(svc, tenantId)
+        const sixMonthsAgo = payPeriodInTz('monthly', -6, tz).start
         const { data: historical } = await svc
           .from('appointments')
           .select('start_time, total_price, status')
@@ -2306,11 +2276,11 @@ export async function POST(request: Request) {
         // Monthly historical trend
         const monthlyTrend: { month: string; revenue: number }[] = []
         for (let m = 5; m >= 0; m--) {
-          const mDate = new Date(now.getFullYear(), now.getMonth() - m, 1)
-          const mEnd = new Date(now.getFullYear(), now.getMonth() - m + 1, 0, 23, 59, 59)
-          const mLabel = mDate.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
+          const p = payPeriodInTz('monthly', -m, tz)
+          const mLabel = new Intl.DateTimeFormat('en-US', { month: 'short', year: '2-digit', timeZone: 'UTC' })
+            .format(new Date(p.startStr + 'T00:00:00Z'))
           const mRevenue = (historical || [])
-            .filter(a => { const d = new Date(a.start_time); return d >= mDate && d <= mEnd })
+            .filter(a => a.start_time >= p.start && a.start_time <= p.end)
             .reduce((s, a) => s + (a.total_price || 0), 0)
           monthlyTrend.push({ month: mLabel, revenue: mRevenue })
         }
@@ -2343,10 +2313,14 @@ export async function POST(request: Request) {
         const grid: Record<string, Record<number, number>> = {}
         for (const d of days) { grid[d] = {}; for (const h of hours) grid[d][h] = 0 }
 
+        // Weekday and hour in the salon's zone. In UTC a 10 AM Pacific
+        // appointment landed in the 5 PM cell and evening ones on the next day.
+        const tz = await fetchTenantTz(svc, tenantId)
         for (const a of (apts || [])) {
-          const d = new Date(a.start_time)
-          const dayName = days[(d.getDay() + 6) % 7] // JS Sunday=0, shift to Monday=0
-          const hour = d.getHours()
+          const d = partsInTz(a.start_time, tz)
+          const dow = new Date(Date.UTC(d.year, d.month - 1, d.day)).getUTCDay()
+          const dayName = days[(dow + 6) % 7] // JS Sunday=0, shift to Monday=0
+          const hour = d.hour
           if (hour >= 8 && hour <= 20 && grid[dayName]) {
             grid[dayName][hour] = (grid[dayName][hour] || 0) + 1
           }

@@ -50,7 +50,12 @@ export async function getDashboardOverview(
   const today = new Date()
   // The salon's day, not UTC's — a UTC day is 5 PM–5 PM for a Pacific salon
   const tz = await fetchTenantTz(svc, tenantId)
-  const todayRange = dayRangeInTz(todayInTz(tz), tz)
+  const todayStr = todayInTz(tz)
+  const todayRange = dayRangeInTz(todayStr, tz)
+  // The salon's date as a server-local Date for the birthday countdown, which
+  // reads local getters; using the server's own date was a day off after 5 PM.
+  const [ty, tm, td] = todayStr.split('-').map(Number)
+  const salonToday = new Date(ty, tm - 1, td)
   const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)
   const sixtyDaysAgo = new Date(today.getTime() - 60 * 24 * 60 * 60 * 1000)
 
@@ -113,7 +118,7 @@ export async function getDashboardOverview(
 
   // Birthdays coming up in the next 30 days, soonest first
   const upcomingBirthdays = (birthdayClientsRes.data || [])
-    .map(c => ({ ...c, days_away: daysUntilBirthday(c.birthday as string, today) }))
+    .map(c => ({ ...c, days_away: daysUntilBirthday(c.birthday as string, salonToday) }))
     .filter(c => c.days_away !== null && c.days_away <= 30)
     .sort((a, b) => (a.days_away as number) - (b.days_away as number))
     .slice(0, 8)

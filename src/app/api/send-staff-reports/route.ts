@@ -4,6 +4,8 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 import { verifyCronRequest } from '@/lib/cron-auth'
 import { siteBaseUrl } from '@/lib/site-url'
+import { fetchTenantTz, resolveTenantTz } from '@/lib/notifications'
+import { payPeriodInTz, todayInTz } from '@/lib/tz'
 
 // ─── Staff Revenue Report Email Sender ───
 // POST: Manual send from dashboard (authenticated via session)
@@ -70,7 +72,7 @@ export async function GET(request: Request) {
 
   const { data: tenants } = await svc
     .from('tenants')
-    .select('id, name, settings')
+    .select('id, name, settings, timezone, address')
 
   if (!tenants || tenants.length === 0) {
     return NextResponse.json({ message: 'No tenants found', processed: 0 })
@@ -84,7 +86,8 @@ export async function GET(request: Request) {
 
     if (!automations.auto_staff_reports) continue
 
-    const day = new Date().getDate()
+    // The 1st/16th in the salon's own zone, not the server's
+    const day = Number(todayInTz(resolveTenantTz(tenant)).slice(8))
     const reportPeriod = (settings.staff_report_period as string) || 'biweekly'
 
     if (reportPeriod === 'monthly' && day !== 1) continue
@@ -116,40 +119,15 @@ async function sendReports(
   offset: number,
   staffIds?: string[]
 ) {
-  const now = new Date()
-  let periodStart: Date, periodEnd: Date, periodLabel: string
-
-  if (periodType === 'monthly') {
-    const month = now.getMonth() + offset
-    periodStart = new Date(now.getFullYear(), month, 1)
-    periodEnd = new Date(now.getFullYear(), month + 1, 0, 23, 59, 59)
-    periodLabel = periodStart.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-  } else {
-    const currentDay = now.getDate()
-    const isFirstHalf = currentDay <= 15
-    const baseMonth = now.getMonth()
-    const baseYear = now.getFullYear()
-
-    let halfIndex = isFirstHalf ? 0 : 1
-    halfIndex += offset
-
-    const monthOffset = Math.floor(halfIndex / 2) + (halfIndex < 0 && halfIndex % 2 !== 0 ? -1 : 0)
-    const half = ((halfIndex % 2) + 2) % 2
-
-    const targetMonth = baseMonth + monthOffset
-    const targetDate = new Date(baseYear, targetMonth, 1)
-
-    if (half === 0) {
-      periodStart = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1)
-      periodEnd = new Date(targetDate.getFullYear(), targetDate.getMonth(), 15, 23, 59, 59)
-    } else {
-      periodStart = new Date(targetDate.getFullYear(), targetDate.getMonth(), 16)
-      periodEnd = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0, 23, 59, 59)
-    }
-
-    const monthName = periodStart.toLocaleDateString('en-US', { month: 'short' })
-    periodLabel = `${monthName} ${periodStart.getDate()}–${periodEnd.getDate()}, ${periodStart.getFullYear()}`
-  }
+  // Period bounds in the SALON's zone (shared with reports.staff-revenue and
+  // the statement preview). Computed in the server's zone, the "16th" began
+  // at 5 PM Pacific on the 15th and the last afternoon of a period was paid
+  // in the next one.
+  const tz = await fetchTenantTz(svc, tenantId)
+  const period = payPeriodInTz(periodType === 'monthly' ? 'monthly' : 'biweekly', offset, tz)
+  const periodStart = new Date(period.start)
+  const periodEnd = new Date(period.end)
+  const periodLabel = period.label
 
   // Fetch data — include clients & services for itemized detail
   const [tenantRes, aptsRes, staffRes, clientsRes, servicesRes] = await Promise.all([
@@ -203,8 +181,8 @@ async function sendReports(
 
     const aptDate = new Date(a.start_time)
     r.lines.push({
-      date: aptDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      time: aptDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+      date: aptDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: tz }),
+      time: aptDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz }),
       clientName: a.client_id ? (clientMap[a.client_id] || 'Walk-in') : 'Walk-in',
       serviceName: a.service_id ? (serviceMap[a.service_id] || a.service_name || 'Service') : (a.service_name || 'Service'),
       price: a.total_price || 0,

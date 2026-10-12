@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
+import { resolveTenantTz } from '@/lib/notifications'
 
 // ─── Statement Data API ───
 // Returns itemized statement data for a staff member
@@ -35,7 +36,7 @@ export async function GET(request: Request) {
   )
 
   const [tenantRes, staffRes, aptsRes, clientsRes, servicesRes] = await Promise.all([
-    svc.from('tenants').select('name').eq('id', tenantId).single(),
+    svc.from('tenants').select('name, timezone, address, settings').eq('id', tenantId).single(),
     svc.from('staff').select('id, name, email, role, commission_rate').eq('id', staffId).single(),
     svc.from('appointments').select('*').eq('tenant_id', tenantId).eq('staff_id', staffId)
       .gte('start_time', start).lte('start_time', end)
@@ -45,6 +46,7 @@ export async function GET(request: Request) {
   ])
 
   const businessName = tenantRes.data?.name || 'Your Salon'
+  const tz = resolveTenantTz(tenantRes.data)
   const staff = staffRes.data
   const apts = aptsRes.data || []
   const clients = clientsRes.data || []
@@ -67,8 +69,8 @@ export async function GET(request: Request) {
     totalTips += tip
     const d = new Date(a.start_time as string)
     return {
-      date: d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
-      time: d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+      date: d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: tz }),
+      time: d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz }),
       client: a.client_id ? (clientMap[a.client_id as string] || 'Walk-in') : 'Walk-in',
       service: a.service_id ? (serviceMap[a.service_id as string] || (a.service_name as string) || 'Service') : ((a.service_name as string) || 'Service'),
       price,
@@ -82,7 +84,7 @@ export async function GET(request: Request) {
   // Build period label
   const startDate = new Date(start)
   const endDate = new Date(end)
-  const periodLabel = `${startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+  const periodLabel = `${startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: tz })} – ${endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: tz })}`
 
   return NextResponse.json({
     data: {
