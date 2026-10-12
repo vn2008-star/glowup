@@ -5,6 +5,8 @@
 // drift apart.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { fetchTenantTz } from '@/lib/notifications'
+import { dayRangeInTz, todayInTz } from '@/lib/tz'
 
 /**
  * Days until the next occurrence of a birthday (0 = today), year-agnostic.
@@ -46,7 +48,9 @@ export async function getDashboardOverview(
   tenantId: string
 ): Promise<OverviewData> {
   const today = new Date()
-  const todayStr = today.toISOString().split('T')[0]
+  // The salon's day, not UTC's — a UTC day is 5 PM–5 PM for a Pacific salon
+  const tz = await fetchTenantTz(svc, tenantId)
+  const todayRange = dayRangeInTz(todayInTz(tz), tz)
   const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)
   const sixtyDaysAgo = new Date(today.getTime() - 60 * 24 * 60 * 60 * 1000)
 
@@ -64,8 +68,8 @@ export async function getDashboardOverview(
     svc.from('appointments')
       .select('id, client_id, staff_id, service_id, start_time, end_time, status, total_price, notes, payment_method, tip_amount, checked_in_at, client:clients(id, first_name, last_name, phone, email), service:services(id, name, price), staff_member:staff!staff_id(id, name, photo_url)')
       .eq('tenant_id', tenantId)
-      .gte('start_time', `${todayStr}T00:00:00`)
-      .lte('start_time', `${todayStr}T23:59:59`)
+      .gte('start_time', todayRange.start)
+      .lte('start_time', todayRange.end)
       .order('start_time'),
     svc.from('clients')
       .select('id', { count: 'exact', head: true })

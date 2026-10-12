@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "rea
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData, uploadImage } from "@/lib/api";
-import { todayInTz, DEFAULT_TZ } from "@/lib/tz";
+import { todayInTz, dayRangeInTz, formatDateInTz, DEFAULT_TZ } from "@/lib/tz";
 import { GlowUpLogo } from "@/components/GlowUpLogo";
 import { localeDateStr } from "@/lib/utils";
 import styles from "./checkout.module.css";
@@ -24,11 +24,13 @@ export default function CheckoutPage() {
   const [appointments, setAppointments] = useState<FullAppointment[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [staffMembers, setStaffMembers] = useState<Staff[]>([]);
+  // Same source as the Calendar, so both screens agree on what "Oct 9" means
+  const salonTz = tenant?.timezone || DEFAULT_TZ;
   const [selectedDate, setSelectedDate] = useState(() => {
-    return todayInTz(DEFAULT_TZ);
+    return todayInTz(salonTz);
   });
   // Stamped once so the "Today" shortcut doesn't read the clock every render
-  const [todayStr] = useState(() => todayInTz(DEFAULT_TZ));
+  const [todayStr] = useState(() => todayInTz(salonTz));
   const dateInputRef = useRef<HTMLInputElement>(null);
 
   // Checkout state
@@ -112,8 +114,7 @@ export default function CheckoutPage() {
     if (!tenant) return;
     setLoading(true);
 
-    const dayStart = `${selectedDate}T00:00:00`;
-    const dayEnd = `${selectedDate}T23:59:59`;
+    const { start: dayStart, end: dayEnd } = dayRangeInTz(selectedDate, salonTz);
 
     const [aptsRes, svcRes, staffRes] = await Promise.all([
       queryData<FullAppointment[]>("appointments.list", { startDate: dayStart, endDate: dayEnd }),
@@ -129,7 +130,7 @@ export default function CheckoutPage() {
     setServices((svcRes.data || []).filter((s) => s.is_active));
     setStaffMembers(staffRes.data || []);
     setLoading(false);
-  }, [tenant, selectedDate]);
+  }, [tenant, selectedDate, salonTz]);
 
   useEffect(() => {
     fetchData();
@@ -625,7 +626,7 @@ export default function CheckoutPage() {
           client_id: selectedApt.client_id,
           staff_id: selectedApt.staff_id,
           service_id: selectedApt.service_id,
-          date: selectedApt.start_time?.split("T")[0] || selectedDate,
+          date: selectedApt.start_time ? formatDateInTz(new Date(selectedApt.start_time), salonTz) : selectedDate,
           before_photo_urls: beforePhoto ? [beforePhoto] : [],
           after_photo_urls: afterPhoto ? [afterPhoto] : [],
           total_paid: chargeTotal + tip,
@@ -1297,7 +1298,7 @@ export default function CheckoutPage() {
                   // Current time marker
                   const now = new Date();
                   const nowHDec = now.getHours() + now.getMinutes() / 60;
-                  const isToday = selectedDate === now.toISOString().split("T")[0];
+                  const isToday = selectedDate === todayInTz(salonTz);
 
                   const staffColors = [
                     "linear-gradient(135deg, #8B5CF6, #EC4899)",

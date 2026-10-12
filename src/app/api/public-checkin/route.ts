@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { resolveTenantTz } from '@/lib/notifications'
+import { dayRangeInTz, todayInTz } from '@/lib/tz'
 
 // Public API — no auth required. For client self-check-in on Front Desk welcome screen.
 const svc = createClient(
@@ -20,7 +22,7 @@ export async function GET(request: Request) {
   // Resolve tenant
   const { data: tenant } = await svc
     .from('tenants')
-    .select('id')
+    .select('id, timezone, address, settings')
     .eq('slug', slug)
     .single()
 
@@ -29,16 +31,17 @@ export async function GET(request: Request) {
   }
 
   // Get today's date range
-  const now = new Date()
-  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  // The salon's day — the server runs in UTC, which is 5 PM–5 PM for a Pacific salon
+  const tz = resolveTenantTz(tenant)
+  const today = dayRangeInTz(todayInTz(tz), tz)
 
   // Fetch today's non-cancelled appointments with client info
   const { data: appointments } = await svc
     .from('appointments')
     .select('id, start_time, end_time, status, checked_in_at, checked_out_at, client:clients(first_name, last_name, phone), service:services(name), staff_member:staff!staff_id(name)')
     .eq('tenant_id', tenant.id)
-    .gte('start_time', `${todayStr}T00:00:00`)
-    .lte('start_time', `${todayStr}T23:59:59`)
+    .gte('start_time', today.start)
+    .lte('start_time', today.end)
     .in('status', ['pending', 'confirmed'])
     .order('start_time', { ascending: true })
 

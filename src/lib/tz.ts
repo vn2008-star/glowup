@@ -86,6 +86,21 @@ export function todayInTz(tz: string): string {
 }
 
 /**
+ * UTC bounds of a salon-local calendar day, for `gte`/`lte` on start_time.
+ * A bare `${date}T00:00:00` is read by Postgres as UTC — for a Pacific salon
+ * that's a 5 PM–5 PM window, which drops evening appointments into tomorrow.
+ */
+export function dayRangeInTz(dateStr: string, tz: string): { start: string; end: string } {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const next = new Date(Date.UTC(y, m - 1, d + 1))
+  const nextStr = `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, '0')}-${String(next.getUTCDate()).padStart(2, '0')}`
+  return {
+    start: localToUTC(dateStr, '00:00', tz).toISOString(),
+    end: new Date(localToUTC(nextStr, '00:00', tz).getTime() - 1).toISOString(),
+  }
+}
+
+/**
  * Format a Date object as "YYYY-MM-DD" in a specific timezone.
  */
 export function formatDateInTz(date: Date, tz: string): string {

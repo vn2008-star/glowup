@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { resolveTenantTz } from '@/lib/notifications'
+import { dayRangeInTz, todayInTz } from '@/lib/tz'
 
 // Public API — no auth required. For walk-in waitlist on Front Desk welcome screen.
 const svc = createClient(
@@ -19,7 +21,7 @@ export async function GET(request: Request) {
   // Resolve tenant
   const { data: tenant } = await svc
     .from('tenants')
-    .select('id')
+    .select('id, timezone, address, settings')
     .eq('slug', slug)
     .single()
 
@@ -28,7 +30,9 @@ export async function GET(request: Request) {
   }
 
   const now = new Date()
-  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  // The salon's day — the server runs in UTC, which is 5 PM–5 PM for a Pacific salon
+  const tz = resolveTenantTz(tenant)
+  const today = dayRangeInTz(todayInTz(tz), tz)
   const currentTime = now.getTime()
 
   // Get active staff
@@ -44,7 +48,7 @@ export async function GET(request: Request) {
     .select('id, client_id, service_id, staff_id, status, notes, created_at, client:clients(first_name, last_name), service:services(name, duration_minutes, price)')
     .eq('tenant_id', tenant.id)
     .eq('status', 'waiting')
-    .gte('created_at', `${todayStr}T00:00:00`)
+    .gte('created_at', today.start)
     .order('created_at', { ascending: true })
 
   // Get today's confirmed/pending appointments per staff for wait-time estimation
@@ -52,8 +56,8 @@ export async function GET(request: Request) {
     .from('appointments')
     .select('staff_id, start_time, end_time, status')
     .eq('tenant_id', tenant.id)
-    .gte('start_time', `${todayStr}T00:00:00`)
-    .lte('start_time', `${todayStr}T23:59:59`)
+    .gte('start_time', today.start)
+    .lte('start_time', today.end)
     .in('status', ['pending', 'confirmed'])
 
   // Calculate per-staff busy minutes (time until their last appointment ends)

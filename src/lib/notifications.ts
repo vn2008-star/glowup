@@ -53,6 +53,16 @@ export function resolveTenantTz(tenant: {
     || DEFAULT_TZ
 }
 
+/** Look up and resolve a tenant's timezone by id. */
+export async function fetchTenantTz(svc: SupabaseClient, tenantId: string): Promise<string> {
+  const { data } = await svc
+    .from('tenants')
+    .select('timezone, address, settings')
+    .eq('id', tenantId)
+    .maybeSingle()
+  return resolveTenantTz(data)
+}
+
 /**
  * Resolve a salon's arrival instructions — how to find the suite, where to
  * park, what to do on arrival. Lives in the `tenants.settings` JSON blob

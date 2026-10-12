@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient, type SupabaseClient } from '@supabase/supabase-js'
 import { getImpersonationOverride, isAdminEmail } from '@/lib/admin'
 import { resolveStaffRecord } from '@/lib/api-auth'
-import { scheduleClientReminders, sendClientBookingConfirmation, sendClientChangeNotice, resolveTenantTz, resolveSpecialInstructions, resolveOwnerCopyEmail, sendSms, greetingName } from '@/lib/notifications'
+import { scheduleClientReminders, sendClientBookingConfirmation, sendClientChangeNotice, resolveTenantTz, fetchTenantTz, resolveSpecialInstructions, resolveOwnerCopyEmail, sendSms, greetingName } from '@/lib/notifications'
 import { getTenantSmsConfig, sendSmsVerbose, smsProvider, type StoredSmsGateway } from '@/lib/sms'
 import { cancelAppointment } from '@/lib/cancel-appointment'
 import { promoEmailHtml } from '@/lib/email-templates'
@@ -12,6 +12,7 @@ import { DEFAULT_BIRTHDAY_TEMPLATE } from '@/lib/schedule-utils'
 import { getDashboardOverview } from '@/lib/overview-query'
 import { getClientsList, getCalendarLoad } from '@/lib/dashboard-queries'
 import { toE164 } from '@/lib/utils'
+import { dayRangeInTz, todayInTz } from '@/lib/tz'
 
 // Columns a client is allowed to write on `staff`.
 //
@@ -727,8 +728,8 @@ export async function POST(request: Request) {
 
         if (payload?.date) {
           // Legacy single-date param (kept for backwards compatibility)
-          const dateStr = payload.date;
-          query = query.gte('start_time', `${dateStr}T00:00:00`).lte('start_time', `${dateStr}T23:59:59`)
+          const day = dayRangeInTz(payload.date, await fetchTenantTz(svc, tenantId))
+          query = query.gte('start_time', day.start).lte('start_time', day.end)
         }
 
         if (payload?.startDate && payload?.endDate) {
@@ -1475,13 +1476,14 @@ export async function POST(request: Request) {
 
       // ─── WAITLIST ───
       case 'waitlist.list': {
-        const todayStr = new Date().toISOString().split('T')[0]
+        const tz = await fetchTenantTz(svc, tenantId)
+        const todayStart = dayRangeInTz(todayInTz(tz), tz).start
         const { data, error } = await svc
           .from('waitlist')
           .select('*, client:clients(id, first_name, last_name, phone, email), service:services(id, name, price), staff_member:staff!staff_id(id, name)')
           .eq('tenant_id', tenantId)
           .eq('status', 'waiting')
-          .gte('created_at', `${todayStr}T00:00:00`)
+          .gte('created_at', todayStart)
           .order('created_at', { ascending: true })
         return NextResponse.json({ data, error: error?.message })
       }
@@ -2431,9 +2433,9 @@ export async function POST(request: Request) {
 
       case 'reports.daily-tally': {
         // Only owners/managers can see full tally
-        const targetDate = payload?.date || new Date().toISOString().split('T')[0]
-        const dayStart = `${targetDate}T00:00:00`
-        const dayEnd = `${targetDate}T23:59:59`
+        const tz = await fetchTenantTz(svc, tenantId)
+        const targetDate = payload?.date || todayInTz(tz)
+        const { start: dayStart, end: dayEnd } = dayRangeInTz(targetDate, tz)
 
         // Get all completed/checked-out appointments for the day
         const { data: apts } = await svc
@@ -2726,13 +2728,14 @@ export async function POST(request: Request) {
 
       // ─── Waitlist: List entries for staff view ───
       case 'waitlist.list': {
-        const today = new Date().toISOString().split('T')[0]
+        const tz = await fetchTenantTz(svc, tenantId)
+        const todayStart = dayRangeInTz(todayInTz(tz), tz).start
         const { data: entries, error: wlErr } = await svc
           .from('waitlist')
           .select('id, client_id, service_id, staff_id, status, notes, created_at, client:clients(first_name, last_name), service:services(name, duration_minutes, price)')
           .eq('tenant_id', tenantId)
           .eq('status', 'waiting')
-          .gte('created_at', `${today}T00:00:00`)
+          .gte('created_at', todayStart)
           .order('created_at', { ascending: true })
 
         if (wlErr) return NextResponse.json({ error: wlErr.message }, { status: 500 })
