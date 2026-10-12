@@ -15,6 +15,7 @@ import type { CustomClosedDate } from "@/lib/schedule-utils";
 import styles from "./settings.module.css";
 import { Icon } from "@/components/ui/Icon";
 import { formatPhone, localeDateStr } from "@/lib/utils";
+import { resolveConsentForm, DEFAULT_CONSENT_FORM, type ConsentFormConfig } from "@/lib/consent-shared";
 
 interface BusinessHours {
   [day: string]: { open: string; close: string; closed: boolean };
@@ -214,6 +215,9 @@ export default function SettingsPage() {
   // Accent colour for the public booking/manage pages ("" = app default)
   const [brandColor, setBrandColor] = useState("");
   const [brandSaving, setBrandSaving] = useState(false);
+  // Consent form (questions, terms, re-sign window); saved as one key
+  const [consentForm, setConsentForm] = useState<ConsentFormConfig>(DEFAULT_CONSENT_FORM);
+  const [consentSaving, setConsentSaving] = useState(false);
 
   const loadSettings = useCallback(() => {
     if (!tenant) return;
@@ -264,6 +268,7 @@ export default function SettingsPage() {
       setSpecialInstructionsSms(s.special_instructions_sms === true);
       setReviewUrl(typeof s.google_review_url === "string" ? s.google_review_url : "");
       setBrandColor(typeof s.brand_color === "string" ? s.brand_color : "");
+      setConsentForm(resolveConsentForm(s));
     }
 
     setLoading(false);
@@ -1352,6 +1357,109 @@ export default function SettingsPage() {
           <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
           <span>Enable masked communications for technicians</span>
         </label>
+      </div>
+
+      {/* Consent / intake form */}
+      <div id="consent-form" className={`card ${styles.section}`}>
+        <h2><Icon name="shield" /> Consent form</h2>
+        <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginBottom: "var(--space-4)" }}>
+          Health questions, allergies and a signature before adhesive or chemical services. Clients get a link on their booking confirmation; staff can also hand them the tablet from Front Desk or a client&apos;s profile.
+        </p>
+        <label className={styles.protectionToggle}>
+          <input
+            type="checkbox"
+            checked={consentForm.enabled}
+            onChange={(e) => setConsentForm({ ...consentForm, enabled: e.target.checked })}
+          />
+          <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
+          <span>Ask clients to sign a consent form</span>
+        </label>
+
+        {consentForm.enabled && (
+          <div style={{ marginTop: "var(--space-4)", display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+            <div>
+              <span className="label">Health questions (yes / no)</span>
+              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+                {consentForm.questions.map((q, i) => (
+                  <div key={q.id} style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
+                    <input
+                      className="input"
+                      value={q.label}
+                      aria-label={`Question ${i + 1}`}
+                      onChange={(e) => setConsentForm({ ...consentForm, questions: consentForm.questions.map((x, j) => j === i ? { ...x, label: e.target.value } : x) })}
+                    />
+                    <button type="button" className="btn btn-ghost btn-sm" aria-label="Remove question" onClick={() => setConsentForm({ ...consentForm, questions: consentForm.questions.filter((_, j) => j !== i) })}>✕</button>
+                  </div>
+                ))}
+              </div>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                style={{ marginTop: "var(--space-2)" }}
+                disabled={consentForm.questions.length >= 30}
+                onClick={() => setConsentForm({ ...consentForm, questions: [...consentForm.questions, { id: `q${Date.now().toString(36)}`, label: "" }] })}
+              >
+                + Add question
+              </button>
+            </div>
+
+            <div>
+              <label className="label" htmlFor="consent-terms">What the client agrees to</label>
+              <textarea
+                id="consent-terms"
+                className="input"
+                rows={8}
+                style={{ minHeight: 160, resize: "vertical" }}
+                value={consentForm.terms}
+                onChange={(e) => setConsentForm({ ...consentForm, terms: e.target.value })}
+              />
+            </div>
+
+            <label className={styles.protectionToggle}>
+              <input type="checkbox" checked={consentForm.photo_consent} onChange={(e) => setConsentForm({ ...consentForm, photo_consent: e.target.checked })} />
+              <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
+              <span>Ask for permission to post before/after photos</span>
+            </label>
+
+            <div>
+              <label className="label" htmlFor="consent-resign">Ask clients to sign again</label>
+              <select id="consent-resign" className="input" style={{ maxWidth: 240 }} value={consentForm.resign_months} onChange={(e) => setConsentForm({ ...consentForm, resign_months: Number(e.target.value) })}>
+                <option value={0}>Never (once is enough)</option>
+                <option value={6}>Every 6 months</option>
+                <option value={12}>Every 12 months</option>
+                <option value={24}>Every 2 years</option>
+              </select>
+            </div>
+          </div>
+        )}
+
+        <div style={{ display: "flex", gap: "var(--space-3)", alignItems: "center", marginTop: "var(--space-4)", flexWrap: "wrap" }}>
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            disabled={consentSaving}
+            onClick={async () => {
+              const questions = consentForm.questions.map(q => ({ ...q, label: q.label.trim() })).filter(q => q.label);
+              if (consentForm.enabled && questions.length === 0) { toast.error("Add at least one question, or turn the form off"); return; }
+              setConsentSaving(true);
+              const res = await fetch("/api/save-settings", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ settings: { consent_form: { ...consentForm, questions } } }),
+              });
+              setConsentSaving(false);
+              if (res.ok) { setConsentForm({ ...consentForm, questions }); toast.success("Consent form saved"); refetch(); }
+              else toast.error("Could not save the consent form");
+            }}
+          >
+            {consentSaving ? "Saving…" : "Save consent form"}
+          </button>
+          {consentForm.enabled && (
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setConsentForm({ ...DEFAULT_CONSENT_FORM, enabled: true })}>
+              ↻ Reset to the lash &amp; beauty default
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Review Request Auto-Send */}

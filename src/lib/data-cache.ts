@@ -37,6 +37,7 @@ const READ_ACTIONS = new Set([
   'campaigns.list',
   'charges.list',
   'clients.birthdays',
+  'clients.consent-link', // read: a signed link + status, no state change
   'clients.history',
   'clients.count',
   'clients.export', 'appointments.export', // reads: exporting changes nothing

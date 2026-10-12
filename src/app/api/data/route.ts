@@ -15,6 +15,7 @@ import { toE164 } from '@/lib/utils'
 import { siteBaseUrl } from '@/lib/site-url'
 import { dayRangeInTz, todayInTz, payPeriodInTz, partsInTz, daysInMonth, localToUTC, addDays } from '@/lib/tz'
 import { notifyWaitlistForOpening } from '@/lib/waitlist-openings'
+import { resolveConsentForm, readSignedConsent, consentState, clientConsentToken, SIGNATURE_BUCKET } from '@/lib/consent'
 import { scryptSync, randomBytes, timingSafeEqual } from 'node:crypto'
 
 // ─── Front Desk PINs ───
@@ -1611,6 +1612,37 @@ export async function POST(request: Request) {
         const { feedToken } = await import('@/app/api/calendar-feed/route')
         const url = `${siteBaseUrl()}/api/calendar-feed?tenant=${tenantId}&staff=${target}&token=${feedToken(tenantId, target)}`
         return NextResponse.json({ data: { url, webcal: url.replace(/^https?:/, 'webcal:') } })
+      }
+
+      // Consent form: where this client stands under the salon's current form,
+      // their private signing link (Clients drawer / Front Desk "Open form"),
+      // and a short-lived URL for the signature image. Any staff member may
+      // need to hand a client the tablet, so no role gate.
+      case 'clients.consent-link': {
+        const clientId = String(payload?.client_id || '')
+        if (!clientId) return NextResponse.json({ data: null, error: 'client_id required' }, { status: 400 })
+        const [{ data: client }, { data: tenant }] = await Promise.all([
+          svc.from('clients').select('id, preferences').eq('id', clientId).eq('tenant_id', tenantId).maybeSingle(),
+          svc.from('tenants').select('settings').eq('id', tenantId).maybeSingle(),
+        ])
+        if (!client) return NextResponse.json({ data: null, error: 'Client not found' }, { status: 404 })
+        const form = resolveConsentForm((tenant?.settings || {}) as Record<string, unknown>)
+        const token = clientConsentToken(tenantId, clientId)
+        const signed = readSignedConsent(client.preferences)
+        let signature_url: string | null = null
+        if (signed?.signature_path) {
+          const { data: s } = await svc.storage.from(SIGNATURE_BUCKET).createSignedUrl(signed.signature_path, 600)
+          signature_url = s?.signedUrl || null
+        }
+        return NextResponse.json({
+          data: {
+            enabled: form.enabled,
+            token,
+            url: `${siteBaseUrl()}/consent/${token}`,
+            state: consentState(client.preferences, form),
+            signed: signed ? { ...signed, signature_url, questions: form.questions } : null,
+          },
+        })
       }
 
       case 'staff.verify-pin': {

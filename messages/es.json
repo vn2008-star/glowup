@@ -587,6 +587,36 @@
     "waitlistText": "Déjanos tu número y te avisaremos por SMS si se libera un hueco.",
     "waitlistSubmit": "Avísame",
     "waitlistDone": "Estás en la lista. Te avisaremos si se libera este día.",
-    "waitlistFailed": "No pudimos añadirte a la lista. Inténtalo de nuevo."
+    "waitlistFailed": "No pudimos añadirte a la lista. Inténtalo de nuevo.",
+    "consentLink": "Completa tu formulario de consentimiento"
+  },
+  "consent": {
+    "title": "Formulario de consentimiento",
+    "loading": "Cargando…",
+    "invalidTitle": "Enlace no válido",
+    "invalidText": "Este enlace caducó o es incorrecto. Pide uno nuevo al salón.",
+    "notEnabled": "Este salón no usa formularios de consentimiento en línea ahora mismo.",
+    "alreadySigned": "Firmaste este formulario el {date}. Puedes actualizarlo abajo.",
+    "resignNeeded": "El salón necesita que revises y firmes este formulario de nuevo.",
+    "healthQuestions": "Preguntas de salud",
+    "healthHint": "Responde con sinceridad para que tu profesional pueda cuidarte.",
+    "yes": "Sí",
+    "no": "No",
+    "allergies": "Alergias o sensibilidades",
+    "allergiesPlaceholder": "p. ej. látex, adhesivo, fragancia — o \"ninguna\"",
+    "terms": "Por favor, lee",
+    "agree": "He leído y entendido lo anterior y acepto el servicio.",
+    "photoConsent": "Pueden usar fotos de antes/después de mi servicio en redes sociales (sin mostrar mi nombre).",
+    "typedName": "Escribe tu nombre completo",
+    "signature": "Firma",
+    "clear": "Borrar",
+    "signHint": "Firma con el dedo o el ratón.",
+    "submit": "Firmar y enviar",
+    "saving": "Guardando…",
+    "fine": "Enviado electrónicamente el {date}. Al firmar aceptas que tiene el mismo valor que una firma manuscrita.",
+    "failed": "No se pudo enviar. Inténtalo de nuevo.",
+    "doneTitle": "Gracias",
+    "doneText": "{name} tiene tu formulario firmado.",
+    "backToBooking": "Volver a reservas"
   }
 }

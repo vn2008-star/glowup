@@ -587,6 +587,36 @@
     "waitlistText": "Leave your number and we'll text you if a spot opens up.",
     "waitlistSubmit": "Notify me",
     "waitlistDone": "You're on the list. We'll text you if this day opens up.",
-    "waitlistFailed": "Couldn't add you to the list. Please try again."
+    "waitlistFailed": "Couldn't add you to the list. Please try again.",
+    "consentLink": "Complete your consent form"
+  },
+  "consent": {
+    "title": "Consent form",
+    "loading": "Loading…",
+    "invalidTitle": "Link not valid",
+    "invalidText": "This consent link has expired or is incorrect. Ask the salon for a new one.",
+    "notEnabled": "This salon isn't using online consent forms right now.",
+    "alreadySigned": "You signed this form on {date}. You can update it below.",
+    "resignNeeded": "The salon needs you to review and sign this form again.",
+    "healthQuestions": "Health questions",
+    "healthHint": "Answer honestly so your technician can keep you safe.",
+    "yes": "Yes",
+    "no": "No",
+    "allergies": "Allergies or sensitivities",
+    "allergiesPlaceholder": "e.g. latex, adhesive, fragrance — or \"none\"",
+    "terms": "Please read",
+    "agree": "I have read and understood the above and agree to the service.",
+    "photoConsent": "You may use before/after photos of my service on social media (no name shown).",
+    "typedName": "Type your full name",
+    "signature": "Signature",
+    "clear": "Clear",
+    "signHint": "Sign with your finger or mouse.",
+    "submit": "Sign and submit",
+    "saving": "Saving…",
+    "fine": "Submitted electronically on {date}. By signing you agree this has the same effect as a handwritten signature.",
+    "failed": "Could not submit. Please try again.",
+    "doneTitle": "Thank you",
+    "doneText": "{name} has your signed form on file.",
+    "backToBooking": "Back to booking"
   }
 }

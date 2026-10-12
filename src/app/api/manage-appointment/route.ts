@@ -109,6 +109,7 @@ export async function GET(request: Request) {
       advanceBookingDays,
       closedHolidays: (gSettings.closed_holidays || []) as string[],
       customClosedDates: (gSettings.custom_closed_dates || []) as CustomClosedDate[],
+      consentEnabled: (gSettings.consent_form as { enabled?: boolean } | undefined)?.enabled === true,
     } : null,
     // What the salon's cancellation policy allows for THIS appointment, so the
     // page can explain it up front instead of letting the client hit a 403.

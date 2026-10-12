@@ -30,6 +30,7 @@ interface BusinessData {
   advanceBookingDays?: number;
   closedHolidays?: string[];
   customClosedDates?: CustomClosedDate[];
+  consentEnabled?: boolean;
 }
 
 type ViewState = "details" | "cancel-confirm" | "reschedule" | "cancelled" | "rescheduled";
@@ -596,6 +597,11 @@ export default function ManageClient({ token, initialData = null, initialError =
                 </div>
               )}
             </div>
+
+            {/* Consent form — the same link as on the confirmation screen */}
+            {business?.consentEnabled && view === "details" && appointment.status !== "cancelled" && (
+              <a className={styles.consentLink} href={`/consent/${token}`}>📝 Complete your consent form</a>
+            )}
 
             {/* Action Buttons */}
             {canModify && view === "details" && (

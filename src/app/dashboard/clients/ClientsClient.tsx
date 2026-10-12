@@ -11,6 +11,7 @@ import styles from "./clients.module.css";
 import type { Client, Service, Staff } from "@/lib/types";
 import { formatPhone, fmtDate, localeDateStr, downloadText } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { ConsentBadge } from "@/components/ConsentBadge";
 import { localToUTC, todayInTz, DEFAULT_TZ } from "@/lib/tz";
 
 /* ── Masking helpers (mirrors API logic for "View as Technician" preview) ── */
@@ -1022,6 +1023,11 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Consent form (renders nothing when the salon doesn't use one) */}
+            <div className={styles.profileSection}>
+              <ConsentBadge key={selectedClient.id} clientId={selectedClient.id} />
             </div>
 
             {/* Preferences & Notes */}

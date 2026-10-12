@@ -587,6 +587,36 @@
     "waitlistText": "Để lại số điện thoại, chúng tôi sẽ nhắn tin nếu có chỗ trống.",
     "waitlistSubmit": "Báo cho tôi",
     "waitlistDone": "Bạn đã trong danh sách chờ. Chúng tôi sẽ nhắn tin nếu ngày này có chỗ.",
-    "waitlistFailed": "Không thể thêm bạn vào danh sách. Vui lòng thử lại."
+    "waitlistFailed": "Không thể thêm bạn vào danh sách. Vui lòng thử lại.",
+    "consentLink": "Điền phiếu đồng ý dịch vụ"
+  },
+  "consent": {
+    "title": "Phiếu đồng ý dịch vụ",
+    "loading": "Đang tải…",
+    "invalidTitle": "Đường link không hợp lệ",
+    "invalidText": "Link này đã hết hạn hoặc không đúng. Hãy hỏi tiệm để lấy link mới.",
+    "notEnabled": "Tiệm hiện chưa dùng phiếu đồng ý trực tuyến.",
+    "alreadySigned": "Bạn đã ký phiếu này ngày {date}. Bạn có thể cập nhật bên dưới.",
+    "resignNeeded": "Tiệm cần bạn xem lại và ký lại phiếu này.",
+    "healthQuestions": "Câu hỏi sức khỏe",
+    "healthHint": "Trả lời trung thực để kỹ thuật viên đảm bảo an toàn cho bạn.",
+    "yes": "Có",
+    "no": "Không",
+    "allergies": "Dị ứng hoặc nhạy cảm",
+    "allergiesPlaceholder": "VD: latex, keo, nước hoa — hoặc \"không\"",
+    "terms": "Vui lòng đọc",
+    "agree": "Tôi đã đọc, hiểu nội dung trên và đồng ý thực hiện dịch vụ.",
+    "photoConsent": "Tiệm được dùng ảnh trước/sau dịch vụ của tôi trên mạng xã hội (không hiện tên).",
+    "typedName": "Nhập họ tên đầy đủ",
+    "signature": "Chữ ký",
+    "clear": "Xóa",
+    "signHint": "Ký bằng ngón tay hoặc chuột.",
+    "submit": "Ký và gửi",
+    "saving": "Đang lưu…",
+    "fine": "Gửi điện tử ngày {date}. Khi ký, bạn đồng ý chữ ký này có giá trị như chữ ký tay.",
+    "failed": "Không gửi được. Vui lòng thử lại.",
+    "doneTitle": "Cảm ơn bạn",
+    "doneText": "{name} đã lưu phiếu đã ký của bạn.",
+    "backToBooking": "Về trang đặt lịch"
   }
 }

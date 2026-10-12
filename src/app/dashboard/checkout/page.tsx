@@ -8,6 +8,7 @@ import { useTenant } from "@/lib/tenant-context";
 import { queryData, uploadImage } from "@/lib/api";
 import { todayInTz, nowInTz, partsInTz, dayRangeInTz, formatDateInTz, DEFAULT_TZ } from "@/lib/tz";
 import { GlowUpLogo } from "@/components/GlowUpLogo";
+import { ConsentBadge } from "@/components/ConsentBadge";
 import { localeDateStr } from "@/lib/utils";
 import styles from "./checkout.module.css";
 import { useRouter } from "next/navigation";
@@ -1633,6 +1634,7 @@ export default function CheckoutPage() {
                           : t("walkIn")}
                       </h3>
                       <p>{selectedApt.staff_member?.name || "Unassigned"} • {selectedApt.service?.name}</p>
+                      {selectedApt.client && !isCheckedOut && <ConsentBadge key={selectedApt.client.id} clientId={selectedApt.client.id} compact />}
                     </div>
                   </div>
 

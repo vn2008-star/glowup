@@ -587,6 +587,36 @@
     "waitlistText": "전화번호를 남겨 주시면 자리가 나면 문자로 알려드립니다.",
     "waitlistSubmit": "알림 받기",
     "waitlistDone": "대기 명단에 등록되었습니다. 이 날짜에 자리가 나면 문자로 알려드립니다.",
-    "waitlistFailed": "명단에 추가하지 못했습니다. 다시 시도해 주세요."
+    "waitlistFailed": "명단에 추가하지 못했습니다. 다시 시도해 주세요.",
+    "consentLink": "동의서 작성하기"
+  },
+  "consent": {
+    "title": "동의서",
+    "loading": "불러오는 중…",
+    "invalidTitle": "유효하지 않은 링크",
+    "invalidText": "이 링크는 만료되었거나 잘못되었습니다. 매장에 새 링크를 요청하세요.",
+    "notEnabled": "이 매장은 현재 온라인 동의서를 사용하지 않습니다.",
+    "alreadySigned": "{date}에 이 동의서에 서명하셨습니다. 아래에서 수정할 수 있습니다.",
+    "resignNeeded": "매장에서 동의서를 다시 확인하고 서명해 주시길 요청합니다.",
+    "healthQuestions": "건강 관련 질문",
+    "healthHint": "안전한 시술을 위해 솔직하게 답해 주세요.",
+    "yes": "예",
+    "no": "아니요",
+    "allergies": "알레르기 또는 민감 반응",
+    "allergiesPlaceholder": "예: 라텍스, 접착제, 향료 — 또는 \"없음\"",
+    "terms": "읽어 주세요",
+    "agree": "위 내용을 읽고 이해했으며 시술에 동의합니다.",
+    "photoConsent": "시술 전후 사진을 SNS에 사용해도 됩니다 (이름은 표시하지 않음).",
+    "typedName": "이름을 입력하세요",
+    "signature": "서명",
+    "clear": "지우기",
+    "signHint": "손가락이나 마우스로 서명하세요.",
+    "submit": "서명하고 제출",
+    "saving": "저장 중…",
+    "fine": "{date}에 전자 제출됨. 서명은 자필 서명과 같은 효력을 가집니다.",
+    "failed": "제출하지 못했습니다. 다시 시도해 주세요.",
+    "doneTitle": "감사합니다",
+    "doneText": "{name}에 서명된 동의서가 보관되었습니다.",
+    "backToBooking": "예약으로 돌아가기"
   }
 }

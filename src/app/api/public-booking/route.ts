@@ -114,6 +114,8 @@ export async function GET(request: Request) {
       brand_color: typeof tenantSettings.brand_color === 'string' && /^#[0-9a-fA-F]{6}$/.test(tenantSettings.brand_color) ? tenantSettings.brand_color : null,
       // Shown before Confirm so the client isn't surprised by it later
       cancellationCutoffHours: resolveCancellationPolicy(tenant).cutoffHours,
+      // Confirmation screen offers the consent form link when the salon uses one
+      consentEnabled: (tenantSettings.consent_form as { enabled?: boolean } | undefined)?.enabled === true,
     },
     services: services || [],
     staff: (staff || []).map(s => {
