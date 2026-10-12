@@ -355,6 +355,10 @@ export default function SettingsPage() {
       setSaved(true);
       await refetch();
       setTimeout(() => setSaved(false), 3000);
+    } else {
+      // Silently doing nothing left owners thinking their hours were saved
+      const body = await res.json().catch(() => ({}));
+      alert(`Could not save settings: ${body?.error || `HTTP ${res.status}`}`);
     }
 
     setSaving(false);

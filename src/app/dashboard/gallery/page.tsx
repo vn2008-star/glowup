@@ -97,7 +97,7 @@ export default function GalleryPage() {
     if (!addBefore && !addAfter) { alert("Please upload at least one photo"); return; }
     setSaving(true);
     try {
-      await queryData("gallery.create", {
+      const { error } = await queryData("gallery.create", {
         client_id: addForm.client_id || null,
         staff_id: addForm.staff_id || null,
         service_id: addForm.service_id || null,
@@ -107,6 +107,7 @@ export default function GalleryPage() {
         before_photo_urls: addBefore ? [addBefore] : [],
         after_photo_urls: addAfter ? [addAfter] : [],
       });
+      if (error) { alert(`Could not save: ${error}`); return; }
       setShowAdd(false);
       setAddForm({ client_id: "", staff_id: "", service_id: "", notes: "", formula: "", satisfaction: "" });
       setAddBefore(null);
@@ -117,7 +118,8 @@ export default function GalleryPage() {
 
   async function handleDelete(id: string) {
     if (!confirm("Delete this transformation?")) return;
-    await queryData("gallery.delete", { id });
+    const { error } = await queryData("gallery.delete", { id });
+    if (error) { alert(`Could not delete: ${error}`); return; }
     setItems(prev => prev.filter(i => i.id !== id));
     setSelected(null);
   }

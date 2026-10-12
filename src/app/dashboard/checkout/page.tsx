@@ -86,6 +86,7 @@ export default function CheckoutPage() {
   const [walkInPhone, setWalkInPhone] = useState("");
   const [walkInBirthday, setWalkInBirthday] = useState("");
   const [creatingWalkIn, setCreatingWalkIn] = useState(false);
+  const [addingCharge, setAddingCharge] = useState(false);
 
   // Welcome screen panels
   const [waitlistQueue, setWaitlistQueue] = useState<{ id: string; position: number; client_name: string; service_name: string; staff_name: string; staff_id: string | null; estimated_wait_minutes: number }[]>([]);
@@ -229,11 +230,15 @@ export default function CheckoutPage() {
     setStaffWaitlist((prev) => prev.filter((w) => w.id !== waitlistId));
 
     try {
-      const { data } = await queryData("waitlist.claim", {
+      const { data, error } = await queryData("waitlist.claim", {
         waitlist_id: waitlistId,
         staff_id: unlockedStaffId,
       });
-      if (data) {
+      if (error || !data) {
+        // {error} isn't thrown, so the optimistic removal was never reverted
+        alert(error || "Could not claim this walk-in");
+        fetchStaffWaitlist();
+      } else {
         // Refresh appointments + waitlist to sync with server
         await Promise.all([fetchData(), fetchStaffWaitlist(), fetchWaitlist()]);
       }
@@ -398,7 +403,7 @@ export default function CheckoutPage() {
     if (!walkInStaff || !walkInService) return;
     setCreatingWalkIn(true);
 
-    const { data } = await queryData<FullAppointment>("appointments.walk-in", {
+    const { data, error } = await queryData<FullAppointment>("appointments.walk-in", {
       staff_id: walkInStaff,
       service_id: walkInService,
       client_name: walkInName || null,
@@ -406,6 +411,7 @@ export default function CheckoutPage() {
       client_birthday: walkInBirthday || null,
     });
 
+    if (error) alert(`Could not create the walk-in: ${error}`);
     if (data) {
       setAppointments((prev) =>
         [...prev, data].sort(
@@ -425,6 +431,16 @@ export default function CheckoutPage() {
 
   // ── Charge management ──
   async function addUpsellCharge() {
+    if (!selectedApt || !upsellServiceId || addingCharge) return;
+    setAddingCharge(true);
+    try {
+      await addUpsellChargeInner();
+    } finally {
+      setAddingCharge(false);
+    }
+  }
+
+  async function addUpsellChargeInner() {
     if (!selectedApt || !upsellServiceId) return;
 
     // Check if this is an add-on selection (format: serviceId__addon__index)
@@ -454,9 +470,13 @@ export default function CheckoutPage() {
     }
 
     // If no charges exist yet, add the original service as the base charge first
+    // If no charges exist yet, add the original service as the base charge
+    // first. Two parallel clicks both saw an empty list and inserted the base
+    // charge twice, inflating the total and the tally — hence the in-flight
+    // guard in addUpsellCharge().
     let currentCharges = [...charges];
     if (currentCharges.length === 0 && selectedApt.service) {
-      const { data: baseCharge } = await queryData<AppointmentCharge>("charges.add", {
+      const { data: baseCharge, error: baseErr } = await queryData<AppointmentCharge>("charges.add", {
         appointment_id: selectedApt.id,
         staff_id: selectedApt.staff_id,
         service_id: selectedApt.service.id,
@@ -464,12 +484,15 @@ export default function CheckoutPage() {
         amount: selectedApt.service.price,
         is_upsell: false,
       });
-      if (baseCharge) {
-        currentCharges = [baseCharge];
+      if (!baseCharge) {
+        alert(`Could not record the service charge: ${baseErr || "unknown error"}`);
+        return;
       }
+      currentCharges = [baseCharge];
+      setCharges(currentCharges);
     }
 
-    const { data } = await queryData<AppointmentCharge>("charges.add", {
+    const { data, error } = await queryData<AppointmentCharge>("charges.add", {
       appointment_id: selectedApt.id,
       staff_id: selectedApt.staff_id,
       service_id: serviceId,
@@ -478,10 +501,12 @@ export default function CheckoutPage() {
       is_upsell: true,
     });
 
-    if (data) {
-      setCharges([...currentCharges, data]);
-      setUpsellServiceId("");
+    if (!data) {
+      alert(`Could not add the charge: ${error || "unknown error"}`);
+      return;
     }
+    setCharges([...currentCharges, data]);
+    setUpsellServiceId("");
   }
 
   // Swap the service the appointment is for — the client booked a manicure and
@@ -528,7 +553,13 @@ export default function CheckoutPage() {
   }
 
   async function removeCharge(chargeId: string) {
-    await queryData("charges.delete", { id: chargeId });
+    const { error } = await queryData("charges.delete", { id: chargeId });
+    if (error) {
+      // The line used to disappear from the screen while the DB still had it,
+      // so the checkout total and the tally disagreed.
+      alert(`Could not remove the charge: ${error}`);
+      return;
+    }
     setCharges((prev) => prev.filter((c) => c.id !== chargeId));
   }
 

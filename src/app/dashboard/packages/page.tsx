@@ -73,6 +73,8 @@ export default function PackagesPage() {
 
   const resetPkgForm = () => { setPkgName(""); setPkgDesc(""); setPkgType("bundle"); setPkgPrice(""); setPkgValidity("365"); setPkgServices([]); setEditPkg(null); };
   const resetGCForm = () => { setGcAmount(""); setGcRecipient(""); setGcEmail(""); setGcMessage(""); setGcPurchaser(""); };
+  // In-flight guard: a double click issued two gift cards / two packages
+  const [pkgSaving, setPkgSaving] = useState(false);
 
   const openEditPkg = (pkg: Package) => {
     setEditPkg(pkg); setPkgName(pkg.name); setPkgDesc(pkg.description || "");
@@ -93,20 +95,26 @@ export default function PackagesPage() {
       services: pkgServices.map(ps => ({ ...ps, name: services.find(s => s.id === ps.service_id)?.name })),
     };
 
-    if (editPkg) {
-      await mutateData("packages.update", { id: editPkg.id, ...payload });
-    } else {
-      await mutateData("packages.add", payload);
-    }
+    if (pkgSaving) return;
+    setPkgSaving(true);
+    const res = editPkg
+      ? await mutateData("packages.update", { id: editPkg.id, ...payload })
+      : await mutateData("packages.add", payload);
+    setPkgSaving(false);
+    if (res.error) { alert(`Could not save package: ${res.error}`); return; }
     setShowPkgModal(false); resetPkgForm(); fetchData();
   };
 
   const handleDeletePkg = async (id: string) => {
     if (!confirm("Delete this package?")) return;
-    await mutateData("packages.delete", { id }); fetchData();
+    const res = await mutateData("packages.delete", { id });
+    if (res.error) alert(`Could not delete package: ${res.error}`);
+    fetchData();
   };
 
   const handleCreateGC = async () => {
+    if (pkgSaving) return;
+    setPkgSaving(true);
     try {
       const res = await mutateData("giftcards.create", {
         initial_amount: parseFloat(gcAmount) || 0,
@@ -123,6 +131,8 @@ export default function PackagesPage() {
       setShowGCModal(false); resetGCForm(); fetchData();
     } catch (err) {
       alert(`Failed to create gift card: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setPkgSaving(false);
     }
   };
 

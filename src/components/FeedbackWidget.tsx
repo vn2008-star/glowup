@@ -125,12 +125,17 @@ export function FeedbackWidget() {
     if (!message.trim() || !tenant) return;
     setSubmitting(true);
     try {
-      await mutateData('feedback.create', {
+      const { error } = await mutateData('feedback.create', {
         page: pathname,
         type,
         message: message.trim(),
         rating: rating || null,
       });
+      if (error) {
+        // Used to thank the user for feedback the server had rejected
+        alert(`Could not send feedback: ${error}`);
+        return;
+      }
       setSubmitted(true);
       setTimeout(() => {
         setSubmitted(false);

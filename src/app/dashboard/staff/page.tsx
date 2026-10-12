@@ -237,9 +237,20 @@ export default function StaffPage() {
     });
   }
 
+  // In-flight guard: a double click on Save added the same technician twice
+  const [staffSaving, setStaffSaving] = useState(false);
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
+    if (staffSaving) return;
+    setStaffSaving(true);
+    try {
+      await saveStaff();
+    } finally {
+      setStaffSaving(false);
+    }
+  }
 
+  async function saveStaff() {
     // Prepend the professional title to specialties for storage
     const allSpecialties = [...formData.professional_titles, ...formData.specialties];
 

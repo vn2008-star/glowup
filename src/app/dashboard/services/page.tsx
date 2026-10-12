@@ -109,7 +109,8 @@ export default function ServicesPage() {
 
   async function handleDelete(id: string) {
     if (!confirm("Delete this service?")) return;
-    await queryData("services.delete", { id });
+    const { error } = await queryData("services.delete", { id });
+    if (error) { alert(`Could not delete service: ${error}`); return; }
     setServices(prev => prev.filter(s => s.id !== id));
   }
 

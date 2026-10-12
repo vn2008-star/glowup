@@ -58,15 +58,20 @@ export default function HolidaysPage() {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   // ── Inline CRUD helpers ──
+  const [creatingHoliday, setCreatingHoliday] = useState<string | null>(null);
   async function handleCreateHolidayPromo(h: PromoHoliday & { date: Date }) {
+    if (creatingHoliday) return; // double click created two rows for one holiday
+    setCreatingHoliday(h.name);
     const payload = {
       name: `${h.name} ${h.date.getFullYear()} Special`,
       type: 'holiday',
       template: { message: h.template },
       status: 'active',
     };
-    const { data } = await queryData<Campaign>('campaigns.add', payload);
-    if (data) setCampaigns(prev => [data, ...prev]);
+    const { data, error } = await queryData<Campaign>('campaigns.add', payload);
+    setCreatingHoliday(null);
+    if (error || !data) { alert(`Could not create the promo: ${error || 'unknown error'}`); return; }
+    setCampaigns(prev => [data, ...prev]);
   }
 
   function startEditHoliday(h: { name: string }, existingCampaign: Campaign) {

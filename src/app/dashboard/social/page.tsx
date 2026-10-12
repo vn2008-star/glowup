@@ -29,6 +29,7 @@ const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 export default function SocialPage() {
   const { tenant } = useTenant();
   const salonTz = tenant?.timezone || DEFAULT_TZ;
+  const [postSaving, setPostSaving] = useState(false);
   const t = useTranslations("socialPage");
   // Seeded from the data cache — see lib/data-cache.
   const [posts, setPosts] = useState<SocialPost[]>(() => cached<SocialPost[]>("social.list") ?? []);
@@ -95,6 +96,16 @@ export default function SocialPage() {
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
+    if (postSaving) return;
+    setPostSaving(true);
+    try {
+      await savePost();
+    } finally {
+      setPostSaving(false);
+    }
+  }
+
+  async function savePost() {
     const payload = {
       content: formData.content,
       platforms: formData.platforms,
@@ -106,10 +117,12 @@ export default function SocialPage() {
     };
 
     if (editingPost) {
-      const { data } = await queryData<SocialPost>("social.update", { id: editingPost.id, ...payload });
-      if (data) setPosts((prev) => prev.map((p) => (p.id === data.id ? data : p)));
+      const { data, error } = await queryData<SocialPost>("social.update", { id: editingPost.id, ...payload });
+      if (error || !data) { alert(`Could not save post: ${error || "unknown error"}`); return; }
+      setPosts((prev) => prev.map((p) => (p.id === data.id ? data : p)));
     } else {
-      const { data } = await queryData<SocialPost>("social.add", payload);
+      const { data, error } = await queryData<SocialPost>("social.add", payload);
+      if (error || !data) { alert(`Could not save post: ${error || "unknown error"}`); return; }
       if (data) setPosts((prev) => [data, ...prev]);
     }
     setShowModal(false);

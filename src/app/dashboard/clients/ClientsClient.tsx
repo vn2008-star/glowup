@@ -105,6 +105,8 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
   const [staffMembers, setStaffMembers] = useState<Staff[]>([]);
   const [bookData, setBookData] = useState({ service_id: "", staff_id: "", start_time: "", notes: "" });
   const [bookingSaving, setBookingSaving] = useState(false);
+  // In-flight guard for the add/edit forms: a double click created two clients
+  const [clientSaving, setClientSaving] = useState(false);
 
   const fetchClients = useCallback(async () => {
     if (!tenant) return;
@@ -207,14 +209,19 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
 
   async function handleAddClient(e: React.FormEvent) {
     e.preventDefault();
+    if (clientSaving) return;
+    setClientSaving(true);
     const cleanPayload = { ...formData, birthday: formData.birthday || null, status: "new" as const };
-    const { data } = await queryData<Client>("clients.add", cleanPayload);
-    if (data) {
-      setClients((prev) => [data, ...prev]);
-      setShowAddModal(false);
-      setFormData({ first_name: "", last_name: "", phone: "", email: "", birthday: "", notes: "", photo_url: "" });
-      setPhotoPreview(null);
+    const { data, error } = await queryData<Client>("clients.add", cleanPayload);
+    setClientSaving(false);
+    if (error || !data) {
+      alert(`Could not add client: ${error || "unknown error"}`);
+      return;
     }
+    setClients((prev) => [data, ...prev]);
+    setShowAddModal(false);
+    setFormData({ first_name: "", last_name: "", phone: "", email: "", birthday: "", notes: "", photo_url: "" });
+    setPhotoPreview(null);
   }
 
   // ── Import CSV ──
@@ -307,7 +314,12 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
 
   async function handleDeleteClient(id: string) {
     if (!confirm("Delete this client? This cannot be undone.")) return;
-    await queryData("clients.delete", { id });
+    const { error } = await queryData("clients.delete", { id });
+    if (error) {
+      // The row used to vanish from the list even when the delete failed
+      alert(`Could not delete client: ${error}`);
+      return;
+    }
     setClients((prev) => prev.filter((c) => c.id !== id));
     setSelectedClient(null);
     setSelectedIds(prev => { const next = new Set(prev); next.delete(id); return next; });
@@ -332,13 +344,17 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
   async function handleBulkDelete() {
     if (!confirm(`Delete ${selectedIds.size} selected client(s)? This cannot be undone.`)) return;
     setBulkDeleting(true);
+    const deleted = new Set<string>();
+    let failed = 0;
     for (const id of selectedIds) {
-      await queryData("clients.delete", { id });
+      const { error } = await queryData("clients.delete", { id });
+      if (error) failed++; else deleted.add(id);
     }
-    setClients(prev => prev.filter(c => !selectedIds.has(c.id)));
+    setClients(prev => prev.filter(c => !deleted.has(c.id)));
     setSelectedIds(new Set());
     setBulkDeleting(false);
     setSelectedClient(null);
+    if (failed > 0) alert(`${failed} client(s) could not be deleted`);
   }
 
   // ── Edit Profile ──
@@ -360,7 +376,7 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
 
   async function handleEditProfile(e: React.FormEvent) {
     e.preventDefault();
-    if (!selectedClient) return;
+    if (!selectedClient || clientSaving) return;
     const { client_since, ...rest } = editData;
     const cleanData: Record<string, unknown> = {
       ...rest,
@@ -369,12 +385,16 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
     if (client_since) {
       cleanData.created_at = new Date(client_since + 'T00:00:00').toISOString();
     }
-    const { data } = await queryData<Client>("clients.update", { id: selectedClient.id, ...cleanData });
-    if (data) {
-      setClients((prev) => prev.map((c) => c.id === data.id ? data : c));
-      setSelectedClient(data);
-      setShowEditModal(false);
+    setClientSaving(true);
+    const { data, error } = await queryData<Client>("clients.update", { id: selectedClient.id, ...cleanData });
+    setClientSaving(false);
+    if (error || !data) {
+      alert(`Could not save changes: ${error || "unknown error"}`);
+      return;
     }
+    setClients((prev) => prev.map((c) => c.id === data.id ? data : c));
+    setSelectedClient(data);
+    setShowEditModal(false);
   }
 
   // ── Book Appointment ──
@@ -761,7 +781,7 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
               </div>
               <div className={styles.modalActions}>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowAddModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Add Client</button>
+                <button type="submit" className="btn btn-primary" disabled={clientSaving}>{clientSaving ? "Adding..." : "Add Client"}</button>
               </div>
             </form>
           </div>
@@ -820,7 +840,7 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
               </div>
               <div className={styles.modalActions}>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowEditModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Save Changes</button>
+                <button type="submit" className="btn btn-primary" disabled={clientSaving}>{clientSaving ? "Saving..." : "Save Changes"}</button>
               </div>
             </form>
           </div>

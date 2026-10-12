@@ -38,6 +38,8 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
   // Appointment instants are read through partsInTz(…, salonTz), never with
   // the browser-zone getters.
   const [selectedDate, setSelectedDate] = useState(() => new Date(todayInTz(salonTz) + "T00:00:00"));
+  // In-flight guard for the book/edit and block forms (double click = two rows)
+  const [saving, setSaving] = useState(false);
   // Server-prefetched week: paint immediately. If the browser's idea of "this
   // week" differs from the server's (timezone edge), the first fetch effect
   // detects the range mismatch and refetches.
@@ -450,7 +452,7 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
   // ── Add appointment ──
   async function handleAddAppointment(e: React.FormEvent) {
     e.preventDefault();
-    if (!formData.start_time || !formData.service_id) return;
+    if (!formData.start_time || !formData.service_id || saving) return;
     const service = services.find(s => s.id === formData.service_id);
     // datetime-local gives "YYYY-MM-DDTHH:mm" with no zone. Interpret it in the
     // SALON's timezone, not the browser's — a remote staffer's browser tz used
@@ -458,6 +460,7 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
     const [aptDate, aptTime] = formData.start_time.split("T");
     const start = localToUTC(aptDate, aptTime, salonTz);
     const end = new Date(start.getTime() + formDuration() * 60 * 1000);
+    setSaving(true);
     const { data, error } = await queryData<FullAppointment>("appointments.add", {
       client_id: formData.client_id || null,
       service_id: formData.service_id,
@@ -468,6 +471,7 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
       total_price: service?.price || 0,
       notes: formData.notes || null,
     });
+    setSaving(false);
     if (error) {
       alert(`Failed to book appointment: ${error}`);
       return;
@@ -499,13 +503,14 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
 
   async function handleBlockTime(e: React.FormEvent) {
     e.preventDefault();
-    if (!blockData.staff_id || !blockData.date || !blockData.start_time || !blockData.end_time) return;
+    if (!blockData.staff_id || !blockData.date || !blockData.start_time || !blockData.end_time || saving) return;
     const start = localToUTC(blockData.date, blockData.start_time, salonTz);
     const end = localToUTC(blockData.date, blockData.end_time, salonTz);
     if (end <= start) {
       alert("End time must be after start time");
       return;
     }
+    setSaving(true);
     if (editingBlockId) {
       const { data, error } = await queryData<FullAppointment>("appointments.update", {
         id: editingBlockId,
@@ -514,6 +519,7 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
         end_time: end.toISOString(),
         notes: blockData.notes || "Personal time",
       });
+      setSaving(false);
       if (error) {
         alert(`Failed to update blocked time: ${error}`);
         return;
@@ -535,6 +541,7 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
       total_price: 0,
       notes: blockData.notes || "Personal time",
     });
+    setSaving(false);
     if (error) {
       alert(`Failed to block time: ${error}`);
       return;
@@ -1257,7 +1264,8 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
                   // history/reporting and the client is notified automatically.
                   if (isBlocked(selectedApt)) {
                     if (!confirm("Remove this blocked time?")) return;
-                    await queryData("appointments.delete", { id: selectedApt.id });
+                    const { error } = await queryData("appointments.delete", { id: selectedApt.id });
+                    if (error) { alert(`Could not remove the block: ${error}`); return; }
                     setAppointments(prev => prev.filter(a => a.id !== selectedApt.id));
                   } else {
                     // Real cancellations go through a dialog so the reason gets
@@ -1453,7 +1461,7 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
               </div>
               <div className={styles.modalActions}>
                 <button type="button" className="btn btn-secondary" onClick={() => { setShowModal(false); setEditingApt(null); }}>{t("cancel")}</button>
-                <button type="submit" className="btn btn-primary">{editingApt ? t("updateAppointment") : t("bookAppointment")}</button>
+                <button type="submit" className="btn btn-primary" disabled={saving}>{editingApt ? t("updateAppointment") : t("bookAppointment")}</button>
               </div>
             </form>
           </div>
