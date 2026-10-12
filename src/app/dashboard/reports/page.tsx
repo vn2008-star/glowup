@@ -4,8 +4,9 @@ import { useToast } from "@/components/ui/Toast";
 import React, { useState, useEffect, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
-import { cachedQuery, cached, hasCached } from "@/lib/api";
-import { localeDateStr } from "@/lib/utils";
+import { queryData, cachedQuery, cached, hasCached } from "@/lib/api";
+import { localeDateStr, downloadText } from "@/lib/utils";
+import { dayRangeInTz, addDays, todayInTz, DEFAULT_TZ } from "@/lib/tz";
 import styles from "./reports.module.css";
 
 /* ═══ Types ═══ */
@@ -80,6 +81,7 @@ type CancellationData = {
 export default function ReportsPage() {
   const { tenant, refetch: refetchTenant } = useTenant();
   const toast = useToast();
+  const [exporting, setExporting] = useState(false);
   const t = useTranslations("reportsPage");
   const [activeTab, setActiveTab] = useState<string>(TABS[0]);
   const [loading, setLoading] = useState(() => !hasCached("reports.overview"));
@@ -146,6 +148,30 @@ export default function ReportsPage() {
         <div>
           <h1>Reports & Analytics</h1>
           <p>Comprehensive business intelligence dashboard</p>
+        </div>
+        <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+          {[{ label: "Export last 90 days", days: 90 }, { label: "Export last 12 months", days: 365 }].map(({ label, days }) => (
+            <button
+              key={days}
+              type="button"
+              className="btn btn-secondary btn-sm"
+              disabled={exporting}
+              onClick={async () => {
+                setExporting(true);
+                const tz = tenant?.timezone || DEFAULT_TZ;
+                const { data, error } = await queryData<{ csv: string; count: number; filename: string }>("appointments.export", {
+                  startDate: dayRangeInTz(addDays(todayInTz(tz), -days), tz).start,
+                  endDate: dayRangeInTz(todayInTz(tz), tz).end,
+                });
+                setExporting(false);
+                if (error || !data) { toast.error(error || "Export failed"); return; }
+                downloadText(data.filename, data.csv);
+                toast.success(`Exported ${data.count} appointments`);
+              }}
+            >
+              {exporting ? "Exporting…" : label}
+            </button>
+          ))}
         </div>
       </div>
 

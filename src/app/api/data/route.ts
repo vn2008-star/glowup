@@ -137,7 +137,7 @@ const MANAGEMENT_ACTIONS = new Set([
   'services.add', 'services.bulkAdd', 'services.update', 'services.delete', 'services.reorder',
   'packages.add', 'packages.update', 'packages.delete',
   'social.add', 'social.update', 'social.delete',
-  'clients.delete', 'clients.send_birthday_promo', 'clients.adjust_points',
+  'clients.delete', 'clients.send_birthday_promo', 'clients.adjust_points', 'clients.export', 'appointments.export',
   'appointments.delete',
   'payments.request',
   'sms.gateway-status',
@@ -343,6 +343,18 @@ async function compensateCreditRedemption(
     stripe_credit_id: stripeCredit,
   })
   if (error) console.error('[credits] failed to record redemption:', error.message)
+}
+
+/** RFC 4180 CSV with a UTF-8 BOM so Excel opens accented names correctly. */
+function toCsv(header: string[], rows: unknown[][]): string {
+  const cell = (v: unknown) => {
+    if (v === null || v === undefined) return ''
+    const s = String(v)
+    // Neutralise formula injection (=, +, -, @ at the start) for spreadsheet apps
+    const safe = /^[=+\-@]/.test(s) ? `'${s}` : s
+    return /[",\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe
+  }
+  return '﻿' + [header, ...rows].map(r => r.map(cell).join(',')).join('\r\n') + '\r\n'
 }
 
 /** Undo a redeemCard(), restoring the exact prior balance. Returns an error string on failure. */
@@ -715,6 +727,65 @@ export async function POST(request: Request) {
           },
           error: error?.message,
         })
+      }
+
+      // CSV exports: the salon's own data, out. Both are owner/manager only
+      // (MANAGEMENT_ACTIONS) and unmasked by construction; the dashboard
+      // list caps at 200 rows, these walk the whole table in pages.
+      case 'clients.export': {
+        const rows: Record<string, unknown>[] = []
+        for (let from = 0; from < 20000; from += 1000) {
+          const { data, error } = await svc
+            .from('clients')
+            .select('first_name, last_name, phone, email, birthday, status, visit_count, lifetime_spend, loyalty_points, last_visit, sms_opt_out, tags, notes, created_at')
+            .eq('tenant_id', tenantId)
+            .order('created_at', { ascending: true })
+            .range(from, from + 999)
+          if (error) return NextResponse.json({ data: null, error: error.message })
+          rows.push(...(data || []))
+          if (!data || data.length < 1000) break
+        }
+        const tz = await fetchTenantTz(svc, tenantId)
+        const header = ['First name', 'Last name', 'Phone', 'Email', 'Birthday', 'Status', 'Visits', 'Lifetime spend', 'Loyalty points', 'Last visit', 'SMS opt-out', 'Tags', 'Notes', 'Client since']
+        const lines = rows.map(r => [
+          r.first_name, r.last_name, r.phone, r.email, r.birthday, r.status, r.visit_count, r.lifetime_spend, r.loyalty_points,
+          r.last_visit ? partsInTz(String(r.last_visit), tz).dateStr : '', r.sms_opt_out ? 'yes' : 'no',
+          Array.isArray(r.tags) ? r.tags.join('; ') : '', r.notes, r.created_at ? partsInTz(String(r.created_at), tz).dateStr : '',
+        ])
+        return NextResponse.json({ data: { csv: toCsv(header, lines), count: rows.length, filename: `clients-${todayInTz(tz)}.csv` } })
+      }
+
+      case 'appointments.export': {
+        const tz = await fetchTenantTz(svc, tenantId)
+        const startISO = typeof payload?.startDate === 'string' ? payload.startDate : dayRangeInTz(addDays(todayInTz(tz), -90), tz).start
+        const endISO = typeof payload?.endDate === 'string' ? payload.endDate : dayRangeInTz(todayInTz(tz), tz).end
+        const rows: Record<string, unknown>[] = []
+        for (let from = 0; from < 50000; from += 1000) {
+          const { data, error } = await svc
+            .from('appointments')
+            .select('start_time, end_time, status, total_price, tip_amount, payment_method, notes, checked_in_at, checked_out_at, client:clients(first_name, last_name, phone, email), service:services(name), staff_member:staff!staff_id(name)')
+            .eq('tenant_id', tenantId)
+            .gte('start_time', startISO)
+            .lte('start_time', endISO)
+            .order('start_time', { ascending: true })
+            .range(from, from + 999)
+          if (error) return NextResponse.json({ data: null, error: error.message })
+          rows.push(...(data || []))
+          if (!data || data.length < 1000) break
+        }
+        const header = ['Date', 'Start', 'End', 'Client', 'Phone', 'Email', 'Service', 'Staff', 'Status', 'Price', 'Tip', 'Payment', 'Checked in', 'Checked out', 'Notes']
+        const lines = rows.map(r => {
+          const c = r.client as { first_name?: string; last_name?: string; phone?: string; email?: string } | null
+          const s = partsInTz(String(r.start_time), tz), e = partsInTz(String(r.end_time), tz)
+          return [
+            s.dateStr, s.timeStr, e.timeStr,
+            c ? `${c.first_name || ''} ${c.last_name || ''}`.trim() : (r.status === 'blocked' ? 'Blocked time' : 'Walk-in'),
+            c?.phone, c?.email, (r.service as { name?: string } | null)?.name, (r.staff_member as { name?: string } | null)?.name,
+            r.status, r.total_price, r.tip_amount, r.payment_method,
+            r.checked_in_at ? partsInTz(String(r.checked_in_at), tz).timeStr : '', r.checked_out_at ? partsInTz(String(r.checked_out_at), tz).timeStr : '', r.notes,
+          ]
+        })
+        return NextResponse.json({ data: { csv: toCsv(header, lines), count: rows.length, filename: `appointments-${partsInTz(startISO, tz).dateStr}-to-${partsInTz(endISO, tz).dateStr}.csv` } })
       }
 
       // Just the number. Settings and Quick Start used to pull 200 client rows

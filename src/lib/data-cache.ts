@@ -39,6 +39,7 @@ const READ_ACTIONS = new Set([
   'clients.birthdays',
   'clients.history',
   'clients.count',
+  'clients.export', 'appointments.export', // reads: exporting changes nothing
   'clients.list',
   'clients.search',
   'conversations.list',

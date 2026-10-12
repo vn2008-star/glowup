@@ -9,7 +9,7 @@ import { useTenant } from "@/lib/tenant-context";
 import { queryData, cachedQuery, uploadImage } from "@/lib/api";
 import styles from "./clients.module.css";
 import type { Client, Service, Staff } from "@/lib/types";
-import { formatPhone, fmtDate, localeDateStr } from "@/lib/utils";
+import { formatPhone, fmtDate, localeDateStr, downloadText } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { localToUTC, todayInTz, DEFAULT_TZ } from "@/lib/tz";
 
@@ -121,6 +121,7 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [adjustDelta, setAdjustDelta] = useState("");
   const [adjusting, setAdjusting] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const fetchClients = useCallback(async () => {
     if (!tenant) return;
@@ -513,6 +514,22 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
             </button>
           )}
           <button className={styles.importBtn} onClick={() => { setShowImportModal(true); setImportData([]); setImportFileName(''); setImportResult(null); }}>📥 Import</button>
+          {currentStaff?.role !== "technician" && (
+            <button
+              className={styles.importBtn}
+              disabled={exporting}
+              onClick={async () => {
+                setExporting(true);
+                const { data, error } = await queryData<{ csv: string; count: number; filename: string }>("clients.export");
+                setExporting(false);
+                if (error || !data) { toast.error(error || "Export failed"); return; }
+                downloadText(data.filename, data.csv);
+                toast.success(`Exported ${data.count} clients`);
+              }}
+            >
+              {exporting ? "Exporting…" : "📤 Export CSV"}
+            </button>
+          )}
           <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>{t("addClient")}</button>
         </div>
       </div>
