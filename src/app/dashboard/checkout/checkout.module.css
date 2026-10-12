@@ -2501,11 +2501,6 @@
   .modalFooter > * { width: 100%; min-height: 44px; }
 }
 
-/* The 340px fixed sidebar left ~380px for the checkout panel on a 720px
-   tablet in portrait; stack instead. */
-@media (max-width: 900px) {
-  .mainLayout { grid-template-columns: 1fr; }
-}
 @media (pointer: coarse) {
   .walkInBtn { min-height: 40px; padding: var(--space-2) var(--space-3); }
 }

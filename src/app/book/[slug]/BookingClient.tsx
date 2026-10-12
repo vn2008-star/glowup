@@ -2,6 +2,8 @@
 
 import { useToast } from '@/components/ui/Toast'
 import { useState, useEffect, useMemo } from 'react'
+import { useTranslations, useLocale } from 'next-intl'
+import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import styles from './booking.module.css'
 import ChatWidget from './ChatWidget'
 import { formatPhone, localeDateStr } from '@/lib/utils'
@@ -18,7 +20,7 @@ interface BusinessInfo { name: string; slug: string; phone: string | null; logo_
 /** What GET /api/public-booking returns; the server page passes it in as initialData. */
 export interface BookingPayload { business: BusinessInfo; services: ServiceInfo[]; staff: StaffInfo[]; bookedSlots: BookedSlot[] }
 
-const STEPS = ['Service', 'Staff', 'Date & Time', 'Your Info', 'Confirm'] as const
+const STEP_KEYS = ['stepService', 'stepStaff', 'stepDateTime', 'stepYourInfo', 'stepConfirm'] as const
 type Step = 0 | 1 | 2 | 3 | 4
 
 export default function BookingClient({ slug, initialData = null, initialError = null }: {
@@ -29,6 +31,8 @@ export default function BookingClient({ slug, initialData = null, initialError =
 }) {
   const [step, setStep] = useState<Step>(0)
   const toast = useToast()
+  const t = useTranslations('booking')
+  const locale = useLocale()
   const [loading, setLoading] = useState(!initialData && !initialError)
   const [error, setError] = useState<string | null>(initialError)
   const [submitting, setSubmitting] = useState(false)
@@ -109,13 +113,13 @@ export default function BookingClient({ slug, initialData = null, initialError =
     async function load() {
       try {
         const res = await fetch(`/api/public-booking?slug=${encodeURIComponent(slug)}`)
-        if (!res.ok) { setError('Business not found'); setLoading(false); return }
+        if (!res.ok) { setError(t('notFound')); setLoading(false); return }
         const data = await res.json()
         setBusiness(data.business)
         setServices(data.services)
         setStaff(data.staff)
         setBookedSlots(data.bookedSlots)
-      } catch { setError('Failed to load booking page') }
+      } catch { setError(t('notFound')) }
       setLoading(false)
     }
     load()
@@ -395,7 +399,7 @@ export default function BookingClient({ slug, initialData = null, initialError =
         } catch { /* links are a bonus; the booking itself succeeded */ }
         // Display confirmation in the salon's timezone so the client sees the correct local time
         const confirmDate = new Date(selectedDate + 'T12:00:00') // just for the date portion
-        const dateDisplay = localeDateStr(confirmDate, { weekday: 'long', month: 'long', day: 'numeric' })
+        const dateDisplay = new Intl.DateTimeFormat(locale, { weekday: 'long', month: 'long', day: 'numeric' }).format(confirmDate)
         const [h, m] = selectedTime.split(':').map(Number)
         const ampm = h >= 12 ? 'PM' : 'AM'
         const h12 = h > 12 ? h - 12 : h === 0 ? 12 : h
@@ -405,7 +409,7 @@ export default function BookingClient({ slug, initialData = null, initialError =
         setBooked(true)
       } else if (res.status === 409) {
         // Slot was taken — refresh availability and go back to time picker
-        toast.error('Sorry, that time slot was just booked by someone else. Please choose another time.')
+        toast.error(t('slotTaken'))
         try {
           const refreshRes = await fetch(`/api/public-booking?slug=${encodeURIComponent(slug)}`)
           if (refreshRes.ok) {
@@ -416,10 +420,10 @@ export default function BookingClient({ slug, initialData = null, initialError =
         setSelectedTime('')
         setStep(2)
       } else {
-        toast.error('Booking failed. Please try again.')
+        toast.error(t('bookingFailed'))
       }
     } catch {
-      toast.error('Network error. Please try again.')
+      toast.error(t('networkError'))
     }
     setSubmitting(false)
   }
@@ -447,7 +451,7 @@ export default function BookingClient({ slug, initialData = null, initialError =
     <div className={styles.page}>
       <div className={styles.loadingState}>
         <div className={styles.spinner} />
-        <p>Loading booking page...</p>
+        <p>{t('loading')}</p>
       </div>
     </div>
   )
@@ -455,8 +459,8 @@ export default function BookingClient({ slug, initialData = null, initialError =
   if (error || !business) return (
     <div className={styles.page}>
       <div className={styles.errorState}>
-        <h2>😔 {error || 'Business not found'}</h2>
-        <p>This booking link may be invalid or the business has not set up online booking yet.</p>
+        <h2>{error || t('notFound')}</h2>
+        <p>{t('notFoundHint')}</p>
       </div>
     </div>
   )
@@ -466,38 +470,38 @@ export default function BookingClient({ slug, initialData = null, initialError =
     <div className={styles.page} style={brandStyle}>
       <div className={styles.successCard}>
         <div className={styles.successIcon}>✓</div>
-        <h2>Booking Confirmed!</h2>
+        <h2>{t('confirmedTitle')}</h2>
         <p className={styles.successBusiness}>{business.name}</p>
         <div className={styles.successDetails}>
           {selectedServices.map((s, i) => {
             const st = staffByService[s.id]
             return (
               <div key={i} className={styles.successRow}>
-                <span>{s.name}{st ? ` with ${st.name}` : ''}</span>
-                <strong>{(st?.service_durations?.[s.id] || s.duration_minutes) + ' min'}</strong>
+                <span>{s.name}{st ? ` ${t('withStaff', { name: st.name })}` : ''}</span>
+                <strong>{t('min', { count: st?.service_durations?.[s.id] || s.duration_minutes })}</strong>
               </div>
             )
           })}
 
           <div className={styles.successRow}>
-            <span>Date & Time</span>
+            <span>{t('dateTime')}</span>
             <strong>{bookedTime}</strong>
           </div>
           <div className={styles.successRow}>
-            <span>Total Duration</span>
-            <strong>{totalDuration} minutes</strong>
+            <span>{t('totalDuration')}</span>
+            <strong>{t('min', { count: totalDuration })}</strong>
           </div>
           {selectedServices.length > 1 && (
             <div className={styles.successRow}>
-              <span>Total</span>
+              <span>{t('total')}</span>
               <strong>${totalPrice}</strong>
             </div>
           )}
         </div>
         {!birthdaySaved && (
           <div className={styles.birthdayPrompt}>
-            <p className={styles.birthdayPromptTitle}>🎂 When&apos;s your birthday?</p>
-            <p className={styles.birthdayPromptText}>Share your birthday and we&apos;ll send you a special treat — discounts, freebies, and more!</p>
+            <p className={styles.birthdayPromptTitle}>{t('birthdayTitle')}</p>
+            <p className={styles.birthdayPromptText}>{t('birthdayText')}</p>
             <div className={styles.birthdayPromptForm}>
               <input type="date" value={clientBirthday} onChange={async (e) => {
                 const val = e.target.value
@@ -524,13 +528,13 @@ export default function BookingClient({ slug, initialData = null, initialError =
                 }}
                 disabled={!clientBirthday}
               >
-                Save Birthday 🎁
+                {t('saveBirthday')}
               </button>
             </div>
           </div>
         )}
         {birthdaySaved && (
-          <p className={styles.birthdayConfirmed}>🎂 Birthday saved — expect a special surprise!</p>
+          <p className={styles.birthdayConfirmed}>{t('birthdaySaved')}</p>
         )}
         {bookedInfo && (
           <div className={styles.successLinks}>
@@ -547,19 +551,19 @@ export default function BookingClient({ slug, initialData = null, initialError =
               }).toString()}`}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
-              Add to calendar
+              {t('addToCalendar')}
             </a>
             {bookedInfo.manageToken && (
               <a className={styles.successLink} href={`/manage/${bookedInfo.manageToken}`}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
-                Reschedule or cancel
+                {t('manageLink')}
               </a>
             )}
           </div>
         )}
         <p className={styles.successNote}>
-          {clientEmail || clientPhone ? 'A confirmation is on its way. ' : ''}
-          {business.phone ? `Questions? Call ${business.phone}` : 'We look forward to seeing you!'}
+          {clientEmail || clientPhone ? `${t('confirmationOnWay')} ` : ''}
+          {business.phone ? t('questionsCall', { phone: business.phone }) : t('lookForward')}
         </p>
         <button
           className={styles.bookAnotherBtn}
@@ -574,7 +578,7 @@ export default function BookingClient({ slug, initialData = null, initialError =
             setStep(0)
           }}
         >
-          Book another appointment
+          {t('bookAnother')}
         </button>
       </div>
     </div>
@@ -600,12 +604,12 @@ export default function BookingClient({ slug, initialData = null, initialError =
 
         {/* Progress Steps */}
         <div className={styles.progress}>
-          {STEPS.map((label, i) => (
-            <div key={label} className={`${styles.progressStep} ${i === step ? styles.progressActive : ''} ${i < step ? styles.progressDone : ''}`}>
+          {STEP_KEYS.map((key, i) => (
+            <div key={key} className={`${styles.progressStep} ${i === step ? styles.progressActive : ''} ${i < step ? styles.progressDone : ''}`}>
               <div className={styles.progressDot}>
                 {i < step ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg> : i + 1}
               </div>
-              <span className={styles.progressLabel}>{label}</span>
+              <span className={styles.progressLabel}>{t(key)}</span>
             </div>
           ))}
         </div>
@@ -616,8 +620,8 @@ export default function BookingClient({ slug, initialData = null, initialError =
           {/* ── Step 0: Choose Service(s) ── */}
           {step === 0 && (
             <div className={styles.stepPanel}>
-              <h2 className={styles.stepTitle}>Choose Your Services</h2>
-              <p className={styles.stepSubtitle}>Select one or more services for your visit</p>
+              <h2 className={styles.stepTitle}>{t('chooseServices')}</h2>
+              <p className={styles.stepSubtitle}>{t('chooseServicesSub')}</p>
 
               {/* Cart Bar (top) */}
               {selectedServices.length > 0 && (
@@ -625,7 +629,7 @@ export default function BookingClient({ slug, initialData = null, initialError =
                   <div className={styles.cartInfo}>
                     <span className={styles.cartBadge}>{selectedServices.length}</span>
                     <span className={styles.cartText}>
-                      {selectedServices.length === 1 ? '1 service' : `${selectedServices.length} services`} · {totalDuration} min
+                      {t('services', { count: selectedServices.length })} · {t('min', { count: totalDuration })}
                     </span>
                   </div>
                   <div className={styles.cartRight}>
@@ -641,7 +645,7 @@ export default function BookingClient({ slug, initialData = null, initialError =
                         } else { setStep(1) }
                       }}
                     >
-                      Continue →
+                      {t('continue')}
                     </button>
                   </div>
                 </div>
@@ -687,21 +691,21 @@ export default function BookingClient({ slug, initialData = null, initialError =
           {/* ── Step 1: Choose Staff ── */}
           {step === 1 && (
             <div className={styles.stepPanel}>
-              <h2 className={styles.stepTitle}>Choose Your Stylists</h2>
-              <p className={styles.stepSubtitle}>Pick a stylist for each service</p>
+              <h2 className={styles.stepTitle}>{t('chooseStylists')}</h2>
+              <p className={styles.stepSubtitle}>{t('chooseStylistsSub')}</p>
 
               {selectedServices.map(svc => {
                 const currentStaff = getStaffForService(svc.id)
                 return (
                   <div key={svc.id} className={styles.staffSection}>
-                    <h3 className={styles.staffSectionTitle}>{svc.name} <span className={styles.staffSectionMeta}>{svc.duration_minutes} min</span></h3>
+                    <h3 className={styles.staffSectionTitle}>{svc.name} <span className={styles.staffSectionMeta}>{t('min', { count: svc.duration_minutes })}</span></h3>
                     <div className={styles.staffGrid}>
                       <button
                         className={`${styles.staffCard} ${!currentStaff ? styles.staffSelected : ''}`}
                         onClick={() => setStaffByService(prev => ({ ...prev, [svc.id]: null }))}
                       >
-                        <div className={styles.staffAvatar}>✨</div>
-                        <span className={styles.staffName}>Any Available</span>
+                        <div className={styles.staffAvatar}>★</div>
+                        <span className={styles.staffName}>{t('anyAvailable')}</span>
                       </button>
                       {staff.map(s => (
                         <button
@@ -719,8 +723,8 @@ export default function BookingClient({ slug, initialData = null, initialError =
               })}
 
               <div className={`${styles.stepActions} ${styles.stickyActions}`}>
-                <button className={styles.backBtn} onClick={() => setStep(0)}>← Back</button>
-                <button className={styles.nextBtn} onClick={() => setStep(2)}>Continue →</button>
+                <button className={styles.backBtn} onClick={() => setStep(0)}>{t('back')}</button>
+                <button className={styles.nextBtn} onClick={() => setStep(2)}>{t('continue')}</button>
               </div>
             </div>
           )}
@@ -728,7 +732,7 @@ export default function BookingClient({ slug, initialData = null, initialError =
           {/* ── Step 2: Date & Time ── */}
           {step === 2 && (
             <div className={styles.stepPanel}>
-              <h2 className={styles.stepTitle}>Pick a Date & Time</h2>
+              <h2 className={styles.stepTitle}>{t('pickDateTime')}</h2>
               <p className={styles.stepSubtitle}>{selectedServices.map(s => s.name).join(', ')} • {totalDuration} min{staffSubtitle}</p>
 
               {/* Calendar */}
@@ -758,8 +762,8 @@ export default function BookingClient({ slug, initialData = null, initialError =
                   </button>
                 </div>
                 <div className={styles.calendarWeekdays}>
-                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
-                    <span key={d}>{d}</span>
+                  {[0, 1, 2, 3, 4, 5, 6].map(d => (
+                    <span key={d}>{new Intl.DateTimeFormat(locale, { weekday: 'short' }).format(new Date(Date.UTC(2024, 0, 7 + d, 12)))}</span>
                   ))}
                 </div>
                 <div className={styles.calendarGrid}>
@@ -785,9 +789,9 @@ export default function BookingClient({ slug, initialData = null, initialError =
 
               {selectedDate && (
                 <>
-                  <h3 className={styles.timeSectionTitle}>Available Times</h3>
+                  <h3 className={styles.timeSectionTitle}>{t('availableTimes')}</h3>
                   {timeSlots.length === 0 ? (
-                    <p className={styles.noSlots}>No available slots on this day. Try another date.</p>
+                    <p className={styles.noSlots}>{t('noSlots')}</p>
                   ) : (
                     <div className={styles.timeGrid}>
                       {timeSlots.map(t => (
@@ -804,28 +808,28 @@ export default function BookingClient({ slug, initialData = null, initialError =
                 </>
               )}
 
-              <button className={styles.backBtn} onClick={() => setStep(1)}>← Back</button>
+              <button className={styles.backBtn} onClick={() => setStep(1)}>{t('back')}</button>
             </div>
           )}
 
           {/* ── Step 3: Client Info ── */}
           {step === 3 && (
             <div className={styles.stepPanel}>
-              <h2 className={styles.stepTitle}>Your Information</h2>
-              <p className={styles.stepSubtitle}>So we can confirm your appointment</p>
+              <h2 className={styles.stepTitle}>{t('yourInfo')}</h2>
+              <p className={styles.stepSubtitle}>{t('yourInfoSub')}</p>
 
               <div className={styles.clientForm}>
                 <div className={styles.formGroup}>
-                  <label>Full Name *</label>
+                  <label>{t('fullName')} *</label>
                   <input type="text" value={clientName} onChange={e => setClientName(e.target.value)} placeholder="Jane Smith" required />
                 </div>
                 <div className={styles.formRow}>
                   <div className={styles.formGroup}>
-                    <label>Phone *</label>
+                    <label>{t('phone')} *</label>
                     <input type="tel" value={clientPhone} onChange={e => setClientPhone(formatPhone(e.target.value))} placeholder="(415) 555-1234" required />
                   </div>
                   <div className={styles.formGroup}>
-                    <label>Email <span className={styles.optionalLabel}>(optional)</span></label>
+                    <label>{t('email')} <span className={styles.optionalLabel}>{t('optional')}</span></label>
                     <input type="email" value={clientEmail} onChange={e => setClientEmail(e.target.value)} placeholder="jane@email.com" />
                   </div>
                 </div>
@@ -835,21 +839,21 @@ export default function BookingClient({ slug, initialData = null, initialError =
                   <span className={styles.birthdayHint}>🎁 We&apos;ll surprise you with a special treat on your birthday!</span>
                 </div>
                 <div className={styles.formGroup}>
-                  <label>Notes <span className={styles.optionalLabel}>(optional)</span></label>
+                  <label>{t('notes')} <span className={styles.optionalLabel}>{t('optional')}</span></label>
                   <textarea value={clientNotes} onChange={e => setClientNotes(e.target.value)} rows={3} placeholder="Any special requests or notes for your stylist..." />
                 </div>
                 <label className={styles.consentLabel}>
                   <input type="checkbox" checked={smsConsent} onChange={e => setSmsConsent(e.target.checked)} className={styles.consentCheckbox} />
                   <span className={styles.consentText}>
-                    I agree to receive appointment confirmations, reminders, and updates via SMS to the phone number provided. Msg & data rates may apply. Reply STOP to opt out.
+                    {t('consent')}
                   </span>
                 </label>
               </div>
 
               <div className={`${styles.stepActions} ${styles.stickyActions}`}>
-                <button className={styles.backBtn} onClick={() => setStep(2)}>← Back</button>
+                <button className={styles.backBtn} onClick={() => setStep(2)}>{t('back')}</button>
                 <button className={styles.nextBtn} onClick={() => { if (clientName.trim() && clientPhone.trim()) setStep(4) }} disabled={!clientName.trim() || !clientPhone.trim()}>
-                  Review Booking →
+                  {t('reviewBooking')}
                 </button>
               </div>
             </div>
@@ -858,8 +862,8 @@ export default function BookingClient({ slug, initialData = null, initialError =
           {/* ── Step 4: Confirm ── */}
           {step === 4 && (
             <div className={styles.stepPanel}>
-              <h2 className={styles.stepTitle}>Confirm Your Booking</h2>
-              <p className={styles.stepSubtitle}>Please review your appointment details</p>
+              <h2 className={styles.stepTitle}>{t('confirmTitle')}</h2>
+              <p className={styles.stepSubtitle}>{t('confirmSub')}</p>
 
               <div className={styles.summaryCard}>
                 {/* Individual services with per-service staff */}
@@ -869,27 +873,27 @@ export default function BookingClient({ slug, initialData = null, initialError =
                     <div key={i} className={styles.summaryRow}>
                       <span className={styles.summaryLabel}>{s.name}{st ? ` · ${st.name}` : ''}</span>
                       <span className={styles.summaryValue}>
-                        {st?.service_durations?.[s.id] || s.duration_minutes} min · ${s.price}
+                        {t('min', { count: st?.service_durations?.[s.id] || s.duration_minutes })} · ${s.price}
                       </span>
                     </div>
                   )
                 })}
                 <div className={styles.summaryRow}>
-                  <span className={styles.summaryLabel}>Date</span>
+                  <span className={styles.summaryLabel}>{t('date')}</span>
                   <span className={styles.summaryValue}>
-                    {localeDateStr(new Date(selectedDate + 'T00:00:00'), { weekday: 'long', month: 'long', day: 'numeric' })}
+                    {new Intl.DateTimeFormat(locale, { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date(selectedDate + 'T00:00:00'))}
                   </span>
                 </div>
                 <div className={styles.summaryRow}>
-                  <span className={styles.summaryLabel}>Time</span>
+                  <span className={styles.summaryLabel}>{t('time')}</span>
                   <span className={styles.summaryValue}>{formatTime(selectedTime)}</span>
                 </div>
                 <div className={styles.summaryRow}>
-                  <span className={styles.summaryLabel}>Total Duration</span>
-                  <span className={styles.summaryValue}>{totalDuration} min</span>
+                  <span className={styles.summaryLabel}>{t('totalDuration')}</span>
+                  <span className={styles.summaryValue}>{t('min', { count: totalDuration })}</span>
                 </div>
                 <div className={`${styles.summaryRow} ${styles.summaryTotal}`}>
-                  <span className={styles.summaryLabel}>Total</span>
+                  <span className={styles.summaryLabel}>{t('total')}</span>
                   <span className={styles.summaryValue}>${totalPrice}</span>
                 </div>
               </div>
@@ -905,17 +909,17 @@ export default function BookingClient({ slug, initialData = null, initialError =
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0, marginTop: 2 }}><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
                 <span>
                   {business.cancellationCutoffHours == null
-                    ? `Online cancellations aren't available for this salon${business.phone ? `; call ${business.phone} if your plans change` : ''}.`
+                    ? `${t('policyNone')}${business.phone ? ` ${t('policyCall', { phone: business.phone })}` : ''}`
                     : business.cancellationCutoffHours === 0
-                      ? 'You can reschedule or cancel online any time before your appointment.'
-                      : `You can reschedule or cancel online up to ${business.cancellationCutoffHours} hours before your appointment.`}
+                      ? t('policyAnytime')
+                      : t('policyHours', { hours: business.cancellationCutoffHours })}
                 </span>
               </p>
 
               <div className={`${styles.stepActions} ${styles.stickyActions}`}>
-                <button className={styles.backBtn} onClick={() => setStep(3)}>← Back</button>
+                <button className={styles.backBtn} onClick={() => setStep(3)}>{t('back')}</button>
                 <button className={styles.confirmBtn} onClick={handleSubmit} disabled={submitting}>
-                  {submitting ? 'Booking...' : '✓ Confirm Booking'}
+                  {submitting ? t('booking') : t('confirmBooking')}
                 </button>
               </div>
             </div>
@@ -924,9 +928,12 @@ export default function BookingClient({ slug, initialData = null, initialError =
 
         {/* Footer: the salon's page, so GlowUp is a credit line, not an ad */}
         <div className={styles.footer}>
-          <a href="https://glowup-jade.vercel.app" target="_blank" rel="noopener noreferrer" className={styles.footerCta}>
-            Powered by <strong>GlowUp</strong>
-          </a>
+          <div className={styles.footerRow}>
+            <LanguageSwitcher />
+            <a href="https://glowup-jade.vercel.app" target="_blank" rel="noopener noreferrer" className={styles.footerCta}>
+              {t('poweredBy')} <strong>GlowUp</strong>
+            </a>
+          </div>
         </div>
       </div>
 

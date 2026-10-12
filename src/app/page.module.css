@@ -14,7 +14,6 @@
   background: radial-gradient(circle, rgba(201, 160, 220, 0.1) 0%, rgba(240, 163, 181, 0.04) 40%, transparent 70%);
   pointer-events: none;
   z-index: 0;
-  animation: floatOrb1 20s ease-in-out infinite;
 }
 .ambientOrb2 {
   position: fixed;
@@ -25,7 +24,6 @@
   background: radial-gradient(circle, rgba(240, 163, 181, 0.08) 0%, rgba(201, 160, 220, 0.03) 40%, transparent 70%);
   pointer-events: none;
   z-index: 0;
-  animation: floatOrb2 25s ease-in-out infinite;
 }
 @keyframes floatOrb1 {
   0%, 100% { transform: translate(0, 0); }
@@ -76,7 +74,6 @@
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  animation: logoSparkle 5s ease-in-out infinite;
   filter: drop-shadow(0 0 0 transparent);
 }
 @keyframes logoSparkle {
@@ -104,7 +101,6 @@
 .logo svg {
   color: var(--color-primary);
   filter: drop-shadow(0 0 8px rgba(201, 160, 220, 0.4));
-  animation: logoIconPulse 3s ease-in-out infinite;
 }
 @keyframes logoIconPulse {
   0%, 100% { filter: drop-shadow(0 0 6px rgba(201, 160, 220, 0.3)); transform: scale(1); }
@@ -136,7 +132,6 @@
     0 0 20px rgba(232, 106, 148, 0.4),
     0 0 6px rgba(179, 125, 212, 0.3),
     inset 0 1px 0 rgba(255, 255, 255, 0.15);
-  animation: pulseGlow 2.5s ease-in-out infinite;
 }
 .nav :global(.btn-primary:hover) {
   transform: translateY(-2px) scale(1.04);
@@ -177,7 +172,6 @@
   font-size: 14px;
   color: var(--color-primary);
   opacity: 0.3;
-  animation: sparkleFloat 4s ease-in-out infinite;
   pointer-events: none;
 }
 @keyframes sparkleFloat {

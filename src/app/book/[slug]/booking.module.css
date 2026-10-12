@@ -941,3 +941,11 @@
 @media (prefers-reduced-motion: reduce) {
   .stepPanel, .successCard, .serviceCheck { animation: none; }
 }
+
+.footerRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
