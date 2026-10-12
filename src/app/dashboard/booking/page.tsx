@@ -5,6 +5,7 @@ import { useTenant } from "@/lib/tenant-context";
 import { queryData, cachedQuery } from "@/lib/api";
 import { localeDateStr } from "@/lib/utils";
 import { isSalonClosedOnDate, isStaffOffOnDate } from "@/lib/schedule-utils";
+import { dayRangeInTz, todayInTz, DEFAULT_TZ } from "@/lib/tz";
 import styles from "./booking.module.css";
 import type { Campaign, Staff, Appointment, Client } from "@/lib/types";
 
@@ -103,6 +104,8 @@ function detectOpenSlots(
       // For each work window, subtract booked intervals and emit open slots
       for (const win of workWindows) {
         let cursor = win.start;
+        // Today: nothing earlier than the next half hour is an "opening".
+        if (d === 0) cursor = Math.max(cursor, Math.ceil((now.getHours() + now.getMinutes() / 60) * 2) / 2);
         for (const b of booked) {
           // Skip bookings that don't overlap this window
           if (b.end <= win.start || b.start >= win.end) continue;
@@ -166,6 +169,8 @@ export default function BookingPage() {
   const [showSaveList, setShowSaveList] = useState(false);
   const [fillSending, setFillSending] = useState(false);
   const [fillSent, setFillSent] = useState(false);
+  const [fillResult, setFillResult] = useState<{ sent: number; skipped: number; failed: number } | null>(null);
+  const [fillError, setFillError] = useState<string | null>(null);
   const [allStaff, setAllStaff] = useState<Staff[]>([]);
   const [allClients, setAllClients] = useState<Client[]>([]);
   const [allAppointments, setAllAppointments] = useState<Appointment[]>([]);
@@ -176,9 +181,20 @@ export default function BookingPage() {
 
   const loadFillData = useCallback(async () => {
     if (!tenant) return;
+    // Only the days being offered. With no range, appointments.list returned
+    // the oldest 200 appointments ever, so once a salon passed ~200 bookings
+    // every hour of next week looked open.
+    const tz = tenant.timezone || DEFAULT_TZ;
+    const today = todayInTz(tz);
+    const [y, m, d] = today.split("-").map(Number);
+    const lastDay = new Date(Date.UTC(y, m - 1, d + Math.max(fillDays, 1) - 1)).toISOString().slice(0, 10);
     const [staffRes, aptRes, clientRes] = await Promise.all([
       cachedQuery<Staff[]>("staff.list"),
-      cachedQuery<Appointment[]>("appointments.list"),
+      cachedQuery<Appointment[]>("appointments.list", {
+        startDate: dayRangeInTz(today, tz).start,
+        endDate: dayRangeInTz(lastDay, tz).end,
+        limit: 1000,
+      }),
       cachedQuery<Client[]>("clients.list"),
     ]);
     const staff = staffRes.data || [];
@@ -293,6 +309,7 @@ export default function BookingPage() {
     const { data: campaign } = await queryData<Campaign>("campaigns.add", payload);
     if (campaign) setCampaigns(prev => [campaign, ...prev]);
 
+    setFillError(null);
     try {
       const res = await fetch("/api/send-campaign", {
         method: "POST",
@@ -301,25 +318,37 @@ export default function BookingPage() {
           campaign_id: campaign?.id,
           message: personalizedMessage,
           audience: fillAudience,
+          // "Select Clients" was never sent, so the blast went to everyone.
+          client_ids: fillAudience === "selected" ? Array.from(selectedClientIds) : undefined,
           channel: fillChannel,
         }),
       });
-      const result = await res.json();
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok || result.error) {
+        throw new Error(result.error || `Send failed (HTTP ${res.status})`);
+      }
 
+      setFillResult({ sent: result.sent ?? recipientCount, skipped: result.skipped ?? 0, failed: result.failed ?? 0 });
       if (campaign) {
         const updated: Campaign = {
           ...campaign,
           status: "completed" as Campaign["status"],
-          metrics: { sent: result.sent || recipientCount, opened: 0, booked: 0, revenue: 0 },
+          metrics: { sent: result.sent ?? recipientCount, opened: 0, booked: 0, revenue: 0 },
         };
         setCampaigns(prev => prev.map(c => c.id === campaign.id ? updated : c));
       }
+      setFillSent(true);
     } catch (err) {
+      // Used to show "Blast Sent Successfully!" regardless.
       console.error("Blast send failed:", err);
+      setFillError(err instanceof Error ? err.message : "Send failed");
+      if (campaign) {
+        await queryData("campaigns.update", { id: campaign.id, status: "failed" });
+        setCampaigns(prev => prev.map(c => c.id === campaign.id ? { ...c, status: "failed" as Campaign["status"] } : c));
+      }
     }
 
     setFillSending(false);
-    setFillSent(true);
   }
 
   async function handleToggleAutomation(key: string) {
@@ -364,12 +393,22 @@ export default function BookingPage() {
           })}
         </div>
 
+        {fillError && !fillSent && (
+          <div className="card" role="alert" style={{ borderColor: "var(--color-danger)", color: "var(--color-danger)", marginBottom: "var(--space-4)" }}>
+            Blast not sent: {fillError}
+          </div>
+        )}
         {fillSent ? (
           <div className={`card ${styles.fillSuccess}`}>
             <div className="successEmoji">🚀</div>
-            <h3>Blast Sent Successfully!</h3>
-            <p>{getAudienceCount(fillAudience)} clients notified about {selectedSlots.size} open slot{selectedSlots.size !== 1 ? "s" : ""}.</p>
-            <button className="btn btn-primary" onClick={() => { setFillSent(false); setFillStep(1); setSelectedSlots(new Set()); }}>
+            <h3>Blast Sent</h3>
+            <p>
+              {fillResult ? `${fillResult.sent} sent` : `${getAudienceCount(fillAudience)} clients`}
+              {fillResult && fillResult.skipped > 0 ? `, ${fillResult.skipped} skipped (opted out or no contact)` : ""}
+              {fillResult && fillResult.failed > 0 ? `, ${fillResult.failed} failed` : ""}
+              {" "}about {selectedSlots.size} open slot{selectedSlots.size !== 1 ? "s" : ""}.
+            </p>
+            <button className="btn btn-primary" onClick={() => { setFillSent(false); setFillResult(null); setFillStep(1); setSelectedSlots(new Set()); }}>
               Send Another Blast
             </button>
           </div>

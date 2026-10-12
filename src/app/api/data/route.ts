@@ -1503,26 +1503,53 @@ export async function POST(request: Request) {
         })
         if (badRef) return foreignRefError(badRef)
 
+        const content = String(payload.content || '').trim()
+        if (!content) return NextResponse.json({ data: null, error: 'Message is empty' }, { status: 400 })
+
+        // Only staff replies come through here (the receptionist and the
+        // webhooks write client messages themselves), so the body can't
+        // forge a client message or set created_at/metadata.
         const { data: msg, error } = await svc
           .from('messages')
-          .insert({ ...payload, tenant_id: tenantId })
+          .insert({
+            conversation_id: payload.conversation_id,
+            sender_type: 'staff',
+            sender_name: typeof payload.sender_name === 'string' ? payload.sender_name.slice(0, 80) : 'Staff',
+            content,
+            tenant_id: tenantId,
+          })
           .select()
           .single()
+        if (error || !msg) return NextResponse.json({ data: null, error: error?.message || 'Could not save message' })
 
-        // Update conversation last_message
-        if (msg) {
-          await svc
-            .from('conversations')
-            .update({
-              last_message: msg.content,
-              last_message_at: msg.created_at,
-              unread_count: payload.sender_type === 'client' ? 1 : 0,
-            })
-            .eq('id', msg.conversation_id)
-            .eq('tenant_id', tenantId)
+        await svc
+          .from('conversations')
+          .update({ last_message: msg.content, last_message_at: msg.created_at, unread_count: 0 })
+          .eq('id', msg.conversation_id)
+          .eq('tenant_id', tenantId)
+
+        // Actually deliver it. This used to stop at the insert: the thread
+        // looked answered on screen and the client never heard anything.
+        let delivered = false
+        let delivery_error: string | null = null
+        const { data: convo } = await svc
+          .from('conversations')
+          .select('channel, client:clients(phone)')
+          .eq('id', msg.conversation_id)
+          .eq('tenant_id', tenantId)
+          .maybeSingle()
+        const client = (convo?.client as unknown as { phone?: string | null } | null) ?? null
+        if (convo?.channel === 'sms') {
+          const to = toE164(client?.phone || '')
+          if (!to) delivery_error = 'This client has no valid phone number on file'
+          else if (await sendSms(to, content, await getTenantSmsConfig(svc, tenantId))) delivered = true
+          else delivery_error = 'The text could not be sent. Check Settings → Text Messaging'
+        } else {
+          delivery_error = 'Web chat visitors only see replies while the chat is open; text them instead'
         }
 
-        return NextResponse.json({ data: msg, error: error?.message })
+        // queryData() hands the page only `data`, so delivery rides inside it.
+        return NextResponse.json({ data: { ...msg, delivered, delivery_error } })
       }
 
       // ─── LOYALTY ───

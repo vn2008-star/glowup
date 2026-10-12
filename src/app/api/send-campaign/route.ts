@@ -65,7 +65,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'No tenant' }, { status: 404 })
   }
 
-  const { campaign_id, message, audience, channel = 'sms' } = body
+  const { campaign_id, message, audience, channel = 'sms', client_ids } = body
 
   if (!message) {
     return NextResponse.json({ error: 'Missing message' }, { status: 400 })
@@ -78,6 +78,18 @@ export async function POST(request: Request) {
     .eq('tenant_id', tenantId)
 
   switch (audience) {
+    case 'selected': {
+      // The wizard's "Select Clients" step. This case was missing, so a
+      // hand-picked list fell through to "no filter" and went to everyone.
+      const ids = Array.isArray(client_ids)
+        ? client_ids.filter((id: unknown): id is string => typeof id === 'string').slice(0, 2000)
+        : []
+      if (ids.length === 0) {
+        return NextResponse.json({ error: 'No clients selected' }, { status: 400 })
+      }
+      query = query.in('id', ids)
+      break
+    }
     case 'active':
       query = query.eq('status', 'active')
       break

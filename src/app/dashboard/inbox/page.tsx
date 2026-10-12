@@ -59,6 +59,8 @@ export default function InboxPage() {
   const [selectedConvo, setSelectedConvo] = useState<Conversation | null>(null);
   const [loading, setLoading] = useState(() => !hasCached("conversations.list"));
   const [messageText, setMessageText] = useState("");
+  // Delivery result of the last reply; null when nothing to report
+  const [sendStatus, setSendStatus] = useState<{ ok: boolean; text: string } | null>(null);
   const [activeTab, setActiveTab] = useState<"inbox" | "config">("inbox");
   const [filter, setFilter] = useState<"all" | "open" | "closed">("all");
   const [showQuickReplies, setShowQuickReplies] = useState(false);
@@ -96,6 +98,7 @@ export default function InboxPage() {
 
   async function selectConversation(convo: Conversation) {
     setSelectedConvo(convo);
+    setSendStatus(null);
     const { data } = await queryData<Message[]>("messages.list", { conversation_id: convo.id });
     setMessages(data || []);
 
@@ -112,21 +115,28 @@ export default function InboxPage() {
     e.preventDefault();
     if (!messageText.trim() || !selectedConvo) return;
 
-    const { data } = await queryData<Message>("messages.add", {
+    setSendStatus(null);
+    const { data, error } = await queryData<Message & { delivered?: boolean; delivery_error?: string | null }>("messages.add", {
       conversation_id: selectedConvo.id,
       sender_type: "staff",
       sender_name: "You",
       content: messageText,
     });
 
-    if (data) {
-      setMessages((prev) => [...prev, data]);
-      setConversations((prev) => prev.map((c) =>
-        c.id === selectedConvo.id ? { ...c, last_message: data.content, last_message_at: data.created_at } : c
-      ));
-      setMessageText("");
-      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+    if (error || !data) {
+      setSendStatus({ ok: false, text: error || "Could not send" });
+      return;
     }
+    setMessages((prev) => [...prev, data]);
+    setConversations((prev) => prev.map((c) =>
+      c.id === selectedConvo.id ? { ...c, last_message: data.content, last_message_at: data.created_at } : c
+    ));
+    setMessageText("");
+    // The row is saved either way; say whether the client will actually get it.
+    setSendStatus(data.delivered
+      ? { ok: true, text: "Sent by text" }
+      : { ok: false, text: data.delivery_error || "Saved, but not delivered" });
+    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
   }
 
   function useQuickReply(text: string) {
@@ -547,6 +557,11 @@ export default function InboxPage() {
                           {r}
                         </button>
                       ))}
+                    </div>
+                  )}
+                  {sendStatus && (
+                    <div role="status" style={{ fontSize: "var(--text-sm)", padding: "4px 8px", color: sendStatus.ok ? "var(--color-success)" : "var(--color-danger)" }}>
+                      {sendStatus.text}
                     </div>
                   )}
                   <form onSubmit={handleSendMessage} className={styles.composeForm}>
