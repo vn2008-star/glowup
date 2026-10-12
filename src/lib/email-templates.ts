@@ -331,7 +331,7 @@ export function bookingConfirmationHtml(opts: {
     : ''
 
   const body = `
-    <p style="margin:0 0 4px;color:#e8e8f0;font-size:16px;">Dear ${greeting},</p>
+    <p style="margin:0 0 4px;color:#e8e8f0;font-size:16px;">Dear ${escapeHtml(greeting)},</p>
     <p style="margin:0 0 24px;color:#a0a0c0;font-size:14px;">Your appointment has been confirmed! ✨</p>
 
     <!-- Appointment card -->
@@ -390,7 +390,7 @@ export function appointmentReminderHtml(opts: {
     : `<p style="margin:24px 0 8px;color:#a0a0c0;font-size:14px;text-align:center;">To confirm, modify, or cancel, please reply to this email.</p>`
 
   const body = `
-    <p style="margin:0 0 4px;color:#e8e8f0;font-size:16px;">Dear ${greeting},</p>
+    <p style="margin:0 0 4px;color:#e8e8f0;font-size:16px;">Dear ${escapeHtml(greeting)},</p>
     <p style="margin:0 0 24px;color:#a0a0c0;font-size:14px;">This is a friendly reminder about your upcoming appointment 🔔</p>
 
     <!-- Appointment card -->
@@ -500,7 +500,7 @@ export function rescheduleConfirmationHtml(opts: {
     : ''
 
   const body = `
-    <p style="margin:0 0 4px;color:#e8e8f0;font-size:16px;">Dear ${greeting},</p>
+    <p style="margin:0 0 4px;color:#e8e8f0;font-size:16px;">Dear ${escapeHtml(greeting)},</p>
     <p style="margin:0 0 24px;color:#a0a0c0;font-size:14px;">Your appointment has been rescheduled! 🔄</p>
 
     <!-- Updated appointment card -->
@@ -558,7 +558,7 @@ export function cancellationConfirmationHtml(opts: {
     : ''
 
   const body = `
-    <p style="margin:0 0 4px;color:#e8e8f0;font-size:16px;">Dear ${greeting},</p>
+    <p style="margin:0 0 4px;color:#e8e8f0;font-size:16px;">Dear ${escapeHtml(greeting)},</p>
     <p style="margin:0 0 24px;color:#a0a0c0;font-size:14px;">Your appointment has been cancelled. ❌</p>
 
     <!-- Cancelled appointment card -->

@@ -270,6 +270,8 @@ function generateReportEmail(data: {
   uniqueClients: number; lines: AppointmentLine[]; statementUrl: string;
 }): string {
   const fmt = (n: number) => `$${n.toLocaleString()}`
+  // Client and service names come from the public booking form
+  const esc = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")
 
   // Build itemized rows HTML
   let itemizedRows = ''
@@ -279,8 +281,8 @@ function generateReportEmail(data: {
         <tr>
           <td style="color:#a0a0b0;font-size:13px;padding:6px 8px;border-bottom:1px solid #2d2840;">${line.date}</td>
           <td style="color:#a0a0b0;font-size:13px;padding:6px 8px;border-bottom:1px solid #2d2840;">${line.time}</td>
-          <td style="color:#f0f0f5;font-size:13px;padding:6px 8px;border-bottom:1px solid #2d2840;">${line.clientName}</td>
-          <td style="color:#f0f0f5;font-size:13px;padding:6px 8px;border-bottom:1px solid #2d2840;">${line.serviceName}</td>
+          <td style="color:#f0f0f5;font-size:13px;padding:6px 8px;border-bottom:1px solid #2d2840;">${esc(line.clientName)}</td>
+          <td style="color:#f0f0f5;font-size:13px;padding:6px 8px;border-bottom:1px solid #2d2840;">${esc(line.serviceName)}</td>
           <td style="color:#f0f0f5;font-size:13px;padding:6px 8px;border-bottom:1px solid #2d2840;text-align:right;font-weight:600;">${fmt(line.price)}</td>
           <td style="color:#e8b4cb;font-size:13px;padding:6px 8px;border-bottom:1px solid #2d2840;text-align:right;">${line.tip > 0 ? fmt(line.tip) : '—'}</td>
         </tr>`
@@ -299,8 +301,8 @@ function generateReportEmail(data: {
         <tr>
           <td style="color:#a0a0b0;font-size:13px;padding:6px 8px;border-bottom:1px solid #2d2840;">${line.date}</td>
           <td style="color:#a0a0b0;font-size:13px;padding:6px 8px;border-bottom:1px solid #2d2840;">${line.time}</td>
-          <td style="color:#f0f0f5;font-size:13px;padding:6px 8px;border-bottom:1px solid #2d2840;">${line.clientName}</td>
-          <td style="color:#f0f0f5;font-size:13px;padding:6px 8px;border-bottom:1px solid #2d2840;">${line.serviceName}</td>
+          <td style="color:#f0f0f5;font-size:13px;padding:6px 8px;border-bottom:1px solid #2d2840;">${esc(line.clientName)}</td>
+          <td style="color:#f0f0f5;font-size:13px;padding:6px 8px;border-bottom:1px solid #2d2840;">${esc(line.serviceName)}</td>
           <td style="color:#f0f0f5;font-size:13px;padding:6px 8px;border-bottom:1px solid #2d2840;text-align:right;font-weight:600;">${fmt(line.price)}</td>
           <td style="color:#e8b4cb;font-size:13px;padding:6px 8px;border-bottom:1px solid #2d2840;text-align:right;">${line.tip > 0 ? fmt(line.tip) : '—'}</td>
         </tr>`
@@ -324,7 +326,7 @@ function generateReportEmail(data: {
   <div style="max-width:650px;margin:0 auto;padding:32px 20px;">
     <!-- Header -->
     <div style="text-align:center;margin-bottom:32px;">
-      <h1 style="color:#c9a0dc;font-size:28px;margin:0 0 4px;">${data.businessName}</h1>
+      <h1 style="color:#c9a0dc;font-size:28px;margin:0 0 4px;">${esc(data.businessName)}</h1>
       <p style="color:#a0a0b0;font-size:14px;margin:0;">Revenue Statement</p>
     </div>
 
@@ -337,7 +339,7 @@ function generateReportEmail(data: {
 
     <!-- Greeting -->
     <div style="background:#231e30;border:1px solid #3d3550;border-radius:16px;padding:24px;margin-bottom:24px;">
-      <h2 style="color:#f0f0f5;font-size:18px;margin:0 0 8px;">Hi ${data.staffName} 👋</h2>
+      <h2 style="color:#f0f0f5;font-size:18px;margin:0 0 8px;">Hi ${esc(data.staffName)} 👋</h2>
       <p style="color:#a0a0b0;font-size:14px;margin:0;line-height:1.5;">
         Here's your itemized revenue statement for <strong style="color:#e8b4cb;">${data.periodLabel}</strong>.
       </p>
@@ -444,7 +446,7 @@ function generateReportEmail(data: {
         </a>
       </p>
       <p style="color:#555;font-size:11px;margin:8px 0 0;">
-        This is an automated report from ${data.businessName}. If you have questions, please contact your manager.
+        This is an automated report from ${esc(data.businessName)}. If you have questions, please contact your manager.
       </p>
     </div>
   </div>

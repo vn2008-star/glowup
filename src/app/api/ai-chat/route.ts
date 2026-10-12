@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { rateLimited, clientIp, TOO_MANY } from '@/lib/rate-limit'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { handleAiChat, type TenantRow } from '@/lib/ai-receptionist'
 
@@ -6,6 +7,10 @@ import { handleAiChat, type TenantRow } from '@/lib/ai-receptionist'
 // The heavy lifting lives in src/lib/ai-receptionist.ts, shared with the
 // inbound-SMS webhook so both channels behave identically.
 export async function POST(request: Request) {
+  // Three reads, a Gemini call and two inserts per message, from anyone.
+  if (rateLimited(`chat:${clientIp(request)}`, 40, 10 * 60 * 1000)) {
+    return NextResponse.json(TOO_MANY, { status: 429 })
+  }
   try {
     const { message, conversation_id, slug } = await request.json()
 

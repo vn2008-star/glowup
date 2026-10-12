@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { rateLimited, clientIp, TOO_MANY } from '@/lib/rate-limit'
 import { createClient } from '@supabase/supabase-js'
 import { resolveTenantTz } from '@/lib/notifications'
 import { dayRangeInTz, todayInTz } from '@/lib/tz'
@@ -128,7 +129,13 @@ export async function GET(request: Request) {
 
 // POST: Add a new walk-in to the waitlist
 export async function POST(request: Request) {
-  const body = await request.json()
+  if (rateLimited(`waitlist:${clientIp(request)}`, 12, 10 * 60 * 1000)) {
+    return NextResponse.json(TOO_MANY, { status: 429 })
+  }
+  const body = await request.json().catch(() => null)
+  if (!body || typeof body !== 'object') {
+    return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
+  }
   const { slug, client_name, client_phone, client_email, client_birthday, service_id, staff_id } = body
 
   if (!slug || !client_name?.trim()) {
@@ -177,13 +184,17 @@ export async function POST(request: Request) {
     if (existing) clientId = existing.id
   }
 
-  // Update existing client with any new info (email, birthday)
+  // Fill in missing info only. This is unauthenticated and matched by phone,
+  // so it must never overwrite an email the salon already has (confirmations
+  // would start going to whoever typed the form).
   if (clientId) {
-    const updates: Record<string, string> = {}
-    if (client_email?.trim()) updates.email = client_email.trim()
-    if (client_birthday) updates.birthday = client_birthday
-    if (Object.keys(updates).length > 0) {
-      await svc.from('clients').update(updates).eq('id', clientId)
+    if (client_email?.trim()) {
+      await svc.from('clients').update({ email: client_email.trim() })
+        .eq('id', clientId).eq('tenant_id', tenant.id).is('email', null)
+    }
+    if (client_birthday) {
+      await svc.from('clients').update({ birthday: client_birthday })
+        .eq('id', clientId).eq('tenant_id', tenant.id).is('birthday', null)
     }
   }
 

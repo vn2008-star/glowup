@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { rateLimited, clientIp, TOO_MANY } from '@/lib/rate-limit'
 import { waitUntil } from '@vercel/functions'
 import { createClient } from '@supabase/supabase-js'
 import { timezoneFromAddress, DEFAULT_TZ } from '@/lib/tz'
@@ -134,7 +135,14 @@ export async function GET(request: Request) {
 // POST: Create a booking (public — no auth)
 // Supports both single-service (legacy) and multi-service (batch) mode.
 export async function POST(request: Request) {
-  const body = await request.json()
+  // Each booking creates a client row and texts + emails the owner.
+  if (rateLimited(`book:${clientIp(request)}`, 12, 10 * 60 * 1000)) {
+    return NextResponse.json(TOO_MANY, { status: 429 })
+  }
+  const body = await request.json().catch(() => null)
+  if (!body || typeof body !== 'object') {
+    return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
+  }
   const { slug, staff_id, start_time, client_name, client_email, client_phone, notes, client_birthday } = body
   // SMS consent from the booking form's checkbox. Default true for any legacy
   // caller that doesn't send the field; false only when explicitly unchecked.
@@ -371,7 +379,9 @@ export async function POST(request: Request) {
     // consent checkbox used to be silently discarded for existing clients.
     const updates: Record<string, unknown> = {}
     if (client_birthday) updates.birthday = client_birthday
-    if ('sms_consent' in body) updates.sms_opt_out = !smsConsent
+    // A public form may only ever OPT a client OUT. Clearing opt-out from here
+    // let anyone who knew a client's phone re-subscribe them to texts.
+    if (body.sms_consent === false) updates.sms_opt_out = true
     if (Object.keys(updates).length > 0) {
       await svc.from('clients').update(updates).eq('id', clientId)
     }
@@ -491,7 +501,9 @@ export async function PATCH(request: Request) {
   }
 
   // Find the client
-  let query = svc.from('clients').update({ birthday }).eq('tenant_id', tenant.id)
+  // Only fill in a birthday that isn't set: this is unauthenticated, keyed by
+  // phone or email, and must never overwrite what the salon has on file.
+  let query = svc.from('clients').update({ birthday }).eq('tenant_id', tenant.id).is('birthday', null)
 
   if (client_email) {
     query = query.eq('email', client_email)
