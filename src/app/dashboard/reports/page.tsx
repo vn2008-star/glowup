@@ -1,5 +1,6 @@
 "use client";
 
+import { useToast } from "@/components/ui/Toast";
 import React, { useState, useEffect, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
@@ -78,6 +79,7 @@ type CancellationData = {
 
 export default function ReportsPage() {
   const { tenant, refetch: refetchTenant } = useTenant();
+  const toast = useToast();
   const t = useTranslations("reportsPage");
   const [activeTab, setActiveTab] = useState<string>(TABS[0]);
   const [loading, setLoading] = useState(() => !hasCached("reports.overview"));
@@ -581,8 +583,8 @@ export default function ReportsPage() {
                         body: JSON.stringify({ period: revPeriodType, offset: revOffset }),
                       });
                       const result = await res.json();
-                      alert(`Reports sent! ${result.data?.sent || 0} emails delivered.${result.data?.dry_run ? ' (Dry run — set RESEND_API_KEY for live sending)' : ''}`);
-                    } catch { alert('Failed to send reports.'); }
+                      toast.success(`Reports sent! ${result.data?.sent || 0} emails delivered.${result.data?.dry_run ? ' (Dry run — set RESEND_API_KEY for live sending)' : ''}`);
+                    } catch { toast.error('Failed to send reports.'); }
                     setSendingEmail(null);
                   }}>
                   {sendingEmail === 'all' ? '⏳ Sending...' : '📧 Email All Staff'}
@@ -678,7 +680,7 @@ export default function ReportsPage() {
                                   });
                                   const result = await res.json();
                                   if (result.data?.url) window.open(result.data.url, '_blank');
-                                } catch { alert('Failed to generate preview.'); }
+                                } catch { toast.error('Failed to generate preview.'); }
                               }}>
                               👁️
                             </button>
@@ -695,8 +697,8 @@ export default function ReportsPage() {
                                     body: JSON.stringify({ period: revPeriodType, offset: revOffset, staffIds: [s.id] }),
                                   });
                                   const result = await res.json();
-                                  alert(`Report sent to ${s.name}!${result.data?.dry_run ? ' (Dry run)' : ''}`);
-                                } catch { alert('Failed to send.'); }
+                                  toast.success(`Report sent to ${s.name}!${result.data?.dry_run ? ' (Dry run)' : ''}`);
+                                } catch { toast.error('Failed to send.'); }
                                 setSendingEmail(null);
                               }}>
                               {sendingEmail === s.id ? '⏳' : '📧'}

@@ -1,5 +1,6 @@
 "use client";
 
+import { useToast } from "@/components/ui/Toast";
 import { useState, useEffect, useCallback } from "react";
 import { localeDateStr } from "@/lib/utils";
 import { localToUTC, nowInTz, todayInTz, formatDateInTz, DEFAULT_TZ } from "@/lib/tz";
@@ -47,6 +48,7 @@ export default function ManageClient({ token, initialData = null, initialError =
   initialData?: ManagePayload | null;
   initialError?: string | null;
 }) {
+  const toast = useToast();
   const [appointment, setAppointment] = useState<AppointmentData | null>(initialData?.appointment ?? null);
   const [business, setBusiness] = useState<BusinessData | null>(initialData?.business ?? null);
   const [loading, setLoading] = useState(!initialData && !initialError);
@@ -112,10 +114,10 @@ export default function ManageClient({ token, initialData = null, initialError =
         if (appointment) setAppointment({ ...appointment, status: "cancelled" });
       } else {
         const data = await res.json();
-        alert(data.error || "Failed to cancel");
+        toast.error(data.error || "Failed to cancel");
       }
     } catch {
-      alert("Network error. Please try again.");
+      toast.error("Network error. Please try again.");
     }
     setActionLoading(false);
   }
@@ -149,10 +151,10 @@ export default function ManageClient({ token, initialData = null, initialError =
         setView("rescheduled");
       } else {
         const data = await res.json();
-        alert(data.error || "Failed to reschedule");
+        toast.error(data.error || "Failed to reschedule");
       }
     } catch {
-      alert("Network error. Please try again.");
+      toast.error("Network error. Please try again.");
     }
     setActionLoading(false);
   }

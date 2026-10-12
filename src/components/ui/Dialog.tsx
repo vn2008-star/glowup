@@ -6,7 +6,7 @@
 // none of those. Under 640px it becomes a bottom sheet. Scroll lock is in
 // globals.css (`body:has(dialog[open])`).
 
-import { useEffect, useRef, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import styles from './Dialog.module.css'
 
 export interface DialogProps {
@@ -118,5 +118,61 @@ export function ConfirmDialog({ open, title, description, confirmLabel = 'Confir
     >
       {null}
     </Dialog>
+  )
+}
+
+// ─── useConfirm ───
+// `if (!(await confirmDialog({ title: 'Delete this client?', danger: true }))) return`
+// One ConfirmDialog mounted by the provider serves the whole app, so a page
+// needs no state of its own to ask a yes/no question.
+
+export interface ConfirmOptions {
+  title: ReactNode
+  description?: ReactNode
+  confirmLabel?: string
+  cancelLabel?: string
+  danger?: boolean
+}
+
+type ConfirmFn = (opts: ConfirmOptions) => Promise<boolean>
+
+const ConfirmContext = createContext<ConfirmFn | null>(null)
+
+export function useConfirm(): ConfirmFn {
+  const fn = useContext(ConfirmContext)
+  // Outside the provider, fall back to the browser dialog rather than crash.
+  return fn || (async (opts) => typeof window !== 'undefined' && window.confirm(String(opts.title)))
+}
+
+export function ConfirmProvider({ children }: { children: ReactNode }) {
+  const [pending, setPending] = useState<{ opts: ConfirmOptions; resolve: (v: boolean) => void } | null>(null)
+
+  const ask = useCallback<ConfirmFn>((opts) => new Promise<boolean>((resolve) => {
+    setPending((prev) => {
+      prev?.resolve(false) // a second question supersedes the first
+      return { opts, resolve }
+    })
+  }), [])
+
+  const settle = useCallback((value: boolean) => {
+    setPending((prev) => { prev?.resolve(value); return null })
+  }, [])
+
+  const value = useMemo(() => ask, [ask])
+
+  return (
+    <ConfirmContext.Provider value={value}>
+      {children}
+      <ConfirmDialog
+        open={!!pending}
+        title={pending?.opts.title ?? ''}
+        description={pending?.opts.description}
+        confirmLabel={pending?.opts.confirmLabel}
+        cancelLabel={pending?.opts.cancelLabel}
+        danger={pending?.opts.danger}
+        onConfirm={() => settle(true)}
+        onCancel={() => settle(false)}
+      />
+    </ConfirmContext.Provider>
   )
 }

@@ -1,5 +1,7 @@
 "use client";
 
+import { useToast } from "@/components/ui/Toast";
+import { useConfirm } from "@/components/ui/Dialog";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
@@ -51,6 +53,8 @@ const DEFAULT_HOURS: BusinessHours = DAYS.reduce((acc, day) => {
 
 export default function SettingsPage() {
   const { tenant, refetch } = useTenant();
+  const toast = useToast();
+  const confirmDialog = useConfirm();
   const t = useTranslations("settingsPage");
 
   const [saving, setSaving] = useState(false);
@@ -179,7 +183,7 @@ export default function SettingsPage() {
   }
 
   async function handleRemoveSmsGateway() {
-    if (!confirm("Disconnect this phone? Texts will fall back to the platform number.")) return;
+    if (!(await confirmDialog({ title: "Disconnect this phone?", description: "Texts will fall back to the platform number.", danger: true, confirmLabel: "Disconnect" }))) return;
     await queryData("sms.remove-gateway", {});
     setSmsForm({ login: "", password: "", phone: "", base_url: "" });
     setSmsMessage(null);
@@ -358,7 +362,7 @@ export default function SettingsPage() {
     } else {
       // Silently doing nothing left owners thinking their hours were saved
       const body = await res.json().catch(() => ({}));
-      alert(`Could not save settings: ${body?.error || `HTTP ${res.status}`}`);
+      toast.error(`Could not save settings: ${body?.error || `HTTP ${res.status}`}`);
     }
 
     setSaving(false);
@@ -402,14 +406,14 @@ export default function SettingsPage() {
                 const file = e.target.files?.[0];
                 if (!file) return;
                 if (file.size > 2 * 1024 * 1024) {
-                  alert("Image must be under 2 MB");
+                  toast.error("Image must be under 2 MB");
                   return;
                 }
                 // Instant local preview, then upload to Storage and store the URL
                 // (not a base64 data URI, which bloats the tenants row).
                 setLogoUrl(URL.createObjectURL(file));
                 const { url, error } = await uploadImage(file, "logos");
-                if (error || !url) { alert(`Logo upload failed: ${error || "unknown error"}`); return; }
+                if (error || !url) { toast.error(`Logo upload failed: ${error || "unknown error"}`); return; }
                 setLogoUrl(url);
               }}
             />
@@ -964,10 +968,10 @@ export default function SettingsPage() {
                   onChange={async (e) => {
                     const file = e.target.files?.[0];
                     if (!file) return;
-                    if (file.size > 2 * 1024 * 1024) { alert("Max 2 MB"); return; }
+                    if (file.size > 2 * 1024 * 1024) { toast.error("Max 2 MB"); return; }
                     setPaymentQr(prev => ({ ...prev, venmo_qr: URL.createObjectURL(file) }));
                     const { url, error } = await uploadImage(file, "qr");
-                    if (error || !url) { alert(`Upload failed: ${error || "unknown error"}`); return; }
+                    if (error || !url) { toast.error(`Upload failed: ${error || "unknown error"}`); return; }
                     setPaymentQr(prev => ({ ...prev, venmo_qr: url }));
                   }}
                 />
@@ -1020,10 +1024,10 @@ export default function SettingsPage() {
                   onChange={async (e) => {
                     const file = e.target.files?.[0];
                     if (!file) return;
-                    if (file.size > 2 * 1024 * 1024) { alert("Max 2 MB"); return; }
+                    if (file.size > 2 * 1024 * 1024) { toast.error("Max 2 MB"); return; }
                     setPaymentQr(prev => ({ ...prev, zelle_qr: URL.createObjectURL(file) }));
                     const { url, error } = await uploadImage(file, "qr");
-                    if (error || !url) { alert(`Upload failed: ${error || "unknown error"}`); return; }
+                    if (error || !url) { toast.error(`Upload failed: ${error || "unknown error"}`); return; }
                     setPaymentQr(prev => ({ ...prev, zelle_qr: url }));
                   }}
                 />
@@ -1495,7 +1499,7 @@ export default function SettingsPage() {
                   } else {
                     // Previously this silently did nothing on failure, so a
                     // non-owner just saw a dead button.
-                    alert(error || 'Could not open the billing portal. Please try again.');
+                    toast.error(error || 'Could not open the billing portal. Please try again.');
                   }
                 }}
               >
@@ -1578,10 +1582,10 @@ export default function SettingsPage() {
                                 if (data.url) {
                                   window.location.href = data.url;
                                 } else {
-                                  alert(`Checkout failed: ${data.error || 'Unable to create checkout session.'}`);
+                                  toast.error(`Checkout failed: ${data.error || 'Unable to create checkout session.'}`);
                                 }
                               } catch (err) {
-                                alert(`Checkout error: ${err instanceof Error ? err.message : 'Network error. Please try again.'}`);
+                                toast.error(`Checkout error: ${err instanceof Error ? err.message : 'Network error. Please try again.'}`);
                               }
                             }}
                           >
@@ -1612,7 +1616,7 @@ export default function SettingsPage() {
             className={`btn ${tenant?.is_active === false ? 'btn-primary' : 'btn-secondary'} ${styles.dangerBtn}`}
             onClick={async () => {
               const action = tenant?.is_active === false ? 'enable' : 'disable';
-              if (action === 'disable' && !confirm('Are you sure you want to suspend your account? Staff will be logged out and bookings will be paused.')) return;
+              if (action === 'disable' && !(await confirmDialog({ title: 'Suspend your account?', description: 'Staff will be logged out and bookings will be paused.', danger: true, confirmLabel: 'Suspend' }))) return;
               const res = await fetch('/api/account-management', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1620,10 +1624,10 @@ export default function SettingsPage() {
               });
               if (res.ok) {
                 await refetch();
-                alert(action === 'disable' ? 'Account suspended.' : 'Account reactivated!');
+                toast.success(action === 'disable' ? 'Account suspended.' : 'Account reactivated!');
               } else {
                 const d = await res.json();
-                alert(d.error || 'Failed');
+                toast.error(d.error || 'Failed');
               }
             }}
           >
@@ -1648,7 +1652,7 @@ export default function SettingsPage() {
                 });
                 if (res.ok) {
                   await refetch();
-                  alert('Deletion cancelled! Your account has been reactivated.');
+                  toast.success('Deletion cancelled. Your account has been reactivated.');
                 }
               }}
             >
@@ -1676,9 +1680,9 @@ export default function SettingsPage() {
               const d = await res.json();
               if (res.ok) {
                 await refetch();
-                alert(`Account scheduled for deletion on ${localeDateStr(new Date(d.deletion_date), { month: 'long', day: 'numeric', year: 'numeric' })}. You have 30 days to cancel.`);
+                toast.info(`Account scheduled for deletion on ${localeDateStr(new Date(d.deletion_date), { month: 'long', day: 'numeric', year: 'numeric' })}. You have 30 days to cancel.`);
               } else {
-                alert(d.error || 'Deletion failed');
+                toast.error(d.error || 'Deletion failed');
               }
             }}
           >

@@ -1,5 +1,7 @@
 "use client";
 
+import { useToast } from "@/components/ui/Toast";
+import { useConfirm } from "@/components/ui/Dialog";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
@@ -13,6 +15,8 @@ const CATEGORY_OPTIONS = SERVICE_CATEGORIES.map((c) => c.label);
 
 export default function ServicesPage() {
   const { tenant } = useTenant();
+  const toast = useToast();
+  const confirmDialog = useConfirm();
   const t = useTranslations("servicesPage");
   // Seeded from the data cache so a return visit paints the list in the first
   // render — no "Loading services…" between one sidebar click and the next.
@@ -78,7 +82,7 @@ export default function ServicesPage() {
     // Shared helper so this picks up the same downscaling as every other upload
     const { url, error } = await uploadImage(file, 'services');
     if (url) setFormData(prev => ({ ...prev, image_url: url }));
-    else alert(`Upload failed: ${error}`);
+    else toast.error(`Upload failed: ${error}`);
     setUploading(false);
   }
 
@@ -97,20 +101,20 @@ export default function ServicesPage() {
 
     if (editingService) {
       const { data, error } = await queryData<Service>("services.update", { id: editingService.id, ...payload });
-      if (error) { console.error('Update error:', error); alert('Save failed: ' + error); return; }
+      if (error) { console.error('Update error:', error); toast.error('Save failed: ' + error); return; }
       if (data) setServices(prev => prev.map(s => s.id === data.id ? data : s));
     } else {
       const { data, error } = await queryData<Service>("services.add", payload);
-      if (error) { console.error('Add error:', error); alert('Save failed: ' + error); return; }
+      if (error) { console.error('Add error:', error); toast.error('Save failed: ' + error); return; }
       if (data) setServices(prev => [...prev, data]);
     }
     setShowModal(false);
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Delete this service?")) return;
+    if (!(await confirmDialog({ title: "Delete this service?", danger: true, confirmLabel: "Delete" }))) return;
     const { error } = await queryData("services.delete", { id });
-    if (error) { alert(`Could not delete service: ${error}`); return; }
+    if (error) { toast.error(`Could not delete service: ${error}`); return; }
     setServices(prev => prev.filter(s => s.id !== id));
   }
 

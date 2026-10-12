@@ -1,5 +1,7 @@
 "use client";
 
+import { useToast } from "@/components/ui/Toast";
+import { useConfirm } from "@/components/ui/Dialog";
 import { useState, useEffect, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
@@ -28,6 +30,8 @@ const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export default function SocialPage() {
   const { tenant } = useTenant();
+  const toast = useToast();
+  const confirmDialog = useConfirm();
   const salonTz = tenant?.timezone || DEFAULT_TZ;
   const [postSaving, setPostSaving] = useState(false);
   const t = useTranslations("socialPage");
@@ -118,18 +122,18 @@ export default function SocialPage() {
 
     if (editingPost) {
       const { data, error } = await queryData<SocialPost>("social.update", { id: editingPost.id, ...payload });
-      if (error || !data) { alert(`Could not save post: ${error || "unknown error"}`); return; }
+      if (error || !data) { toast.error(`Could not save post: ${error || "unknown error"}`); return; }
       setPosts((prev) => prev.map((p) => (p.id === data.id ? data : p)));
     } else {
       const { data, error } = await queryData<SocialPost>("social.add", payload);
-      if (error || !data) { alert(`Could not save post: ${error || "unknown error"}`); return; }
+      if (error || !data) { toast.error(`Could not save post: ${error || "unknown error"}`); return; }
       if (data) setPosts((prev) => [data, ...prev]);
     }
     setShowModal(false);
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Delete this post?")) return;
+    if (!(await confirmDialog({ title: "Delete this post?", danger: true, confirmLabel: "Delete" }))) return;
     await queryData("social.delete", { id });
     setPosts((prev) => prev.filter((p) => p.id !== id));
   }

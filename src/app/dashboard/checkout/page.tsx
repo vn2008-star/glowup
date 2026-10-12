@@ -1,5 +1,6 @@
 "use client";
 
+import { useToast } from "@/components/ui/Toast";
 import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "react";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
@@ -19,6 +20,7 @@ type FullAppointment = Appointment & {
 
 export default function CheckoutPage() {
   const { tenant } = useTenant();
+  const toast = useToast();
   const t = useTranslations("checkoutPage");
   const [loading, setLoading] = useState(true);
   const [appointments, setAppointments] = useState<FullAppointment[]>([]);
@@ -240,7 +242,7 @@ export default function CheckoutPage() {
       });
       if (error || !data) {
         // {error} isn't thrown, so the optimistic removal was never reverted
-        alert(error || "Could not claim this walk-in");
+        toast.error(error || "Could not claim this walk-in");
         fetchStaffWaitlist();
       } else {
         // Refresh appointments + waitlist to sync with server
@@ -415,7 +417,7 @@ export default function CheckoutPage() {
       client_birthday: walkInBirthday || null,
     });
 
-    if (error) alert(`Could not create the walk-in: ${error}`);
+    if (error) toast.error(`Could not create the walk-in: ${error}`);
     if (data) {
       setAppointments((prev) =>
         [...prev, data].sort(
@@ -489,7 +491,7 @@ export default function CheckoutPage() {
         is_upsell: false,
       });
       if (!baseCharge) {
-        alert(`Could not record the service charge: ${baseErr || "unknown error"}`);
+        toast.error(`Could not record the service charge: ${baseErr || "unknown error"}`);
         return;
       }
       currentCharges = [baseCharge];
@@ -506,7 +508,7 @@ export default function CheckoutPage() {
     });
 
     if (!data) {
-      alert(`Could not add the charge: ${error || "unknown error"}`);
+      toast.error(`Could not add the charge: ${error || "unknown error"}`);
       return;
     }
     setCharges([...currentCharges, data]);
@@ -545,7 +547,7 @@ export default function CheckoutPage() {
     });
 
     if (error || !data) {
-      alert(`Could not change the service: ${typeof error === "string" ? error : "unknown error"}`);
+      toast.error(`Could not change the service: ${typeof error === "string" ? error : "unknown error"}`);
     } else {
       setAppointments((prev) => prev.map((a) => (a.id === selectedApt.id ? { ...a, ...data } : a)));
       setSelectedApt((prev) => (prev ? { ...prev, ...data } : prev));
@@ -561,7 +563,7 @@ export default function CheckoutPage() {
     if (error) {
       // The line used to disappear from the screen while the DB still had it,
       // so the checkout total and the tally disagreed.
-      alert(`Could not remove the charge: ${error}`);
+      toast.error(`Could not remove the charge: ${error}`);
       return;
     }
     setCharges((prev) => prev.filter((c) => c.id !== chargeId));
@@ -652,7 +654,7 @@ export default function CheckoutPage() {
       if (!data) {
         // Proceeding here checked the client out at $0 and awarded loyalty
         // points and lifetime spend from that zero.
-        alert(`Checkout failed: ${typeof chargeErr === 'string' ? chargeErr : 'could not record the service charge'}`);
+        toast.error(`Checkout failed: ${typeof chargeErr === 'string' ? chargeErr : 'could not record the service charge'}`);
         setCheckingOut(false);
         return;
       }
@@ -680,7 +682,7 @@ export default function CheckoutPage() {
       // Was silently swallowed: the cashier's only signal was a missing badge.
       const msg = typeof checkoutErr === 'string' ? checkoutErr : 'Checkout failed';
       if (redeemGiftCard) setGcError(msg);
-      alert(`Checkout failed: ${msg}`);
+      toast.error(`Checkout failed: ${msg}`);
       setCheckingOut(false);
       return;
     }
@@ -1896,10 +1898,10 @@ export default function CheckoutPage() {
                           <input type="file" accept="image/*" style={{ display: "none" }} onChange={async (e) => {
                             const file = e.target.files?.[0];
                             if (!file) return;
-                            if (file.size > 2 * 1024 * 1024) { alert("Max 2 MB"); return; }
+                            if (file.size > 2 * 1024 * 1024) { toast.error("Max 2 MB"); return; }
                             setBeforePhoto(URL.createObjectURL(file));
                             const { url, error } = await uploadImage(file, "gallery");
-                            if (error || !url) { alert(`Upload failed: ${error || "unknown error"}`); return; }
+                            if (error || !url) { toast.error(`Upload failed: ${error || "unknown error"}`); return; }
                             setBeforePhoto(url);
                           }} />
                           {beforePhoto ? (
@@ -1919,10 +1921,10 @@ export default function CheckoutPage() {
                           <input type="file" accept="image/*" style={{ display: "none" }} onChange={async (e) => {
                             const file = e.target.files?.[0];
                             if (!file) return;
-                            if (file.size > 2 * 1024 * 1024) { alert("Max 2 MB"); return; }
+                            if (file.size > 2 * 1024 * 1024) { toast.error("Max 2 MB"); return; }
                             setAfterPhoto(URL.createObjectURL(file));
                             const { url, error } = await uploadImage(file, "gallery");
-                            if (error || !url) { alert(`Upload failed: ${error || "unknown error"}`); return; }
+                            if (error || !url) { toast.error(`Upload failed: ${error || "unknown error"}`); return; }
                             setAfterPhoto(url);
                           }} />
                           {afterPhoto ? (

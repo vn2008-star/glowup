@@ -1,5 +1,7 @@
 "use client";
 
+import { useToast } from "@/components/ui/Toast";
+import { useConfirm } from "@/components/ui/Dialog";
 import { useState, useEffect, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
@@ -27,6 +29,8 @@ const TABS = ["Packages", "Gift Cards"] as const;
 
 export default function PackagesPage() {
   const { tenant } = useTenant();
+  const toast = useToast();
+  const confirmDialog = useConfirm();
   const t = useTranslations("packagesPage");
   const [tab, setTab] = useState<string>(TABS[0]);
   // Seeded from the data cache — see lib/data-cache.
@@ -101,14 +105,14 @@ export default function PackagesPage() {
       ? await mutateData("packages.update", { id: editPkg.id, ...payload })
       : await mutateData("packages.add", payload);
     setPkgSaving(false);
-    if (res.error) { alert(`Could not save package: ${res.error}`); return; }
+    if (res.error) { toast.error(`Could not save package: ${res.error}`); return; }
     setShowPkgModal(false); resetPkgForm(); fetchData();
   };
 
   const handleDeletePkg = async (id: string) => {
-    if (!confirm("Delete this package?")) return;
+    if (!(await confirmDialog({ title: "Delete this package?", danger: true, confirmLabel: "Delete" }))) return;
     const res = await mutateData("packages.delete", { id });
-    if (res.error) alert(`Could not delete package: ${res.error}`);
+    if (res.error) toast.error(`Could not delete package: ${res.error}`);
     fetchData();
   };
 
@@ -125,12 +129,12 @@ export default function PackagesPage() {
         purchaser_name: gcPurchaser || null,
       });
       if (res.error) {
-        alert(`Failed to create gift card: ${res.error}`);
+        toast.error(`Failed to create gift card: ${res.error}`);
         return;
       }
       setShowGCModal(false); resetGCForm(); fetchData();
     } catch (err) {
-      alert(`Failed to create gift card: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      toast.error(`Failed to create gift card: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setPkgSaving(false);
     }

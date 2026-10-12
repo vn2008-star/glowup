@@ -1,5 +1,7 @@
 "use client";
 
+import { useToast } from "@/components/ui/Toast";
+import { useConfirm } from "@/components/ui/Dialog";
 import React, { useState, useEffect, useCallback } from "react";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData, cachedQuery, cached } from "@/lib/api";
@@ -26,6 +28,8 @@ const SEND_DAYS_OPTIONS = [3, 5, 7, 10, 14];
 
 export default function HolidaysPage() {
   const { tenant, refetch } = useTenant();
+  const toast = useToast();
+  const confirmDialog = useConfirm();
   // Seeded from the data cache, so coming back to Holidays paints the list in
   // the first render instead of announcing itself. See lib/data-cache.
   const [campaigns, setCampaigns] = useState<Campaign[]>(() => cached<Campaign[]>("campaigns.list") ?? []);
@@ -70,7 +74,7 @@ export default function HolidaysPage() {
     };
     const { data, error } = await queryData<Campaign>('campaigns.add', payload);
     setCreatingHoliday(null);
-    if (error || !data) { alert(`Could not create the promo: ${error || 'unknown error'}`); return; }
+    if (error || !data) { toast.error(`Could not create the promo: ${error || 'unknown error'}`); return; }
     setCampaigns(prev => [data, ...prev]);
   }
 
@@ -99,7 +103,7 @@ export default function HolidaysPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Delete this promotion?")) return;
+    if (!(await confirmDialog({ title: "Delete this promotion?", danger: true, confirmLabel: "Delete" }))) return;
     await queryData("campaigns.delete", { id });
     setCampaigns((prev) => prev.filter((c) => c.id !== id));
   }

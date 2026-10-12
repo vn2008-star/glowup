@@ -1,5 +1,7 @@
 "use client";
 
+import { useToast } from "@/components/ui/Toast";
+import { useConfirm } from "@/components/ui/Dialog";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
@@ -30,6 +32,8 @@ const DEFAULT_WORK_END = 18;
 
 export default function CalendarClient({ initialCalendar }: { initialCalendar: InitialCalendarData | null }) {
   const { tenant } = useTenant();
+  const toast = useToast();
+  const confirmDialog = useConfirm();
   const salonTz = tenant?.timezone || DEFAULT_TZ;
   const t = useTranslations("calendarPage");
   const [view, setView] = useState<"day" | "week" | "month">("week");
@@ -72,7 +76,7 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
       cancellation_reason: cancelReason.trim(),
     });
     setCancelling(false);
-    if (res.error) { alert(`Failed to cancel: ${res.error}`); return; }
+    if (res.error) { toast.error(`Failed to cancel: ${res.error}`); return; }
     setAppointments(prev => prev.filter(a => a.id !== cancelTarget.id));
     setCancelTarget(null);
     setCancelReason("");
@@ -473,7 +477,7 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
     });
     setSaving(false);
     if (error) {
-      alert(`Failed to book appointment: ${error}`);
+      toast.error(`Failed to book appointment: ${error}`);
       return;
     }
     if (data) {
@@ -507,7 +511,7 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
     const start = localToUTC(blockData.date, blockData.start_time, salonTz);
     const end = localToUTC(blockData.date, blockData.end_time, salonTz);
     if (end <= start) {
-      alert("End time must be after start time");
+      toast.error("End time must be after start time");
       return;
     }
     setSaving(true);
@@ -521,7 +525,7 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
       });
       setSaving(false);
       if (error) {
-        alert(`Failed to update blocked time: ${error}`);
+        toast.error(`Failed to update blocked time: ${error}`);
         return;
       }
       if (data) {
@@ -543,7 +547,7 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
     });
     setSaving(false);
     if (error) {
-      alert(`Failed to block time: ${error}`);
+      toast.error(`Failed to block time: ${error}`);
       return;
     }
     if (data) {
@@ -1263,9 +1267,9 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
                   // Real appointments get CANCELLED instead: the row stays for
                   // history/reporting and the client is notified automatically.
                   if (isBlocked(selectedApt)) {
-                    if (!confirm("Remove this blocked time?")) return;
+                    if (!(await confirmDialog({ title: "Remove this blocked time?", danger: true, confirmLabel: "Remove" }))) return;
                     const { error } = await queryData("appointments.delete", { id: selectedApt.id });
-                    if (error) { alert(`Could not remove the block: ${error}`); return; }
+                    if (error) { toast.error(`Could not remove the block: ${error}`); return; }
                     setAppointments(prev => prev.filter(a => a.id !== selectedApt.id));
                   } else {
                     // Real cancellations go through a dialog so the reason gets
@@ -1317,7 +1321,7 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
                 // error and close, so a rejected reschedule (e.g. the target
                 // slot is already booked) looked like it silently worked.
                 if (res.error) {
-                  alert(`Failed to update appointment: ${res.error}`);
+                  toast.error(`Failed to update appointment: ${res.error}`);
                   return;
                 }
                 if (res.data) {

@@ -1,5 +1,6 @@
 "use client";
 
+import { useToast } from "@/components/ui/Toast";
 import { useState, useEffect, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
@@ -36,6 +37,7 @@ import { todayInTz, DEFAULT_TZ } from "@/lib/tz";
 
 export default function StaffPage() {
   const { tenant } = useTenant();
+  const toast = useToast();
   const t = useTranslations("staffPage");
   // Seeded from the data cache — see lib/data-cache.
   const [staffMembers, setStaffMembers] = useState<Staff[]>(() => cached<Staff[]>("staff.list") ?? []);
@@ -204,12 +206,12 @@ export default function StaffPage() {
   async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { alert('Photo must be under 5MB'); return; }
+    if (file.size > 5 * 1024 * 1024) { toast.error('Photo must be under 5MB'); return; }
     // Show an instant local preview, then upload to Storage and save the URL
     // (never store the base64 in the DB — it bloats staff.list on every query).
     setPhotoPreview(URL.createObjectURL(file));
     const { url, error } = await uploadImage(file, 'staff');
-    if (error || !url) { alert(`Photo upload failed: ${error || 'unknown error'}`); return; }
+    if (error || !url) { toast.error(`Photo upload failed: ${error || 'unknown error'}`); return; }
     setPhotoPreview(url);
     setFormData(prev => ({ ...prev, photo_url: url }));
   }
@@ -279,13 +281,13 @@ export default function StaffPage() {
         if (error.includes("photo_url")) {
           delete payload.photo_url;
           const retry = await queryData<Staff>("staff.update", { id: editingStaff.id, ...payload });
-          if (retry.error) { alert(`Error updating staff: ${retry.error}`); return; }
+          if (retry.error) { toast.error(`Error updating staff: ${retry.error}`); return; }
           if (retry.data) {
             setStaffMembers((prev) => prev.map((s) => (s.id === retry.data!.id ? retry.data! : s)));
             if (selectedStaff?.id === retry.data.id) setSelectedStaff(retry.data);
           }
         } else {
-          alert(`Error updating staff: ${error}`); return;
+          toast.error(`Error updating staff: ${error}`); return;
         }
       } else if (data) {
         setStaffMembers((prev) => prev.map((s) => (s.id === data.id ? data : s)));
@@ -298,10 +300,10 @@ export default function StaffPage() {
         if (error.includes("photo_url")) {
           delete payload.photo_url;
           const retry = await queryData<Staff>("staff.add", payload);
-          if (retry.error) { alert(`Error adding staff: ${retry.error}`); return; }
+          if (retry.error) { toast.error(`Error adding staff: ${retry.error}`); return; }
           if (retry.data) setStaffMembers((prev) => [...prev, retry.data!]);
         } else {
-          alert(`Error adding staff: ${error}`); return;
+          toast.error(`Error adding staff: ${error}`); return;
         }
       } else if (data) {
         setStaffMembers((prev) => [...prev, data]);
@@ -318,9 +320,9 @@ export default function StaffPage() {
     const { error } = await queryData("staff.delete", { id });
     if (error) {
       if (error.includes("foreign key") || error.includes("violates") || error.includes("referenced")) {
-        alert("Cannot delete this staff member because they have existing appointments. Deactivate them instead.");
+        toast.error("Cannot delete this staff member because they have existing appointments. Deactivate them instead.");
       } else {
-        alert(`Error deleting staff: ${error}`);
+        toast.error(`Error deleting staff: ${error}`);
       }
       return;
     }

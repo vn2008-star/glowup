@@ -1,5 +1,6 @@
 'use client';
 
+import { useToast } from "@/components/ui/Toast";
 import { useState, useEffect, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
 import { useTenant } from '@/lib/tenant-context';
@@ -58,6 +59,7 @@ const PAGE_LABELS: Record<string, string> = {
 export function FeedbackWidget() {
   const pathname = usePathname();
   const { tenant } = useTenant();
+  const toast = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [tab, setTab] = useState<'send' | 'history'>('send');
   const [type, setType] = useState<FeedbackType>('feedback');
@@ -133,7 +135,7 @@ export function FeedbackWidget() {
       });
       if (error) {
         // Used to thank the user for feedback the server had rejected
-        alert(`Could not send feedback: ${error}`);
+        toast.error(`Could not send feedback: ${error}`);
         return;
       }
       setSubmitted(true);

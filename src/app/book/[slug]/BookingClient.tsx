@@ -1,5 +1,6 @@
 'use client'
 
+import { useToast } from '@/components/ui/Toast'
 import { useState, useEffect, useMemo } from 'react'
 import styles from './booking.module.css'
 import ChatWidget from './ChatWidget'
@@ -27,6 +28,7 @@ export default function BookingClient({ slug, initialData = null, initialError =
   initialError?: string | null
 }) {
   const [step, setStep] = useState<Step>(0)
+  const toast = useToast()
   const [loading, setLoading] = useState(!initialData && !initialError)
   const [error, setError] = useState<string | null>(initialError)
   const [submitting, setSubmitting] = useState(false)
@@ -378,7 +380,7 @@ export default function BookingClient({ slug, initialData = null, initialError =
         setBooked(true)
       } else if (res.status === 409) {
         // Slot was taken — refresh availability and go back to time picker
-        alert('Sorry, that time slot was just booked by someone else. Please choose another time.')
+        toast.error('Sorry, that time slot was just booked by someone else. Please choose another time.')
         try {
           const refreshRes = await fetch(`/api/public-booking?slug=${encodeURIComponent(slug)}`)
           if (refreshRes.ok) {
@@ -389,10 +391,10 @@ export default function BookingClient({ slug, initialData = null, initialError =
         setSelectedTime('')
         setStep(2)
       } else {
-        alert('Booking failed. Please try again.')
+        toast.error('Booking failed. Please try again.')
       }
     } catch {
-      alert('Network error. Please try again.')
+      toast.error('Network error. Please try again.')
     }
     setSubmitting(false)
   }

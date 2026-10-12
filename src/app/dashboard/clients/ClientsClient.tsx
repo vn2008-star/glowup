@@ -1,5 +1,7 @@
 "use client";
 
+import { useToast } from "@/components/ui/Toast";
+import { useConfirm } from "@/components/ui/Dialog";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -57,6 +59,8 @@ function computeClientStatus(c: Client): 'new' | 'active' | 'at_risk' | 'inactiv
 
 export default function ClientsClient({ initialClients }: { initialClients: Client[] | null }) {
   const { tenant, currentStaff } = useTenant();
+  const toast = useToast();
+  const confirmDialog = useConfirm();
   const t = useTranslations("clientsPage");
   // Server-provided first payload: hydrate directly (status computed here,
   // same as fetchClients does) and skip the mount fetch.
@@ -215,7 +219,7 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
     const { data, error } = await queryData<Client>("clients.add", cleanPayload);
     setClientSaving(false);
     if (error || !data) {
-      alert(`Could not add client: ${error || "unknown error"}`);
+      toast.error(`Could not add client: ${error || "unknown error"}`);
       return;
     }
     setClients((prev) => [data, ...prev]);
@@ -316,15 +320,15 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
 
     setImportResult({ added, skipped });
     setImportLoading(false);
-    if (failed) alert(`Import stopped: ${failed}. ${added} client(s) were added before the error.`);
+    if (failed) toast.error(`Import stopped: ${failed}. ${added} client(s) were added before the error.`);
   }
 
   async function handleDeleteClient(id: string) {
-    if (!confirm("Delete this client? This cannot be undone.")) return;
+    if (!(await confirmDialog({ title: "Delete this client?", description: "This cannot be undone.", danger: true, confirmLabel: "Delete" }))) return;
     const { error } = await queryData("clients.delete", { id });
     if (error) {
       // The row used to vanish from the list even when the delete failed
-      alert(`Could not delete client: ${error}`);
+      toast.error(`Could not delete client: ${error}`);
       return;
     }
     setClients((prev) => prev.filter((c) => c.id !== id));
@@ -349,7 +353,7 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
   }
 
   async function handleBulkDelete() {
-    if (!confirm(`Delete ${selectedIds.size} selected client(s)? This cannot be undone.`)) return;
+    if (!(await confirmDialog({ title: `Delete ${selectedIds.size} selected client(s)?`, description: "This cannot be undone.", danger: true, confirmLabel: "Delete" }))) return;
     setBulkDeleting(true);
     const deleted = new Set<string>();
     let failed = 0;
@@ -361,7 +365,7 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
     setSelectedIds(new Set());
     setBulkDeleting(false);
     setSelectedClient(null);
-    if (failed > 0) alert(`${failed} client(s) could not be deleted`);
+    if (failed > 0) toast.error(`${failed} client(s) could not be deleted`);
   }
 
   // ── Edit Profile ──
@@ -396,7 +400,7 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
     const { data, error } = await queryData<Client>("clients.update", { id: selectedClient.id, ...cleanData });
     setClientSaving(false);
     if (error || !data) {
-      alert(`Could not save changes: ${error || "unknown error"}`);
+      toast.error(`Could not save changes: ${error || "unknown error"}`);
       return;
     }
     setClients((prev) => prev.map((c) => c.id === data.id ? data : c));
@@ -447,21 +451,21 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
 
     if (data && !error) {
       setShowBookModal(false);
-      alert(`✅ Appointment booked for ${selectedClient.first_name} on ${localeDateStr(start)} at ${start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
+      toast.success(`Appointment booked for ${selectedClient.first_name} on ${localeDateStr(start)} at ${start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
     } else {
-      alert("Failed to book appointment. Please try again.");
+      toast.error("Failed to book appointment. Please try again.");
     }
   }
 
   async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>, mode: 'add' | 'edit') {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { alert('Photo must be under 5MB'); return; }
+    if (file.size > 5 * 1024 * 1024) { toast.error('Photo must be under 5MB'); return; }
     // Instant local preview, then upload to Storage and save the URL (not base64).
     const localPreview = URL.createObjectURL(file);
     if (mode === 'add') setPhotoPreview(localPreview); else setEditPhotoPreview(localPreview);
     const { url, error } = await uploadImage(file, 'clients');
-    if (error || !url) { alert(`Photo upload failed: ${error || 'unknown error'}`); return; }
+    if (error || !url) { toast.error(`Photo upload failed: ${error || 'unknown error'}`); return; }
     if (mode === 'add') {
       setPhotoPreview(url);
       setFormData(prev => ({ ...prev, photo_url: url }));

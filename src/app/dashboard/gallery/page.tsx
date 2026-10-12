@@ -1,5 +1,7 @@
 "use client";
 
+import { useToast } from "@/components/ui/Toast";
+import { useConfirm } from "@/components/ui/Dialog";
 import { useState, useEffect, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { useTenant } from "@/lib/tenant-context";
@@ -31,6 +33,8 @@ const GALLERY_QUERY = { limit: 100 };
 
 export default function GalleryPage() {
   const { tenant } = useTenant();
+  const toast = useToast();
+  const confirmDialog = useConfirm();
   const t = useTranslations("galleryPage");
   // Seeded from the data cache — see lib/data-cache.
   const [items, setItems] = useState<GalleryItem[]>(() => cached<GalleryItem[]>("gallery.list", GALLERY_QUERY) ?? []);
@@ -84,17 +88,17 @@ export default function GalleryPage() {
     return async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
-      if (file.size > 2 * 1024 * 1024) { alert("Image must be under 2 MB"); return; }
+      if (file.size > 2 * 1024 * 1024) { toast.error("Image must be under 2 MB"); return; }
       // Instant local preview, then upload to Storage and keep the URL (not base64).
       setter(URL.createObjectURL(file));
       const { url, error } = await uploadImage(file, "gallery");
-      if (error || !url) { alert(`Upload failed: ${error || "unknown error"}`); return; }
+      if (error || !url) { toast.error(`Upload failed: ${error || "unknown error"}`); return; }
       setter(url);
     };
   }
 
   async function handleAddSubmit() {
-    if (!addBefore && !addAfter) { alert("Please upload at least one photo"); return; }
+    if (!addBefore && !addAfter) { toast.error("Please upload at least one photo"); return; }
     setSaving(true);
     try {
       const { error } = await queryData("gallery.create", {
@@ -107,7 +111,7 @@ export default function GalleryPage() {
         before_photo_urls: addBefore ? [addBefore] : [],
         after_photo_urls: addAfter ? [addAfter] : [],
       });
-      if (error) { alert(`Could not save: ${error}`); return; }
+      if (error) { toast.error(`Could not save: ${error}`); return; }
       setShowAdd(false);
       setAddForm({ client_id: "", staff_id: "", service_id: "", notes: "", formula: "", satisfaction: "" });
       setAddBefore(null);
@@ -117,9 +121,9 @@ export default function GalleryPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Delete this transformation?")) return;
+    if (!(await confirmDialog({ title: "Delete this transformation?", danger: true, confirmLabel: "Delete" }))) return;
     const { error } = await queryData("gallery.delete", { id });
-    if (error) { alert(`Could not delete: ${error}`); return; }
+    if (error) { toast.error(`Could not delete: ${error}`); return; }
     setItems(prev => prev.filter(i => i.id !== id));
     setSelected(null);
   }

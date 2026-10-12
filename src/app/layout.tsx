@@ -10,6 +10,7 @@ const outfit = Outfit({ subsets: ["latin"], weight: ["400", "500", "600", "700",
 const playfair = Playfair_Display({ subsets: ["latin", "vietnamese"], weight: ["400", "600", "700"], style: ["normal", "italic"], variable: "--font-playfair", display: "swap" });
 import { ThemeProvider } from "@/lib/theme-context";
 import { ToastProvider } from "@/components/ui/Toast";
+import { ConfirmProvider } from "@/components/ui/Dialog";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
 
@@ -59,7 +60,7 @@ export default async function RootLayout({
       </head>
       <body>
         <NextIntlClientProvider messages={messages}>
-          <ThemeProvider><ToastProvider>{children}</ToastProvider></ThemeProvider>
+          <ThemeProvider><ToastProvider><ConfirmProvider>{children}</ConfirmProvider></ToastProvider></ThemeProvider>
         </NextIntlClientProvider>
         <script
           dangerouslySetInnerHTML={{
