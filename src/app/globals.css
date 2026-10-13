@@ -549,7 +549,9 @@ a.card:hover::before, button.card:hover::before, .card-interactive:hover::before
 .input {
   width: 100%;
   padding: var(--space-3) var(--space-4);
-  background: var(--bg-input);
+  /* background-color, not the shorthand: the shorthand resets background-repeat
+     and -image, which tiled the select chevron across select.input in dark mode. */
+  background-color: var(--bg-input);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   color: var(--text-primary);
@@ -563,6 +565,7 @@ a.card:hover::before, button.card:hover::before, .card-interactive:hover::before
   box-shadow: 0 0 0 3px var(--color-primary-50), var(--shadow-glow-soft);
 }
 .input::placeholder { color: var(--text-tertiary); }
+select.input { padding-right: var(--space-7, 2rem); }
 
 /* --- Native Date/Time Picker Visibility — Dark Mode --- */
 [data-theme="dark"] input[type="time"],
