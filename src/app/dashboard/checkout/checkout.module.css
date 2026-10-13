@@ -1736,14 +1736,18 @@
   20%, 40%, 60%, 80% { transform: translateX(8px); }
 }
 
-/* ── Welcome Panels (Waitlist + Check-in) ── */
+/* ── Welcome Panels (Book + Waitlist + Check-in) ── */
 .welcomePanels {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: var(--space-5);
   width: 100%;
-  max-width: 860px;
+  max-width: 1200px;
   margin-top: var(--space-6);
+}
+@media (max-width: 1100px) {
+  .welcomePanels { grid-template-columns: 1fr 1fr; }
+  .bookPanel { grid-column: 1 / -1; }
 }
 @media (max-width: 700px) {
   .welcomePanels { grid-template-columns: 1fr; }
@@ -1785,6 +1789,9 @@
 }
 .panelIconWaitlist {
   background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(239, 68, 68, 0.1));
+}
+.panelIconBook {
+  background: linear-gradient(135deg, rgba(212, 160, 212, 0.2), rgba(139, 92, 246, 0.12));
 }
 .panelIconCheckin {
   background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(59, 130, 246, 0.1));
@@ -1853,6 +1860,21 @@
 .waitlistSubmitBtn {
   background: linear-gradient(135deg, #F59E0B, #EF4444);
   color: white;
+}
+.bookSubmitBtn {
+  background: linear-gradient(135deg, #D946EF, #8B5CF6);
+  color: white;
+  margin-top: auto;
+}
+.bookPanel {
+  display: flex;
+  flex-direction: column;
+}
+.bookDesc {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin: 0 0 var(--space-4);
 }
 .checkinSubmitBtn {
   background: linear-gradient(135deg, #10B981, #3B82F6);
@@ -2102,6 +2124,41 @@
   opacity: 0.5;
   cursor: not-allowed;
   transform: none;
+}
+
+/* ── Kiosk Booking Modal (public booking page in an iframe) ── */
+.bookModal {
+  background: var(--bg-glass, rgba(30, 20, 50, 0.95));
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-xl);
+  width: 100%;
+  max-width: 960px;
+  height: 92vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  animation: slideUpModal 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.bookModalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  flex-shrink: 0;
+}
+.bookModalHeader h3 {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+.bookFrame {
+  flex: 1;
+  width: 100%;
+  border: none;
+  background: var(--bg-primary, #0f0a1a);
 }
 
 /* ── Waitlist Join Modal ── */
@@ -2489,6 +2546,7 @@
 
   /* ── Modals → bottom sheets ── */
   .modalOverlay, .wlModalOverlay, .pinOverlay { align-items: flex-end; }
+  .bookModal { height: 94dvh; border-radius: var(--radius-xl) var(--radius-xl) 0 0; }
   .modal, .wlModal, .pinModal, .qrModal {
     width: 100% !important;
     max-width: 100% !important;

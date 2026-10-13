@@ -121,6 +121,10 @@ export default function CheckoutPage() {
   const [wlSubmitting, setWlSubmitting] = useState(false);
   const [wlSuccess, setWlSuccess] = useState(false);
   const [wlShowForm, setWlShowForm] = useState(false);
+  // Kiosk booking opens the public booking page in a modal so the client
+  // never leaves the kiosk; bumping the key resets it for the next person.
+  const [bookOpen, setBookOpen] = useState(false);
+  const [bookKey, setBookKey] = useState(0);
   const [ciQuery, setCiQuery] = useState("");
   const [ciResults, setCiResults] = useState<{ id: string; start_time: string; client_name: string; service_name: string; staff_name: string; checked_in_at: string | null }[]>([]);
   const [ciSearching, setCiSearching] = useState(false);
@@ -931,8 +935,42 @@ export default function CheckoutPage() {
 
           <p className={styles.welcomeHint}>Tap your name to sign in</p>
 
-          {/* ── Walk-in Waitlist + Client Check-in Panels ── */}
+          {/* ── Book + Walk-in Waitlist + Client Check-in Panels ── */}
           <div className={styles.welcomePanels}>
+            {/* Book an Appointment Panel */}
+            {tenant?.slug && (
+              <div className={`${styles.welcomePanel} ${styles.bookPanel}`}>
+                <div className={styles.panelHeader}>
+                  <div className={`${styles.panelIcon} ${styles.panelIconBook}`}>📅</div>
+                  <h3>{t("bookTitle")}</h3>
+                </div>
+                <p className={styles.bookDesc}>{t("bookDesc")}</p>
+                <button
+                  className={`${styles.panelSubmitBtn} ${styles.bookSubmitBtn}`}
+                  onClick={() => { setBookKey((k) => k + 1); setBookOpen(true); }}
+                >
+                  📅 {t("bookBtn")}
+                </button>
+
+                {bookOpen && (
+                  <div className={styles.wlModalOverlay} onClick={() => setBookOpen(false)}>
+                    <div className={styles.bookModal} onClick={(e) => e.stopPropagation()}>
+                      <div className={styles.bookModalHeader}>
+                        <h3>📅 {t("bookTitle")}</h3>
+                        <button className={styles.wlModalClose} onClick={() => setBookOpen(false)}>✕</button>
+                      </div>
+                      <iframe
+                        key={bookKey}
+                        src={`/book/${tenant.slug}`}
+                        className={styles.bookFrame}
+                        title={t("bookTitle")}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Walk-in Waitlist Panel */}
             <div className={styles.welcomePanel}>
               <div className={styles.panelHeader}>
