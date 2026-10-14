@@ -41,16 +41,15 @@ export default async function RootLayout({
       <head>
         {/* Theme before first paint. The provider used to set data-theme in an
             effect, so every page painted light and then flipped to dark. Saved
-            choice first, otherwise the OS preference. */}
+            choice first, otherwise dark (the default, regardless of OS). */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var s=localStorage.getItem('glowup_theme');var t=(s==='dark'||s==='light')?s:(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t)}catch(e){}})()`,
+            __html: `(function(){var t='dark';try{if(localStorage.getItem('glowup_theme')==='light')t='light'}catch(e){}document.documentElement.setAttribute('data-theme',t)})()`,
           }}
         />
         <link rel="icon" type="image/png" href="/favicon.png" />
         <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" media="(prefers-color-scheme: light)" content="#faf7f5" />
-        <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0e0b14" />
+        <meta name="theme-color" content="#0e0b14" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="GlowUp" />

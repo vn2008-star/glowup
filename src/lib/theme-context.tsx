@@ -9,7 +9,7 @@ interface ThemeContextValue {
 }
 
 const ThemeContext = createContext<ThemeContextValue>({
-  theme: 'light',
+  theme: 'dark',
   toggleTheme: () => {},
 })
 
@@ -19,12 +19,12 @@ export function useTheme() {
 
 /**
  * The inline script in app/layout.tsx has already put data-theme on <html>
- * before first paint (saved choice, else the OS preference). This provider
- * just reads it back and owns the toggle. It used to default to dark and set
- * the attribute in an effect, which painted every page light then flipped it.
+ * before first paint (saved choice, else dark). This provider just reads it
+ * back and owns the toggle. Setting the attribute in an effect instead used to
+ * paint every page light then flip it.
  */
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>('light')
+  const [theme, setTheme] = useState<Theme>('dark')
 
   useEffect(() => {
     const current = document.documentElement.getAttribute('data-theme')
@@ -32,25 +32,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       setTheme(current)
       return
     }
-    // Script didn't run (very old browser): fall back to the OS preference
-    const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches
-    const initial: Theme = prefersDark ? 'dark' : 'light'
-    document.documentElement.setAttribute('data-theme', initial)
-    setTheme(initial)
-  }, [])
-
-  // Follow the OS until the user picks explicitly
-  useEffect(() => {
-    const mq = window.matchMedia?.('(prefers-color-scheme: dark)')
-    if (!mq) return
-    const onChange = (e: MediaQueryListEvent) => {
-      try { if (localStorage.getItem('glowup_theme')) return } catch { /* ignore */ }
-      const next: Theme = e.matches ? 'dark' : 'light'
-      document.documentElement.setAttribute('data-theme', next)
-      setTheme(next)
-    }
-    mq.addEventListener('change', onChange)
-    return () => mq.removeEventListener('change', onChange)
+    // Script didn't run (very old browser): fall back to the dark default
+    document.documentElement.setAttribute('data-theme', 'dark')
   }, [])
 
   const toggleTheme = useCallback(() => {
