@@ -435,6 +435,15 @@
   line-height: var(--leading-relaxed);
   white-space: pre-wrap;
 }
+.notesTappable {
+  display: block;
+  width: 100%;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.notesTappable:hover { border-color: var(--border-strong, var(--text-tertiary)); }
+.emptyNote.notesTappable { text-align: center; }
 /* ── Appointment history inside the client profile ── */
 .aptHistoryList {
   display: flex;
@@ -452,7 +461,28 @@
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
+.aptHistoryRow:hover { border-color: var(--border-strong, var(--text-tertiary)); }
+.aptHistoryNote, .aptHistoryNoteEmpty {
+  grid-column: 1 / -1;
+  font-size: var(--text-xs);
+  line-height: 1.4;
+}
+.aptHistoryNote {
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  /* First few lines only; the full note opens on tap */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.aptHistoryNoteEmpty { color: var(--text-tertiary); }
 .aptHistoryDate, .aptHistoryService {
   display: flex;
   flex-direction: column;

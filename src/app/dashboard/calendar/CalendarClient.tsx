@@ -1303,7 +1303,7 @@ export default function CalendarClient({ initialCalendar }: { initialCalendar: I
               {selectedApt.notes && (
                 <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>{t("notes")}</span>
-                  <span className={styles.detailValue}>{selectedApt.notes}</span>
+                  <span className={styles.detailValue} style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{selectedApt.notes}</span>
                 </div>
               )}
             </div>

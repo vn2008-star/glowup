@@ -1,7 +1,7 @@
 "use client";
 
 import { useToast } from "@/components/ui/Toast";
-import { useConfirm } from "@/components/ui/Dialog";
+import { Dialog, useConfirm } from "@/components/ui/Dialog";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -39,6 +39,7 @@ type ClientApt = {
   staff_member?: { name: string } | null;
   cancellation_reason?: string | null;
   cancelled_by?: string | null;
+  notes?: string | null;
 };
 
 /* ── Dynamic client status computation ── */
@@ -143,6 +144,52 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
   // ── Appointment history shown inside the client profile ──
   const [historyApts, setHistoryApts] = useState<ClientApt[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+
+  // Per-appointment note, opened by tapping a history row. The rows used to be
+  // plain text with the note left out, so a note written on an appointment
+  // could be neither read nor fixed from the client's profile.
+  const [noteApt, setNoteApt] = useState<ClientApt | null>(null);
+  const [noteDraft, setNoteDraft] = useState("");
+  const [noteSaving, setNoteSaving] = useState(false);
+
+  function openAptNote(a: ClientApt) {
+    setNoteApt(a);
+    setNoteDraft(a.notes || "");
+  }
+
+  async function saveAptNote() {
+    if (!noteApt) return;
+    setNoteSaving(true);
+    const notes = noteDraft.trim() || null;
+    const { error } = await queryData("appointments.update", { id: noteApt.id, notes });
+    setNoteSaving(false);
+    if (error) { toast.error(`Could not save the note: ${error}`); return; }
+    setHistoryApts(prev => prev.map(a => a.id === noteApt.id ? { ...a, notes } : a));
+    setNoteApt(null);
+    toast.success("Note saved");
+  }
+
+  // The client's own Preferences & Notes, editable by tapping the box instead
+  // of going through the full Edit profile form.
+  const [clientNoteOpen, setClientNoteOpen] = useState(false);
+  const [clientNoteDraft, setClientNoteDraft] = useState("");
+
+  function openClientNote() {
+    setClientNoteDraft(selectedClient?.notes || "");
+    setClientNoteOpen(true);
+  }
+
+  async function saveClientNote() {
+    if (!selectedClient) return;
+    setNoteSaving(true);
+    const { data, error } = await queryData<Client>("clients.update", { id: selectedClient.id, notes: clientNoteDraft.trim() || null });
+    setNoteSaving(false);
+    if (error || !data) { toast.error(`Could not save the note: ${error || "unknown error"}`); return; }
+    setClients(prev => prev.map(c => c.id === data.id ? { ...data, status: computeClientStatus(data) } : c));
+    setSelectedClient(prev => prev ? { ...prev, notes: data.notes } : prev);
+    setClientNoteOpen(false);
+    toast.success("Note saved");
+  }
 
   function openClientProfile(c: Client) {
     setSelectedClient(c);
@@ -1034,9 +1081,9 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
             <div className={styles.profileSection}>
               <h3 className={styles.sectionTitle}>Preferences & Notes</h3>
               {selectedClient.notes ? (
-                <div className={styles.notesBox}>{selectedClient.notes}</div>
+                <button type="button" className={`${styles.notesBox} ${styles.notesTappable}`} onClick={openClientNote} title="Edit notes">{selectedClient.notes}</button>
               ) : (
-                <div className={styles.emptyNote}>No notes added yet</div>
+                <button type="button" className={`${styles.emptyNote} ${styles.notesTappable}`} onClick={openClientNote}>No notes added yet. Tap to add one.</button>
               )}
             </div>
 
@@ -1076,7 +1123,7 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
               ) : (
                 <div className={styles.aptHistoryList}>
                   {historyApts.map((a) => (
-                    <div key={a.id} className={styles.aptHistoryRow}>
+                    <button key={a.id} type="button" className={styles.aptHistoryRow} onClick={() => openAptNote(a)} title={a.notes ? "View or edit note" : "Add a note"}>
                       <span className={styles.aptHistoryDate}>
                         {localeDateStr(new Date(a.start_time), { month: "short", day: "numeric", year: "numeric", timeZone: tenant?.timezone || DEFAULT_TZ })}
                         <small>{new Date(a.start_time).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", timeZone: tenant?.timezone || DEFAULT_TZ })}</small>
@@ -1096,7 +1143,10 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
                           ? `$${(Number(a.total_price) + Number(a.tip_amount || 0)).toFixed(2)}`
                           : "—"}
                       </span>
-                    </div>
+                      <span className={a.notes ? styles.aptHistoryNote : styles.aptHistoryNoteEmpty}>
+                        {a.notes ? `📝 ${a.notes}` : "+ Add note"}
+                      </span>
+                    </button>
                   ))}
                 </div>
               )}
@@ -1212,6 +1262,62 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
           </div>
         </div>
       )}
+
+      {/* ── Client Preferences & Notes ── */}
+      <Dialog
+        open={clientNoteOpen}
+        onClose={() => { if (!noteSaving) setClientNoteOpen(false); }}
+        size="sm"
+        title="Preferences & Notes"
+        description={selectedClient ? `${selectedClient.first_name} ${selectedClient.last_name || ""}`.trim() : undefined}
+        footer={
+          <>
+            <button className="btn btn-secondary" onClick={() => setClientNoteOpen(false)} disabled={noteSaving}>{t("cancel")}</button>
+            <button className="btn btn-primary" onClick={saveClientNote} disabled={noteSaving || clientNoteDraft.trim() === (selectedClient?.notes || "").trim()}>
+              {noteSaving ? "Saving…" : "Save note"}
+            </button>
+          </>
+        }
+      >
+        <textarea
+          className="input"
+          rows={6}
+          value={clientNoteDraft}
+          onChange={(e) => setClientNoteDraft(e.target.value)}
+          placeholder="Preferences, sensitivities, anything to remember about this client…"
+          style={{ width: "100%", resize: "vertical" }}
+        />
+      </Dialog>
+
+      {/* ── Appointment note (from the profile's history list) ── */}
+      <Dialog
+        open={!!noteApt}
+        onClose={() => { if (!noteSaving) setNoteApt(null); }}
+        size="sm"
+        title="Appointment note"
+        description={noteApt ? [
+          localeDateStr(new Date(noteApt.start_time), { month: "short", day: "numeric", year: "numeric", timeZone: tenant?.timezone || DEFAULT_TZ }),
+          noteApt.service?.name,
+          noteApt.staff_member?.name,
+        ].filter(Boolean).join(" · ") : undefined}
+        footer={
+          <>
+            <button className="btn btn-secondary" onClick={() => setNoteApt(null)} disabled={noteSaving}>{t("cancel")}</button>
+            <button className="btn btn-primary" onClick={saveAptNote} disabled={noteSaving || noteDraft.trim() === (noteApt?.notes || "").trim()}>
+              {noteSaving ? "Saving…" : "Save note"}
+            </button>
+          </>
+        }
+      >
+        <textarea
+          className="input"
+          rows={6}
+          value={noteDraft}
+          onChange={(e) => setNoteDraft(e.target.value)}
+          placeholder="Lash style, curl, length, glue, anything to remember next time…"
+          style={{ width: "100%", resize: "vertical" }}
+        />
+      </Dialog>
     </div>
   );
 }
