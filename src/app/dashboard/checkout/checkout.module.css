@@ -1745,12 +1745,18 @@
   max-width: 1200px;
   margin-top: var(--space-6);
 }
+/* Fewer panels when the salon turns some off (Settings → Check-in Kiosk) */
+.welcomePanels[data-count="2"] { grid-template-columns: 1fr 1fr; max-width: 820px; }
+.welcomePanels[data-count="1"] { grid-template-columns: 1fr; max-width: 420px; }
 @media (max-width: 1100px) {
   .welcomePanels { grid-template-columns: 1fr 1fr; }
   .bookPanel { grid-column: 1 / -1; }
+  .welcomePanels[data-count="2"] .bookPanel,
+  .welcomePanels[data-count="1"] .bookPanel { grid-column: auto; }
 }
 @media (max-width: 700px) {
-  .welcomePanels { grid-template-columns: 1fr; }
+  .welcomePanels,
+  .welcomePanels[data-count] { grid-template-columns: 1fr; }
 }
 
 .welcomePanel {

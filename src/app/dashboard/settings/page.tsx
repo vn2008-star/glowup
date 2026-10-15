@@ -1359,6 +1359,41 @@ export default function SettingsPage() {
         </label>
       </div>
 
+      {/* Check-in kiosk welcome-screen panels (read by dashboard/checkout) */}
+      <div id="kiosk-panels" className={`card ${styles.section}`}>
+        <h2><Icon name="calendar" /> Check-in Kiosk</h2>
+        <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginBottom: "var(--space-4)" }}>
+          Choose which panels clients see on the kiosk welcome screen. A solo artist may not need a walk-in waitlist.
+        </p>
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+          {([
+            ["book", "Book an Appointment"],
+            ["waitlist", "Walk-in Waitlist"],
+            ["checkin", "Check In"],
+          ] as const).map(([key, label]) => {
+            const kp = ((tenant?.settings as Record<string, unknown>)?.kiosk_panels || {}) as Record<string, unknown>;
+            return (
+              <label key={key} className={styles.protectionToggle}>
+                <input
+                  type="checkbox"
+                  checked={kp[key] !== false}
+                  onChange={(e) => {
+                    // Saved immediately; the server merges kiosk_panels one level deep
+                    fetch("/api/save-settings", {
+                      method: "PUT",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ settings: { kiosk_panels: { [key]: e.target.checked } } }),
+                    }).then(() => refetch());
+                  }}
+                />
+                <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
+                <span>{label}</span>
+              </label>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Consent / intake form */}
       <div id="consent-form" className={`card ${styles.section}`}>
         <h2><Icon name="shield" /> {t("consent.title")}</h2>

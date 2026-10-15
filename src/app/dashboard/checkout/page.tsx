@@ -208,6 +208,14 @@ export default function CheckoutPage() {
     fetchTally();
   }, [fetchTally]);
 
+  // Which welcome-screen panels this salon shows (settings.kiosk_panels).
+  // Each defaults on; a solo artist may turn the walk-in waitlist off.
+  const kioskPanels = useMemo(() => {
+    const kp = ((tenant?.settings as Record<string, unknown> | undefined)?.kiosk_panels || {}) as Record<string, unknown>;
+    return { book: kp.book !== false, waitlist: kp.waitlist !== false, checkin: kp.checkin !== false };
+  }, [tenant?.settings]);
+  const kioskPanelCount = Number(kioskPanels.book && !!tenant?.slug) + Number(kioskPanels.waitlist) + Number(kioskPanels.checkin);
+
   // ── Waitlist queue fetching ──
   const fetchWaitlist = useCallback(async () => {
     if (!tenant?.slug) return;
@@ -221,6 +229,7 @@ export default function CheckoutPage() {
   }, [tenant?.slug]);
 
   useEffect(() => {
+    if (!kioskPanels.waitlist) return;
     fetchWaitlist();
     // Refresh every 30 seconds — but not while the tab is hidden; a kiosk left
     // on another tab all day was hammering /api/data for nothing
@@ -228,7 +237,7 @@ export default function CheckoutPage() {
     const onVisible = () => { if (!document.hidden) fetchWaitlist(); };
     document.addEventListener('visibilitychange', onVisible);
     return () => { clearInterval(iv); document.removeEventListener('visibilitychange', onVisible); };
-  }, [fetchWaitlist]);
+  }, [fetchWaitlist, kioskPanels.waitlist]);
 
   // ── Staff-facing waitlist fetch (raw entries for Accept flow) ──
   const fetchStaffWaitlist = useCallback(async () => {
@@ -936,9 +945,10 @@ export default function CheckoutPage() {
           <p className={styles.welcomeHint}>Tap your name to sign in</p>
 
           {/* ── Book + Walk-in Waitlist + Client Check-in Panels ── */}
-          <div className={styles.welcomePanels}>
+          {kioskPanelCount > 0 && (
+          <div className={styles.welcomePanels} data-count={kioskPanelCount}>
             {/* Book an Appointment Panel */}
-            {tenant?.slug && (
+            {kioskPanels.book && tenant?.slug && (
               <div className={`${styles.welcomePanel} ${styles.bookPanel}`}>
                 <div className={styles.panelHeader}>
                   <div className={`${styles.panelIcon} ${styles.panelIconBook}`}>📅</div>
@@ -972,6 +982,7 @@ export default function CheckoutPage() {
             )}
 
             {/* Walk-in Waitlist Panel */}
+            {kioskPanels.waitlist && (
             <div className={styles.welcomePanel}>
               <div className={styles.panelHeader}>
                 <div className={`${styles.panelIcon} ${styles.panelIconWaitlist}`}>🚶</div>
@@ -1108,8 +1119,10 @@ export default function CheckoutPage() {
                 </div>
               )}
             </div>
+            )}
 
             {/* Client Check-in Panel */}
+            {kioskPanels.checkin && (
             <div className={styles.welcomePanel}>
               <div className={styles.panelHeader}>
                 <div className={`${styles.panelIcon} ${styles.panelIconCheckin}`}>✓</div>
@@ -1170,7 +1183,9 @@ export default function CheckoutPage() {
                 )}
               </div>
             </div>
+            )}
           </div>
+          )}
 
           <div className={styles.poweredBy}>
             <span className={styles.poweredByText}>powered by</span>
