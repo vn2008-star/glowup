@@ -49,6 +49,7 @@ export default function SiteImporter() {
   const [url, setUrl] = useState("");
   const [scanning, setScanning] = useState(false);
   const [elapsed, setElapsed] = useState(0);
+  const [scanError, setScanError] = useState<string | null>(null);
   const [draft, setDraft] = useState<ImportDraft | null>(null);
   const [ownerIndex, setOwnerIndex] = useState(-1);
   const [creating, setCreating] = useState(false);
@@ -73,10 +74,11 @@ export default function SiteImporter() {
 
   async function scan() {
     if (!url.trim()) return;
-    setScanning(true); setElapsed(0); setDraft(null); setResult(null);
+    setScanning(true); setElapsed(0); setDraft(null); setResult(null); setScanError(null);
     const { data, error } = await post<ImportDraft>({ action: "scan", url });
     setScanning(false);
-    if (error || !data) { toast.error(error || "Scan failed"); return; }
+    // Kept on screen, not just a toast — a toast fades while you're looking away during a 30s scan
+    if (error || !data) { setScanError(error || "Scan failed"); toast.error(error || "Scan failed"); return; }
     setDraft(data);
     setOwnerIndex(data.staff.findIndex(s => s.role === "owner"));
   }
@@ -148,6 +150,11 @@ export default function SiteImporter() {
         </button>
       </div>
       {scanning && <div className={styles.progress} role="status">⏳ {step} <span style={{ color: "var(--text-tertiary)" }}>({elapsed}s — usually 20–40s)</span></div>}
+      {scanError && !scanning && (
+        <div className={`${styles.warnings} ${styles.scanError}`} role="alert">
+          <strong>Scan didn&apos;t finish:</strong> {scanError}. Try <em>Scan website</em> again — the AI service is sometimes briefly busy.
+        </div>
+      )}
 
       {result && (
         <div className={styles.result}>
