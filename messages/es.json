@@ -604,6 +604,8 @@
     "policyHours": "Puedes cambiar o cancelar en línea hasta {hours} horas antes de tu cita.",
     "booking": "Reservando…",
     "confirmBooking": "Confirmar reserva",
+    "previewBanner": "Vista previa: la reserva en línea para este negocio abrirá pronto.",
+    "previewCall": "Para reservar ahora, llame al {phone}.",
     "poweredBy": "Con tecnología de",
     "slotTaken": "Lo sentimos, alguien acaba de reservar esa hora. Elige otra.",
     "bookingFailed": "No se pudo completar la reserva. Inténtalo de nuevo.",

@@ -604,6 +604,8 @@
     "policyHours": "Bạn có thể đổi hoặc hủy lịch trực tuyến trước giờ hẹn tối đa {hours} giờ.",
     "booking": "Đang đặt…",
     "confirmBooking": "Xác nhận đặt lịch",
+    "previewBanner": "Xem trước — đặt lịch trực tuyến cho cơ sở này sẽ sớm mở.",
+    "previewCall": "Để đặt lịch ngay, hãy gọi {phone}.",
     "poweredBy": "Cung cấp bởi",
     "slotTaken": "Rất tiếc, khung giờ này vừa có người đặt. Vui lòng chọn giờ khác.",
     "bookingFailed": "Đặt lịch không thành công. Vui lòng thử lại.",

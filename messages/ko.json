@@ -604,6 +604,8 @@
     "policyHours": "예약 {hours}시간 전까지 온라인으로 변경하거나 취소할 수 있습니다.",
     "booking": "예약 중…",
     "confirmBooking": "예약 확정",
+    "previewBanner": "미리보기 — 이 업체의 온라인 예약이 곧 열립니다.",
+    "previewCall": "지금 예약하려면 {phone}로 전화하세요.",
     "poweredBy": "제공",
     "slotTaken": "죄송합니다. 방금 다른 분이 그 시간을 예약했습니다. 다른 시간을 선택해 주세요.",
     "bookingFailed": "예약에 실패했습니다. 다시 시도해 주세요.",

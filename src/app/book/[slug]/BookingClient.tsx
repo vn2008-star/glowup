@@ -15,7 +15,7 @@ import type { CustomClosedDate } from '@/lib/schedule-utils'
 interface ServiceInfo { id: string; name: string; category: string; description: string | null; duration_minutes: number; price: number; sort_order: number; image_url: string | null }
 interface StaffInfo { id: string; name: string; specialties: string[]; schedule: Record<string, unknown>; service_durations: Record<string, number> }
 interface BookedSlot { staff_id: string | null; start: string; end: string }
-interface BusinessInfo { name: string; slug: string; phone: string | null; logo_url: string | null; address: string | null; timezone: string; hours: Record<string, { open: string; close: string; closed: boolean }> | null; advanceBookingDays?: number; closedHolidays?: string[]; customClosedDates?: CustomClosedDate[]; chatEnabled?: boolean; chatGreeting?: string | null; brand_color?: string | null; cancellationCutoffHours?: number | null; consentEnabled?: boolean }
+interface BusinessInfo { name: string; slug: string; phone: string | null; logo_url: string | null; address: string | null; timezone: string; hours: Record<string, { open: string; close: string; closed: boolean }> | null; advanceBookingDays?: number; closedHolidays?: string[]; customClosedDates?: CustomClosedDate[]; chatEnabled?: boolean; chatGreeting?: string | null; brand_color?: string | null; cancellationCutoffHours?: number | null; consentEnabled?: boolean; preview?: boolean }
 
 /** What GET /api/public-booking returns; the server page passes it in as initialData. */
 export interface BookingPayload { business: BusinessInfo; services: ServiceInfo[]; staff: StaffInfo[]; bookedSlots: BookedSlot[] }
@@ -611,6 +611,12 @@ export default function BookingClient({ slug, initialData = null, initialError =
           </div>
         </div>
 
+        {business.preview && (
+          <div role="status" style={{ margin: '0 0 16px', padding: '10px 14px', borderRadius: 10, fontSize: 14, lineHeight: 1.45, background: 'var(--status-pending-bg, rgba(245,158,11,0.12))', color: 'var(--text-primary)', border: '1px solid var(--status-pending, rgba(245,158,11,0.4))' }}>
+            {t('previewBanner')}{business.phone ? ` ${t('previewCall', { phone: business.phone })}` : ''}
+          </div>
+        )}
+
         {/* Progress Steps */}
         <div className={styles.progress}>
           {STEP_KEYS.map((key, i) => (
@@ -969,7 +975,7 @@ export default function BookingClient({ slug, initialData = null, initialError =
 
               <div className={`${styles.stepActions} ${styles.stickyActions}`}>
                 <button className={styles.backBtn} onClick={() => setStep(3)}>{t('back')}</button>
-                <button className={styles.confirmBtn} onClick={handleSubmit} disabled={submitting}>
+                <button className={styles.confirmBtn} onClick={handleSubmit} disabled={submitting || !!business.preview}>
                   {submitting ? t('booking') : t('confirmBooking')}
                 </button>
               </div>

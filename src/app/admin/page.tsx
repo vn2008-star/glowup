@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { localeDateStr } from "@/lib/utils";
 import styles from "./admin.module.css";
 import GrowthDashboard from "./GrowthDashboard";
+import SiteImporter from "./SiteImporter";
 import FeedbackCenter from "./FeedbackCenter";
 
 interface TenantRow {
@@ -520,6 +521,9 @@ export default function AdminPage() {
           </div>
         );
       })()}
+
+      {/* Import a business from its website */}
+      <SiteImporter />
 
       {/* Growth Command Center */}
       <GrowthDashboard />

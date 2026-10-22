@@ -74,6 +74,13 @@ export async function PUT(request: Request) {
     const stored = (isPlainObject(current?.settings) ? current!.settings : {}) as Record<string, unknown>
     const incoming = { ...(updates.settings as Record<string, unknown>) }
     delete incoming.sms_gateway
+    // settings.import is the website importer's record (claim nonce, who
+    // imported it). The salon may only flip its booking page out of preview.
+    if (incoming.import !== undefined) {
+      const preview = isPlainObject(incoming.import) ? incoming.import.preview : undefined
+      if (typeof preview === 'boolean') incoming.import = { preview }
+      else delete incoming.import
+    }
     const merged: Record<string, unknown> = { ...stored }
     for (const [k, v] of Object.entries(incoming)) {
       merged[k] = isPlainObject(v) && isPlainObject(stored[k])

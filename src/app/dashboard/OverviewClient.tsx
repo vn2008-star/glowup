@@ -15,7 +15,22 @@ import { Icon } from "@/components/ui/Icon";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 
 export default function OverviewClient({ initialOverview }: { initialOverview: OverviewData | null }) {
-  const { tenant, currentStaff } = useTenant();
+  const { tenant, currentStaff, refetch } = useTenant();
+  const [goingLive, setGoingLive] = useState(false);
+  const inPreview = ((tenant?.settings || {}) as { import?: { preview?: boolean } }).import?.preview === true;
+
+  // Salons built by the website importer start with a booking page that
+  // browses but refuses bookings; the owner opens it when they're ready.
+  async function goLive() {
+    setGoingLive(true);
+    const res = await fetch("/api/save-settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ settings: { import: { preview: false } } }),
+    });
+    if (res.ok) await refetch();
+    setGoingLive(false);
+  }
   const t = useTranslations("overviewPage");
   const router = useRouter();
 
@@ -123,6 +138,21 @@ export default function OverviewClient({ initialOverview }: { initialOverview: O
           <span className={styles.dateDay}>{dayName}, {dateStr}</span>
         </div>
       </div>
+
+      {inPreview && (currentStaff?.role === "owner" || currentStaff?.role === "manager" || currentStaff?.name === "Admin") && (
+        <div className="card" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, justifyContent: "space-between", marginBottom: 20, borderColor: "var(--status-pending, #f59e0b)" }}>
+          <div style={{ minWidth: 220, flex: 1 }}>
+            <strong>Your booking page is in preview.</strong>
+            <div style={{ color: "var(--text-secondary)", fontSize: 14, marginTop: 4 }}>
+              We set it up from your website. Clients can look around, but can&apos;t book until you go live — check your services, prices and hours first.
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {tenant?.slug && <a className="btn btn-secondary" href={`/book/${tenant.slug}`} target="_blank" rel="noreferrer">View page</a>}
+            <button className="btn btn-primary" onClick={goLive} disabled={goingLive}>{goingLive ? "Opening…" : "Go live"}</button>
+          </div>
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div className={styles.metricsGrid}>

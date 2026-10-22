@@ -2,7 +2,7 @@
 
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useState, Suspense } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
@@ -16,6 +16,10 @@ function SignupForm() {
 
   const refFromUrl = searchParams.get('ref') || ''
   const crefFromUrl = searchParams.get('cref') || ''
+  // Invite from an imported salon (admin → Import from website)
+  const claimToken = searchParams.get('claim') || ''
+  const [claimInfo, setClaimInfo] = useState<{ businessName: string; logoUrl: string | null; ownerName: string; email: string | null } | null>(null)
+  const [claimError, setClaimError] = useState('')
 
   const [formData, setFormData] = useState({
     businessName: '',
@@ -27,6 +31,18 @@ function SignupForm() {
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!claimToken) return
+    fetch(`/api/setup-tenant?claim=${encodeURIComponent(claimToken)}`)
+      .then(r => r.json())
+      .then(j => {
+        if (!j.data) { setClaimError(j.error || 'This invite link is invalid or has already been used'); return }
+        setClaimInfo(j.data)
+        setFormData(f => ({ ...f, businessName: j.data.businessName, ownerName: f.ownerName || j.data.ownerName, email: f.email || j.data.email || '' }))
+      })
+      .catch(() => setClaimError("Couldn't check this invite link — try reloading"))
+  }, [claimToken])
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     setFormData({ ...formData, [e.target.name]: e.target.value })
@@ -80,6 +96,7 @@ function SignupForm() {
           ownerName: formData.ownerName,
           referralCode: formData.referralCode.trim() || undefined,
           clientReferralCode: crefFromUrl.trim() || undefined,
+          claim: claimInfo ? claimToken : undefined,
         }),
       })
 
@@ -101,7 +118,7 @@ function SignupForm() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback?redirect=/dashboard`,
+        redirectTo: `${window.location.origin}/auth/callback?redirect=/dashboard${claimInfo ? `&claim=${encodeURIComponent(claimToken)}` : ''}`,
       },
     })
     if (error) {
@@ -139,6 +156,17 @@ function SignupForm() {
           <p className={styles.authSubtitle}>30 days free. No credit card required.</p>
         </div>
 
+        {claimInfo && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', marginBottom: 16, borderRadius: 12, background: 'var(--bg-surface)', border: '1px solid var(--border-accent)' }}>
+            {claimInfo.logoUrl && <img src={claimInfo.logoUrl} alt="" style={{ width: 40, height: 40, objectFit: 'contain', borderRadius: 8, background: '#fff' }} />}
+            <div style={{ fontSize: 14, lineHeight: 1.4 }}>
+              <strong>{claimInfo.businessName}</strong> is set up and waiting for you.
+              <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>Create your login to take it over — services, team and hours are already in.</div>
+            </div>
+          </div>
+        )}
+        {claimError && <div className={styles.errorMessage} style={{ marginBottom: 16 }}>{claimError}</div>}
+
         <button
           type="button"
           className={styles.googleButton}
@@ -171,6 +199,7 @@ function SignupForm() {
               onChange={handleChange}
               placeholder="Nails by Lisa"
               required
+              readOnly={!!claimInfo}
             />
           </div>
 

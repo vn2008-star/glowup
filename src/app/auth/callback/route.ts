@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { claimTenant } from '@/lib/tenant-claim'
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
   const redirect = searchParams.get('redirect') || '/dashboard'
   const type = searchParams.get('type')
+  const claim = searchParams.get('claim')
 
   if (code) {
     const supabase = await createClient()
@@ -29,7 +31,12 @@ export async function GET(request: Request) {
           .eq('user_id', user.id)
           .single()
 
-        if (!existingStaff) {
+        // Google sign-up from an imported salon's invite link
+        const claimed = !existingStaff && claim
+          ? await claimTenant(serviceSupabase, claim, user.id, user.email || '')
+          : null
+
+        if (!existingStaff && !claimed) {
           // First-time user — create tenant and staff record
           const businessName = user.user_metadata?.business_name || 
                               user.user_metadata?.full_name || 

@@ -2,6 +2,26 @@ import { NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { isAdminEmail } from '@/lib/admin'
+import { claimTenant, resolveClaim } from '@/lib/tenant-claim'
+
+// The signup page asks what a claim link opens, to greet the owner by salon.
+export async function GET(request: Request) {
+  const token = new URL(request.url).searchParams.get('claim') || ''
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+  const claim = await resolveClaim(supabase, token)
+  if (!claim) return NextResponse.json({ error: 'This invite link is invalid or has already been used' }, { status: 404 })
+  return NextResponse.json({
+    data: {
+      businessName: claim.tenant.name,
+      logoUrl: claim.tenant.logo_url,
+      ownerName: claim.staff.name,
+      email: claim.meta.owner_email || null,
+    },
+  })
+}
 
 // ─── First-run tenant setup ───
 // Called by the signup page immediately after supabase.auth.signUp().
@@ -19,7 +39,7 @@ import { isAdminEmail } from '@/lib/admin'
 export async function POST(request: Request) {
   const body = await request.json()
   // Presentation-only fields. Anything identity-bearing is taken from the JWT.
-  const { businessName, ownerName, referralCode, clientReferralCode } = body
+  const { businessName, ownerName, referralCode, clientReferralCode, claim } = body
 
   const authed = await createClient()
   let claims: { sub?: string; email?: string } | null = null
@@ -52,6 +72,17 @@ export async function POST(request: Request) {
 
   if (existingStaff) {
     return NextResponse.json({ success: true, message: 'Already set up' })
+  }
+
+  // Invited owner of a salon built by the website importer: take over that
+  // tenant rather than creating an empty one. A bad link is an error, not a
+  // silent fresh salon — the owner would never find their imported setup.
+  if (claim) {
+    const tenantId = await claimTenant(supabase, String(claim), userId, email)
+    if (!tenantId) {
+      return NextResponse.json({ error: 'This invite link is invalid or has already been used' }, { status: 409 })
+    }
+    return NextResponse.json({ success: true, tenantId, claimed: true })
   }
 
   // Create tenant

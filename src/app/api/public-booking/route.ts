@@ -117,6 +117,8 @@ export async function GET(request: Request) {
       cancellationCutoffHours: resolveCancellationPolicy(tenant).cutoffHours,
       // Confirmation screen offers the consent form link when the salon uses one
       consentEnabled: (tenantSettings.consent_form as { enabled?: boolean } | undefined)?.enabled === true,
+      // Built by the website importer and not live yet: browse, don't book
+      preview: (tenantSettings.import as { preview?: boolean } | undefined)?.preview === true,
     },
     services: services || [],
     staff: (staff || []).map(s => {
@@ -178,6 +180,12 @@ export async function POST(request: Request) {
 
   if (!tenant) {
     return NextResponse.json({ error: 'Business not found' }, { status: 404 })
+  }
+
+  // An imported salon's page is a preview until it goes live — a real client
+  // must not book a business that hasn't agreed to use GlowUp yet.
+  if (((tenant.settings || {}) as { import?: { preview?: boolean } }).import?.preview === true) {
+    return NextResponse.json({ error: 'Online booking for this business isn’t open yet. Please call them to book.' }, { status: 403 })
   }
 
   // ── Resolve the requested services and staff INSIDE this salon ──

@@ -604,6 +604,8 @@
     "policyHours": "You can reschedule or cancel online up to {hours} hours before your appointment.",
     "booking": "Booking…",
     "confirmBooking": "Confirm booking",
+    "previewBanner": "Preview — online booking for this business opens soon.",
+    "previewCall": "To book now, call {phone}.",
     "poweredBy": "Powered by",
     "slotTaken": "Sorry, that time slot was just booked by someone else. Please choose another time.",
     "bookingFailed": "Booking failed. Please try again.",

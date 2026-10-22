@@ -604,6 +604,8 @@
     "policyHours": "您可以在预约前 {hours} 小时内在线改期或取消。",
     "booking": "预约中…",
     "confirmBooking": "确认预约",
+    "previewBanner": "预览 — 该商家的在线预约即将开放。",
+    "previewCall": "如需立即预约，请致电 {phone}。",
     "poweredBy": "技术支持",
     "slotTaken": "抱歉，该时段刚被他人预约，请选择其他时间。",
     "bookingFailed": "预约失败，请重试。",
