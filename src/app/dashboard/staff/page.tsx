@@ -788,6 +788,9 @@ export default function StaffPage() {
                 <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => openVacation(selectedStaff)}>🏖️ Vacation / Holidays</button>
                 <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => openDurations(selectedStaff)}>⏱️ Durations</button>
                 <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setAgreementStaff(selectedStaff)}>{(selectedStaff as any).agreement_signed_at ? '✅ Agreement' : '📝 Agreement'}</button>
+                {canInvite && !selectedStaff.user_id && selectedStaff.role !== "owner" && (
+                  <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => openInvite(selectedStaff)}>✉️ Send login invite</button>
+                )}
                 <button className="btn btn-ghost" style={{ color: "var(--color-danger)" }} onClick={() => setDeleteConfirmId(selectedStaff.id)}>🗑️</button>
               </div>
             </div>
