@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { PLATFORM_REPLY_TO } from '@/lib/admin'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { renderTemplate, TEMPLATES, TemplateId, renderSmsTemplate, SMS_TEMPLATES, SmsTemplateId } from '@/lib/outreach-templates'
@@ -341,6 +342,7 @@ async function handleBulkSend(body: {
           await resend.emails.send({
             from: fromLine,
             to: [email],
+            replyTo: PLATFORM_REPLY_TO,
             subject: template.subjectFn(salon_name.trim()),
             html: htmlContent,
           })
@@ -461,6 +463,7 @@ async function handleFollowUps(body: { senderName?: string; campaignIds?: string
               ? `${senderName} via GlowUp <bookings@joinglowup.org>`
               : 'GlowUp Team <bookings@joinglowup.org>',
             to: [campaign.owner_email],
+            replyTo: PLATFORM_REPLY_TO,
             subject: template.subjectFn(campaign.salon_name),
             html: htmlContent,
           })

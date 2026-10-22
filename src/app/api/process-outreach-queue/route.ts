@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { PLATFORM_REPLY_TO } from '@/lib/admin'
 import { createClient } from '@supabase/supabase-js'
 import { renderTemplate, TEMPLATES, TemplateId } from '@/lib/outreach-templates'
 import { verifyCronRequest } from '@/lib/cron-auth'
@@ -95,6 +96,7 @@ export async function GET(request: Request) {
           await resend.emails.send({
             from: fromLine,
             to: [lead.owner_email],
+            replyTo: PLATFORM_REPLY_TO,
             subject: template.subjectFn(lead.salon_name),
             html: htmlContent,
           })

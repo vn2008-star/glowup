@@ -1,16 +1,21 @@
 import { NextResponse } from 'next/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { isAdminEmail } from '@/lib/admin'
+import { isAdminEmail, PLATFORM_REPLY_TO } from '@/lib/admin'
 import { timezoneFromAddress } from '@/lib/tz'
 import { crawlSite, extractDraft, normalizeSiteUrl, type ImportDraft } from '@/lib/site-import'
 import { createFromDraft, claimUrl } from '@/lib/site-import-create'
 import { newClaimNonce, readImportMeta } from '@/lib/tenant-claim'
+import { salonInviteHtml } from '@/lib/email-templates'
+import { siteBaseUrl } from '@/lib/site-url'
 
 // ─── Import a business from its website (platform admin only) ───
 // scan       { url }                         → crawl + AI extraction → draft
 // create     { draft, owner_index }          → tenant, owner row, staff, services, settings
 // claim-link { tenant_id, rotate? }          → the owner's signup link
+// send-invite{ tenant_id, email, message }   → email the owner that link (texting
+//                                              is done from the admin's own phone —
+//                                              our Twilio number isn't delivering)
 // set-preview{ tenant_id, preview }          → booking page preview on/off
 // GET                                        → salons created by the importer
 //
@@ -38,12 +43,17 @@ export async function GET() {
   if (!await adminEmail()) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   const db = svc()
   const { data, error } = await db.from('tenants')
-    .select('id, name, slug, website, logo_url, created_at, settings')
+    .select('id, name, slug, website, logo_url, phone, created_at, settings')
     .not('settings->import', 'is', null)
     .is('deleted_at', null)
     .order('created_at', { ascending: false })
     .limit(50)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  const ownerIds = (data || []).map(t => readImportMeta(t.settings)?.owner_staff_id).filter((id): id is string => !!id)
+  const { data: owners } = ownerIds.length
+    ? await db.from('staff').select('id, name').in('id', ownerIds)
+    : { data: [] as { id: string; name: string }[] }
+  const ownerName = new Map((owners || []).map(o => [o.id, o.name]))
   return NextResponse.json({
     data: (data || []).map(t => {
       const meta = readImportMeta(t.settings) || {}
@@ -51,6 +61,11 @@ export async function GET() {
         id: t.id, name: t.name, slug: t.slug, website: t.website, logo_url: t.logo_url, created_at: t.created_at,
         preview: meta.preview === true, claimed_at: meta.claimed_at || null, claimed_by: meta.claimed_by || null,
         owner_email: meta.owner_email || null,
+        owner_name: (meta.owner_staff_id && ownerName.get(meta.owner_staff_id)) || null,
+        phone: t.phone || null,
+        booking_url: `${siteBaseUrl()}/book/${t.slug}`,
+        invited_at: (meta.invited_at as string) || null,
+        invited_to: (meta.invited_to as string) || null,
       }
     }),
   })
@@ -96,6 +111,35 @@ export async function POST(request: Request) {
         await db.from('tenants').update({ settings: { ...(t.settings as object), import: { ...meta, claim_nonce: nonce } } }).eq('id', t.id)
       }
       return NextResponse.json({ data: { claim_url: claimUrl(t.id, meta.owner_staff_id, nonce) } })
+    }
+
+    case 'send-invite': {
+      const to = String(body.email || '').trim().toLowerCase()
+      const message = String(body.message || '').trim().slice(0, 4000)
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return NextResponse.json({ error: 'Enter a valid email address' }, { status: 400 })
+      if (!message) return NextResponse.json({ error: 'Write a message' }, { status: 400 })
+      const { data: t } = await db.from('tenants').select('id, name, slug, logo_url, settings').eq('id', String(body.tenant_id || '')).maybeSingle()
+      const meta = readImportMeta(t?.settings)
+      if (!t || !meta?.owner_staff_id) return NextResponse.json({ error: 'Not an imported salon' }, { status: 404 })
+      if (meta.claimed_at) return NextResponse.json({ error: `Already claimed by ${meta.claimed_by}` }, { status: 409 })
+      const nonce = meta.claim_nonce || newClaimNonce()
+      const link = claimUrl(t.id, meta.owner_staff_id, nonce)
+
+      const { Resend } = await import('resend')
+      const { error: sendErr } = await new Resend(process.env.RESEND_API_KEY).emails.send({
+        from: 'GlowUp <bookings@joinglowup.org>',
+        replyTo: PLATFORM_REPLY_TO,
+        to: [to],
+        subject: `${t.name} is set up on GlowUp — create your login`,
+        html: salonInviteHtml({ businessName: t.name, message, claimUrl: link, bookingUrl: `${siteBaseUrl()}/book/${t.slug}`, logoUrl: t.logo_url }),
+      })
+      if (sendErr) return NextResponse.json({ error: `Email not sent: ${sendErr.message}` }, { status: 502 })
+
+      // The signup form pre-fills owner_email, so it should be the address she was invited at
+      await db.from('tenants').update({
+        settings: { ...(t.settings as object), import: { ...meta, claim_nonce: nonce, owner_email: to, invited_at: new Date().toISOString(), invited_to: to } },
+      }).eq('id', t.id)
+      return NextResponse.json({ data: { sent: true } })
     }
 
     case 'set-preview': {

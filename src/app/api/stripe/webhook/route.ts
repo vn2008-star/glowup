@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { PLATFORM_REPLY_TO } from '@/lib/admin';
 import Stripe from 'stripe';
 import { stripe } from '@/lib/stripe';
 import { createClient } from '@supabase/supabase-js';
@@ -188,6 +189,7 @@ export async function POST(req: NextRequest) {
                   await resend.emails.send({
                     from: 'GlowUp <bookings@joinglowup.org>',
                     to: [ref.client_referrer_email],
+                    replyTo: PLATFORM_REPLY_TO,
                     subject: `\uD83C\uDF81 You earned a $${amount} GlowUp Credit!`,
                     html: `
                       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px; background: #1a1a2e; color: #e0e0e0; border-radius: 16px;">

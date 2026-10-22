@@ -3,6 +3,14 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
 
 /**
+ * Where replies to GlowUp's own emails go — owner invites, sales outreach,
+ * referral credits, owner notices. bookings@joinglowup.org is send-only, so
+ * without this a salon owner's reply went nowhere. Salon → client emails keep
+ * replying to the salon instead.
+ */
+export const PLATFORM_REPLY_TO = 'joinglowup@gmail.com'
+
+/**
  * Check if a user email is a platform admin.
  */
 export function isAdminEmail(email: string): boolean {

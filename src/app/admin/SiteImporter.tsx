@@ -22,7 +22,24 @@ const SCAN_STEPS = ["Reading the website…", "Finding the price menu…", "Read
 type Imported = {
   id: string; name: string; slug: string; website: string | null; logo_url: string | null; created_at: string;
   preview: boolean; claimed_at: string | null; claimed_by: string | null; owner_email: string | null;
+  owner_name: string | null; phone: string | null; booking_url: string; invited_at: string | null; invited_to: string | null;
 };
+type InviteDraft = { tenant: Imported; email: string; phone: string; message: string; link: string };
+
+function defaultInviteMessage(t: Imported): string {
+  const first = (t.owner_name || "").replace(/^(dr|mr|mrs|ms)\.?\s+/i, "").split(" ")[0];
+  return `Hi${first ? ` ${first}` : ""},
+
+I set up ${t.name} on GlowUp so you can try online booking — your services, team and prices are already in.
+
+Have a look at your booking page, then create your login. It's free for 30 days, no credit card needed. When you're happy with it, press "Go live" on your dashboard and clients can start booking.`;
+}
+
+/** sms: link that opens the admin's own Messages app with the invite typed in */
+function smsHref(phone: string, body: string): string {
+  // "?&body=" is the form both iOS and Android accept
+  return `sms:${phone.replace(/[^\d+]/g, "")}?&body=${encodeURIComponent(body)}`;
+}
 type CreateResult = { tenant_id: string; slug: string; booking_url: string; claim_url: string; services: number; staff: number; logo: boolean };
 
 async function post<T>(body: Record<string, unknown>): Promise<{ data?: T; error?: string }> {
@@ -107,6 +124,32 @@ export default function SiteImporter() {
     await copy(data.claim_url);
     if (rotate) toast.info("Old invite link no longer works");
   }
+
+  const [invite, setInvite] = useState<InviteDraft | null>(null);
+  const [sendingInvite, setSendingInvite] = useState(false);
+
+  async function openInvite(t: Imported) {
+    if (invite?.tenant.id === t.id) { setInvite(null); return; }
+    setBusy(t.id);
+    const { data, error } = await post<{ claim_url: string }>({ action: "claim-link", tenant_id: t.id });
+    setBusy(null);
+    if (error || !data) { toast.error(error || "Couldn't get the link"); return; }
+    setInvite({ tenant: t, email: t.invited_to || t.owner_email || "", phone: t.phone || "", message: defaultInviteMessage(t), link: data.claim_url });
+  }
+
+  async function sendInviteEmail() {
+    if (!invite) return;
+    setSendingInvite(true);
+    const { error } = await post({ action: "send-invite", tenant_id: invite.tenant.id, email: invite.email, message: invite.message });
+    setSendingInvite(false);
+    if (error) { toast.error(error); return; }
+    toast.success(`Invite emailed to ${invite.email}`);
+    setInvite(null);
+    loadImported();
+  }
+
+  // The text carries both links inline; the email puts them on buttons
+  const inviteText = invite ? `${invite.message}\n\nYour booking page: ${invite.tenant.booking_url}\nCreate your login: ${invite.link}` : "";
 
   async function setPreview(t: Imported, preview: boolean) {
     setBusy(t.id);
@@ -372,7 +415,8 @@ export default function SiteImporter() {
           <h4>Imported salons</h4>
           <div className={styles.importedList}>
             {imported.map(t => (
-              <div key={t.id} className={styles.importedRow}>
+              <div key={t.id}>
+              <div className={styles.importedRow}>
                 {t.logo_url ? <img src={t.logo_url} alt="" /> : null}
                 <div className={styles.importedName}>
                   <strong>{t.name}</strong>{" "}
@@ -382,10 +426,45 @@ export default function SiteImporter() {
                 <span className={`${styles.chip} ${t.claimed_at ? styles.chipClaimed : styles.chipWaiting}`} title={t.claimed_by || t.owner_email || ""}>
                   {t.claimed_at ? `Claimed by ${t.claimed_by}` : "Owner not signed up"}
                 </span>
+                {!t.claimed_at && t.invited_at && (
+                  <span style={{ fontSize: 12, color: "var(--text-tertiary)" }} title={t.invited_to || ""}>
+                    Emailed {new Date(t.invited_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                  </span>
+                )}
+                {!t.claimed_at && <button className={styles.smallBtn} disabled={busy === t.id} onClick={() => openInvite(t)}>✉️ Send invite</button>}
                 {!t.claimed_at && <button className={styles.smallBtn} disabled={busy === t.id} onClick={() => claimLink(t)}>Copy invite</button>}
                 {!t.claimed_at && <button className={styles.smallBtn} disabled={busy === t.id} onClick={() => claimLink(t, true)} title="Make a new link and stop the old one working">New invite</button>}
                 <button className={styles.smallBtn} disabled={busy === t.id} onClick={() => setPreview(t, !t.preview)}>{t.preview ? "Go live" : "Back to preview"}</button>
                 <button className={styles.smallBtn} disabled={busy === t.id} onClick={async () => { setBusy(t.id); const e = await viewAs(t.id); setBusy(null); if (e) toast.error(e); }}>👁 View As</button>
+              </div>
+              {invite?.tenant.id === t.id && (
+                <div className={styles.inviteBox}>
+                  <div className={styles.grid}>
+                    <label className={styles.field}><span>Owner&apos;s email</span>
+                      <input type="email" value={invite.email} placeholder="owner@example.com" onChange={e => setInvite({ ...invite, email: e.target.value })} />
+                    </label>
+                    <label className={styles.field}><span>Owner&apos;s mobile (for texting)</span>
+                      <input type="tel" value={invite.phone} placeholder="(530) 555-0123" onChange={e => setInvite({ ...invite, phone: e.target.value })} />
+                    </label>
+                    <label className={`${styles.field} ${styles.wide}`}><span>Message — the booking page and login links are added below it</span>
+                      <textarea className={styles.textarea} rows={7} value={invite.message} onChange={e => setInvite({ ...invite, message: e.target.value })} />
+                    </label>
+                  </div>
+                  <div className={styles.inviteActions}>
+                    <button className={adminStyles.enableBtn} onClick={sendInviteEmail} disabled={sendingInvite || !invite.email.trim() || !invite.message.trim()}>
+                      {sendingInvite ? "Sending…" : "Send email"}
+                    </button>
+                    {invite.phone.replace(/\D/g, "").length >= 10
+                      ? <a className={styles.smallBtn} href={smsHref(invite.phone, inviteText)}>💬 Text from my phone</a>
+                      : <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>Add a mobile number to text it</span>}
+                    <button className={styles.smallBtn} onClick={() => copy(inviteText)}>Copy text</button>
+                    <button className={styles.smallBtn} onClick={() => setInvite(null)}>Cancel</button>
+                  </div>
+                  <p style={{ fontSize: 12, color: "var(--text-tertiary)", margin: 0 }}>
+                    The email comes from bookings@joinglowup.org and replies go to joinglowup@gmail.com. &ldquo;Text from my phone&rdquo; opens your Messages app with the text ready, so it comes from your own number — on a computer it only works with a phone link app, otherwise use Copy text.
+                  </p>
+                </div>
+              )}
               </div>
             ))}
           </div>

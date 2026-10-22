@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { PLATFORM_REPLY_TO } from '@/lib/admin'
 import { waitUntil } from '@vercel/functions'
 import { createClient } from '@supabase/supabase-js'
 import { toE164 } from '@/lib/utils'
@@ -668,6 +669,7 @@ async function notifyOwner(opts: {
       await resend.emails.send({
         from: `GlowUp <bookings@joinglowup.org>`,
         to: [ownerEmail],
+        replyTo: PLATFORM_REPLY_TO,
         subject: `${emoji} ${action}: ${clientName} — ${serviceName}`,
         html: ownerHtml,
       })

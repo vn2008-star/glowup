@@ -281,6 +281,17 @@
   border-radius: var(--radius-md);
   font-size: 13px;
 }
+.inviteBox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--border-accent, var(--border-default));
+  border-radius: var(--radius-md);
+}
+.inviteActions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+a.smallBtn { text-decoration: none; color: inherit; }
 .importedRow img { width: 32px; height: 32px; object-fit: contain; border-radius: 6px; background: #fff; }
 .importedName { flex: 1; min-width: 160px; }
 .chip {

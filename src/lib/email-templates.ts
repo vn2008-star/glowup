@@ -97,6 +97,34 @@ function escapeHtml(text: string): string {
     .replace(/"/g, '&quot;')
 }
 
+// ─── Imported-salon owner invite (admin → Import from website) ───
+// The admin's note (plain text, editable before sending) plus the owner's
+// claim link as the button and the booking-page preview as a text link.
+export function salonInviteHtml(opts: {
+  businessName: string
+  message: string
+  claimUrl: string
+  bookingUrl: string
+  logoUrl?: string | null
+}): string {
+  const { businessName, message, claimUrl, bookingUrl, logoUrl } = opts
+  const bodyText = escapeHtml(message.trim())
+    .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" style="color:#a855f7;text-decoration:none;">$1</a>')
+    .replace(/\n/g, '<br>')
+
+  const body = `
+    <p style="margin:0;color:#e8e8f0;font-size:15px;line-height:1.7;">${bodyText}</p>
+    <div style="margin-top:28px;">${emailButton('Create your login', claimUrl)}</div>
+    <p style="margin:20px 0 0;color:#a0a0c0;font-size:13px;line-height:1.6;text-align:center;">
+      Preview your booking page: <a href="${escapeHtml(bookingUrl)}" target="_blank" style="color:#a855f7;text-decoration:none;">${escapeHtml(bookingUrl.replace(/^https?:\/\//, ''))}</a>
+    </p>
+    <p style="margin:20px 0 0;color:#a0a0c0;font-size:12px;line-height:1.6;text-align:center;">
+      This link is just for you — it gives whoever uses it the login for ${escapeHtml(businessName)}.
+    </p>
+  `
+  return emailShell(escapeHtml(businessName), body, logoUrl)
+}
+
 // ─── Promo / Marketing Email (automations + campaign blasts) ───
 // Takes the same plain-text message used for SMS, strips the raw CTA link out
 // of the body, and renders it in the styled shell with a proper button instead.
