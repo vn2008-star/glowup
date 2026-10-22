@@ -37,9 +37,11 @@ import { formatPhone, localeDateStr } from "@/lib/utils";
 import { todayInTz, DEFAULT_TZ } from "@/lib/tz";
 
 export default function StaffPage() {
-  const { tenant } = useTenant();
+  const { tenant, currentStaff } = useTenant();
   const toast = useToast();
   const t = useTranslations("staffPage");
+  // Owners and managers can send a login invite to a teammate who has none
+  const canInvite = !!currentStaff && currentStaff.role !== "technician";
   // Seeded from the data cache — see lib/data-cache.
   const [staffMembers, setStaffMembers] = useState<Staff[]>(() => cached<Staff[]>("staff.list") ?? []);
   const [loading, setLoading] = useState(() => cached<Staff[]>("staff.list") === undefined);
@@ -248,6 +250,16 @@ export default function StaffPage() {
     if (error || !data) { toast.error(error || "Could not create the calendar link"); return; }
     setFeedCopied(false);
     setFeedFor({ staff: s, ...data });
+  }
+
+  // Login invite for a teammate with no login (see /api/data staff.invite-link)
+  const [inviteFor, setInviteFor] = useState<{ staff: Staff; url: string; expires_at: string } | null>(null);
+  const [inviteCopied, setInviteCopied] = useState(false);
+  async function openInvite(s: Staff) {
+    const { data, error } = await queryData<{ url: string; expires_at: string }>("staff.invite-link", { staff_id: s.id });
+    if (error || !data) { toast.error(error || "Could not create the invite link"); return; }
+    setInviteCopied(false);
+    setInviteFor({ staff: s, ...data });
   }
 
   // In-flight guard: a double click on Save added the same technician twice
@@ -588,6 +600,9 @@ export default function StaffPage() {
                   <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); openDurations(s); }}>{getCustomDurationCount(s) > 0 ? `⏱️ Durations (${getCustomDurationCount(s)})` : '⏱️ Durations'}</button>
                   <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); setAgreementStaff(s); }}>{(s as any).agreement_signed_at ? '✅' : '📝'} Agreement</button>
                   <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); openFeed(s); }}>🔗 Calendar feed</button>
+                  {canInvite && !s.user_id && s.role !== "owner" && (
+                    <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); openInvite(s); }}>✉️ Send login invite</button>
+                  )}
                   <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); openEdit(s); }}>✏️ Edit</button>
                   <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(s.id); }} style={{ color: "var(--color-danger)" }}>🗑️</button>
                 </div>
@@ -1383,6 +1398,47 @@ export default function StaffPage() {
               <li><strong>Outlook:</strong> Add calendar → Subscribe from web.</li>
             </ul>
             <a href={feedFor.webcal} className="btn btn-ghost btn-sm" style={{ alignSelf: "flex-start" }}>Open in my calendar app (webcal)</a>
+          </div>
+        )}
+      </Dialog>
+
+      {/* Login invite for a teammate */}
+      <Dialog
+        open={!!inviteFor}
+        onClose={() => setInviteFor(null)}
+        title={inviteFor ? `Login invite for ${inviteFor.staff.name}` : ""}
+        description="Send this link to your team member. When they sign up through it, their login joins this salon with their current role — they don't create a new business."
+        size="md"
+        footer={<button type="button" className="btn btn-secondary" onClick={() => setInviteFor(null)}>Done</button>}
+      >
+        {inviteFor && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+            <div style={{ display: "flex", gap: "var(--space-2)" }}>
+              <input className="input" readOnly value={inviteFor.url} onFocus={(e) => e.currentTarget.select()} aria-label="Invite link" />
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={async () => {
+                  try { await navigator.clipboard.writeText(inviteFor.url); setInviteCopied(true); }
+                  catch { toast.error("Copy failed; select the link and copy it"); }
+                }}
+              >
+                {inviteCopied ? "Copied" : "Copy"}
+              </button>
+            </div>
+            <ul style={{ margin: 0, paddingLeft: "1.2em", fontSize: "var(--text-sm)", color: "var(--text-secondary)", lineHeight: 1.6 }}>
+              <li>Works once, until {localeDateStr(new Date(inviteFor.expires_at), { month: "short", day: "numeric" })}. Lost it? Press Send login invite again for a fresh link.</li>
+              <li>They should open it while logged out, and use an email that doesn&apos;t already have a GlowUp login.</li>
+            </ul>
+            {inviteFor.staff.email && (
+              <a
+                className="btn btn-ghost btn-sm"
+                style={{ alignSelf: "flex-start" }}
+                href={`mailto:${inviteFor.staff.email}?subject=${encodeURIComponent(`Your ${tenant?.name || "GlowUp"} login`)}&body=${encodeURIComponent(`Hi ${inviteFor.staff.name.split(" ")[0]},\n\nCreate your login for ${tenant?.name || "our salon"} here:\n${inviteFor.url}\n`)}`}
+              >
+                Email it to {inviteFor.staff.email}
+              </a>
+            )}
           </div>
         )}
       </Dialog>

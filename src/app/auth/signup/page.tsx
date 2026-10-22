@@ -16,9 +16,10 @@ function SignupForm() {
 
   const refFromUrl = searchParams.get('ref') || ''
   const crefFromUrl = searchParams.get('cref') || ''
-  // Invite from an imported salon (admin → Import from website)
+  // Invite from an imported salon (admin → Import from website), or a
+  // teammate's login invite from the Staff page (kind: 'staff')
   const claimToken = searchParams.get('claim') || ''
-  const [claimInfo, setClaimInfo] = useState<{ businessName: string; logoUrl: string | null; ownerName: string; email: string | null } | null>(null)
+  const [claimInfo, setClaimInfo] = useState<{ kind: 'owner' | 'staff'; businessName: string; logoUrl: string | null; ownerName: string; email: string | null } | null>(null)
   const [claimError, setClaimError] = useState('')
 
   const [formData, setFormData] = useState({
@@ -153,15 +154,24 @@ function SignupForm() {
             <span className={styles.logoText}>GlowUp</span>
           </Link>
           <h1 className={styles.authTitle}>{t('signUpSubtitle').split(' ').slice(0,3).join(' ')}</h1>
-          <p className={styles.authSubtitle}>30 days free. No credit card required.</p>
+          {claimInfo?.kind !== 'staff' && <p className={styles.authSubtitle}>30 days free. No credit card required.</p>}
         </div>
 
         {claimInfo && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', marginBottom: 16, borderRadius: 12, background: 'var(--bg-surface)', border: '1px solid var(--border-accent)' }}>
             {claimInfo.logoUrl && <img src={claimInfo.logoUrl} alt="" style={{ width: 40, height: 40, objectFit: 'contain', borderRadius: 8, background: '#fff' }} />}
             <div style={{ fontSize: 14, lineHeight: 1.4 }}>
-              <strong>{claimInfo.businessName}</strong> is set up and waiting for you.
-              <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>Create your login to take it over — services, team and hours are already in.</div>
+              {claimInfo.kind === 'staff' ? (
+                <>
+                  You&apos;re invited to join <strong>{claimInfo.businessName}</strong>.
+                  <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>Create your login to see your schedule and appointments.</div>
+                </>
+              ) : (
+                <>
+                  <strong>{claimInfo.businessName}</strong> is set up and waiting for you.
+                  <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>Create your login to take it over — services, team and hours are already in.</div>
+                </>
+              )}
             </div>
           </div>
         )}

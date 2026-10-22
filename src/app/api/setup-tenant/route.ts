@@ -4,7 +4,8 @@ import { createClient } from '@/lib/supabase/server'
 import { isAdminEmail } from '@/lib/admin'
 import { claimTenant, resolveClaim } from '@/lib/tenant-claim'
 
-// The signup page asks what a claim link opens, to greet the owner by salon.
+// The signup page asks what a claim link opens, to greet the owner (or an
+// invited teammate) by salon.
 export async function GET(request: Request) {
   const token = new URL(request.url).searchParams.get('claim') || ''
   const supabase = createServerClient(
@@ -12,13 +13,14 @@ export async function GET(request: Request) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
   const claim = await resolveClaim(supabase, token)
-  if (!claim) return NextResponse.json({ error: 'This invite link is invalid or has already been used' }, { status: 404 })
+  if (!claim) return NextResponse.json({ error: 'This invite link is invalid, expired, or has already been used' }, { status: 404 })
   return NextResponse.json({
     data: {
+      kind: claim.kind,
       businessName: claim.tenant.name,
       logoUrl: claim.tenant.logo_url,
       ownerName: claim.staff.name,
-      email: claim.meta.owner_email || null,
+      email: claim.kind === 'staff' ? claim.staff.email : claim.meta.owner_email || null,
     },
   })
 }
@@ -80,7 +82,7 @@ export async function POST(request: Request) {
   if (claim) {
     const tenantId = await claimTenant(supabase, String(claim), userId, email)
     if (!tenantId) {
-      return NextResponse.json({ error: 'This invite link is invalid or has already been used' }, { status: 409 })
+      return NextResponse.json({ error: 'This invite link is invalid, expired, or has already been used' }, { status: 409 })
     }
     return NextResponse.json({ success: true, tenantId, claimed: true })
   }

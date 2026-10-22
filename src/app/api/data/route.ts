@@ -13,6 +13,7 @@ import { getDashboardOverview } from '@/lib/overview-query'
 import { getClientsList, getCalendarLoad } from '@/lib/dashboard-queries'
 import { toE164 } from '@/lib/utils'
 import { siteBaseUrl } from '@/lib/site-url'
+import { staffInviteToken } from '@/lib/tenant-claim'
 import { dayRangeInTz, todayInTz, payPeriodInTz, partsInTz, daysInMonth, localToUTC, addDays } from '@/lib/tz'
 import { notifyWaitlistForOpening } from '@/lib/waitlist-openings'
 import { resolveConsentForm, readSignedConsent, consentState, clientConsentToken, consentLinkFromManage, SIGNATURE_BUCKET } from '@/lib/consent'
@@ -1614,6 +1615,21 @@ export async function POST(request: Request) {
         const { feedToken } = await import('@/app/api/calendar-feed/route')
         const url = `${siteBaseUrl()}/api/calendar-feed?tenant=${tenantId}&staff=${target}&token=${feedToken(tenantId, target)}`
         return NextResponse.json({ data: { url, webcal: url.replace(/^https?:/, 'webcal:') } })
+      }
+
+      // Login invite for a teammate who has no login yet. Signing up through
+      // the link binds the new account to their existing row (lib/tenant-claim)
+      // instead of creating a new salon. Owners and managers only; the owner
+      // row is never invitable (an imported salon's owner uses the admin's
+      // claim link).
+      case 'staff.invite-link': {
+        if (staffRole === 'technician') return staffWriteForbidden
+        const { data: st } = await svc.from('staff').select('id, user_id, role').eq('id', String(payload?.staff_id || '')).eq('tenant_id', tenantId).maybeSingle()
+        if (!st) return NextResponse.json({ data: null, error: 'Staff member not found' }, { status: 404 })
+        if (st.role === 'owner') return NextResponse.json({ data: null, error: "The owner's login can't be sent from here" }, { status: 400 })
+        if (st.user_id) return NextResponse.json({ data: null, error: 'This team member already has a login' }, { status: 409 })
+        const { token, expires } = staffInviteToken(tenantId, st.id)
+        return NextResponse.json({ data: { url: `${siteBaseUrl()}/auth/signup?claim=${encodeURIComponent(token)}`, expires_at: expires.toISOString() } })
       }
 
       // Consent form: where this client stands under the salon's current form,
