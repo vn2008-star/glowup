@@ -9,7 +9,7 @@ import GrowthDashboard from "./GrowthDashboard";
 import SiteImporter from "./SiteImporter";
 import FeedbackCenter from "./FeedbackCenter";
 import OutreachTextKit from "./OutreachTextKit";
-import { TEMPLATES as OUTREACH_TEMPLATES, FOLLOW_UP_SEQUENCE, OUTREACH_MAILING_ADDRESS, OUTREACH_SENDER_NAME, normalizeTemplateId } from "@/lib/outreach-templates";
+import { TEMPLATES as OUTREACH_TEMPLATES, FOLLOW_UP_SEQUENCE, OUTREACH_MAILING_ADDRESS, normalizeTemplateId } from "@/lib/outreach-templates";
 
 interface TenantRow {
   id: string;
@@ -150,7 +150,6 @@ export default function AdminPage() {
   // Outreach state
   const [outreachTab, setOutreachTab] = useState<'upload' | 'sms' | 'history' | 'followups'>('upload');
   const [csvLeads, setCsvLeads] = useState<OutreachLead[]>([]);
-  const [senderName, setSenderName] = useState(OUTREACH_SENDER_NAME);
   const [senderEmail, setSenderEmail] = useState('');
   const [sending, setSending] = useState(false);
   const [sendResults, setSendResults] = useState<{ summary: { total: number; sent: number; queued?: number; skipped: number; failed: number }; results: OutreachResult[] } | null>(null);
@@ -339,7 +338,6 @@ export default function AdminPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           leads: csvLeads,
-          senderName: senderName.trim() || undefined,
           senderEmail: senderEmail.trim() || undefined,
         }),
       });
@@ -644,16 +642,6 @@ export default function AdminPage() {
             {/* Sender config */}
             <div style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-4)', flexWrap: 'wrap' }}>
               <div style={{ flex: '1 1 200px' }}>
-                <label style={{ fontSize: '12px', fontWeight: 600, display: 'block', marginBottom: '4px', color: 'var(--text-secondary)' }}>Sender Name (optional)</label>
-                <input
-                  type="text"
-                  value={senderName}
-                  onChange={(e) => setSenderName(e.target.value)}
-                  placeholder={OUTREACH_SENDER_NAME}
-                  style={{ width: '100%', padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-default)', background: 'var(--bg-surface)', color: 'var(--text-primary)', fontSize: '13px' }}
-                />
-              </div>
-              <div style={{ flex: '1 1 200px' }}>
                 <label style={{ fontSize: '12px', fontWeight: 600, display: 'block', marginBottom: '4px', color: 'var(--text-secondary)' }}>Sender Email (optional)</label>
                 <input
                   type="email"
@@ -849,10 +837,6 @@ export default function AdminPage() {
                     <span style={{ fontSize: '20px', fontWeight: 800 }}>{sendResults.summary.total}</span>
                     <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>Total</span>
                   </div>
-                  <div className={styles.statCard} style={{ flex: '1 1 80px', padding: 'var(--space-3)' }}>
-                    <span style={{ fontSize: '20px', fontWeight: 800, color: 'var(--color-success)' }}>{sendResults.summary.sent}</span>
-                    <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>Sent ✉️</span>
-                  </div>
                   {(sendResults.summary.queued || 0) > 0 && (
                     <div className={styles.statCard} style={{ flex: '1 1 80px', padding: 'var(--space-3)' }}>
                       <span style={{ fontSize: '20px', fontWeight: 800, color: '#818cf8' }}>{sendResults.summary.queued}</span>
@@ -977,7 +961,6 @@ export default function AdminPage() {
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({
                             action: 'send-follow-ups',
-                            senderName: senderName.trim() || undefined,
                             campaignIds: followUpCandidates.map(c => c.id),
                           }),
                         });
