@@ -1,275 +1,246 @@
-// ─── GlowUp Outreach Email Templates ───
-// 4 professionally crafted dark-mode HTML email templates
+// ─── GlowUp Outreach Templates ───
+// A 4-email sequence for salons that haven't heard of GlowUp, plus 4 texts
+// for people who replied or asked to be texted.
+//
+// Rules this copy keeps (rewritten 2026-10-22 after review):
+// - Only claim what the app does today. No invented stats, testimonials,
+//   "free forever", or fake scarcity — the trial is 30 days, plans $29/79/149.
+// - CAN-SPAM: every email carries the mailing address and an unsubscribe link.
+//   Sending is refused while OUTREACH_MAILING_ADDRESS is empty.
+// - Plain, light layout. The old dark cards used data-URI logos, flex/grid and
+//   gradient text, which Gmail and Outlook strip or render invisible — and
+//   plain mail lands in the inbox more often than designed mail.
+//
+// Imported by the client-side preview page too, so nothing server-only here
+// (unsubscribe tokens live in lib/outreach-send).
 
-export type TemplateId = 'feature_showcase' | 'success_story' | 'limited_offer' | 'follow_up';
+/**
+ * Printed in every outreach email footer — required by CAN-SPAM. A PO box or virtual mailbox is fine.
+ * "Davis, CA" is a placeholder the owner chose 2026-10-22; CAN-SPAM wants a full postal address, so swap it when they have one.
+ */
+export const OUTREACH_MAILING_ADDRESS = 'Davis, CA'
+
+export const TRIAL_DAYS = 30
+export const STARTING_PRICE = 29
+
+export type TemplateId = 'intro' | 'setup_offer' | 'benefits' | 'last_note'
 
 export const TEMPLATES: Record<TemplateId, {
-  id: TemplateId;
-  name: string;
-  description: string;
-  icon: string;
-  subjectFn: (salonName: string) => string;
+  id: TemplateId
+  step: number
+  name: string
+  description: string
+  icon: string
+  subjectFn: (salonName: string) => string
 }> = {
-  feature_showcase: {
-    id: 'feature_showcase',
-    name: 'Feature Showcase',
-    description: 'Highlights GlowUp\'s top features with stats — best for first cold outreach',
-    icon: '🚀',
-    subjectFn: (name) => `✨ ${name} — free salon management that pays for itself`,
+  intro: {
+    id: 'intro',
+    step: 1,
+    name: 'Online booking',
+    description: 'Day 1 — first email: what GlowUp does, 30 days free',
+    icon: '1',
+    subjectFn: (name) => `Online booking for ${name}`,
   },
-  success_story: {
-    id: 'success_story',
-    name: 'Success Story',
-    description: 'Social proof with salon success metrics — best for warm leads',
-    icon: '⭐',
-    subjectFn: (name) => `How salons like ${name} are growing 3.2× with GlowUp`,
+  setup_offer: {
+    id: 'setup_offer',
+    step: 2,
+    name: "We'll set it up",
+    description: 'Day 4 — reply with your website and we build the booking page',
+    icon: '2',
+    subjectFn: (name) => `We'll set up ${name} for you`,
   },
-  limited_offer: {
-    id: 'limited_offer',
-    name: 'Limited-Time Offer',
-    description: 'Urgency-driven with exclusive deal — best for conversion push',
-    icon: '🔥',
-    subjectFn: (name) => `🔥 ${name} — exclusive 60-day free trial (limited spots)`,
+  benefits: {
+    id: 'benefits',
+    step: 3,
+    name: 'Fewer empty chairs',
+    description: 'Day 9 — 24/7 booking, reminders, waitlist, AI receptionist',
+    icon: '3',
+    subjectFn: (name) => `Fewer empty chairs at ${name}`,
   },
-  follow_up: {
-    id: 'follow_up',
-    name: 'Friendly Follow-Up',
-    description: 'Gentle reminder for previously contacted salons — auto or manual',
-    icon: '💬',
-    subjectFn: (name) => `Quick follow-up for ${name} — still interested?`,
+  last_note: {
+    id: 'last_note',
+    step: 4,
+    name: 'Last note',
+    description: 'Day 16 — polite last email, offer stays open',
+    icon: '4',
+    subjectFn: () => 'Last note about GlowUp',
   },
-};
+}
 
-const baseStyles = `font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px; background: #1a1a2e; color: #e0e0e0; border-radius: 16px;`;
+/** Follow-ups in order, and how many days after the previous email each goes out. */
+export const FOLLOW_UP_SEQUENCE: { templateId: TemplateId; daysAfterPrevious: number }[] = [
+  { templateId: 'setup_offer', daysAfterPrevious: 3 },
+  { templateId: 'benefits', daysAfterPrevious: 5 },
+  { templateId: 'last_note', daysAfterPrevious: 7 },
+]
 
-// GlowUp SVG logo as inline data URI (works in all email clients)
-const logoSvgDataUri = `data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 48 48' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3ClinearGradient id='fg' x1='0' y1='0' x2='48' y2='48' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0%25' stop-color='%23c9a0dc'/%3E%3Cstop offset='100%25' stop-color='%23f0a3b5'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M38 24c0 7.732-6.268 14-14 14s-14-6.268-14-14S16.268 10 24 10c3.5 0 6.7 1.28 9.16 3.4' stroke='url(%23fg)' stroke-width='4' stroke-linecap='round' fill='none'/%3E%3Cpath d='M38 24H26' stroke='url(%23fg)' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M38 6l1.2 3.6L43 11l-3.8 1.4L38 16l-1.2-3.6L33 11l3.8-1.4z' fill='url(%23fg)'/%3E%3Ccircle cx='43' cy='6' r='1.5' fill='%23f0a3b5' opacity='0.6'/%3E%3C/svg%3E`;
+// Rows written before the 2026-10-22 rewrite carry the old ids
+const LEGACY_IDS: Record<string, TemplateId> = {
+  feature_showcase: 'intro', success_story: 'benefits', limited_offer: 'intro', follow_up: 'last_note',
+}
+export function normalizeTemplateId(id: string | null | undefined): TemplateId {
+  if (id && id in TEMPLATES) return id as TemplateId
+  return (id && LEGACY_IDS[id]) || 'intro'
+}
 
-const logoHtml = `<div style="display: flex; align-items: center; gap: 10px;">
-  <img src="${logoSvgDataUri}" alt="GlowUp" width="40" height="40" style="display: block;" />
-  <h1 style="font-size: 28px; margin: 0; background: linear-gradient(135deg, #c9a0dc, #f0a3b5); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">GlowUp</h1>
-</div>`;
-const ctaButton = (link: string, text: string) => `<a href="${link}" style="display: inline-block; padding: 14px 36px; background: linear-gradient(135deg, #c37eda, #e8a87c); color: #fff; text-decoration: none; border-radius: 10px; font-weight: 700; font-size: 15px;">${text}</a>`;
-const footer = (senderName: string | undefined, salonName: string) => `
-  <div style="text-align: center; border-top: 1px solid #333; padding-top: 16px;">
-    <img src="${logoSvgDataUri}" alt="GlowUp" width="24" height="24" style="display: inline-block; vertical-align: middle; margin-right: 6px;" />
-    <p style="color: #666; font-size: 11px; margin: 0; display: inline;">
-      ${senderName ? `— ${senderName}, GlowUp Team` : '— The GlowUp Team'}
-    </p>
-    <p style="color: #555; font-size: 10px; margin: 8px 0 0;">
-      Reply to this email if you have any questions. We'd love to help ${salonName} grow!
-    </p>
-  </div>`;
+/**
+ * First name to greet, or null. Leads from the database carry the business
+ * name in owner_name, so a name equal to the salon's is not a person.
+ */
+export function greetingName(ownerName: string | null | undefined, salonName: string): string | null {
+  const owner = (ownerName || '').trim()
+  if (!owner || owner.toLowerCase() === salonName.trim().toLowerCase() || /^salon owner$/i.test(owner)) return null
+  const first = owner.replace(/^(dr|mr|mrs|ms)\.?\s+/i, '').split(/\s+/)[0]
+  return first || null
+}
+
+type Paragraph = string | { bullets: string[] }
+
+function body(templateId: TemplateId, salon: string, signupLink: string, sender: string): Paragraph[] {
+  switch (templateId) {
+    case 'intro':
+      return [
+        `I'm ${sender} with GlowUp, a booking app made for salons and spas.`,
+        `With GlowUp, clients can book ${salon} online any time, get a reminder before their visit, and join a waitlist when you're full. You see everything on one calendar.`,
+        `It's free for ${TRIAL_DAYS} days with no credit card, then plans start at $${STARTING_PRICE} a month. Try it here: ${signupLink}`,
+        `Or simply reply with your website. We'll set up your services, prices and team for you, so you can see your own booking page before deciding anything.`,
+      ]
+    case 'setup_offer':
+      return [
+        `Setting up new software is the part nobody has time for, so we do it for you.`,
+        `Reply with ${salon}'s website. We'll read your service menu and prices, even if your menu is a picture, and build your booking page, team and hours. You get a private preview link. Nothing goes live and no client can book until you say so.`,
+        `Like it? Create your login and it's yours. Don't? Just ignore it.`,
+      ]
+    case 'benefits':
+      return [
+        `What owners tell us they like most about GlowUp:`,
+        { bullets: [
+          `Clients book at 10 pm instead of calling while you're with a client.`,
+          `Reminders go out automatically, so fewer people forget.`,
+          `When someone cancels, clients on your waitlist hear about the opening.`,
+          `An AI receptionist answers common questions like prices, hours and parking.`,
+        ] },
+        `GlowUp also works in English, Spanish, Vietnamese, Korean and Chinese.`,
+        `${TRIAL_DAYS} days free, no card: ${signupLink}`,
+      ]
+    case 'last_note':
+      return [
+        `I haven't heard back, so this is my last email. If the timing isn't right, no problem at all.`,
+        `If you ever want online booking for ${salon}, the offer stands: send us your website and we'll set it up free so you can preview it, or start on your own at ${signupLink}`,
+      ]
+  }
+}
+
+function signOff(templateId: TemplateId, sender: string): string[] {
+  if (templateId === 'last_note') return ['Thanks for your time,', sender]
+  if (templateId === 'intro') return [sender, 'GlowUp']
+  return [sender]
+}
+
+const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+const linkify = (escaped: string) => escaped.replace(/(https?:\/\/[^\s<]+?)([.,]?)(?=\s|$)/g, '<a href="$1" style="color:#7c3aed;">$1</a>$2')
 
 export function renderTemplate(
   templateId: TemplateId,
   salonName: string,
   ownerName: string,
   signupLink: string,
-  senderName?: string,
+  senderName: string | undefined,
+  unsubscribeUrl: string,
 ): string {
-  const salon = salonName.trim();
-  const owner = ownerName.trim();
+  const id = normalizeTemplateId(templateId)
+  const salon = salonName.trim()
+  const sender = senderName?.trim() || 'The GlowUp Team'
+  const first = greetingName(ownerName, salon)
+  const p = (html: string) => `<p style="margin:0 0 16px;">${html}</p>`
 
-  switch (templateId) {
-    case 'feature_showcase':
-      return `<div style="${baseStyles}">
-  <div style="text-align: center; margin-bottom: 24px;">${logoHtml}</div>
-  <div style="margin-bottom: 24px;">
-    <p style="font-size: 16px; line-height: 1.6; color: #ffffff; margin: 0 0 16px;">Hi ${owner},</p>
-    <p style="font-size: 14px; line-height: 1.7; color: #c0c0c0; margin: 0 0 16px;">
-      I wanted to reach out because I think <strong style="color: #ffffff;">${salon}</strong> would be a great fit for GlowUp — the all-in-one platform that helps beauty businesses grow on autopilot.
-    </p>
-    <p style="font-size: 14px; line-height: 1.7; color: #c0c0c0; margin: 0 0 16px;">Salons using GlowUp see on average:</p>
-  </div>
-  <div style="display: flex; gap: 12px; margin-bottom: 24px;">
-    <div style="flex: 1; background: #2a2a3e; border-radius: 12px; padding: 16px; text-align: center;">
-      <div style="font-size: 24px; font-weight: 800; color: #e8a87c;">60%</div>
-      <div style="font-size: 11px; color: #999; margin-top: 4px;">Less no-shows</div>
-    </div>
-    <div style="flex: 1; background: #2a2a3e; border-radius: 12px; padding: 16px; text-align: center;">
-      <div style="font-size: 24px; font-weight: 800; color: #d4a0e8;">3.2×</div>
-      <div style="font-size: 11px; color: #999; margin-top: 4px;">More repeat visits</div>
-    </div>
-    <div style="flex: 1; background: #2a2a3e; border-radius: 12px; padding: 16px; text-align: center;">
-      <div style="font-size: 24px; font-weight: 800; color: #22c55e;">45%</div>
-      <div style="font-size: 11px; color: #999; margin-top: 4px;">Revenue increase</div>
-    </div>
-  </div>
-  <div style="background: #2a2a3e; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
-    <p style="font-size: 13px; color: #b0b0b0; margin: 0 0 8px;"><strong style="color: #d4a0e8;">What you get:</strong></p>
-    <ul style="font-size: 13px; color: #c0c0c0; line-height: 1.8; margin: 0; padding-left: 18px;">
-      <li>Smart booking with photo-based CRM</li>
-      <li>Automated reminders that cut no-shows</li>
-      <li>"Fill My Openings" — blast last-minute availability</li>
-      <li>Client loyalty & retention automation</li>
-      <li>Staff performance reports</li>
-    </ul>
-  </div>
-  <div style="text-align: center; margin-bottom: 24px;">
-    ${ctaButton(signupLink, 'Start Your Free Trial →')}
-    <p style="font-size: 12px; color: #888; margin: 12px 0 0;">No credit card required. Setup takes 2 minutes.</p>
-  </div>
-  ${footer(senderName, salon)}
-</div>`;
+  const paragraphs = body(id, salon, signupLink, sender).map(para =>
+    typeof para === 'string'
+      ? p(linkify(esc(para)))
+      : `<ul style="margin:0 0 16px;padding-left:20px;">${para.bullets.map(b => `<li style="margin:0 0 6px;">${esc(b)}</li>`).join('')}</ul>`,
+  ).join('\n')
 
-    case 'success_story':
-      return `<div style="${baseStyles}">
-  <div style="text-align: center; margin-bottom: 24px;">${logoHtml}</div>
-  <p style="font-size: 16px; line-height: 1.6; color: #ffffff; margin: 0 0 16px;">Hi ${owner},</p>
-  <p style="font-size: 14px; line-height: 1.7; color: #c0c0c0; margin: 0 0 20px;">
-    I wanted to share something exciting — beauty businesses just like <strong style="color: #ffffff;">${salon}</strong> are seeing incredible results with GlowUp.
-  </p>
-  <div style="background: #2a2a3e; border-radius: 12px; padding: 24px; margin-bottom: 24px; border-left: 4px solid #d4a0e8;">
-    <p style="font-size: 15px; color: #ffffff; margin: 0 0 12px; font-weight: 600;">📈 Real Results From Real Salons</p>
-    <div style="margin-bottom: 16px;">
-      <p style="font-size: 13px; color: #e8a87c; font-weight: 700; margin: 0;">BK Lashes Salon — Houston, TX</p>
-      <p style="font-size: 12px; color: #c0c0c0; margin: 4px 0 0; line-height: 1.6;">"Since switching to GlowUp, our no-shows dropped by 60% and we've grown our client base from 12 to 38 in just 2 weeks. The automated reminders and photo CRM are game-changers."</p>
-    </div>
-    <div style="display: flex; gap: 16px; margin-top: 16px;">
-      <div style="text-align: center; flex: 1;">
-        <div style="font-size: 20px; font-weight: 800; color: #22c55e;">38</div>
-        <div style="font-size: 10px; color: #888;">Clients gained</div>
-      </div>
-      <div style="text-align: center; flex: 1;">
-        <div style="font-size: 20px; font-weight: 800; color: #e8a87c;">60%</div>
-        <div style="font-size: 10px; color: #888;">Less no-shows</div>
-      </div>
-      <div style="text-align: center; flex: 1;">
-        <div style="font-size: 20px; font-weight: 800; color: #d4a0e8;">2 min</div>
-        <div style="font-size: 10px; color: #888;">Setup time</div>
-      </div>
-    </div>
-  </div>
-  <p style="font-size: 14px; line-height: 1.7; color: #c0c0c0; margin: 0 0 20px;">
-    I'd love to see <strong style="color: #ffffff;">${salon}</strong> achieve the same growth. Want to give it a try?
-  </p>
-  <div style="text-align: center; margin-bottom: 24px;">
-    ${ctaButton(signupLink, 'See How It Works →')}
-    <p style="font-size: 12px; color: #888; margin: 12px 0 0;">Free trial. No strings attached.</p>
-  </div>
-  ${footer(senderName, salon)}
-</div>`;
-
-    case 'limited_offer':
-      return `<div style="${baseStyles}">
-  <div style="text-align: center; margin-bottom: 24px;">${logoHtml}</div>
-  <div style="background: linear-gradient(135deg, rgba(239,68,68,0.15), rgba(245,158,11,0.15)); border: 1px solid rgba(245,158,11,0.3); border-radius: 12px; padding: 16px; text-align: center; margin-bottom: 24px;">
-    <p style="font-size: 12px; color: #f59e0b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; margin: 0 0 4px;">⏰ Limited-Time Offer</p>
-    <p style="font-size: 20px; color: #ffffff; font-weight: 800; margin: 0;">60 Days Free — Only 50 Spots Left</p>
-  </div>
-  <p style="font-size: 16px; line-height: 1.6; color: #ffffff; margin: 0 0 16px;">Hi ${owner},</p>
-  <p style="font-size: 14px; line-height: 1.7; color: #c0c0c0; margin: 0 0 16px;">
-    We're running an exclusive promotion for select beauty businesses in your area, and <strong style="color: #ffffff;">${salon}</strong> made our list.
-  </p>
-  <p style="font-size: 14px; line-height: 1.7; color: #c0c0c0; margin: 0 0 20px;">
-    For a limited time, you'll get <strong style="color: #f59e0b;">60 days of GlowUp completely free</strong> — full access to every feature, no credit card needed.
-  </p>
-  <div style="background: #2a2a3e; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
-    <p style="font-size: 13px; color: #ffffff; font-weight: 600; margin: 0 0 12px;">What's included:</p>
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-      <div style="font-size: 12px; color: #c0c0c0;">✅ Smart booking system</div>
-      <div style="font-size: 12px; color: #c0c0c0;">✅ Auto reminders (SMS/Email)</div>
-      <div style="font-size: 12px; color: #c0c0c0;">✅ Photo-based client CRM</div>
-      <div style="font-size: 12px; color: #c0c0c0;">✅ Revenue reports</div>
-      <div style="font-size: 12px; color: #c0c0c0;">✅ "Fill My Openings" campaigns</div>
-      <div style="font-size: 12px; color: #c0c0c0;">✅ Loyalty & gift cards</div>
-    </div>
-  </div>
-  <div style="text-align: center; margin-bottom: 24px;">
-    ${ctaButton(signupLink, '🔥 Claim Your Free 60 Days →')}
-    <p style="font-size: 12px; color: #ef4444; margin: 12px 0 0; font-weight: 600;">Spots are limited — claim yours before they're gone</p>
-  </div>
-  ${footer(senderName, salon)}
-</div>`;
-
-    case 'follow_up':
-      return `<div style="${baseStyles}">
-  <div style="text-align: center; margin-bottom: 24px;">${logoHtml}</div>
-  <p style="font-size: 16px; line-height: 1.6; color: #ffffff; margin: 0 0 16px;">Hi ${owner},</p>
-  <p style="font-size: 14px; line-height: 1.7; color: #c0c0c0; margin: 0 0 16px;">
-    I reached out recently about GlowUp for <strong style="color: #ffffff;">${salon}</strong> — just wanted to follow up in case my email got buried.
-  </p>
-  <p style="font-size: 14px; line-height: 1.7; color: #c0c0c0; margin: 0 0 20px;">
-    I know running a salon is incredibly busy, so I'll keep this short: GlowUp automates the things that eat up your time — booking, reminders, client follow-ups — so you can focus on what you love.
-  </p>
-  <div style="background: #2a2a3e; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
-    <p style="font-size: 13px; color: #d4a0e8; font-weight: 600; margin: 0 0 8px;">💡 Quick wins you'll see in Week 1:</p>
-    <ul style="font-size: 13px; color: #c0c0c0; line-height: 2; margin: 0; padding-left: 18px;">
-      <li>No-shows cut by 60% with auto reminders</li>
-      <li>Clients booking online 24/7 (even while you sleep)</li>
-      <li>Every client's history at your fingertips</li>
-    </ul>
-  </div>
-  <div style="text-align: center; margin-bottom: 24px;">
-    ${ctaButton(signupLink, 'Try GlowUp Free →')}
-    <p style="font-size: 12px; color: #888; margin: 12px 0 0;">Takes 2 minutes. No credit card. Cancel anytime.</p>
-  </div>
-  <div style="text-align: center; margin-bottom: 16px;">
-    <p style="font-size: 13px; color: #999;">
-      Not interested? No worries — just reply "pass" and I won't reach out again. 🙏
-    </p>
-  </div>
-  ${footer(senderName, salon)}
-</div>`;
-
-    default:
-      return renderTemplate('feature_showcase', salonName, ownerName, signupLink, senderName);
-  }
+  return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light"></head>
+<body style="margin:0;padding:0;background:#ffffff;">
+<div style="max-width:560px;margin:0 auto;padding:24px 20px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#222222;">
+${p(`Hi ${esc(first || 'there')},`)}
+${paragraphs}
+${p(signOff(id, sender).map(esc).join('<br>'))}
+<p style="margin:32px 0 0;padding-top:12px;border-top:1px solid #e5e5e5;font-size:12px;line-height:1.5;color:#777777;">
+GlowUp &middot; ${esc(OUTREACH_MAILING_ADDRESS || '[mailing address]')}<br>
+Don't want these emails? <a href="${esc(unsubscribeUrl)}" style="color:#777777;">Unsubscribe</a>
+</p>
+</div>
+</body>
+</html>`
 }
 
-// ─── SMS Outreach Templates ───
-export type SmsTemplateId = 'sms_intro' | 'sms_success' | 'sms_offer' | 'sms_followup';
+/** Plain-text version sent alongside the HTML — spam filters weigh its absence. */
+export function renderTemplateText(
+  templateId: TemplateId,
+  salonName: string,
+  ownerName: string,
+  signupLink: string,
+  senderName: string | undefined,
+  unsubscribeUrl: string,
+): string {
+  const id = normalizeTemplateId(templateId)
+  const salon = salonName.trim()
+  const sender = senderName?.trim() || 'The GlowUp Team'
+  const first = greetingName(ownerName, salon)
+  const paragraphs = body(id, salon, signupLink, sender).map(para =>
+    typeof para === 'string' ? para : para.bullets.map(b => `- ${b}`).join('\n'),
+  )
+  return [
+    `Hi ${first || 'there'},`,
+    ...paragraphs,
+    signOff(id, sender).join('\n'),
+    `--\nGlowUp · ${OUTREACH_MAILING_ADDRESS || '[mailing address]'}\nUnsubscribe: ${unsubscribeUrl}`,
+  ].join('\n\n')
+}
+
+// ─── Texts ───
+// Only for people who replied or asked to be texted — cold marketing texts to
+// cell numbers need prior written consent (TCPA). Sent from the admin's own
+// phone: GlowUp's Twilio toll-free number was rejected and doesn't deliver.
+// No emoji (Android draws some with misleading content).
+
+export type SmsTemplateId = 'sms_thanks' | 'sms_setup' | 'sms_preview_ready' | 'sms_last'
 
 export const SMS_TEMPLATES: Record<SmsTemplateId, {
-  id: SmsTemplateId;
-  name: string;
-  description: string;
-  icon: string;
+  id: SmsTemplateId
+  name: string
+  description: string
+  /** Which link the text needs */
+  link: 'signup' | 'preview'
 }> = {
-  sms_intro: {
-    id: 'sms_intro',
-    name: 'Introduction',
-    description: 'Quick intro to GlowUp — best for first contact',
-    icon: '👋',
-  },
-  sms_success: {
-    id: 'sms_success',
-    name: 'Success Story',
-    description: 'Social proof with real salon results',
-    icon: '⭐',
-  },
-  sms_offer: {
-    id: 'sms_offer',
-    name: 'Free Trial Offer',
-    description: 'Highlight the free trial — drives signups',
-    icon: '🔥',
-  },
-  sms_followup: {
-    id: 'sms_followup',
-    name: 'Follow-Up',
-    description: 'Gentle nudge for non-responders',
-    icon: '💬',
-  },
-};
+  sms_thanks: { id: 'sms_thanks', name: 'After they reply', description: 'Thank them and send the free-trial link', link: 'signup' },
+  sms_setup: { id: 'sms_setup', name: 'Offer to set it up', description: 'Ask for their website so you can import it', link: 'signup' },
+  sms_preview_ready: { id: 'sms_preview_ready', name: 'Preview is ready', description: 'After importing their site — paste their booking page link', link: 'preview' },
+  sms_last: { id: 'sms_last', name: 'Last nudge', description: 'One final, polite text', link: 'signup' },
+}
 
 export function renderSmsTemplate(
   templateId: SmsTemplateId,
-  salonName: string,
-  signupLink: string,
+  opts: { salon: string; first?: string | null; sender?: string | null; link: string },
 ): string {
-  const salon = salonName.trim();
-
+  const salon = opts.salon.trim() || 'your salon'
+  const hi = opts.first?.trim() ? `Hi ${opts.first.trim()}` : 'Hi'
+  const name = opts.first?.trim() || 'there'
+  const sender = opts.sender?.trim()
+  const stop = 'Reply STOP to opt out'
+  // Phones linkify a bare domain; dropping "https://www." keeps a text to one 160-character segment
+  const link = opts.link.trim().replace(/^https?:\/\/(www\.)?/i, '')
   switch (templateId) {
-    case 'sms_intro':
-      return `Hi! Is ${salon} looking to automate bookings, cut no-shows by 60%, & grow clients? GlowUp is free for salons — try it: ${signupLink}`;
-    case 'sms_success':
-      return `⭐ Salons using GlowUp see 60% fewer no-shows & 3.2x more repeat clients. ${salon} could see the same results — free to try: ${signupLink}`;
-    case 'sms_offer':
-      return `🔥 ${salon} — Get 60 days FREE of GlowUp! Auto bookings, reminders, loyalty & more. No credit card needed. Sign up: ${signupLink}`;
-    case 'sms_followup':
-      return `Hi again from GlowUp! Just checking if ${salon} had a chance to check us out. Free salon management — takes 2 min to set up: ${signupLink} Reply STOP to opt out.`;
-    default:
-      return renderSmsTemplate('sms_intro', salonName, signupLink);
+    case 'sms_thanks':
+      return `${hi}, it's ${sender || 'the team'} from GlowUp. Thanks for getting back to us! Try GlowUp free for ${TRIAL_DAYS} days: ${link} ${stop}`
+    case 'sms_setup':
+      return `${opts.first?.trim() || 'Hi'}, want us to build ${salon}'s booking page for you? Text us your website and we'll send a preview. GlowUp. ${stop}`
+    case 'sms_preview_ready':
+      return `${hi}, ${salon}'s GlowUp booking page is ready to preview: ${link} It's not live until you say so. ${stop}`
+    case 'sms_last':
+      return `Last note from GlowUp, ${name}. If online booking isn't right for ${salon} now, no problem. If it is: ${link} ${stop}`
   }
 }

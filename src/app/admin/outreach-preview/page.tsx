@@ -1,14 +1,15 @@
 'use client'
 
-import { renderTemplate, TEMPLATES, TemplateId } from '@/lib/outreach-templates'
+import { renderTemplate, renderSmsTemplate, TEMPLATES, SMS_TEMPLATES, FOLLOW_UP_SEQUENCE, OUTREACH_MAILING_ADDRESS, TemplateId, SmsTemplateId } from '@/lib/outreach-templates'
 import { useEffect } from 'react'
 
 export default function OutreachPreview() {
-  const templates: TemplateId[] = ['feature_showcase', 'success_story', 'limited_offer', 'follow_up']
+  const templates: TemplateId[] = ['intro', ...FOLLOW_UP_SEQUENCE.map(f => f.templateId)]
   const sampleSalon = 'Luxe Nails & Spa'
   const sampleOwner = 'Sarah'
-  const sampleLink = 'https://glowup-jade.vercel.app/auth/signup?cref=CR-DEMO01'
-  const sampleSender = 'James from GlowUp'
+  const sampleLink = 'https://joinglowup.org/auth/signup?cref=CR-DEMO01'
+  const sampleSender = 'James'
+  const sampleUnsub = 'https://joinglowup.org/api/outreach/unsubscribe?e=sarah%40example.com&s=demo'
 
   // Scroll to anchor on load
   useEffect(() => {
@@ -77,7 +78,7 @@ export default function OutreachPreview() {
                   transition: 'all 0.2s',
                 }}
               >
-                {t.icon} {t.name}
+                {t.step}. {t.name}
               </a>
             )
           })}
@@ -87,7 +88,7 @@ export default function OutreachPreview() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 40 }}>
           {templates.map((id) => {
             const t = TEMPLATES[id]
-            const html = renderTemplate(id, sampleSalon, sampleOwner, sampleLink, sampleSender)
+            const html = renderTemplate(id, sampleSalon, sampleOwner, sampleLink, sampleSender, sampleUnsub)
             return (
               <div
                 key={id}
@@ -109,7 +110,7 @@ export default function OutreachPreview() {
                   alignItems: 'center',
                   gap: 12,
                 }}>
-                  <span style={{ fontSize: 24 }}>{t.icon}</span>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: '#d4a0e8' }}>Email {t.step}</span>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 16, fontWeight: 700, color: '#fff' }}>{t.name}</div>
                     <div style={{ fontSize: 12, color: '#888' }}>{t.description}</div>
@@ -132,11 +133,35 @@ export default function OutreachPreview() {
                   <div style={{ fontSize: 14, color: '#e8a87c', fontWeight: 600 }}>{t.subjectFn(sampleSalon)}</div>
                 </div>
 
-                {/* Rendered email */}
-                <div
-                  style={{ padding: 20 }}
-                  dangerouslySetInnerHTML={{ __html: html }}
+                {/* Rendered email — in a frame so its own white page and
+                    styles show as a mail app would, not inherit this dark page */}
+                <iframe
+                  title={`${t.name} preview`}
+                  srcDoc={html}
+                  sandbox=""
+                  style={{ width: '100%', height: 560, border: 0, background: '#fff', display: 'block' }}
                 />
+              </div>
+            )
+          })}
+        </div>
+
+        {!OUTREACH_MAILING_ADDRESS && (
+          <p style={{ marginTop: 24, color: '#f59e0b', fontSize: 13, textAlign: 'center' }}>
+            The footer shows [mailing address] — sending stays blocked until it&apos;s filled in.
+          </p>
+        )}
+
+        {/* Texts */}
+        <h2 style={{ color: '#fff', fontSize: 20, margin: '48px 0 8px' }}>Texts</h2>
+        <p style={{ color: '#888', fontSize: 13, margin: '0 0 16px' }}>Only for people who replied or asked to be texted. Sent from your own phone on the SMS tab.</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {(Object.keys(SMS_TEMPLATES) as SmsTemplateId[]).map(id => {
+            const text = renderSmsTemplate(id, { salon: sampleSalon, first: sampleOwner, sender: sampleSender, link: SMS_TEMPLATES[id].link === 'preview' ? 'https://joinglowup.org/book/luxe-nails-spa' : 'https://joinglowup.org/auth/signup' })
+            return (
+              <div key={id} style={{ background: '#1a1a2e', border: '1px solid #2a2a3e', borderRadius: 12, padding: 16 }}>
+                <div style={{ color: '#d4a0e8', fontSize: 13, fontWeight: 700 }}>{SMS_TEMPLATES[id].name} <span style={{ color: '#666', fontWeight: 400 }}>· {text.length} characters</span></div>
+                <div style={{ color: '#ddd', fontSize: 14, marginTop: 6, lineHeight: 1.5 }}>{text}</div>
               </div>
             )
           })}
@@ -152,7 +177,7 @@ export default function OutreachPreview() {
         }}>
           <h3 style={{ color: '#fff', fontSize: 15, marginBottom: 8 }}>✏️ How to Edit Templates</h3>
           <p style={{ color: '#888', fontSize: 13, lineHeight: 1.6, margin: 0 }}>
-            Open <code style={{ background: '#2a2a3e', padding: '2px 6px', borderRadius: 4, color: '#e8a87c' }}>src/lib/outreach-templates.ts</code> → find the <code style={{ background: '#2a2a3e', padding: '2px 6px', borderRadius: 4, color: '#d4a0e8' }}>case &apos;template_id&apos;</code> block → edit the HTML → refresh this page to see changes.
+            Open <code style={{ background: '#2a2a3e', padding: '2px 6px', borderRadius: 4, color: '#e8a87c' }}>src/lib/outreach-templates.ts</code> → the wording is in <code style={{ background: '#2a2a3e', padding: '2px 6px', borderRadius: 4, color: '#d4a0e8' }}>body()</code> (emails) and <code style={{ background: '#2a2a3e', padding: '2px 6px', borderRadius: 4, color: '#d4a0e8' }}>renderSmsTemplate()</code> (texts). Keep every claim true: no made-up numbers or deadlines.
           </p>
         </div>
       </div>

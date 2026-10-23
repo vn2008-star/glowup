@@ -8,6 +8,8 @@ import styles from "./admin.module.css";
 import GrowthDashboard from "./GrowthDashboard";
 import SiteImporter from "./SiteImporter";
 import FeedbackCenter from "./FeedbackCenter";
+import OutreachTextKit from "./OutreachTextKit";
+import { TEMPLATES as OUTREACH_TEMPLATES, FOLLOW_UP_SEQUENCE, OUTREACH_MAILING_ADDRESS, normalizeTemplateId } from "@/lib/outreach-templates";
 
 interface TenantRow {
   id: string;
@@ -153,7 +155,6 @@ export default function AdminPage() {
   const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
   const [campaignsLoading, setCampaignsLoading] = useState(false);
   const [csvError, setCsvError] = useState('');
-  const [selectedTemplate, setSelectedTemplate] = useState('feature_showcase');
   const [followUpCandidates, setFollowUpCandidates] = useState<CampaignRow[]>([]);
   const [followUpLoading, setFollowUpLoading] = useState(false);
   const [followUpSending, setFollowUpSending] = useState(false);
@@ -162,21 +163,9 @@ export default function AdminPage() {
   const [dbLeadsLoading, setDbLeadsLoading] = useState(false);
   const [dbLeadsInfo, setDbLeadsInfo] = useState<{ total_in_db: number; already_contacted: number; ready_to_send: number } | null>(null);
 
-  // SMS outreach state
-  const [smsLeads, setSmsLeads] = useState<OutreachLead[]>([]);
-  const [smsLoading, setSmsLoading] = useState(false);
-  const [smsInfo, setSmsInfo] = useState<{ total_in_db: number; already_contacted: number; ready_to_send: number } | null>(null);
-  const [smsSending, setSmsSending] = useState(false);
-  const [smsResults, setSmsResults] = useState<{ summary: { total: number; sent: number; queued?: number; skipped: number; failed: number }; results: Array<{ salon_name: string; phone: string; status: string; code?: string; error?: string }> } | null>(null);
-  const [smsTemplate, setSmsTemplate] = useState('sms_intro');
-  const [smsError, setSmsError] = useState('');
 
-  const templateOptions = [
-    { id: 'feature_showcase', name: '🚀 Feature Showcase', desc: 'Highlights top features & stats — best for first cold outreach' },
-    { id: 'success_story', name: '⭐ Success Story', desc: 'Social proof with salon success metrics — best for warm leads' },
-    { id: 'limited_offer', name: '🔥 Limited-Time Offer', desc: 'Urgency-driven exclusive deal — best for conversion push' },
-    { id: 'follow_up', name: '💬 Friendly Follow-Up', desc: 'Gentle reminder for previously contacted salons' },
-  ];
+  // Email 1 goes to new leads; 2-4 follow on the Follow-Ups tab, spaced by FOLLOW_UP_SEQUENCE
+  const outreachSequence = [OUTREACH_TEMPLATES.intro, ...FOLLOW_UP_SEQUENCE.map(f => OUTREACH_TEMPLATES[f.templateId])];
 
   const fetchTenants = useCallback(async () => {
     const res = await fetch("/api/admin/tenants");
@@ -348,13 +337,13 @@ export default function AdminPage() {
           leads: csvLeads,
           senderName: senderName.trim() || undefined,
           senderEmail: senderEmail.trim() || undefined,
-          templateId: selectedTemplate,
         }),
       });
 
       if (res.ok) {
         const data = await res.json();
         setSendResults(data);
+        if (data.error) setCsvError(data.error);
       } else {
         const d = await res.json();
         setCsvError(d.error || 'Failed to send outreach');
@@ -584,7 +573,7 @@ export default function AdminPage() {
               className={`${styles.filterBtn} ${outreachTab === 'sms' ? styles.filterActive : ''}`}
               onClick={() => setOutreachTab('sms')}
             >
-              📱 SMS
+              📱 Texts
             </button>
             <button
               className={`${styles.filterBtn} ${outreachTab === 'followups' ? styles.filterActive : ''}`}
@@ -649,49 +638,32 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* Template Selector */}
+            {/* The 4-email sequence */}
             <div style={{ marginBottom: 'var(--space-4)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>Email Template</label>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>Email sequence — new leads get email 1; 2–4 go out from the Follow-Ups tab</label>
                 <a
                   href="/admin/outreach-preview"
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{ fontSize: '11px', color: 'var(--color-primary)', textDecoration: 'none', fontWeight: 600 }}
                 >
-                  👁 Preview all templates ↗
+                  👁 Preview emails and texts ↗
                 </a>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 'var(--space-2)' }}>
-                {templateOptions.map((t) => (
-                  <div
-                    key={t.id}
-                    onClick={() => setSelectedTemplate(t.id)}
-                    style={{
-                      padding: 'var(--space-3)',
-                      borderRadius: 'var(--radius-md)',
-                      border: selectedTemplate === t.id ? '2px solid var(--color-primary)' : '1px solid var(--border-default)',
-                      background: selectedTemplate === t.id ? 'rgba(195, 126, 218, 0.08)' : 'var(--bg-surface)',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                      <span style={{ fontSize: '13px', fontWeight: 700 }}>{t.name}</span>
-                      <a
-                        href={`/admin/outreach-preview#${t.id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        style={{ fontSize: '10px', color: 'var(--color-primary)', textDecoration: 'none', opacity: 0.7 }}
-                      >
-                        Preview ↗
-                      </a>
-                    </div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', lineHeight: 1.4 }}>{t.desc}</div>
-                  </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-2)' }}>
+                {outreachSequence.map((t) => (
+                  <a key={t.id} href={`/admin/outreach-preview#${t.id}`} target="_blank" rel="noopener noreferrer" style={{ padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-default)', background: 'var(--bg-surface)', textDecoration: 'none', color: 'inherit' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '4px' }}>{t.step}. {t.name}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', lineHeight: 1.4 }}>{t.description}</div>
+                  </a>
                 ))}
               </div>
+              {!OUTREACH_MAILING_ADDRESS && (
+                <div style={{ marginTop: 'var(--space-3)', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', fontSize: '13px' }}>
+                  Sending is off until GlowUp's mailing address is added — the law (CAN-SPAM) requires it in every sales email.
+                </div>
+              )}
             </div>
 
             {/* Load from Database OR CSV Upload */}
@@ -927,209 +899,12 @@ export default function AdminPage() {
             )}
           </div>
         ) : outreachTab === 'sms' ? (
-          /* SMS Outreach Tab */
-          <div>
-            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: 'var(--space-4)', lineHeight: 1.6 }}>
-              Send SMS outreach to salons with phone numbers. Each text includes a <strong>unique signup link</strong> for conversion tracking.
-            </p>
-
-            {/* SMS Template Picker */}
-            <div style={{ marginBottom: 'var(--space-4)' }}>
-              <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px', display: 'block' }}>SMS Template</label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-2)' }}>
-                {[
-                  { id: 'sms_intro', name: '👋 Introduction', desc: 'Quick intro — best for first contact' },
-                  { id: 'sms_success', name: '⭐ Success Story', desc: 'Social proof with real salon results' },
-                  { id: 'sms_offer', name: '🔥 Free Trial', desc: 'Highlights the 60-day free trial' },
-                  { id: 'sms_followup', name: '💬 Follow-Up', desc: 'Gentle nudge for non-responders' },
-                ].map(t => (
-                  <div
-                    key={t.id}
-                    onClick={() => setSmsTemplate(t.id)}
-                    style={{
-                      padding: 'var(--space-3)',
-                      borderRadius: 'var(--radius-md)',
-                      border: smsTemplate === t.id ? '2px solid var(--color-primary)' : '1px solid var(--border-default)',
-                      background: smsTemplate === t.id ? 'rgba(195, 126, 218, 0.08)' : 'transparent',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                    }}
-                  >
-                    <div style={{ fontSize: '13px', fontWeight: 700 }}>{t.name}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '4px' }}>{t.desc}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Load SMS Leads from DB */}
-            <div
-              style={{
-                border: '2px dashed #22c55e',
-                borderRadius: 'var(--radius-lg)',
-                padding: 'var(--space-6)',
-                textAlign: 'center',
-                cursor: smsLoading ? 'wait' : 'pointer',
-                transition: 'all 0.2s',
-                background: 'rgba(34, 197, 94, 0.05)',
-                marginBottom: 'var(--space-4)',
-                opacity: smsLoading ? 0.7 : 1,
-              }}
-              onClick={async () => {
-                if (smsLoading) return;
-                setSmsLoading(true);
-                setSmsError('');
-                setSmsResults(null);
-                try {
-                  const res = await fetch('/api/admin/outreach?action=load-sms-leads');
-                  if (!res.ok) throw new Error('Failed to load leads');
-                  const d = await res.json();
-                  setSmsInfo({ total_in_db: d.total_in_db, already_contacted: d.already_contacted, ready_to_send: d.ready_to_send });
-                  if (d.leads.length === 0) {
-                    setSmsError(`No new SMS leads. ${d.total_in_db} in DB, ${d.already_contacted} already contacted.`);
-                  } else {
-                    setSmsLeads(d.leads);
-                  }
-                } catch (err) {
-                  setSmsError('Failed to load SMS leads: ' + (err instanceof Error ? err.message : ''));
-                }
-                setSmsLoading(false);
-              }}
-            >
-              <div style={{ fontSize: '32px', marginBottom: '8px' }}>{smsLoading ? '⏳' : '📱'}</div>
-              <p style={{ fontSize: '14px', fontWeight: 700, color: '#22c55e', margin: '0 0 4px' }}>
-                {smsLoading ? 'Loading phone leads...' : 'Load Phone Leads from Database'}
-              </p>
-              <p style={{ fontSize: '12px', color: 'var(--text-tertiary)', margin: 0 }}>
-                Pull leads with phone numbers from InfoIQ
-              </p>
-              {smsInfo && (
-                <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                  📊 {smsInfo.total_in_db} total · ✅ {smsInfo.ready_to_send} ready · 🔒 {smsInfo.already_contacted} contacted
-                </div>
-              )}
-            </div>
-
-            {smsError && (
-              <div style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', fontSize: '13px', marginBottom: 'var(--space-4)' }}>
-                {smsError}
-              </div>
-            )}
-
-            {/* SMS Preview Table */}
-            {smsLeads.length > 0 && !smsResults && (
-              <div style={{ marginBottom: 'var(--space-4)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
-                  <span style={{ fontSize: '13px', fontWeight: 600 }}>Preview ({smsLeads.length} leads with phone)</span>
-                  <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                    <button
-                      className={styles.deleteBtn}
-                      onClick={() => { setSmsLeads([]); setSmsError(''); }}
-                    >
-                      Clear
-                    </button>
-                    <button
-                      className={styles.enableBtn}
-                      style={{ padding: '6px 20px', fontSize: '13px', background: 'linear-gradient(135deg, #22c55e, #16a34a)' }}
-                      disabled={smsSending}
-                      onClick={async () => {
-                        if (!confirm(`Send SMS to ${Math.min(smsLeads.length, 200)} salons? Twilio charges ~$0.0079/msg.`)) return;
-                        setSmsSending(true);
-                        setSmsResults(null);
-                        try {
-                          const res = await fetch('/api/admin/outreach', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ action: 'send-sms', leads: smsLeads, smsTemplateId: smsTemplate }),
-                          });
-                          const d = await res.json();
-                          if (res.ok) {
-                            setSmsResults(d);
-                          } else {
-                            setSmsError(d.error || 'SMS send failed');
-                          }
-                        } catch (err) {
-                          setSmsError('SMS send error: ' + (err instanceof Error ? err.message : ''));
-                        }
-                        setSmsSending(false);
-                      }}
-                    >
-                      {smsSending ? 'Sending...' : smsLeads.length > 200 ? `📱 Send 200 Now + Queue ${smsLeads.length - 200}` : `📱 Send ${smsLeads.length} SMS`}
-                    </button>
-                  </div>
-                </div>
-                <div className={styles.tableWrap} style={{ maxHeight: '300px', overflow: 'auto' }}>
-                  <table className={styles.table}>
-                    <thead>
-                      <tr>
-                        <th>#</th>
-                        <th>Salon</th>
-                        <th>Phone</th>
-                        <th>City</th>
-                        <th>State</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {smsLeads.slice(0, 100).map((l, i) => (
-                        <tr key={i}>
-                          <td>{i + 1}</td>
-                          <td>{l.salon_name}</td>
-                          <td>{l.phone || '—'}</td>
-                          <td>{l.city || '—'}</td>
-                          <td>{l.state || '—'}</td>
-                        </tr>
-                      ))}
-                      {smsLeads.length > 100 && (
-                        <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-tertiary)', fontStyle: 'italic' }}>...and {smsLeads.length - 100} more</td></tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {/* SMS Send Results */}
-            {smsResults && (
-              <div>
-                <div style={{ display: 'flex', gap: 'var(--space-4)', marginBottom: 'var(--space-4)', flexWrap: 'wrap' }}>
-                  <div className={styles.statCard} style={{ flex: '1 1 80px', padding: 'var(--space-3)' }}>
-                    <span style={{ fontSize: '20px', fontWeight: 800 }}>{smsResults.summary.total}</span>
-                    <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>Total</span>
-                  </div>
-                  <div className={styles.statCard} style={{ flex: '1 1 80px', padding: 'var(--space-3)' }}>
-                    <span style={{ fontSize: '20px', fontWeight: 800, color: '#22c55e' }}>{smsResults.summary.sent}</span>
-                    <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>Sent 📱</span>
-                  </div>
-                  {(smsResults.summary.queued || 0) > 0 && (
-                    <div className={styles.statCard} style={{ flex: '1 1 80px', padding: 'var(--space-3)' }}>
-                      <span style={{ fontSize: '20px', fontWeight: 800, color: '#818cf8' }}>{smsResults.summary.queued}</span>
-                      <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>Queued ⏳</span>
-                    </div>
-                  )}
-                  <div className={styles.statCard} style={{ flex: '1 1 80px', padding: 'var(--space-3)' }}>
-                    <span style={{ fontSize: '20px', fontWeight: 800, color: '#f59e0b' }}>{smsResults.summary.skipped}</span>
-                    <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>Skipped ⏭️</span>
-                  </div>
-                  <div className={styles.statCard} style={{ flex: '1 1 80px', padding: 'var(--space-3)' }}>
-                    <span style={{ fontSize: '20px', fontWeight: 800, color: '#ef4444' }}>{smsResults.summary.failed}</span>
-                    <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>Failed ❌</span>
-                  </div>
-                </div>
-                <button
-                  className={styles.enableBtn}
-                  style={{ marginTop: 'var(--space-3)' }}
-                  onClick={() => { setSmsResults(null); setSmsLeads([]); }}
-                >
-                  Send Another Batch
-                </button>
-              </div>
-            )}
-          </div>
+          <OutreachTextKit />
         ) : outreachTab === 'followups' ? (
           /* Auto Follow-Ups Tab */
           <div>
             <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: 'var(--space-4)', lineHeight: 1.6 }}>
-              Salons that were emailed <strong>7+ days ago</strong> with no signup will receive an automatic follow-up. Each salon gets up to <strong>2 follow-ups</strong> using escalating templates: 1st → Success Story, 2nd → Friendly Follow-Up.
+              Salons that haven't signed up or unsubscribed get the rest of the sequence: <strong>email 2</strong> three days after email 1, <strong>email 3</strong> five days after that, and <strong>email 4</strong> (the last) seven days later. Only salons whose next email is due are listed.
             </p>
 
             {followUpLoading ? (
@@ -1156,7 +931,7 @@ export default function AdminPage() {
               <div style={{ textAlign: 'center', padding: 'var(--space-6)' }}>
                 <div style={{ fontSize: '32px', marginBottom: '8px' }}>✅</div>
                 <p style={{ fontSize: '14px', color: 'var(--text-secondary)', fontWeight: 600 }}>No follow-ups needed right now</p>
-                <p style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>All sent campaigns are either less than 7 days old, already signed up, or have reached the follow-up limit.</p>
+                <p style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>Everyone is either waiting for their next email to come due, signed up, unsubscribed, or has had all 4 emails.</p>
               </div>
             ) : (
               <div>
@@ -1207,14 +982,14 @@ export default function AdminPage() {
                     </thead>
                     <tbody>
                       {followUpCandidates.map((c) => {
-                        const nextTemplate = (c as any).follow_up_count === 0 ? '⭐ Success Story' : '💬 Follow-Up';
+                        const next = FOLLOW_UP_SEQUENCE[(c as any).follow_up_count || 0]; const nextTemplate = next ? `${OUTREACH_TEMPLATES[next.templateId].step}. ${OUTREACH_TEMPLATES[next.templateId].name}` : '—';
                         return (
                           <tr key={c.id}>
                             <td><strong>{c.salon_name}</strong></td>
                             <td>{c.owner_name}</td>
                             <td style={{ fontSize: '12px' }}>{c.owner_email}</td>
                             <td className={styles.dateCell}>{c.sent_at ? localeDateStr(new Date(c.sent_at), { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</td>
-                            <td style={{ textAlign: 'center' }}>{(c as any).follow_up_count || 0}/2</td>
+                            <td style={{ textAlign: 'center' }}>{(c as any).follow_up_count || 0}/{FOLLOW_UP_SEQUENCE.length}</td>
                             <td style={{ fontSize: '12px' }}>{nextTemplate}</td>
                           </tr>
                         );
@@ -1333,8 +1108,7 @@ export default function AdminPage() {
                                 border: '1px solid var(--border-subtle)',
                                 fontWeight: 600,
                               }}>
-                                {(c as any).template_id === 'success_story' ? '⭐' : (c as any).template_id === 'limited_offer' ? '🔥' : (c as any).template_id === 'follow_up' ? '💬' : '🚀'}
-                                {' '}{((c as any).template_id || 'feature_showcase').replace(/_/g, ' ')}
+                                {(c as any).status === 'unsubscribed' ? 'unsubscribed' : OUTREACH_TEMPLATES[normalizeTemplateId((c as any).last_template_id || (c as any).template_id)].name}
                               </span>
                             </td>
                             <td>

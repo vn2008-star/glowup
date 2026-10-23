@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
-import { PLATFORM_REPLY_TO } from '@/lib/admin'
 import { createClient } from '@supabase/supabase-js'
-import { renderTemplate, TEMPLATES, TemplateId } from '@/lib/outreach-templates'
 import { verifyCronRequest } from '@/lib/cron-auth'
+import { outreachReady, sendOutreachEmail, unsubscribedAmong } from '@/lib/outreach-send'
 
 // ─── Outreach Queue Processor (Cron-triggered) ───
-// Runs daily at 10 AM. Picks up to 95 queued outreach leads and sends them.
+// Runs daily at 10 AM. Picks up to 95 queued outreach leads and sends them
+// email 1 of the sequence (follow-ups go out from the admin Follow-Ups tab).
 // This respects Resend's free tier limit of 100 emails/day.
 
 const DAILY_LIMIT = 95
@@ -14,6 +14,11 @@ export async function GET(request: Request) {
   // Auth: only allow Vercel Cron or manual call with CRON_SECRET
   const unauthorized = verifyCronRequest(request)
   if (unauthorized) return unauthorized
+
+  // No mailing address yet → nothing may go out; the queue just waits
+  if (!outreachReady()) {
+    return NextResponse.json({ message: 'Outreach paused: no mailing address configured', processed: 0 })
+  }
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -24,13 +29,12 @@ export async function GET(request: Request) {
   const todayStart = new Date()
   todayStart.setHours(0, 0, 0, 0)
 
-  const { count: sentTodayCount } = await supabase
-    .from('outreach_campaigns')
-    .select('*', { count: 'exact', head: true })
-    .eq('status', 'sent')
-    .gte('sent_at', todayStart.toISOString())
+  const [{ count: sentTodayCount }, { count: followUpsToday }] = await Promise.all([
+    supabase.from('outreach_campaigns').select('*', { count: 'exact', head: true }).eq('status', 'sent').gte('sent_at', todayStart.toISOString()),
+    supabase.from('outreach_campaigns').select('*', { count: 'exact', head: true }).gte('last_follow_up_at', todayStart.toISOString()),
+  ])
 
-  const sentToday = sentTodayCount || 0
+  const sentToday = (sentTodayCount || 0) + (followUpsToday || 0)
   const canSend = Math.max(0, DAILY_LIMIT - sentToday)
 
   if (canSend === 0) {
@@ -57,6 +61,9 @@ export async function GET(request: Request) {
     })
   }
 
+  // Unsubscribing also flips queued rows, but double-check at send time
+  const unsubscribed = await unsubscribedAmong(supabase, queuedLeads.map(l => l.owner_email))
+
   let sent = 0
   let failed = 0
 
@@ -67,58 +74,30 @@ export async function GET(request: Request) {
     const batch = queuedLeads.slice(i, i + BATCH_SIZE)
 
     for (const lead of batch) {
-      const templateId = (lead.template_id || 'feature_showcase') as TemplateId
-      const template = TEMPLATES[templateId] || TEMPLATES.feature_showcase
-      const senderName = lead.sender_name || undefined
-
-      const signupLink = lead.referral_code
-        ? `${process.env.NEXT_PUBLIC_APP_URL || 'https://glowup-jade.vercel.app'}/auth/signup?cref=${lead.referral_code}`
-        : `${process.env.NEXT_PUBLIC_APP_URL || 'https://glowup-jade.vercel.app'}/auth/signup`
-
-      const htmlContent = renderTemplate(
-        templateId,
-        lead.salon_name,
-        lead.owner_name,
-        signupLink,
-        senderName,
-      )
-
-      let emailSent = false
-      try {
-        if (process.env.RESEND_API_KEY) {
-          const { Resend } = await import('resend')
-          const resend = new Resend(process.env.RESEND_API_KEY)
-
-          const fromLine = senderName
-            ? `${senderName} via GlowUp <bookings@joinglowup.org>`
-            : 'GlowUp Team <bookings@joinglowup.org>'
-
-          await resend.emails.send({
-            from: fromLine,
-            to: [lead.owner_email],
-            replyTo: PLATFORM_REPLY_TO,
-            subject: template.subjectFn(lead.salon_name),
-            html: htmlContent,
-          })
-          emailSent = true
-        } else {
-          console.log(`[DRY RUN] Queue send to ${lead.owner_email} (template: ${templateId})`)
-          emailSent = true
-        }
-      } catch (err) {
-        console.error(`Queue send failed for ${lead.owner_email}:`, err)
+      if (unsubscribed.has(String(lead.owner_email).toLowerCase())) {
+        await supabase.from('outreach_campaigns').update({ status: 'unsubscribed' }).eq('id', lead.id)
+        continue
       }
+
+      const sendErr = await sendOutreachEmail({
+        to: lead.owner_email,
+        templateId: lead.template_id || 'intro',
+        salonName: lead.salon_name,
+        ownerName: lead.owner_name,
+        referralCode: lead.referral_code,
+      })
+      if (sendErr) console.error(`Queue send failed for ${lead.owner_email}:`, sendErr)
 
       // Update status
       await supabase.from('outreach_campaigns')
         .update({
-          status: emailSent ? 'sent' : 'failed',
-          sent_at: emailSent ? new Date().toISOString() : null,
+          status: sendErr ? 'failed' : 'sent',
+          sent_at: sendErr ? null : new Date().toISOString(),
         })
         .eq('id', lead.id)
 
-      if (emailSent) sent++
-      else failed++
+      if (sendErr) failed++
+      else sent++
     }
 
     // Throttle between batches
