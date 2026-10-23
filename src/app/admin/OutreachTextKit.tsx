@@ -29,7 +29,7 @@ export default function OutreachTextKit() {
   const [salon, setSalon] = useState("");
   const [phone, setPhone] = useState("");
   const [sender, setSender] = useState(OUTREACH_SENDER_NAME);
-  const [signup, setSignup] = useState("https://joinglowup.org/auth/signup");
+  const [signup, setSignup] = useState("https://www.joinglowup.org/auth/signup");
   const [preview, setPreview] = useState("");
   const [copied, setCopied] = useState(false);
 

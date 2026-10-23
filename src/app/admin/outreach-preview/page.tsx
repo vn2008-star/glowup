@@ -7,9 +7,9 @@ export default function OutreachPreview() {
   const templates: TemplateId[] = ['intro', ...FOLLOW_UP_SEQUENCE.map(f => f.templateId)]
   const sampleSalon = 'Luxe Nails & Spa'
   const sampleOwner = 'Sarah'
-  const sampleLink = 'https://joinglowup.org/auth/signup?cref=CR-DEMO01'
+  const sampleLink = 'https://www.joinglowup.org/auth/signup?cref=CR-DEMO01'
   const sampleSender = OUTREACH_SENDER_NAME
-  const sampleUnsub = 'https://joinglowup.org/api/outreach/unsubscribe?e=sarah%40example.com&s=demo'
+  const sampleUnsub = 'https://www.joinglowup.org/api/outreach/unsubscribe?e=sarah%40example.com&s=demo'
 
   // Scroll to anchor on load
   useEffect(() => {
@@ -157,7 +157,7 @@ export default function OutreachPreview() {
         <p style={{ color: '#888', fontSize: 13, margin: '0 0 16px' }}>Only for people who replied or asked to be texted. Sent from your own phone on the SMS tab.</p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {(Object.keys(SMS_TEMPLATES) as SmsTemplateId[]).map(id => {
-            const text = renderSmsTemplate(id, { salon: sampleSalon, first: sampleOwner, sender: sampleSender, link: SMS_TEMPLATES[id].link === 'preview' ? 'https://joinglowup.org/book/luxe-nails-spa' : 'https://joinglowup.org/auth/signup' })
+            const text = renderSmsTemplate(id, { salon: sampleSalon, first: sampleOwner, sender: sampleSender, link: SMS_TEMPLATES[id].link === 'preview' ? 'https://www.joinglowup.org/book/luxe-nails-spa' : 'https://www.joinglowup.org/auth/signup' })
             return (
               <div key={id} style={{ background: '#1a1a2e', border: '1px solid #2a2a3e', borderRadius: 12, padding: 16 }}>
                 <div style={{ color: '#d4a0e8', fontSize: 13, fontWeight: 700 }}>{SMS_TEMPLATES[id].name} <span style={{ color: '#666', fontWeight: 400 }}>· {text.length} characters</span></div>

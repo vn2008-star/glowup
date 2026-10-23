@@ -2,12 +2,13 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { TEMPLATES, SMS_TEMPLATES, OUTREACH_SENDER_NAME } from '@/lib/outreach-templates'
-import { CONTACTED_STATUSES, DAILY_LIMIT, MISSING_ADDRESS_ERROR, dueFollowUps, outreachReady, sendFollowUps, sendOutreachEmail, sentTodayCount } from '@/lib/outreach-send'
+import { CONTACTED_STATUSES, DAILY_LIMIT, MISSING_ADDRESS_ERROR, dueFollowUps, junkEmails, outreachReady, sendFollowUps, sentTodayCount } from '@/lib/outreach-send'
 
 // ─── Admin bulk outreach ───
-// Email 1 goes to new leads (or the daily queue, see process-outreach-queue);
-// emails 2-4 are follow-ups the same daily cron sends once enough days have
-// passed (FOLLOW_UP_SEQUENCE); the Follow-Ups tab can send due ones early.
+// New leads are only queued here; the daily cron (process-outreach-queue)
+// sends email 1 to them and emails 2-4 once enough days have passed
+// (FOLLOW_UP_SEQUENCE), 95 a day in all. The Follow-Ups tab can send due
+// follow-ups early.
 // Texts are not sent from here: cold marketing texts need prior consent, and
 // our Twilio number doesn't deliver — the SMS tab builds texts for the admin
 // to send from their own phone.
@@ -67,9 +68,18 @@ export async function GET(request: Request) {
 
     const contactedEmails = new Set((contacted || []).map(c => c.owner_email?.toLowerCase()))
 
-    // Map leads to outreach format, filtering out already-contacted
+    // Website placeholders and vendor addresses scraped off salon sites
+    const junk = junkEmails((rawLeads || []).map(l => ({ salon_name: l.business_name, owner_email: l.email })))
+    const seen = new Set<string>()
+
+    // Map leads to outreach format: one row per address, not contacted, not junk
     const leads = (rawLeads || [])
-      .filter(l => l.email && !contactedEmails.has(l.email.toLowerCase()))
+      .filter(l => {
+        const e = l.email?.trim().toLowerCase()
+        if (!e || contactedEmails.has(e) || junk.has(e) || seen.has(e)) return false
+        seen.add(e)
+        return true
+      })
       .map(l => ({
         salon_name: l.business_name || 'Unknown Salon',
         // The leads table has no person's name; the email greets "Hi there"
@@ -86,6 +96,7 @@ export async function GET(request: Request) {
       leads,
       total_in_db: rawLeads?.length || 0,
       already_contacted: contactedEmails.size,
+      junk: junk.size,
       ready_to_send: leads.length,
     })
   }
@@ -176,10 +187,6 @@ async function handleBulkSend(body: {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
   const genCode = () => 'CR-' + Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
 
-  // Check how many we can send today
-  const sentToday = await sentTodayCount(svc)
-  let remainingToday = Math.max(0, DAILY_LIMIT - sentToday)
-
   // Look every address up in bulk. One query per lead (the old way) took
   // ~4 round trips each, so a 14,000-row upload ran far past the function's
   // time limit and everything after the cut-off was never queued.
@@ -199,6 +206,8 @@ async function handleBulkSend(body: {
       if (contacted.get(e) !== 'unsubscribed') contacted.set(e, r.status)
     }
   }
+
+  const junk = junkEmails(leads)
 
   const results: Array<{
     salon_name: string; owner_name: string; owner_email: string;
@@ -239,7 +248,14 @@ async function handleBulkSend(body: {
       continue
     }
 
-    // 3. Referral code — ties a signup back to this email
+    // 3. Website placeholder or a vendor's address, not the salon's
+    const junkReason = junk.get(email)
+    if (junkReason) {
+      results.push({ salon_name, owner_name, owner_email: email, status: 'skipped_junk', error: junkReason })
+      continue
+    }
+
+    // 4. Referral code — ties a signup back to this email
     const code = genCode()
     referralRows.push({
       code,
@@ -250,25 +266,13 @@ async function handleBulkSend(body: {
       referred_owner_email: email,
     })
 
-    // 4. Over today's limit → queue for the daily cron. The table has no
-    // sender_name/sender_email columns (writing them failed the insert, so
-    // every lead past the limit silently vanished); queued emails are signed
+    // 5. Queue it. Sending happens only in the daily cron: sending here meant
+    // 95 emails one by one inside a 60-second request, with the record of
+    // who got one written at the end, so a timeout lost track of them all.
+    // The table has no sender_name column; queued emails are signed
     // OUTREACH_SENDER_NAME.
-    if (remainingToday <= 0) {
-      campaignRows.push({ ...base, referral_code: code, template_id: templateId, follow_up_count: 0, status: 'queued' })
-      results.push({ salon_name, owner_name, owner_email: email, status: 'queued', code })
-      continue
-    }
-
-    // 5. Send email 1 now
-    const sendErr = await sendOutreachEmail({ to: email, templateId, salonName: salon_name, ownerName, referralCode: code, senderName })
-    if (sendErr) console.error(`Failed to send outreach email to ${email}:`, sendErr)
-    else remainingToday--
-    campaignRows.push({
-      ...base, referral_code: code, template_id: templateId, follow_up_count: 0,
-      status: sendErr ? 'failed' : 'sent', sent_at: sendErr ? null : new Date().toISOString(),
-    })
-    results.push({ salon_name, owner_name, owner_email: email, status: sendErr ? 'failed' : 'sent', code, error: sendErr || undefined })
+    campaignRows.push({ ...base, referral_code: code, template_id: templateId, follow_up_count: 0, status: 'queued' })
+    results.push({ salon_name, owner_name, owner_email: email, status: 'queued', code })
   }
 
   // 6. Record everything in bulk

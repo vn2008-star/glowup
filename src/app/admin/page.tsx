@@ -163,7 +163,7 @@ export default function AdminPage() {
   const [followUpResults, setFollowUpResults] = useState<{ summary: { total: number; sent: number; skipped: number; failed: number } } | null>(null);
   const [queueStats, setQueueStats] = useState<{ queued: number; sent_today: number; daily_limit: number; remaining_today: number; estimated_days: number } | null>(null);
   const [dbLeadsLoading, setDbLeadsLoading] = useState(false);
-  const [dbLeadsInfo, setDbLeadsInfo] = useState<{ total_in_db: number; already_contacted: number; ready_to_send: number } | null>(null);
+  const [dbLeadsInfo, setDbLeadsInfo] = useState<{ total_in_db: number; already_contacted: number; junk: number; ready_to_send: number } | null>(null);
 
 
   // Email 1 goes to new leads; 2-4 follow on the Follow-Ups tab, spaced by FOLLOW_UP_SEQUENCE
@@ -326,7 +326,7 @@ export default function AdminPage() {
 
   async function handleSendOutreach() {
     if (csvLeads.length === 0) return;
-    if (!confirm(`Send outreach emails to ${csvLeads.length} salons? This action cannot be undone.`)) return;
+    if (!confirm(`Queue ${csvLeads.length} salons for outreach? The daily send (10 AM UTC) emails 95 a day, follow-ups first, starting with tomorrow's run. Website placeholders and vendor addresses are skipped.`)) return;
 
     setSending(true);
     setSendResults(null);
@@ -691,7 +691,7 @@ export default function AdminPage() {
                     const res = await fetch('/api/admin/outreach?action=load-leads');
                     if (!res.ok) throw new Error('Failed to load leads');
                     const d = await res.json();
-                    setDbLeadsInfo({ total_in_db: d.total_in_db, already_contacted: d.already_contacted, ready_to_send: d.ready_to_send });
+                    setDbLeadsInfo({ total_in_db: d.total_in_db, already_contacted: d.already_contacted, junk: d.junk || 0, ready_to_send: d.ready_to_send });
                     if (d.leads.length === 0) {
                       setCsvError(`No new leads to send. ${d.total_in_db} leads in DB, ${d.already_contacted} already contacted.`);
                     } else {
@@ -712,7 +712,7 @@ export default function AdminPage() {
                 </p>
                 {dbLeadsInfo && (
                   <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                    📊 {dbLeadsInfo.total_in_db} total · ✅ {dbLeadsInfo.ready_to_send} ready · 🔒 {dbLeadsInfo.already_contacted} contacted
+                    📊 {dbLeadsInfo.total_in_db} rows · ✅ {dbLeadsInfo.ready_to_send} ready · 🔒 {dbLeadsInfo.already_contacted} contacted · 🗑️ {dbLeadsInfo.junk} junk addresses
                   </div>
                 )}
               </div>
@@ -781,7 +781,7 @@ export default function AdminPage() {
                       disabled={sending}
                       onClick={handleSendOutreach}
                     >
-                      {sending ? `Sending... (batch mode)` : csvLeads.length > 95 ? `🚀 Send 95 Now + Queue ${csvLeads.length - 95}` : `🚀 Send ${csvLeads.length} Emails`}
+                      {sending ? 'Queueing...' : `🚀 Queue ${csvLeads.length} (95/day from tomorrow)`}
                     </button>
                   </div>
                 </div>
@@ -854,7 +854,7 @@ export default function AdminPage() {
                     color: '#818cf8',
                     lineHeight: 1.5,
                   }}>
-                    ⏳ <strong>{sendResults.summary.queued} emails queued</strong> — they'll be sent automatically at <strong>95/day</strong> (est. {Math.ceil((sendResults.summary.queued || 0) / 95)} days). The queue runs daily at 10 AM via cron.
+                    ⏳ <strong>{sendResults.summary.queued} salons queued</strong> — the daily send at 10 AM UTC starts with them tomorrow. It sends <strong>95 emails a day</strong> in all, due follow-ups first, so the first emails take at least {Math.ceil((sendResults.summary.queued || 0) / 95)} days and the full 4-email sequence about {Math.ceil((sendResults.summary.queued || 0) * 4 / 95)}. Addresses whose domain can't receive mail are dropped at send time.
                   </div>
                 )}
                 <div className={styles.tableWrap} style={{ maxHeight: '300px', overflow: 'auto' }}>
@@ -881,7 +881,7 @@ export default function AdminPage() {
                               : r.status === 'failed' ? styles.statusDeletion
                               : styles.statusSuspended
                             }`}>
-                              {r.status === 'sent' ? '✉️ Sent' : r.status === 'queued' ? '⏳ Queued' : r.status === 'skipped_active' ? '✅ Already Active' : r.status === 'skipped_duplicate' ? '⏭️ Already Contacted' : r.status === 'skipped' ? `⚠️ ${r.error}` : '❌ Failed'}
+                              {r.status === 'sent' ? '✉️ Sent' : r.status === 'queued' ? '⏳ Queued' : r.status === 'skipped_active' ? '✅ Already Active' : r.status === 'skipped_duplicate' ? '⏭️ Already Contacted' : r.status === 'skipped_unsubscribed' ? '🚫 Unsubscribed' : r.status === 'skipped_junk' ? `🗑️ Junk: ${r.error}` : r.status === 'skipped' ? `⚠️ ${r.error}` : '❌ Failed'}
                             </span>
                           </td>
                           <td style={{ fontFamily: 'monospace', fontSize: '11px' }}>{r.code || '—'}</td>

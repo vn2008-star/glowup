@@ -6,11 +6,10 @@
 import crypto from 'node:crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { PLATFORM_REPLY_TO } from '@/lib/admin'
-import { siteBaseUrl } from '@/lib/site-url'
 import { FOLLOW_UP_SEQUENCE, OUTREACH_MAILING_ADDRESS, OUTREACH_SENDER_NAME, TEMPLATES, normalizeTemplateId, renderTemplate, renderTemplateText, type TemplateId } from '@/lib/outreach-templates'
 
 /** Statuses that mean "don't email this address as a new lead again". */
-export const CONTACTED_STATUSES = ['sent', 'queued', 'skipped_active', 'unsubscribed']
+export const CONTACTED_STATUSES = ['sent', 'queued', 'skipped_active', 'unsubscribed', 'undeliverable']
 
 export const MISSING_ADDRESS_ERROR =
   'Add GlowUp\'s mailing address (OUTREACH_MAILING_ADDRESS in src/lib/outreach-templates.ts) before sending — the law requires it in every sales email.'
@@ -23,9 +22,15 @@ function unsubSig(email: string): string {
   return crypto.createHmac('sha256', process.env.SUPABASE_SERVICE_ROLE_KEY || '').update(`outreach-unsub:${email.toLowerCase()}`).digest('hex').slice(0, 24)
 }
 
+/**
+ * Links in sales emails always use the GlowUp brand domain, not whatever the
+ * deployment's site URL resolves to (which can be the vercel.app address).
+ */
+const OUTREACH_SITE_URL = 'https://www.joinglowup.org'
+
 export function unsubscribeUrl(email: string): string {
   const e = email.trim().toLowerCase()
-  return `${siteBaseUrl()}/api/outreach/unsubscribe?e=${encodeURIComponent(e)}&s=${unsubSig(e)}`
+  return `${OUTREACH_SITE_URL}/api/outreach/unsubscribe?e=${encodeURIComponent(e)}&s=${unsubSig(e)}`
 }
 
 export function verifyUnsubscribe(email: string, sig: string): boolean {
@@ -34,7 +39,7 @@ export function verifyUnsubscribe(email: string, sig: string): boolean {
 }
 
 export function signupLink(referralCode: string | null | undefined): string {
-  return referralCode ? `${siteBaseUrl()}/auth/signup?cref=${referralCode}` : `${siteBaseUrl()}/auth/signup`
+  return referralCode ? `${OUTREACH_SITE_URL}/auth/signup?cref=${referralCode}` : `${OUTREACH_SITE_URL}/auth/signup`
 }
 
 /** Lower-cased addresses that unsubscribed, out of the given list. */
@@ -58,42 +63,127 @@ export async function unsubscribe(svc: SupabaseClient, email: string): Promise<v
   await svc.from('outreach_campaigns').update({ status: 'unsubscribed' }).eq('owner_email', e).eq('status', 'queued')
 }
 
-/** Send one outreach email. Returns null on success, else the reason. */
-export async function sendOutreachEmail(opts: {
+export type OutreachEmail = {
   to: string
   templateId: TemplateId | string
   salonName: string
   ownerName: string
   referralCode: string | null | undefined
   senderName?: string | null
-}): Promise<string | null> {
-  if (!outreachReady()) return MISSING_ADDRESS_ERROR
+}
+
+function buildEmail(opts: OutreachEmail) {
   const to = opts.to.trim().toLowerCase()
   const id = normalizeTemplateId(opts.templateId)
   const link = signupLink(opts.referralCode)
   const unsub = unsubscribeUrl(to)
   const sender = opts.senderName?.trim() || OUTREACH_SENDER_NAME
+  return {
+    from: `${sender} via GlowUp <bookings@joinglowup.org>`,
+    to: [to],
+    replyTo: PLATFORM_REPLY_TO,
+    subject: TEMPLATES[id].subjectFn(opts.salonName.trim()),
+    html: renderTemplate(id, opts.salonName, opts.ownerName, link, sender, unsub),
+    text: renderTemplateText(id, opts.salonName, opts.ownerName, link, sender, unsub),
+    // One-click unsubscribe (RFC 8058) — Gmail and Yahoo expect it on bulk mail
+    headers: { 'List-Unsubscribe': `<${unsub}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' },
+  }
+}
+
+/**
+ * Send up to 100 outreach emails in ONE Resend request. One request per email
+ * ran into Resend's requests-per-second limit and the 60-second function
+ * limit at 95 emails a day.
+ *
+ * Returns { error } when nothing was sent (callers leave those rows as they
+ * were, so they go out on the next run), else the indexes that Resend
+ * rejected individually.
+ */
+export async function sendOutreachBatch(emails: OutreachEmail[]): Promise<{ error: string } | { failed: Map<number, string> }> {
+  if (!outreachReady()) return { error: MISSING_ADDRESS_ERROR }
+  if (!emails.length) return { failed: new Map() }
+  if (emails.length > 100) return { error: 'Resend sends at most 100 emails per batch' }
 
   if (!process.env.RESEND_API_KEY) {
-    console.log(`[DRY RUN] Outreach ${id} to ${to}`)
-    return null
+    for (const e of emails) console.log(`[DRY RUN] Outreach ${normalizeTemplateId(e.templateId)} to ${e.to}`)
+    return { failed: new Map() }
   }
   try {
     const { Resend } = await import('resend')
-    const { error } = await new Resend(process.env.RESEND_API_KEY).emails.send({
-      from: `${sender} via GlowUp <bookings@joinglowup.org>`,
-      to: [to],
-      replyTo: PLATFORM_REPLY_TO,
-      subject: TEMPLATES[id].subjectFn(opts.salonName.trim()),
-      html: renderTemplate(id, opts.salonName, opts.ownerName, link, sender, unsub),
-      text: renderTemplateText(id, opts.salonName, opts.ownerName, link, sender, unsub),
-      // One-click unsubscribe (RFC 8058) — Gmail and Yahoo expect it on bulk mail
-      headers: { 'List-Unsubscribe': `<${unsub}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' },
-    })
-    return error ? error.message : null
+    const { data, error } = await new Resend(process.env.RESEND_API_KEY).batch.send(emails.map(buildEmail), { batchValidation: 'permissive' })
+    if (error) return { error: error.message }
+    return { failed: new Map((data?.errors || []).map(e => [e.index, e.message])) }
   } catch (err) {
-    return err instanceof Error ? err.message : 'Send failed'
+    return { error: err instanceof Error ? err.message : 'Send failed' }
   }
+}
+
+// ─── Junk addresses ───
+// Scraped lead lists pick up addresses from website templates and footers:
+// the site builder's placeholder, the font foundry, the domain seller, the web
+// designer. Emailing those gets bounces and spam reports that hurt
+// bookings@joinglowup.org, which salons' booking emails also come from.
+
+const PLACEHOLDER_DOMAIN = /(^|\.)(example|sample|xyz|mysite|mystore|yoursite|yourdomain|yourcompany|domain|address|newsletter|domainmarket|domainregistryinc|godaddy|wix|wixpress|sentry|squarespace|latofonts|indiantypefoundry)\.[a-z.]+$/
+const PLACEHOLDER_LOCAL = /^(example|filler|yourname|youremail|yourdomain|your\.?email|name|email|test|user|noreply|no-reply|domainbroker)$/
+const IMAGE_FILE = /\.(png|jpe?g|gif|webp|svg)$/
+
+const alnum = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
+
+/** Whether the address's domain looks like one of these salon names (info@happinessnailsspa.com). */
+function domainMatchesSalon(domain: string, salons: Set<string>): boolean {
+  const label = alnum(domain.split('.').slice(-2, -1)[0] || '')
+  return label.length >= 4 && [...salons].some(n => n.includes(label) || (n.length >= 4 && label.includes(n)))
+}
+
+/**
+ * Addresses that aren't a salon's own, with the reason. An address on 2+
+ * differently named businesses is a vendor's (booking software, website
+ * builder, font foundry) unless its domain matches one of their names: a
+ * chain's info@ on every location is real.
+ */
+export function junkEmails(leads: { salon_name?: string | null; owner_email?: string | null }[]): Map<string, string> {
+  const names = new Map<string, Set<string>>()
+  for (const l of leads) {
+    const e = String(l.owner_email || '').trim().toLowerCase()
+    if (!e) continue
+    if (!names.has(e)) names.set(e, new Set())
+    names.get(e)!.add(alnum(l.salon_name || ''))
+  }
+  const junk = new Map<string, string>()
+  for (const [email, salons] of names) {
+    const [local, domain = ''] = email.split('@')
+    const own = domainMatchesSalon(domain, salons)
+    if (!domain || !domain.includes('.') || IMAGE_FILE.test(email)) junk.set(email, 'not an email address')
+    else if (PLACEHOLDER_DOMAIN.test(domain) || (PLACEHOLDER_LOCAL.test(local) && !own)) junk.set(email, 'website placeholder')
+    else if (salons.size >= 2 && !own) junk.set(email, `shared by ${salons.size} businesses`)
+  }
+  return junk
+}
+
+/**
+ * Domains that can't receive email (typos like gmai.com, dead domains), from
+ * a DNS mail-server lookup. A lookup that times out or errors otherwise
+ * counts as fine: only a definite "no such domain / no mail server" drops it.
+ */
+export async function undeliverableDomains(emails: string[]): Promise<Set<string>> {
+  const { promises: dns } = await import('node:dns')
+  const domains = [...new Set(emails.map(e => e.trim().toLowerCase().split('@')[1]).filter(Boolean))]
+  const bad = new Set<string>()
+  const check = async (d: string) => {
+    try {
+      const mx = await Promise.race([dns.resolveMx(d), new Promise<null>(r => setTimeout(() => r(null), 3000))])
+      if (mx && mx.length === 0) bad.add(d)
+    } catch (err) {
+      const code = (err as { code?: string }).code
+      if (code === 'ENOTFOUND' || code === 'ENODATA') {
+        // No MX record: mail falls back to the domain's own address, if it has one
+        try { await dns.resolve(d) } catch { bad.add(d) }
+      }
+    }
+  }
+  for (let i = 0; i < domains.length; i += 50) await Promise.all(domains.slice(i, i + 50).map(check))
+  return bad
 }
 
 /** Most outreach emails per day: Resend's free tier is 100/day, 5 left as a buffer. */
@@ -163,34 +253,38 @@ export async function dueFollowUps(svc: SupabaseClient, limit: number, ids?: str
 
 export type FollowUpResult = { salon_name: string; owner_email: string; status: 'sent' | 'failed' | 'deferred'; template: string }
 
-/** Send each campaign its next email in the sequence, stopping at `remaining` sends. */
-export async function sendFollowUps(svc: SupabaseClient, campaigns: Campaign[], remaining: number, senderName?: string | null): Promise<FollowUpResult[]> {
-  const results: FollowUpResult[] = []
-  const BATCH_SIZE = 10
-  const BATCH_DELAY = 1000
-
-  for (let i = 0; i < campaigns.length; i += BATCH_SIZE) {
-    for (const campaign of campaigns.slice(i, i + BATCH_SIZE)) {
-      if (remaining <= 0) {
-        results.push({ salon_name: campaign.salon_name, owner_email: campaign.owner_email, status: 'deferred', template: 'tomorrow' })
-        continue
-      }
-      const templateId = FOLLOW_UP_SEQUENCE[campaign.follow_up_count || 0].templateId
-      const sendErr = await sendOutreachEmail({
-        to: campaign.owner_email, templateId, salonName: campaign.salon_name, ownerName: campaign.owner_name,
-        referralCode: campaign.referral_code, senderName,
-      })
-      if (!sendErr) {
-        remaining--
-        await svc.from('outreach_campaigns')
-          .update({ follow_up_count: (campaign.follow_up_count || 0) + 1, last_follow_up_at: new Date().toISOString(), last_template_id: templateId })
-          .eq('id', campaign.id)
-      } else {
-        console.error(`Follow-up failed for ${campaign.owner_email}:`, sendErr)
-      }
-      results.push({ salon_name: campaign.salon_name, owner_email: campaign.owner_email, status: sendErr ? 'failed' : 'sent', template: templateId })
-    }
-    if (i + BATCH_SIZE < campaigns.length) await new Promise(resolve => setTimeout(resolve, BATCH_DELAY))
+/** The next email in the sequence for a campaign that's due one. */
+export function followUpEmail(c: Campaign, senderName?: string | null): OutreachEmail {
+  return {
+    to: c.owner_email, templateId: FOLLOW_UP_SEQUENCE[c.follow_up_count || 0].templateId,
+    salonName: c.salon_name, ownerName: c.owner_name, referralCode: c.referral_code, senderName,
   }
-  return results
+}
+
+/** Record follow-ups that went out: bump each campaign's step. */
+export async function markFollowUpsSent(svc: SupabaseClient, campaigns: Campaign[]): Promise<void> {
+  const now = new Date().toISOString()
+  // One update per step rather than per campaign
+  const byStep = new Map<number, string[]>()
+  for (const c of campaigns) byStep.set(c.follow_up_count || 0, [...(byStep.get(c.follow_up_count || 0) || []), c.id])
+  for (const [step, ids] of byStep) {
+    await svc.from('outreach_campaigns')
+      .update({ follow_up_count: step + 1, last_follow_up_at: now, last_template_id: FOLLOW_UP_SEQUENCE[step].templateId })
+      .in('id', ids)
+  }
+}
+
+/** Send each campaign its next email in the sequence, up to `remaining` sends; the rest wait. */
+export async function sendFollowUps(svc: SupabaseClient, campaigns: Campaign[], remaining: number, senderName?: string | null): Promise<FollowUpResult[]> {
+  const now = campaigns.slice(0, Math.max(0, Math.min(remaining, 100)))
+  const later = campaigns.slice(now.length)
+  const template = (c: Campaign) => FOLLOW_UP_SEQUENCE[c.follow_up_count || 0].templateId
+  const result = await sendOutreachBatch(now.map(c => followUpEmail(c, senderName)))
+  if ('error' in result) console.error('Follow-up batch failed:', result.error)
+  const failed = 'error' in result ? null : result.failed
+  await markFollowUpsSent(svc, now.filter((_, i) => failed && !failed.has(i)))
+  return [
+    ...now.map((c, i) => ({ salon_name: c.salon_name, owner_email: c.owner_email, status: (failed && !failed.has(i) ? 'sent' : 'failed') as FollowUpResult['status'], template: template(c) })),
+    ...later.map(c => ({ salon_name: c.salon_name, owner_email: c.owner_email, status: 'deferred' as const, template: 'tomorrow' })),
+  ]
 }
