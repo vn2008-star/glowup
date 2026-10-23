@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { renderSmsTemplate, SMS_TEMPLATES, type SmsTemplateId } from "@/lib/outreach-templates";
+import { OUTREACH_SENDER_NAME, renderSmsTemplate, SMS_TEMPLATES, type SmsTemplateId } from "@/lib/outreach-templates";
 import styles from "./admin.module.css";
 
 // ─── Outreach texts, sent from the admin's own phone ───
@@ -28,7 +28,7 @@ export default function OutreachTextKit() {
   const [first, setFirst] = useState("");
   const [salon, setSalon] = useState("");
   const [phone, setPhone] = useState("");
-  const [sender, setSender] = useState("");
+  const [sender, setSender] = useState(OUTREACH_SENDER_NAME);
   const [signup, setSignup] = useState("https://joinglowup.org/auth/signup");
   const [preview, setPreview] = useState("");
   const [copied, setCopied] = useState(false);
@@ -66,7 +66,7 @@ export default function OutreachTextKit() {
         <div><label style={label}>Their first name</label><input style={input} value={first} onChange={e => setFirst(e.target.value)} placeholder="Sarah" /></div>
         <div><label style={label}>Business name</label><input style={input} value={salon} onChange={e => setSalon(e.target.value)} placeholder="Luxe Nails & Spa" /></div>
         <div><label style={label}>Their mobile</label><input style={input} type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="(530) 555-0123" /></div>
-        <div><label style={label}>Your name</label><input style={input} value={sender} onChange={e => setSender(e.target.value)} placeholder="James" /></div>
+        <div><label style={label}>Your name</label><input style={input} value={sender} onChange={e => setSender(e.target.value)} placeholder={OUTREACH_SENDER_NAME} /></div>
         {needsPreview
           ? <div style={{ gridColumn: "1 / -1" }}><label style={label}>Their booking page link (from Imported salons)</label><input style={input} value={preview} onChange={e => setPreview(e.target.value)} placeholder="https://www.joinglowup.org/book/luxe-nails-spa" /></div>
           : <div style={{ gridColumn: "1 / -1" }}><label style={label}>Sign-up link</label><input style={input} value={signup} onChange={e => setSignup(e.target.value)} /></div>}

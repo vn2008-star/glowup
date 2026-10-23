@@ -7,7 +7,7 @@ import crypto from 'node:crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { PLATFORM_REPLY_TO } from '@/lib/admin'
 import { siteBaseUrl } from '@/lib/site-url'
-import { FOLLOW_UP_SEQUENCE, OUTREACH_MAILING_ADDRESS, TEMPLATES, normalizeTemplateId, renderTemplate, renderTemplateText, type TemplateId } from '@/lib/outreach-templates'
+import { FOLLOW_UP_SEQUENCE, OUTREACH_MAILING_ADDRESS, OUTREACH_SENDER_NAME, TEMPLATES, normalizeTemplateId, renderTemplate, renderTemplateText, type TemplateId } from '@/lib/outreach-templates'
 
 /** Statuses that mean "don't email this address as a new lead again". */
 export const CONTACTED_STATUSES = ['sent', 'queued', 'skipped_active', 'unsubscribed']
@@ -72,7 +72,7 @@ export async function sendOutreachEmail(opts: {
   const id = normalizeTemplateId(opts.templateId)
   const link = signupLink(opts.referralCode)
   const unsub = unsubscribeUrl(to)
-  const sender = opts.senderName?.trim() || undefined
+  const sender = opts.senderName?.trim() || OUTREACH_SENDER_NAME
 
   if (!process.env.RESEND_API_KEY) {
     console.log(`[DRY RUN] Outreach ${id} to ${to}`)
@@ -81,7 +81,7 @@ export async function sendOutreachEmail(opts: {
   try {
     const { Resend } = await import('resend')
     const { error } = await new Resend(process.env.RESEND_API_KEY).emails.send({
-      from: sender ? `${sender} via GlowUp <bookings@joinglowup.org>` : 'GlowUp Team <bookings@joinglowup.org>',
+      from: `${sender} via GlowUp <bookings@joinglowup.org>`,
       to: [to],
       replyTo: PLATFORM_REPLY_TO,
       subject: TEMPLATES[id].subjectFn(opts.salonName.trim()),

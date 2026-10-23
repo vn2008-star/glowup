@@ -9,7 +9,7 @@ import GrowthDashboard from "./GrowthDashboard";
 import SiteImporter from "./SiteImporter";
 import FeedbackCenter from "./FeedbackCenter";
 import OutreachTextKit from "./OutreachTextKit";
-import { TEMPLATES as OUTREACH_TEMPLATES, FOLLOW_UP_SEQUENCE, OUTREACH_MAILING_ADDRESS, normalizeTemplateId } from "@/lib/outreach-templates";
+import { TEMPLATES as OUTREACH_TEMPLATES, FOLLOW_UP_SEQUENCE, OUTREACH_MAILING_ADDRESS, OUTREACH_SENDER_NAME, normalizeTemplateId } from "@/lib/outreach-templates";
 
 interface TenantRow {
   id: string;
@@ -150,7 +150,7 @@ export default function AdminPage() {
   // Outreach state
   const [outreachTab, setOutreachTab] = useState<'upload' | 'sms' | 'history' | 'followups'>('upload');
   const [csvLeads, setCsvLeads] = useState<OutreachLead[]>([]);
-  const [senderName, setSenderName] = useState('');
+  const [senderName, setSenderName] = useState(OUTREACH_SENDER_NAME);
   const [senderEmail, setSenderEmail] = useState('');
   const [sending, setSending] = useState(false);
   const [sendResults, setSendResults] = useState<{ summary: { total: number; sent: number; queued?: number; skipped: number; failed: number }; results: OutreachResult[] } | null>(null);
@@ -624,7 +624,7 @@ export default function AdminPage() {
                   type="text"
                   value={senderName}
                   onChange={(e) => setSenderName(e.target.value)}
-                  placeholder="e.g. James from GlowUp"
+                  placeholder={OUTREACH_SENDER_NAME}
                   style={{ width: '100%', padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-default)', background: 'var(--bg-surface)', color: 'var(--text-primary)', fontSize: '13px' }}
                 />
               </div>

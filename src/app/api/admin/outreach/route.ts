@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
-import { TEMPLATES, SMS_TEMPLATES } from '@/lib/outreach-templates'
+import { TEMPLATES, SMS_TEMPLATES, OUTREACH_SENDER_NAME } from '@/lib/outreach-templates'
 import { CONTACTED_STATUSES, DAILY_LIMIT, MISSING_ADDRESS_ERROR, dueFollowUps, outreachReady, sendFollowUps, sendOutreachEmail, sentTodayCount } from '@/lib/outreach-send'
 
 // ─── Admin bulk outreach ───
@@ -243,7 +243,7 @@ async function handleBulkSend(body: {
     const code = genCode()
     referralRows.push({
       code,
-      referrer_name: senderName || 'GlowUp Team',
+      referrer_name: senderName || OUTREACH_SENDER_NAME,
       referrer_email: senderEmail || 'outreach@glowup.com',
       referred_salon_name: base.salon_name,
       referred_owner_name: ownerName,
@@ -253,7 +253,7 @@ async function handleBulkSend(body: {
     // 4. Over today's limit → queue for the daily cron. The table has no
     // sender_name/sender_email columns (writing them failed the insert, so
     // every lead past the limit silently vanished); queued emails are signed
-    // "The GlowUp Team".
+    // OUTREACH_SENDER_NAME.
     if (remainingToday <= 0) {
       campaignRows.push({ ...base, referral_code: code, template_id: templateId, follow_up_count: 0, status: 'queued' })
       results.push({ salon_name, owner_name, owner_email: email, status: 'queued', code })

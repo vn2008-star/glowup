@@ -20,6 +20,9 @@
  */
 export const OUTREACH_MAILING_ADDRESS = 'Davis, CA'
 
+/** Who signs outreach emails when no sender name is typed in (the daily cron never has one). "Anh" is the owner's chosen Vietnamese title. */
+export const OUTREACH_SENDER_NAME = 'Anh James Hung'
+
 export const TRIAL_DAYS = 30
 export const STARTING_PRICE = 29
 
@@ -153,7 +156,7 @@ export function renderTemplate(
 ): string {
   const id = normalizeTemplateId(templateId)
   const salon = salonName.trim()
-  const sender = senderName?.trim() || 'The GlowUp Team'
+  const sender = senderName?.trim() || OUTREACH_SENDER_NAME
   const first = greetingName(ownerName, salon)
   const p = (html: string) => `<p style="margin:0 0 16px;">${html}</p>`
 
@@ -191,7 +194,7 @@ export function renderTemplateText(
 ): string {
   const id = normalizeTemplateId(templateId)
   const salon = salonName.trim()
-  const sender = senderName?.trim() || 'The GlowUp Team'
+  const sender = senderName?.trim() || OUTREACH_SENDER_NAME
   const first = greetingName(ownerName, salon)
   const paragraphs = body(id, salon, signupLink, sender).map(para =>
     typeof para === 'string' ? para : para.bullets.map(b => `- ${b}`).join('\n'),

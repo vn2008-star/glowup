@@ -1,6 +1,6 @@
 'use client'
 
-import { renderTemplate, renderSmsTemplate, TEMPLATES, SMS_TEMPLATES, FOLLOW_UP_SEQUENCE, OUTREACH_MAILING_ADDRESS, TemplateId, SmsTemplateId } from '@/lib/outreach-templates'
+import { renderTemplate, renderSmsTemplate, TEMPLATES, SMS_TEMPLATES, FOLLOW_UP_SEQUENCE, OUTREACH_MAILING_ADDRESS, OUTREACH_SENDER_NAME, TemplateId, SmsTemplateId } from '@/lib/outreach-templates'
 import { useEffect } from 'react'
 
 export default function OutreachPreview() {
@@ -8,7 +8,7 @@ export default function OutreachPreview() {
   const sampleSalon = 'Luxe Nails & Spa'
   const sampleOwner = 'Sarah'
   const sampleLink = 'https://joinglowup.org/auth/signup?cref=CR-DEMO01'
-  const sampleSender = 'James'
+  const sampleSender = OUTREACH_SENDER_NAME
   const sampleUnsub = 'https://joinglowup.org/api/outreach/unsubscribe?e=sarah%40example.com&s=demo'
 
   // Scroll to anchor on load
