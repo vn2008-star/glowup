@@ -23,6 +23,9 @@ export const OUTREACH_MAILING_ADDRESS = 'Davis, CA'
 /** Who signs outreach emails when no sender name is typed in (the daily cron never has one). "Anh" is the owner's chosen Vietnamese title. */
 export const OUTREACH_SENDER_NAME = 'Anh James Hung'
 
+/** In every email signature so owners can call or text to book a demo. */
+export const OUTREACH_PHONE = '530-848-1587'
+
 export const TRIAL_DAYS = 30
 export const STARTING_PRICE = 29
 
@@ -138,9 +141,9 @@ function body(templateId: TemplateId, salon: string, signupLink: string, sender:
 }
 
 function signOff(templateId: TemplateId, sender: string): string[] {
-  if (templateId === 'last_note') return ['Thanks for your time,', sender]
-  if (templateId === 'intro') return [sender, 'GlowUp']
-  return [sender]
+  const contact = `GlowUp · ${OUTREACH_PHONE} (call or text)`
+  if (templateId === 'last_note') return ['Thanks for your time,', sender, contact]
+  return [sender, contact]
 }
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
@@ -173,7 +176,7 @@ export function renderTemplate(
 <div style="max-width:560px;margin:0 auto;padding:24px 20px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#222222;">
 ${p(`Hi ${esc(first || 'there')},`)}
 ${paragraphs}
-${p(signOff(id, sender).map(esc).join('<br>'))}
+${p(signOff(id, sender).map(esc).join('<br>').replace(OUTREACH_PHONE, `<a href="tel:+1${OUTREACH_PHONE.replace(/\D/g, '')}" style="color:#222222;">${OUTREACH_PHONE}</a>`))}
 <p style="margin:32px 0 0;padding-top:12px;border-top:1px solid #e5e5e5;font-size:12px;line-height:1.5;color:#777777;">
 GlowUp &middot; ${esc(OUTREACH_MAILING_ADDRESS || '[mailing address]')}<br>
 Don't want these emails? <a href="${esc(unsubscribeUrl)}" style="color:#777777;">Unsubscribe</a>
