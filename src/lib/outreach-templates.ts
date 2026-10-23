@@ -37,7 +37,7 @@ export const TEMPLATES: Record<TemplateId, {
     id: 'intro',
     step: 1,
     name: 'Online booking',
-    description: 'Day 1 — first email: what GlowUp does, 30 days free',
+    description: 'Day 1 — first email: what GlowUp does, 30 days free, import offer, book a call',
     icon: '1',
     subjectFn: (name) => `Online booking for ${name}`,
   },
@@ -45,7 +45,7 @@ export const TEMPLATES: Record<TemplateId, {
     id: 'setup_offer',
     step: 2,
     name: "We'll set it up",
-    description: 'Day 4 — reply with your website and we build the booking page',
+    description: 'Day 4 — reply with your website and we build the booking page; or book a call',
     icon: '2',
     subjectFn: (name) => `We'll set up ${name} for you`,
   },
@@ -53,7 +53,7 @@ export const TEMPLATES: Record<TemplateId, {
     id: 'benefits',
     step: 3,
     name: 'Fewer empty chairs',
-    description: 'Day 9 — 24/7 booking, reminders, waitlist, AI receptionist',
+    description: 'Day 9 — 24/7 booking, reminders, waitlist, AI receptionist; import offer or a call',
     icon: '3',
     subjectFn: (name) => `Fewer empty chairs at ${name}`,
   },
@@ -61,7 +61,7 @@ export const TEMPLATES: Record<TemplateId, {
     id: 'last_note',
     step: 4,
     name: 'Last note',
-    description: 'Day 16 — polite last email, offer stays open',
+    description: 'Day 16 — polite last email; import and call offers stay open',
     icon: '4',
     subjectFn: () => 'Last note about GlowUp',
   },
@@ -103,13 +103,15 @@ function body(templateId: TemplateId, salon: string, signupLink: string, sender:
         `I'm ${sender} with GlowUp, a booking app made for salons and spas.`,
         `With GlowUp, clients can book ${salon} online any time, get a reminder before their visit, and join a waitlist when you're full. You see everything on one calendar.`,
         `It's free for ${TRIAL_DAYS} days with no credit card, then plans start at $${STARTING_PRICE} a month. Try it here: ${signupLink}`,
-        `Or simply reply with your website. We'll set up your services, prices and team for you, so you can see your own booking page before deciding anything.`,
+        `Or simply reply with your website. We'll bring your services, prices and team into GlowUp for you, so you can review your own booking page before deciding anything.`,
+        `Rather talk it through first? Reply with a day and time that works for you, and I'll set up a short call or video demo.`,
       ]
     case 'setup_offer':
       return [
         `Setting up new software is the part nobody has time for, so we do it for you.`,
-        `Reply with ${salon}'s website. We'll read your service menu and prices, even if your menu is a picture, and build your booking page, team and hours. You get a private preview link. Nothing goes live and no client can book until you say so.`,
+        `Reply with ${salon}'s website. We'll read your service menu and prices, even if your menu is a picture, and build your booking page, team and hours. You get a private preview link to review. Nothing goes live and no client can book until you say so.`,
         `Like it? Create your login and it's yours. Don't? Just ignore it.`,
+        `If you'd like to go over it together, reply with a good time and I'll book a short call or video demo with you.`,
       ]
     case 'benefits':
       return [
@@ -121,12 +123,13 @@ function body(templateId: TemplateId, salon: string, signupLink: string, sender:
           `An AI receptionist answers common questions like prices, hours and parking.`,
         ] },
         `GlowUp also works in English, Spanish, Vietnamese, Korean and Chinese.`,
+        `Want to see it with your own menu? Reply with your website and we'll import it into GlowUp, then send you a private preview of ${salon}'s booking page to review. Or reply with a good time and I'll walk you through it on a short call.`,
         `${TRIAL_DAYS} days free, no card: ${signupLink}`,
       ]
     case 'last_note':
       return [
         `I haven't heard back, so this is my last email. If the timing isn't right, no problem at all.`,
-        `If you ever want online booking for ${salon}, the offer stands: send us your website and we'll set it up free so you can preview it, or start on your own at ${signupLink}`,
+        `If you ever want online booking for ${salon}, the offer stands: send us your website and we'll import it into GlowUp free so you can review your booking page, or reply any time to set up a call. You can also start on your own at ${signupLink}`,
       ]
   }
 }
