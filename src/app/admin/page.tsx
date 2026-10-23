@@ -156,6 +156,8 @@ export default function AdminPage() {
   const [sendResults, setSendResults] = useState<{ summary: { total: number; sent: number; queued?: number; skipped: number; failed: number }; results: OutreachResult[] } | null>(null);
   const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
   const [campaignsLoading, setCampaignsLoading] = useState(false);
+  const [campaignSearch, setCampaignSearch] = useState('');
+  const [stoppingEmail, setStoppingEmail] = useState<string | null>(null);
   const [csvError, setCsvError] = useState('');
   const [followUpCandidates, setFollowUpCandidates] = useState<CampaignRow[]>([]);
   const [followUpLoading, setFollowUpLoading] = useState(false);
@@ -355,6 +357,35 @@ export default function AdminPage() {
     }
 
     setSending(false);
+  }
+
+  async function loadCampaigns(q: string) {
+    setCampaignsLoading(true);
+    const res = await fetch('/api/admin/outreach' + (q.trim() ? `?q=${encodeURIComponent(q.trim())}` : ''));
+    if (res.ok) {
+      const d = await res.json();
+      setCampaigns(d.campaigns || []);
+    }
+    setCampaignsLoading(false);
+  }
+
+  /** Stop (or resume) every outreach email to one address — for salons that replied. */
+  async function setOutreachStopped(email: string, stop: boolean) {
+    if (stop && !confirm(`Stop all outreach emails to ${email}? Use this when they reply. You can resume later.`)) return;
+    setStoppingEmail(email);
+    const res = await fetch('/api/admin/outreach', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: stop ? 'stop-emails' : 'resume-emails', email }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (res.ok) {
+      const updated = new Map<string, CampaignRow>((d.campaigns || []).map((c: CampaignRow) => [c.id, c]));
+      setCampaigns(prev => prev.map(c => updated.get(c.id) || c));
+    } else {
+      alert(d.error || 'Could not update this salon');
+    }
+    setStoppingEmail(null);
   }
 
   function getStatus(t: TenantRow) {
@@ -594,15 +625,9 @@ export default function AdminPage() {
             </button>
             <button
               className={`${styles.filterBtn} ${outreachTab === 'history' ? styles.filterActive : ''}`}
-              onClick={async () => {
+              onClick={() => {
                 setOutreachTab('history');
-                setCampaignsLoading(true);
-                const res = await fetch('/api/admin/outreach');
-                if (res.ok) {
-                  const d = await res.json();
-                  setCampaigns(d.campaigns || []);
-                }
-                setCampaignsLoading(false);
+                loadCampaigns(campaignSearch);
               }}
             >
               Campaign History
@@ -1005,10 +1030,24 @@ export default function AdminPage() {
         ) : (
           /* Campaign History Tab — Pipeline View */
           <div>
+            {/* Search: find the salon that replied, then Stop emails */}
+            <form
+              onSubmit={(e) => { e.preventDefault(); loadCampaigns(campaignSearch); }}
+              style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }}
+            >
+              <input
+                type="search"
+                value={campaignSearch}
+                onChange={(e) => { setCampaignSearch(e.target.value); if (!e.target.value) loadCampaigns(''); }}
+                placeholder="Search salon name or email (e.g. the address that replied)"
+                style={{ flex: 1, padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-default)', background: 'var(--bg-surface)', color: 'var(--text-primary)', fontSize: '13px' }}
+              />
+              <button type="submit" className={styles.filterBtn}>Search</button>
+            </form>
             {campaignsLoading ? (
               <div style={{ textAlign: 'center', padding: 'var(--space-8)', color: 'var(--text-tertiary)' }}>Loading campaigns...</div>
             ) : campaigns.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: 'var(--space-8)', color: 'var(--text-tertiary)' }}>No outreach campaigns yet</div>
+              <div style={{ textAlign: 'center', padding: 'var(--space-8)', color: 'var(--text-tertiary)' }}>{campaignSearch.trim() ? 'No salons match that search' : 'No outreach campaigns yet'}</div>
             ) : (() => {
               // Same rules as dueFollowUps in lib/outreach-send: each follow-up is
               // due daysAfterPrevious days after the last email, and the sequence
@@ -1025,8 +1064,9 @@ export default function AdminPage() {
               const needsFollowUp = inSequence.filter(c => (c.follow_up_count || 0) < FOLLOW_UP_SEQUENCE.length && isDue(c));
               const waiting = inSequence.filter(c => (c.follow_up_count || 0) < FOLLOW_UP_SEQUENCE.length && !isDue(c));
               const queued = campaigns.filter(c => c.status === 'queued');
+              const stopped = campaigns.filter(c => c.status === 'stopped');
 
-              type PipeFilter = 'all' | 'signed_up' | 'needs_followup' | 'waiting' | 'queued' | 'maxed';
+              type PipeFilter = 'all' | 'signed_up' | 'needs_followup' | 'waiting' | 'queued' | 'maxed' | 'stopped';
               const getFiltered = () => {
                 const pf = (window as any).__outreachPipeFilter as PipeFilter | undefined;
                 if (pf === 'signed_up') return signedUp;
@@ -1034,6 +1074,7 @@ export default function AdminPage() {
                 if (pf === 'waiting') return waiting;
                 if (pf === 'queued') return queued;
                 if (pf === 'maxed') return maxedOut;
+                if (pf === 'stopped') return stopped;
                 return campaigns;
               };
               const filtered = getFiltered();
@@ -1048,6 +1089,7 @@ export default function AdminPage() {
                       { label: 'Waiting ✉️', count: waiting.length, color: '#60a5fa', key: 'waiting' },
                       { label: 'Queued ⏳', count: queued.length, color: '#818cf8', key: 'queued' },
                       { label: 'Sequence Done 🚫', count: maxedOut.length, color: '#6b7280', key: 'maxed' },
+                      { label: 'Stopped ⏹️', count: stopped.length, color: '#ef4444', key: 'stopped' },
                       { label: 'Total', count: campaigns.length, color: '#a78bfa', key: 'all' },
                     ].map(s => (
                       <div
@@ -1103,6 +1145,7 @@ export default function AdminPage() {
                           <th>Status</th>
                           <th>Follow-Ups</th>
                           <th>Sent</th>
+                          <th></th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1131,11 +1174,22 @@ export default function AdminPage() {
                                 : c.status === 'skipped_active' ? styles.statusSuspended
                                 : styles.statusDeletion
                               }`}>
-                                {c.signed_up ? '🎉 Signed Up' : c.status === 'sent' ? '✉️ Sent' : c.status === 'queued' ? '⏳ Queued' : c.status === 'skipped_active' ? '✅ Already Active' : '❌ ' + c.status}
+                                {c.signed_up ? '🎉 Signed Up' : c.status === 'sent' ? '✉️ Sent' : c.status === 'queued' ? '⏳ Queued' : c.status === 'stopped' ? '⏹️ Stopped' : c.status === 'skipped_active' ? '✅ Already Active' : '❌ ' + c.status}
                               </span>
                             </td>
                             <td style={{ textAlign: 'center', fontSize: '12px' }}>{c.follow_up_count || 0}/{FOLLOW_UP_SEQUENCE.length}</td>
                             <td className={styles.dateCell}>{c.sent_at ? localeDateStr(new Date(c.sent_at), { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</td>
+                            <td>
+                              {!c.signed_up && (c.status === 'sent' || c.status === 'queued') && (c.follow_up_count || 0) < FOLLOW_UP_SEQUENCE.length ? (
+                                <button className={styles.deleteBtn} style={{ fontSize: '11px', padding: '4px 10px', whiteSpace: 'nowrap' }} disabled={stoppingEmail === c.owner_email} onClick={() => setOutreachStopped(c.owner_email, true)}>
+                                  {stoppingEmail === c.owner_email ? '…' : 'Stop emails'}
+                                </button>
+                              ) : c.status === 'stopped' ? (
+                                <button className={styles.filterBtn} style={{ fontSize: '11px', padding: '4px 10px', whiteSpace: 'nowrap' }} disabled={stoppingEmail === c.owner_email} onClick={() => setOutreachStopped(c.owner_email, false)}>
+                                  {stoppingEmail === c.owner_email ? '…' : 'Resume'}
+                                </button>
+                              ) : null}
+                            </td>
                           </tr>
                         ))}
                       </tbody>

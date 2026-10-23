@@ -135,11 +135,16 @@ export async function GET(request: Request) {
     return NextResponse.json({ candidates: await dueFollowUps(svc, 200) })
   }
 
-  const { data, error } = await svc
+  // Search by salon or email, so a salon that replied can be found (and
+  // stopped) however far back it was queued
+  const q = (url.searchParams.get('q') || '').trim().replace(/[,()%*\\]/g, ' ').trim()
+  let list = svc
     .from('outreach_campaigns')
     .select('*')
     .order('created_at', { ascending: false })
-    .limit(500)
+    .limit(1000)
+  if (q) list = list.or(`owner_email.ilike.%${q}%,salon_name.ilike.%${q}%`)
+  const { data, error } = await list
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
@@ -153,6 +158,28 @@ export async function POST(request: Request) {
 
   const body = await request.json()
   const { action } = body
+
+  // Stop (or resume) the sequence for one address — for salons that replied.
+  // Works without a mailing address, since it sends nothing.
+  if (action === 'stop-emails' || action === 'resume-emails') {
+    const email = String(body.email || '').trim().toLowerCase()
+    if (!email) return NextResponse.json({ error: 'No email given' }, { status: 400 })
+    const svc = getSvc()
+    if (action === 'stop-emails') {
+      const { error } = await svc.from('outreach_campaigns').update({ status: 'stopped' }).eq('owner_email', email).in('status', ['sent', 'queued'])
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    } else {
+      // Back to where it was: emailed rows carry on with follow-ups, never-sent ones rejoin the queue
+      const [a, b] = await Promise.all([
+        svc.from('outreach_campaigns').update({ status: 'sent' }).eq('owner_email', email).eq('status', 'stopped').not('sent_at', 'is', null),
+        svc.from('outreach_campaigns').update({ status: 'queued' }).eq('owner_email', email).eq('status', 'stopped').is('sent_at', null),
+      ])
+      const error = a.error || b.error
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+    const { data } = await svc.from('outreach_campaigns').select('*').eq('owner_email', email)
+    return NextResponse.json({ campaigns: data || [] })
+  }
 
   if (action === 'send-sms') {
     return NextResponse.json({ error: 'Bulk texting is turned off — send texts from your own phone on the SMS tab, only to people who replied or asked to be texted.' }, { status: 410 })

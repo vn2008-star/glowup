@@ -9,7 +9,8 @@ import { PLATFORM_REPLY_TO } from '@/lib/admin'
 import { FOLLOW_UP_SEQUENCE, OUTREACH_MAILING_ADDRESS, OUTREACH_SENDER_NAME, TEMPLATES, normalizeTemplateId, renderTemplate, renderTemplateText, type TemplateId } from '@/lib/outreach-templates'
 
 /** Statuses that mean "don't email this address as a new lead again". */
-export const CONTACTED_STATUSES = ['sent', 'queued', 'skipped_active', 'unsubscribed', 'undeliverable']
+/** 'stopped' = the admin stopped the sequence by hand (usually because they replied). */
+export const CONTACTED_STATUSES = ['sent', 'queued', 'skipped_active', 'unsubscribed', 'undeliverable', 'stopped']
 
 export const MISSING_ADDRESS_ERROR =
   'Add GlowUp\'s mailing address (OUTREACH_MAILING_ADDRESS in src/lib/outreach-templates.ts) before sending — the law requires it in every sales email.'
