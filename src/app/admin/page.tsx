@@ -122,6 +122,8 @@ interface CampaignRow {
   status: string;
   signed_up: boolean;
   sent_at: string | null;
+  follow_up_count: number | null;
+  last_follow_up_at: string | null;
   created_at: string;
 }
 
@@ -641,7 +643,7 @@ export default function AdminPage() {
             {/* The 4-email sequence */}
             <div style={{ marginBottom: 'var(--space-4)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>Email sequence — new leads get email 1; 2–4 go out from the Follow-Ups tab</label>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>Email sequence — new leads get email 1; 2–4 go out automatically each morning</label>
                 <a
                   href="/admin/outreach-preview"
                   target="_blank"
@@ -904,7 +906,7 @@ export default function AdminPage() {
           /* Auto Follow-Ups Tab */
           <div>
             <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: 'var(--space-4)', lineHeight: 1.6 }}>
-              Salons that haven't signed up or unsubscribed get the rest of the sequence: <strong>email 2</strong> three days after email 1, <strong>email 3</strong> five days after that, and <strong>email 4</strong> (the last) seven days later. Only salons whose next email is due are listed.
+              Salons that haven't signed up or unsubscribed get the rest of the sequence: <strong>email 2</strong> three days after email 1, <strong>email 3</strong> five days after that, and <strong>email 4</strong> (the last) seven days later. The daily send at 10 AM UTC sends these automatically; use the button below to send the ones due now without waiting. Salons whose address now owns a GlowUp salon are counted as signed up and stop getting emails.
             </p>
 
             {followUpLoading ? (
@@ -982,14 +984,14 @@ export default function AdminPage() {
                     </thead>
                     <tbody>
                       {followUpCandidates.map((c) => {
-                        const next = FOLLOW_UP_SEQUENCE[(c as any).follow_up_count || 0]; const nextTemplate = next ? `${OUTREACH_TEMPLATES[next.templateId].step}. ${OUTREACH_TEMPLATES[next.templateId].name}` : '—';
+                        const next = FOLLOW_UP_SEQUENCE[c.follow_up_count || 0]; const nextTemplate = next ? `${OUTREACH_TEMPLATES[next.templateId].step}. ${OUTREACH_TEMPLATES[next.templateId].name}` : '—';
                         return (
                           <tr key={c.id}>
                             <td><strong>{c.salon_name}</strong></td>
                             <td>{c.owner_name}</td>
                             <td style={{ fontSize: '12px' }}>{c.owner_email}</td>
                             <td className={styles.dateCell}>{c.sent_at ? localeDateStr(new Date(c.sent_at), { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</td>
-                            <td style={{ textAlign: 'center' }}>{(c as any).follow_up_count || 0}/{FOLLOW_UP_SEQUENCE.length}</td>
+                            <td style={{ textAlign: 'center' }}>{c.follow_up_count || 0}/{FOLLOW_UP_SEQUENCE.length}</td>
                             <td style={{ fontSize: '12px' }}>{nextTemplate}</td>
                           </tr>
                         );
@@ -1008,11 +1010,21 @@ export default function AdminPage() {
             ) : campaigns.length === 0 ? (
               <div style={{ textAlign: 'center', padding: 'var(--space-8)', color: 'var(--text-tertiary)' }}>No outreach campaigns yet</div>
             ) : (() => {
+              // Same rules as dueFollowUps in lib/outreach-send: each follow-up is
+              // due daysAfterPrevious days after the last email, and the sequence
+              // ends once all of FOLLOW_UP_SEQUENCE has gone out
+              const unsubscribedEmails = new Set(campaigns.filter(c => c.status === 'unsubscribed').map(c => c.owner_email.toLowerCase()));
+              const inSequence = campaigns.filter(c => c.status === 'sent' && !c.signed_up && !unsubscribedEmails.has(c.owner_email.toLowerCase()));
+              const isDue = (c: CampaignRow) => {
+                const step = FOLLOW_UP_SEQUENCE[c.follow_up_count || 0];
+                const last = c.last_follow_up_at || c.sent_at;
+                return !!step && !!last && Date.now() - new Date(last).getTime() >= step.daysAfterPrevious * 86400000;
+              };
               const signedUp = campaigns.filter(c => c.signed_up);
-              const needsFollowUp = campaigns.filter(c => c.status === 'sent' && !c.signed_up && (c as any).follow_up_count < 2 && c.sent_at && Date.now() - new Date(c.sent_at).getTime() > 7 * 86400000);
-              const waiting = campaigns.filter(c => c.status === 'sent' && !c.signed_up && (!c.sent_at || Date.now() - new Date(c.sent_at).getTime() <= 7 * 86400000));
+              const maxedOut = inSequence.filter(c => (c.follow_up_count || 0) >= FOLLOW_UP_SEQUENCE.length);
+              const needsFollowUp = inSequence.filter(c => (c.follow_up_count || 0) < FOLLOW_UP_SEQUENCE.length && isDue(c));
+              const waiting = inSequence.filter(c => (c.follow_up_count || 0) < FOLLOW_UP_SEQUENCE.length && !isDue(c));
               const queued = campaigns.filter(c => c.status === 'queued');
-              const maxedOut = campaigns.filter(c => c.status === 'sent' && !c.signed_up && (c as any).follow_up_count >= 2);
 
               type PipeFilter = 'all' | 'signed_up' | 'needs_followup' | 'waiting' | 'queued' | 'maxed';
               const getFiltered = () => {
@@ -1032,10 +1044,10 @@ export default function AdminPage() {
                   <div style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-4)', flexWrap: 'wrap' }}>
                     {[
                       { label: 'Signed Up 🎉', count: signedUp.length, color: '#22c55e', key: 'signed_up' },
-                      { label: 'Needs Follow-Up ⏰', count: needsFollowUp.length, color: '#f59e0b', key: 'needs_followup' },
+                      { label: 'Follow-Up Due ⏰', count: needsFollowUp.length, color: '#f59e0b', key: 'needs_followup' },
                       { label: 'Waiting ✉️', count: waiting.length, color: '#60a5fa', key: 'waiting' },
                       { label: 'Queued ⏳', count: queued.length, color: '#818cf8', key: 'queued' },
-                      { label: 'Maxed Out 🚫', count: maxedOut.length, color: '#6b7280', key: 'maxed' },
+                      { label: 'Sequence Done 🚫', count: maxedOut.length, color: '#6b7280', key: 'maxed' },
                       { label: 'Total', count: campaigns.length, color: '#a78bfa', key: 'all' },
                     ].map(s => (
                       <div
@@ -1122,7 +1134,7 @@ export default function AdminPage() {
                                 {c.signed_up ? '🎉 Signed Up' : c.status === 'sent' ? '✉️ Sent' : c.status === 'queued' ? '⏳ Queued' : c.status === 'skipped_active' ? '✅ Already Active' : '❌ ' + c.status}
                               </span>
                             </td>
-                            <td style={{ textAlign: 'center', fontSize: '12px' }}>{(c as any).follow_up_count || 0}</td>
+                            <td style={{ textAlign: 'center', fontSize: '12px' }}>{c.follow_up_count || 0}/{FOLLOW_UP_SEQUENCE.length}</td>
                             <td className={styles.dateCell}>{c.sent_at ? localeDateStr(new Date(c.sent_at), { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</td>
                           </tr>
                         ))}

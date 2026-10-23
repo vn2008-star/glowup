@@ -1,14 +1,15 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { verifyCronRequest } from '@/lib/cron-auth'
-import { outreachReady, sendOutreachEmail, unsubscribedAmong } from '@/lib/outreach-send'
+import { DAILY_LIMIT, dueFollowUps, outreachReady, sendFollowUps, sendOutreachEmail, sentTodayCount, unsubscribedAmong } from '@/lib/outreach-send'
 
 // ─── Outreach Queue Processor (Cron-triggered) ───
-// Runs daily at 10 AM. Picks up to 95 queued outreach leads and sends them
-// email 1 of the sequence (follow-ups go out from the admin Follow-Ups tab).
-// This respects Resend's free tier limit of 100 emails/day.
+// Runs daily at 10 AM UTC. Sends the follow-ups that are due first (emails
+// 2-4 of the sequence — without this they only went out when someone opened
+// the admin Follow-Ups tab), then fills the rest of the day's 95 with email 1
+// to queued leads. This respects Resend's free tier limit of 100 emails/day.
 
-const DAILY_LIMIT = 95
+export const maxDuration = 60
 
 export async function GET(request: Request) {
   // Auth: only allow Vercel Cron or manual call with CRON_SECRET
@@ -26,16 +27,8 @@ export async function GET(request: Request) {
   )
 
   // Check how many we've already sent today (in case manual sends happened)
-  const todayStart = new Date()
-  todayStart.setHours(0, 0, 0, 0)
-
-  const [{ count: sentTodayCount }, { count: followUpsToday }] = await Promise.all([
-    supabase.from('outreach_campaigns').select('*', { count: 'exact', head: true }).eq('status', 'sent').gte('sent_at', todayStart.toISOString()),
-    supabase.from('outreach_campaigns').select('*', { count: 'exact', head: true }).gte('last_follow_up_at', todayStart.toISOString()),
-  ])
-
-  const sentToday = (sentTodayCount || 0) + (followUpsToday || 0)
-  const canSend = Math.max(0, DAILY_LIMIT - sentToday)
+  const sentToday = await sentTodayCount(supabase)
+  let canSend = Math.max(0, DAILY_LIMIT - sentToday)
 
   if (canSend === 0) {
     return NextResponse.json({
@@ -45,33 +38,35 @@ export async function GET(request: Request) {
     })
   }
 
-  // Fetch queued leads (oldest first)
-  const { data: queuedLeads } = await supabase
-    .from('outreach_campaigns')
-    .select('*')
-    .eq('status', 'queued')
-    .order('created_at', { ascending: true })
-    .limit(canSend)
+  // 1. Follow-ups first: they go to people who already heard from us, on a
+  // schedule; new leads can wait a day without losing anything
+  const followUps = await sendFollowUps(supabase, await dueFollowUps(supabase, canSend), canSend)
+  const followUpsSent = followUps.filter(r => r.status === 'sent').length
+  const followUpsFailed = followUps.filter(r => r.status === 'failed').length
+  canSend -= followUpsSent
 
-  if (!queuedLeads || queuedLeads.length === 0) {
-    return NextResponse.json({
-      message: 'No queued leads to process',
-      sent_today: sentToday,
-      processed: 0,
-    })
-  }
+  // 2. Email 1 to queued leads (oldest first) with what's left
+  const { data: queuedLeads } = canSend > 0
+    ? await supabase
+      .from('outreach_campaigns')
+      .select('*')
+      .eq('status', 'queued')
+      .order('created_at', { ascending: true })
+      .limit(canSend)
+    : { data: [] }
 
   // Unsubscribing also flips queued rows, but double-check at send time
-  const unsubscribed = await unsubscribedAmong(supabase, queuedLeads.map(l => l.owner_email))
+  const unsubscribed = await unsubscribedAmong(supabase, (queuedLeads || []).map(l => l.owner_email))
 
   let sent = 0
   let failed = 0
 
   const BATCH_SIZE = 10
   const BATCH_DELAY = 1000
+  const leads = queuedLeads || []
 
-  for (let i = 0; i < queuedLeads.length; i += BATCH_SIZE) {
-    const batch = queuedLeads.slice(i, i + BATCH_SIZE)
+  for (let i = 0; i < leads.length; i += BATCH_SIZE) {
+    const batch = leads.slice(i, i + BATCH_SIZE)
 
     for (const lead of batch) {
       if (unsubscribed.has(String(lead.owner_email).toLowerCase())) {
@@ -101,7 +96,7 @@ export async function GET(request: Request) {
     }
 
     // Throttle between batches
-    if (i + BATCH_SIZE < queuedLeads.length) {
+    if (i + BATCH_SIZE < leads.length) {
       await new Promise(resolve => setTimeout(resolve, BATCH_DELAY))
     }
   }
@@ -113,8 +108,10 @@ export async function GET(request: Request) {
     .eq('status', 'queued')
 
   return NextResponse.json({
-    message: `Queue batch processed: ${sent} sent, ${failed} failed`,
-    processed: sent + failed,
+    message: `Outreach processed: ${followUpsSent} follow-ups, ${sent} new leads sent, ${followUpsFailed + failed} failed`,
+    processed: followUps.length + sent + failed,
+    follow_ups_sent: followUpsSent,
+    follow_ups_failed: followUpsFailed,
     sent,
     failed,
     remaining_queued: remainingQueued || 0,

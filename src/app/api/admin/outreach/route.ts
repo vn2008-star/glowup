@@ -1,19 +1,18 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { createClient as createServiceClient, type SupabaseClient } from '@supabase/supabase-js'
-import { TEMPLATES, SMS_TEMPLATES, FOLLOW_UP_SEQUENCE } from '@/lib/outreach-templates'
-import { CONTACTED_STATUSES, MISSING_ADDRESS_ERROR, outreachReady, sendOutreachEmail, unsubscribedAmong } from '@/lib/outreach-send'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { TEMPLATES, SMS_TEMPLATES } from '@/lib/outreach-templates'
+import { CONTACTED_STATUSES, DAILY_LIMIT, MISSING_ADDRESS_ERROR, dueFollowUps, outreachReady, sendFollowUps, sendOutreachEmail, sentTodayCount } from '@/lib/outreach-send'
 
 // ─── Admin bulk outreach ───
 // Email 1 goes to new leads (or the daily queue, see process-outreach-queue);
-// emails 2-4 are follow-ups sent from the Follow-Ups tab once enough days have
-// passed (FOLLOW_UP_SEQUENCE). Texts are not sent from here: cold marketing
-// texts need prior consent, and our Twilio number doesn't deliver — the SMS
-// tab builds texts for the admin to send from their own phone.
+// emails 2-4 are follow-ups the same daily cron sends once enough days have
+// passed (FOLLOW_UP_SEQUENCE); the Follow-Ups tab can send due ones early.
+// Texts are not sent from here: cold marketing texts need prior consent, and
+// our Twilio number doesn't deliver — the SMS tab builds texts for the admin
+// to send from their own phone.
 
 export const maxDuration = 60
-
-const DAILY_LIMIT = 95 // Leave 5 buffer for follow-ups within Resend's 100/day free tier
 
 // Verify the current user is a platform admin
 async function verifyAdmin() {
@@ -32,47 +31,6 @@ function getSvc() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
-}
-
-// Helper: count how many outreach emails we've sent today
-async function getSentTodayCount(svc: SupabaseClient) {
-  const todayStart = new Date()
-  todayStart.setHours(0, 0, 0, 0)
-
-  const [{ count: firsts }, { count: followUps }] = await Promise.all([
-    svc.from('outreach_campaigns').select('*', { count: 'exact', head: true }).eq('status', 'sent').gte('sent_at', todayStart.toISOString()),
-    svc.from('outreach_campaigns').select('*', { count: 'exact', head: true }).gte('last_follow_up_at', todayStart.toISOString()),
-  ])
-
-  return (firsts || 0) + (followUps || 0)
-}
-
-type Campaign = {
-  id: string; salon_name: string; owner_name: string; owner_email: string; referral_code: string | null
-  sent_at: string | null; last_follow_up_at: string | null; follow_up_count: number | null; signed_up: boolean
-}
-
-/**
- * Sent campaigns whose next follow-up is due: no signup, not unsubscribed,
- * fewer than 3 follow-ups, and enough days since the last email.
- */
-async function dueFollowUps(svc: SupabaseClient, limit: number, ids?: string[]): Promise<Campaign[]> {
-  let q = svc.from('outreach_campaigns').select('*')
-    .eq('status', 'sent')
-    .eq('signed_up', false)
-    .lt('follow_up_count', FOLLOW_UP_SEQUENCE.length)
-    .order('sent_at', { ascending: true })
-    .limit(1000)
-  if (ids?.length) q = q.in('id', ids)
-  const { data } = await q
-  const now = Date.now()
-  const due = ((data || []) as Campaign[]).filter(c => {
-    const step = FOLLOW_UP_SEQUENCE[c.follow_up_count || 0]
-    const last = c.last_follow_up_at || c.sent_at
-    return step && last && now - new Date(last).getTime() >= step.daysAfterPrevious * 86400000
-  })
-  const unsubscribed = await unsubscribedAmong(svc, due.map(c => c.owner_email))
-  return due.filter(c => !unsubscribed.has(c.owner_email.toLowerCase())).slice(0, limit)
 }
 
 // GET — list past outreach campaigns
@@ -144,7 +102,7 @@ export async function GET(request: Request) {
       .select('*', { count: 'exact', head: true })
       .eq('status', 'queued')
 
-    const sentToday = await getSentTodayCount(svc)
+    const sentToday = await sentTodayCount(svc)
     const remaining = Math.max(0, DAILY_LIMIT - sentToday)
 
     const { count: totalSent } = await svc
@@ -219,7 +177,7 @@ async function handleBulkSend(body: {
   const genCode = () => 'CR-' + Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
 
   // Check how many we can send today
-  const sentToday = await getSentTodayCount(svc)
+  const sentToday = await sentTodayCount(svc)
   let remainingToday = Math.max(0, DAILY_LIMIT - sentToday)
 
   // Look every address up in bulk. One query per lead (the old way) took
@@ -348,50 +306,9 @@ async function handleFollowUps(body: { senderName?: string; campaignIds?: string
     return NextResponse.json({ summary: { total: 0, sent: 0, skipped: 0, failed: 0 }, results: [] })
   }
 
-  const results: Array<{ salon_name: string; owner_email: string; status: string; template: string }> = []
-
   // Respect daily limit for follow-ups too
-  const sentToday = await getSentTodayCount(svc)
-  let remainingToday = Math.max(0, DAILY_LIMIT - sentToday)
-
-  const BATCH_SIZE = 10
-  const BATCH_DELAY = 1000
-
-  for (let i = 0; i < candidates.length; i += BATCH_SIZE) {
-    const batch = candidates.slice(i, i + BATCH_SIZE)
-
-    for (const campaign of batch) {
-      if (remainingToday <= 0) {
-        results.push({ salon_name: campaign.salon_name, owner_email: campaign.owner_email, status: 'deferred', template: 'tomorrow' })
-        continue
-      }
-
-      const templateId = FOLLOW_UP_SEQUENCE[campaign.follow_up_count || 0].templateId
-      const sendErr = await sendOutreachEmail({
-        to: campaign.owner_email, templateId, salonName: campaign.salon_name, ownerName: campaign.owner_name,
-        referralCode: campaign.referral_code, senderName,
-      })
-
-      if (!sendErr) {
-        remainingToday--
-        await svc.from('outreach_campaigns')
-          .update({
-            follow_up_count: (campaign.follow_up_count || 0) + 1,
-            last_follow_up_at: new Date().toISOString(),
-            last_template_id: templateId,
-          })
-          .eq('id', campaign.id)
-      } else {
-        console.error(`Follow-up failed for ${campaign.owner_email}:`, sendErr)
-      }
-
-      results.push({ salon_name: campaign.salon_name, owner_email: campaign.owner_email, status: sendErr ? 'failed' : 'sent', template: templateId })
-    }
-
-    if (i + BATCH_SIZE < candidates.length) {
-      await new Promise(resolve => setTimeout(resolve, BATCH_DELAY))
-    }
-  }
+  const remainingToday = Math.max(0, DAILY_LIMIT - await sentTodayCount(svc))
+  const results = await sendFollowUps(svc, candidates, remainingToday, senderName)
 
   return NextResponse.json({
     summary: {
