@@ -150,7 +150,6 @@ export default function AdminPage() {
   // Outreach state
   const [outreachTab, setOutreachTab] = useState<'upload' | 'sms' | 'history' | 'followups'>('upload');
   const [csvLeads, setCsvLeads] = useState<OutreachLead[]>([]);
-  const [senderEmail, setSenderEmail] = useState('');
   const [sending, setSending] = useState(false);
   const [sendResults, setSendResults] = useState<{ summary: { total: number; sent: number; queued?: number; skipped: number; failed: number }; results: OutreachResult[] } | null>(null);
   const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
@@ -338,7 +337,6 @@ export default function AdminPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           leads: csvLeads,
-          senderEmail: senderEmail.trim() || undefined,
         }),
       });
 
@@ -638,20 +636,6 @@ export default function AdminPage() {
             <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: 'var(--space-4)' }}>
               Upload a CSV with salon leads. Each row needs: <code style={{ background: 'var(--bg-surface)', padding: '2px 6px', borderRadius: '4px', fontSize: '12px' }}>salon_name, owner_name, owner_email</code>. Optional: <code style={{ background: 'var(--bg-surface)', padding: '2px 6px', borderRadius: '4px', fontSize: '12px' }}>phone, city, state</code>
             </p>
-
-            {/* Sender config */}
-            <div style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-4)', flexWrap: 'wrap' }}>
-              <div style={{ flex: '1 1 200px' }}>
-                <label style={{ fontSize: '12px', fontWeight: 600, display: 'block', marginBottom: '4px', color: 'var(--text-secondary)' }}>Sender Email (optional)</label>
-                <input
-                  type="email"
-                  value={senderEmail}
-                  onChange={(e) => setSenderEmail(e.target.value)}
-                  placeholder="e.g. james@glowup.com"
-                  style={{ width: '100%', padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-default)', background: 'var(--bg-surface)', color: 'var(--text-primary)', fontSize: '13px' }}
-                />
-              </div>
-            </div>
 
             {/* The 4-email sequence */}
             <div style={{ marginBottom: 'var(--space-4)' }}>

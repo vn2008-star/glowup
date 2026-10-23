@@ -209,7 +209,32 @@ export async function POST(request: Request) {
         .eq('code', clientReferralCode.trim())
         .single()
 
-      if (crefCode) {
+      // GlowUp's own sales outreach (admin Bulk Salon Outreach) also hands
+      // out CR- codes, to tie a signup back to the email. Those have no client
+      // behind them: logging a client reward would mint a $ GlowUp credit on
+      // the salon's first payment and email it to the code's referrer_email.
+      const { data: outreachRows } = crefCode
+        ? await supabase.from('outreach_campaigns').select('id').eq('referral_code', crefCode.code).limit(1)
+        : { data: null }
+      const fromOutreach = !!outreachRows?.length
+
+      if (crefCode && fromOutreach) {
+        await supabase
+          .from('client_referral_codes')
+          .update({ uses: (crefCode.uses || 0) + 1 })
+          .eq('id', crefCode.id)
+
+        // Mark the outreach campaign signed up (stops the follow-ups)
+        await supabase
+          .from('outreach_campaigns')
+          .update({
+            signed_up: true,
+            signed_up_at: new Date().toISOString(),
+            signed_up_tenant_id: tenant.id,
+          })
+          .eq('referral_code', crefCode.code)
+          .eq('signed_up', false)
+      } else if (crefCode) {
         // Get the platform reward amount
         const { data: setting } = await supabase
           .from('platform_settings')
@@ -235,19 +260,6 @@ export async function POST(request: Request) {
           .from('client_referral_codes')
           .update({ uses: (crefCode.uses || 0) + 1 })
           .eq('id', crefCode.id)
-
-        // Auto-mark outreach campaign as signed up (close the loop!)
-        if (crefCode.referred_owner_email) {
-          await supabase
-            .from('outreach_campaigns')
-            .update({
-              signed_up: true,
-              signed_up_at: new Date().toISOString(),
-              signed_up_tenant_id: tenant.id,
-            })
-            .eq('referral_code', clientReferralCode.trim())
-            .eq('signed_up', false)
-        }
       }
     } catch (crefErr) {
       console.error('Client referral processing error:', crefErr)

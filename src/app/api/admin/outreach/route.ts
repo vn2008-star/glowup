@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { PLATFORM_REPLY_TO } from '@/lib/admin'
 import { TEMPLATES, SMS_TEMPLATES, OUTREACH_SENDER_NAME } from '@/lib/outreach-templates'
 import { CONTACTED_STATUSES, DAILY_LIMIT, MISSING_ADDRESS_ERROR, dueFollowUps, junkEmails, outreachReady, sendFollowUps, sentTodayCount } from '@/lib/outreach-send'
 
@@ -199,9 +200,8 @@ export async function POST(request: Request) {
 async function handleBulkSend(body: {
   leads: Array<{ salon_name: string; owner_name: string; owner_email: string; phone?: string; city?: string; state?: string }>;
   senderName?: string;
-  senderEmail?: string;
 }) {
-  const { leads, senderName, senderEmail } = body
+  const { leads, senderName } = body
   // New leads always start the sequence at email 1; 2-4 go out as follow-ups
   const templateId = 'intro'
 
@@ -287,7 +287,9 @@ async function handleBulkSend(body: {
     referralRows.push({
       code,
       referrer_name: senderName || OUTREACH_SENDER_NAME,
-      referrer_email: senderEmail || 'outreach@glowup.com',
+      // Required column. Not a real referrer: setup-tenant recognises outreach
+      // codes and gives no client reward. GlowUp's own inbox, just in case.
+      referrer_email: PLATFORM_REPLY_TO,
       referred_salon_name: base.salon_name,
       referred_owner_name: ownerName,
       referred_owner_email: email,
