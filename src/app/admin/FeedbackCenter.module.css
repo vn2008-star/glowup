@@ -99,8 +99,8 @@
 }
 .tabActive .tabCount {
   background: currentColor;
-  color: white;
-  /* Override with a small pseudo trick — use opacity instead */
+  /* Not white: the All tab's color is --text-primary, which is white in dark mode */
+  color: var(--bg-card);
   opacity: 0.85;
 }
 
