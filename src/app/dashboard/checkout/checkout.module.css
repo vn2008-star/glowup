@@ -1528,7 +1528,9 @@
 }
 .formSelect,
 .formInput {
-  background: var(--bg-surface);
+  /* background-color, not the shorthand: the shorthand resets
+     background-repeat, so the dark-mode select chevron tiled */
+  background-color: var(--bg-surface);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   color: var(--text-primary);
@@ -1537,6 +1539,8 @@
   width: 100%;
   transition: border-color 0.15s;
 }
+/* Room for the global select chevron */
+.formSelect { padding-right: var(--space-7, 2rem); }
 .formSelect:focus,
 .formInput:focus {
   outline: none;
