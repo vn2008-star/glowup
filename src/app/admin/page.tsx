@@ -326,7 +326,7 @@ export default function AdminPage() {
 
   async function handleSendOutreach() {
     if (csvLeads.length === 0) return;
-    if (!confirm(`Queue ${csvLeads.length} salons for outreach? The daily send (10 AM UTC) emails 95 a day, follow-ups first, starting with tomorrow's run. Website placeholders and vendor addresses are skipped.`)) return;
+    if (!confirm(`Queue ${csvLeads.length} salons for outreach? The daily send (17:00 UTC, 9-10 AM Pacific) emails 95 a day, follow-ups first, starting with tomorrow's run. Website placeholders and vendor addresses are skipped.`)) return;
 
     setSending(true);
     setSendResults(null);
@@ -847,7 +847,7 @@ export default function AdminPage() {
                     color: '#818cf8',
                     lineHeight: 1.5,
                   }}>
-                    ⏳ <strong>{sendResults.summary.queued} salons queued</strong> — the daily send at 10 AM UTC starts with them tomorrow. It sends <strong>95 emails a day</strong> in all, due follow-ups first, so the first emails take at least {Math.ceil((sendResults.summary.queued || 0) / 95)} days and the full 4-email sequence about {Math.ceil((sendResults.summary.queued || 0) * 4 / 95)}. Addresses whose domain can't receive mail are dropped at send time.
+                    ⏳ <strong>{sendResults.summary.queued} salons queued</strong> — the daily send at 17:00 UTC (9-10 AM Pacific) starts with them tomorrow. It sends <strong>95 emails a day</strong> in all, due follow-ups first, so the first emails take at least {Math.ceil((sendResults.summary.queued || 0) / 95)} days and the full 4-email sequence about {Math.ceil((sendResults.summary.queued || 0) * 4 / 95)}. Addresses whose domain can't receive mail are dropped at send time.
                   </div>
                 )}
                 <div className={styles.tableWrap} style={{ maxHeight: '300px', overflow: 'auto' }}>
@@ -899,7 +899,7 @@ export default function AdminPage() {
           /* Auto Follow-Ups Tab */
           <div>
             <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: 'var(--space-4)', lineHeight: 1.6 }}>
-              Salons that haven't signed up or unsubscribed get the rest of the sequence: <strong>email 2</strong> three days after email 1, <strong>email 3</strong> five days after that, and <strong>email 4</strong> (the last) seven days later. The daily send at 10 AM UTC sends these automatically; use the button below to send the ones due now without waiting. Salons whose address now owns a GlowUp salon are counted as signed up and stop getting emails.
+              Salons that haven't signed up or unsubscribed get the rest of the sequence: <strong>email 2</strong> three days after email 1, <strong>email 3</strong> five days after that, and <strong>email 4</strong> (the last) seven days later. The daily send at 17:00 UTC (9-10 AM Pacific) sends these automatically; use the button below to send the ones due now without waiting. Salons whose address now owns a GlowUp salon are counted as signed up and stop getting emails.
             </p>
 
             {followUpLoading ? (

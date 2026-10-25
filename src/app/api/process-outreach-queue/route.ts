@@ -7,7 +7,8 @@ import {
 } from '@/lib/outreach-send'
 
 // ─── Outreach Queue Processor (Cron-triggered) ───
-// Runs daily at 10 AM UTC and is the only place outreach goes out in bulk.
+// Runs daily at 17:00 UTC (10 AM Pacific in summer, 9 AM in winter) so mail
+// lands during business hours, and is the only place outreach goes out in bulk.
 // Follow-ups that are due go first (emails 2-4: they're to people who already
 // heard from us, on a schedule), then email 1 to queued leads fills the rest
 // of the day's 95 — Resend's free tier is 100/day.
