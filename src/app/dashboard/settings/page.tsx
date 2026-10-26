@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
+import QRCode from "qrcode";
 import { useTenant } from "@/lib/tenant-context";
 import { queryData, cachedQuery, uploadImage } from "@/lib/api";
 import { US_TIMEZONES, timezoneFromAddress } from "@/lib/tz";
@@ -66,6 +67,8 @@ export default function SettingsPage() {
   // reason to say so.
   const [loading, setLoading] = useState(!tenant);
   const [linkCopied, setLinkCopied] = useState(false);
+  // Booking-link QR, generated in the browser from the same URL as the link field
+  const [bookingQr, setBookingQr] = useState("");
   const [editingSlug, setEditingSlug] = useState(false);
   const [slugDraft, setSlugDraft] = useState('');
   const [slugError, setSlugError] = useState('');
@@ -283,6 +286,27 @@ export default function SettingsPage() {
     seededFor.current = tenant.id;
     loadSettings();
   }, [tenant, loadSettings]);
+
+  // Regenerated when the slug changes so a printed code never points at a dead URL
+  useEffect(() => {
+    if (!tenant?.slug) return;
+    QRCode.toDataURL(`${window.location.origin}/book/${tenant.slug}`, { width: 1024, margin: 2, errorCorrectionLevel: "M" })
+      .then(setBookingQr)
+      .catch(() => setBookingQr(""));
+  }, [tenant?.slug]);
+
+  const downloadBookingQr = async (format: "png" | "svg") => {
+    if (!tenant?.slug) return;
+    const url = `${window.location.origin}/book/${tenant.slug}`;
+    const href = format === "png"
+      ? bookingQr
+      : URL.createObjectURL(new Blob([await QRCode.toString(url, { type: "svg", margin: 2 })], { type: "image/svg+xml" }));
+    const a = document.createElement("a");
+    a.href = href;
+    a.download = `${tenant.slug}-booking-qr.${format}`;
+    a.click();
+    if (format === "svg") setTimeout(() => URL.revokeObjectURL(href), 1000);
+  };
 
   // Fetch client count for cost estimator
   useEffect(() => {
@@ -627,6 +651,28 @@ export default function SettingsPage() {
               Preview booking page →
             </a>
           </div>
+
+          {/* QR code for the counter, mirror, business cards and flyers */}
+          {bookingQr && (
+            <div className={styles.bookingQrRow}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={bookingQr} alt={`QR code for ${tenant.name ?? "your"} booking page`} className={styles.bookingQrImg} />
+              <div>
+                <label className="label" style={{ margin: 0 }}>QR code</label>
+                <p style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)", margin: "var(--space-1) 0 var(--space-3)" }}>
+                  Clients scan it with their phone camera to open your booking page. Print it for the front desk, mirrors, business cards or flyers.
+                </p>
+                <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+                  <button className="btn btn-secondary" style={{ fontSize: "var(--text-sm)" }} onClick={() => downloadBookingQr("png")}>
+                    Download PNG
+                  </button>
+                  <button className="btn btn-secondary" style={{ fontSize: "var(--text-sm)" }} onClick={() => downloadBookingQr("svg")}>
+                    Download SVG (print)
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* The accent colour on the client-facing booking and manage pages */}
           <div style={{ marginTop: "var(--space-5)", paddingTop: "var(--space-4)", borderTop: "1px solid var(--border-subtle)" }}>
