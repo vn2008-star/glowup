@@ -78,15 +78,24 @@ const ClipboardIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="8" y="2" width="8" height="4" rx="1" ry="1" /><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><path d="M12 11h4" /><path d="M12 16h4" /><path d="M8 11h.01" /><path d="M8 16h.01" /></svg>
 );
 
-// Grouped by job: getting started, the day's appointments, the people who book
-// them, bringing new ones in, and running the business. The first group has no
-// heading — it's the entry points.
+// Grouped by job: getting started, running the business, the day's
+// appointments, the people who book them, and bringing new ones in. The first
+// group has no heading — it's the entry points.
 const navGroups: { label?: string; items: { href: string; icon: React.ReactNode; key: string }[] }[] = [
   {
     items: [
       { href: "/dashboard/quick-start", icon: <RocketIcon />, key: "quickStart" },
       { href: "/dashboard", icon: <HomeIcon />, key: "home" },
       { href: "/dashboard/checkout", icon: <FrontDeskIcon />, key: "frontDesk" },
+    ],
+  },
+  {
+    label: "navGroupBusiness",
+    items: [
+      { href: "/dashboard/staff", icon: <StaffIcon />, key: "staff" },
+      { href: "/dashboard/services", icon: <ScissorsIcon />, key: "services" },
+      { href: "/dashboard/reports", icon: <BarChartIcon />, key: "reports" },
+      { href: "/dashboard/settings", icon: <SettingsIcon />, key: "settings" },
     ],
   },
   {
@@ -112,15 +121,6 @@ const navGroups: { label?: string; items: { href: string; icon: React.ReactNode;
       { href: "/dashboard/social", icon: <ShareIcon />, key: "social" },
       { href: "/dashboard/gallery", icon: <CameraIcon />, key: "gallery" },
       { href: "/dashboard/referrals", icon: <MegaphoneIcon />, key: "referrals" },
-    ],
-  },
-  {
-    label: "navGroupBusiness",
-    items: [
-      { href: "/dashboard/services", icon: <ScissorsIcon />, key: "services" },
-      { href: "/dashboard/staff", icon: <StaffIcon />, key: "staff" },
-      { href: "/dashboard/reports", icon: <BarChartIcon />, key: "reports" },
-      { href: "/dashboard/settings", icon: <SettingsIcon />, key: "settings" },
     ],
   },
 ];
