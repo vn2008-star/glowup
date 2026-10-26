@@ -152,7 +152,11 @@
     "referrals": "Refer & Earn",
     "settings": "Settings",
     "checkout": "Checkout",
-    "frontDesk": "Front Desk"
+    "frontDesk": "Front Desk",
+    "navGroupSchedule": "Schedule",
+    "navGroupClients": "Clients",
+    "navGroupMarketing": "Marketing",
+    "navGroupBusiness": "Business"
   },
   "calendarPage": {
     "title": "Calendar",

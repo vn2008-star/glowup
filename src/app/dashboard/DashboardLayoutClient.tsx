@@ -78,24 +78,51 @@ const ClipboardIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="8" y="2" width="8" height="4" rx="1" ry="1" /><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><path d="M12 11h4" /><path d="M12 16h4" /><path d="M8 11h.01" /><path d="M8 16h.01" /></svg>
 );
 
-const navKeys = [
-  { href: "/dashboard/quick-start", icon: <RocketIcon />, key: "quickStart" },
-  { href: "/dashboard/checkout", icon: <FrontDeskIcon />, key: "frontDesk" },
-  { href: "/dashboard", icon: <HomeIcon />, key: "home" },
-  { href: "/dashboard/calendar", icon: <CalendarIcon />, key: "calendar" },
-  { href: "/dashboard/booking", icon: <ClipboardIcon />, key: "booking" },
-  { href: "/dashboard/campaigns", icon: <PartyIcon />, key: "holidays" },
-  { href: "/dashboard/staff", icon: <StaffIcon />, key: "staff" },
-  { href: "/dashboard/clients", icon: <UsersIcon />, key: "clients" },
-  { href: "/dashboard/services", icon: <ScissorsIcon />, key: "services" },
-  { href: "/dashboard/packages", icon: <GiftIcon />, key: "packages" },
-  { href: "/dashboard/gallery", icon: <CameraIcon />, key: "gallery" },
-  { href: "/dashboard/social", icon: <ShareIcon />, key: "social" },
-  { href: "/dashboard/loyalty", icon: <HeartIcon />, key: "loyalty" },
-  { href: "/dashboard/inbox", icon: <InboxIcon />, key: "inbox" },
-  { href: "/dashboard/reports", icon: <BarChartIcon />, key: "reports" },
-  { href: "/dashboard/referrals", icon: <MegaphoneIcon />, key: "referrals" },
-  { href: "/dashboard/settings", icon: <SettingsIcon />, key: "settings" },
+// Grouped by job: getting started, the day's appointments, the people who book
+// them, bringing new ones in, and running the business. The first group has no
+// heading — it's the entry points.
+const navGroups: { label?: string; items: { href: string; icon: React.ReactNode; key: string }[] }[] = [
+  {
+    items: [
+      { href: "/dashboard/quick-start", icon: <RocketIcon />, key: "quickStart" },
+      { href: "/dashboard", icon: <HomeIcon />, key: "home" },
+      { href: "/dashboard/checkout", icon: <FrontDeskIcon />, key: "frontDesk" },
+    ],
+  },
+  {
+    label: "navGroupSchedule",
+    items: [
+      { href: "/dashboard/calendar", icon: <CalendarIcon />, key: "calendar" },
+      { href: "/dashboard/booking", icon: <ClipboardIcon />, key: "booking" },
+    ],
+  },
+  {
+    label: "navGroupClients",
+    items: [
+      { href: "/dashboard/clients", icon: <UsersIcon />, key: "clients" },
+      { href: "/dashboard/inbox", icon: <InboxIcon />, key: "inbox" },
+      { href: "/dashboard/loyalty", icon: <HeartIcon />, key: "loyalty" },
+      { href: "/dashboard/packages", icon: <GiftIcon />, key: "packages" },
+    ],
+  },
+  {
+    label: "navGroupMarketing",
+    items: [
+      { href: "/dashboard/campaigns", icon: <PartyIcon />, key: "holidays" },
+      { href: "/dashboard/social", icon: <ShareIcon />, key: "social" },
+      { href: "/dashboard/gallery", icon: <CameraIcon />, key: "gallery" },
+      { href: "/dashboard/referrals", icon: <MegaphoneIcon />, key: "referrals" },
+    ],
+  },
+  {
+    label: "navGroupBusiness",
+    items: [
+      { href: "/dashboard/services", icon: <ScissorsIcon />, key: "services" },
+      { href: "/dashboard/staff", icon: <StaffIcon />, key: "staff" },
+      { href: "/dashboard/reports", icon: <BarChartIcon />, key: "reports" },
+      { href: "/dashboard/settings", icon: <SettingsIcon />, key: "settings" },
+    ],
+  },
 ];
 
 /**
@@ -286,17 +313,24 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
           </button>
         </div>
         <nav className={styles.sidebarNav}>
-          {navKeys.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`${styles.navItem} ${pathname === item.href ? styles.navItemActive : ''} ${item.key === 'quickStart' && pathname !== item.href ? styles.navItemQuickStart : ''}`}
-              onClick={handleNavClick}
-            >
-              <NavPendingHint />
-              {item.icon}
-              <span>{t(item.key as keyof typeof t)}</span>
-            </Link>
+          {navGroups.map((group, gi) => (
+            <div key={group.label ?? gi} className={styles.navGroup}>
+              {group.label && (
+                <p className={styles.navGroupLabel}>{t(group.label as keyof typeof t)}</p>
+              )}
+              {group.items.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`${styles.navItem} ${pathname === item.href ? styles.navItemActive : ''} ${item.key === 'quickStart' && pathname !== item.href ? styles.navItemQuickStart : ''}`}
+                  onClick={handleNavClick}
+                >
+                  <NavPendingHint />
+                  {item.icon}
+                  <span>{t(item.key as keyof typeof t)}</span>
+                </Link>
+              ))}
+            </div>
           ))}
         </nav>
         <div className={styles.sidebarFooter}>

@@ -152,7 +152,11 @@
     "referrals": "推荐",
     "settings": "设置",
     "checkout": "结账",
-    "frontDesk": "前台"
+    "frontDesk": "前台",
+    "navGroupSchedule": "日程",
+    "navGroupClients": "客户",
+    "navGroupMarketing": "营销",
+    "navGroupBusiness": "业务"
   },
   "calendarPage": {
     "title": "日历",

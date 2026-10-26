@@ -152,7 +152,11 @@
     "referrals": "Referidos",
     "settings": "Configuración",
     "checkout": "Cobro",
-    "frontDesk": "Recepción"
+    "frontDesk": "Recepción",
+    "navGroupSchedule": "Agenda",
+    "navGroupClients": "Clientes",
+    "navGroupMarketing": "Marketing",
+    "navGroupBusiness": "Negocio"
   },
   "calendarPage": {
     "title": "Calendario",

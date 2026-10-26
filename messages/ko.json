@@ -152,7 +152,11 @@
     "referrals": "추천",
     "settings": "설정",
     "checkout": "결제",
-    "frontDesk": "프론트 데스크"
+    "frontDesk": "프론트 데스크",
+    "navGroupSchedule": "일정",
+    "navGroupClients": "고객",
+    "navGroupMarketing": "마케팅",
+    "navGroupBusiness": "비즈니스"
   },
   "calendarPage": {
     "title": "캘린더",

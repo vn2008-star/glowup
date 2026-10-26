@@ -98,6 +98,24 @@
   gap: var(--space-1);
   overflow-y: auto;
 }
+.navGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.navGroup + .navGroup {
+  margin-top: var(--space-3);
+}
+.navGroupLabel {
+  margin: 0;
+  padding: 0 var(--space-4) var(--space-1);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted, var(--text-secondary));
+  opacity: 0.7;
+}
 .navItem {
   display: flex;
   align-items: center;
