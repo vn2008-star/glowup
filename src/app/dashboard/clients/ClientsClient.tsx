@@ -12,6 +12,7 @@ import type { Client, Service, Staff } from "@/lib/types";
 import { formatPhone, fmtDate, localeDateStr, downloadText } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ConsentBadge } from "@/components/ConsentBadge";
+import { CallButton } from "@/components/CallButton";
 import { localToUTC, todayInTz, DEFAULT_TZ } from "@/lib/tz";
 
 /* ── Masking helpers (mirrors API logic for "View as Technician" preview) ── */
@@ -993,6 +994,8 @@ export default function ClientsClient({ initialClients }: { initialClients: Clie
                 {selectedClient.status}
               </span>
               <p className={styles.profileSince}>Client since {formatDate(selectedClient.created_at) || "—"}</p>
+              {/* Masked numbers never get a dialable link. */}
+              {selectedClient.phone && !shouldMask && <CallButton phone={selectedClient.phone} />}
             </div>
 
             {/* KPI Strip */}

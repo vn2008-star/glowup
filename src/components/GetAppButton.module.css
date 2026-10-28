@@ -1,0 +1,64 @@
+.button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.button:hover {
+  background: var(--bg-surface-hover);
+}
+@media (pointer: coarse) {
+  .button { min-height: 44px; }
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.qrWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  text-align: center;
+}
+.qr {
+  width: 180px;
+  height: 180px;
+  border-radius: var(--radius-sm);
+  background: #fff;
+}
+.qrCaption {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  max-width: 260px;
+}
+
+.steps h4 {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  margin: var(--space-3) 0 var(--space-1);
+}
+.steps h4:first-child {
+  margin-top: 0;
+}
+.steps ol {
+  margin: 0;
+  padding-left: var(--space-5);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: 1.7;
+}

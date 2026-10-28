@@ -6,6 +6,7 @@ import { useTenant } from "@/lib/tenant-context";
 import { DEFAULT_TZ } from "@/lib/tz";
 import { queryData, cachedQuery, cached, hasCached } from "@/lib/api";
 import styles from "./inbox.module.css";
+import { CallButton } from "@/components/CallButton";
 import type { Conversation, Message } from "@/lib/types";
 
 const CHANNEL_ICONS: Record<string, string> = {
@@ -51,7 +52,10 @@ const CHANNEL_DETAILS = [
 ] as const;
 
 export default function InboxPage() {
-  const { tenant } = useTenant();
+  const { tenant, currentStaff } = useTenant();
+  // Same rule as the Clients page: with Client Protection on, technicians
+  // don't get a client's number, so no Call button for them.
+  const canCall = !((tenant?.settings as Record<string, unknown> | undefined)?.client_protection && currentStaff?.role === "technician");
   const t = useTranslations("inboxPage");
   // Seeded from the data cache — see lib/data-cache. The unfiltered list is
   // what the page opens on, so that is the key worth seeding.
@@ -508,7 +512,8 @@ export default function InboxPage() {
                     <h3>{getConvoName(selectedConvo)}</h3>
                     <span className={styles.chatChannel}>{CHANNEL_ICONS[selectedConvo.channel]} {selectedConvo.channel}</span>
                   </div>
-                  <div style={{ display: "flex", gap: "0.5rem" }}>
+                  <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                    {canCall && selectedConvo.client?.phone && <CallButton phone={selectedConvo.client.phone} />}
                     <span className={`badge ${selectedConvo.status === "open" ? "badge-success" : "badge-warning"}`}>{selectedConvo.status}</span>
                     <button className="btn btn-ghost btn-sm" onClick={handleCloseConvo}>
                       {selectedConvo.status === "open" ? "Close" : "Reopen"}
