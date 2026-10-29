@@ -6,6 +6,7 @@ import styles from './page.module.css'
 import { GlowUpLogo } from '@/components/GlowUpLogo'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { useTheme } from '@/lib/theme-context'
+import { GetAppButton } from '@/components/GetAppButton'
 
 const LogoIcon = () => <GlowUpLogo size={28} />;
 
@@ -41,6 +42,7 @@ export function LandingHeader() {
           <a href="#pricing">{t('pricing')}</a>
           <Link href="/refer" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>🎁 Refer & Earn</Link>
           <Link href="/auth/login">{t('signIn')}</Link>
+          <GetAppButton compact />
           <Link href="/auth/signup" className="btn btn-sm btn-primary">{t('getStarted')}</Link>
         </nav>
 
@@ -75,6 +77,7 @@ export function LandingHeader() {
           <a href="#pricing">{t('pricing')}</a>
           <Link href="/refer">🎁 Refer & Earn</Link>
           <Link href="/auth/login">{t('signIn')}</Link>
+          <GetAppButton onOpen={() => setMenuOpen(false)} />
           <Link href="/auth/signup" className="btn btn-sm btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setMenuOpen(false)}>{t('getStarted')}</Link>
         </nav>
       )}

@@ -39,7 +39,7 @@ function getStandalone() {
     || (navigator as Navigator & { standalone?: boolean }).standalone === true
 }
 
-export function GetAppButton({ onOpen }: { onOpen?: () => void }) {
+export function GetAppButton({ onOpen, compact }: { onOpen?: () => void; compact?: boolean }) {
   const standalone = useSyncExternalStore(subscribeStandalone, getStandalone, () => false)
   const [justInstalled, setJustInstalled] = useState(false)
   const installed = standalone || justInstalled
@@ -54,7 +54,7 @@ export function GetAppButton({ onOpen }: { onOpen?: () => void }) {
 
   useEffect(() => {
     if (!dialogOpen || qr) return
-    QRCode.toDataURL(`${window.location.origin}/dashboard`, { width: 360, margin: 1, errorCorrectionLevel: 'M' })
+    QRCode.toDataURL(`${window.location.origin}/`, { width: 360, margin: 1, errorCorrectionLevel: 'M' })
       .then(setQr)
       .catch(() => {})
   }, [dialogOpen, qr])
@@ -77,7 +77,7 @@ export function GetAppButton({ onOpen }: { onOpen?: () => void }) {
 
   return (
     <>
-      <button type="button" className={styles.button} onClick={handleClick}>
+      <button type="button" className={compact ? `${styles.button} ${styles.compact}` : styles.button} onClick={handleClick}>
         <PhoneIcon /> <span>Get the app</span>
       </button>
       <Dialog

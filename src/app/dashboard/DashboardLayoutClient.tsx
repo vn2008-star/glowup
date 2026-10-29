@@ -15,7 +15,6 @@ import { FeedbackWidget } from "@/components/FeedbackWidget";
 import { useTheme } from "@/lib/theme-context";
 import { useTranslations } from "next-intl";
 import { WelcomeLanguageModal } from "@/components/WelcomeLanguageModal";
-import { GetAppButton } from "@/components/GetAppButton";
 
 /* ─── Icons ─── */
 const GlowUpIcon = () => <GlowUpLogo size={24} />;
@@ -335,7 +334,6 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
         <div className={styles.sidebarFooter}>
-          <GetAppButton onOpen={() => setMobileMenuOpen(false)} />
           <div className={styles.salonInfo}>
             <div className={styles.salonAvatar}>{initials}</div>
             <div>

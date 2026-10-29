@@ -21,6 +21,12 @@
 @media (pointer: coarse) {
   .button { min-height: 44px; }
 }
+/* Header nav variant — sizes to its content instead of filling the sidebar */
+.compact {
+  width: auto;
+  white-space: nowrap;
+  border-radius: var(--radius-full, 999px);
+}
 
 .body {
   display: flex;
