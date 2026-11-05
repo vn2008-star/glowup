@@ -57,7 +57,32 @@ interface StaffRevenueData {
   period: { start: string; end: string; label: string };
 }
 
-const TABS = ["Overview", "Staff Performance", "Staff Revenue", "Client Retention", "Revenue Forecast", "Peak Hours", "Cancellations"] as const;
+interface PaymentMethodRow { method: string; count: number; services: number; tips: number; total: number }
+interface PaymentMethodsData {
+  methods: PaymentMethodRow[];
+  totals: { count: number; services: number; tips: number; total: number };
+  periodType: string;
+  period: { start: string; end: string; label: string };
+  transactions: {
+    id: string; date: string; method: string; clientName: string;
+    serviceName: string; staffName: string; services: number; tips: number;
+  }[];
+}
+
+const PAY_METHOD_META: Record<string, { label: string; icon: string; color: string }> = {
+  cash: { label: "Cash", icon: "💵", color: "#2E9E5B" },
+  card: { label: "Credit / Debit Card", icon: "💳", color: "#3B6FD8" },
+  venmo: { label: "Venmo", icon: "Ⓥ", color: "#008CFF" },
+  zelle: { label: "Zelle", icon: "Ⓩ", color: "#6D1ED4" },
+  gift_card: { label: "Gift Card", icon: "🎁", color: "#D4A017" },
+  mixed: { label: "Mixed", icon: "🔄", color: "#8A8A8A" },
+  other: { label: "Not recorded", icon: "❔", color: "#B0B0B0" },
+};
+// The four the owner reconciles are always shown; the rest only when
+// something was actually paid that way in the period.
+const CORE_PAY_METHODS = ["cash", "card", "venmo", "zelle"];
+
+const TABS = ["Overview", "Staff Performance", "Staff Revenue", "Payment Methods", "Client Retention", "Revenue Forecast", "Peak Hours", "Cancellations"] as const;
 
 type RetentionData = {
   summary: { total: number; active: number; atRisk: number; lost: number; new: number; retentionRate: number };
@@ -103,6 +128,12 @@ export default function ReportsPage() {
   const [revOffset, setRevOffset] = useState(0);
   const [sendingEmail, setSendingEmail] = useState<string | null>(null);
 
+  // Payment Methods tab state
+  const [payData, setPayData] = useState<PaymentMethodsData | null>(null);
+  const [payPeriodType, setPayPeriodType] = useState<'biweekly' | 'monthly'>('monthly');
+  const [payOffset, setPayOffset] = useState(0);
+  const [payFilter, setPayFilter] = useState<string>("all");
+
   // The read behind the active tab, named once. Having it separate from the
   // dispatch below is what lets the fetch decide whether a loading state is
   // even needed — a tab whose answer is already cached shows it instead.
@@ -114,9 +145,10 @@ export default function ReportsPage() {
       case "Peak Hours": return { action: "reports.peak-hours" };
       case "Staff Revenue": return { action: "reports.staff-revenue", payload: { period: revPeriodType, offset: revOffset } };
       case "Cancellations": return { action: "reports.cancellations", payload: { days: cancelDays } };
+      case "Payment Methods": return { action: "reports.payment-methods", payload: { period: payPeriodType, offset: payOffset } };
       default: return { action: "reports.overview" };
     }
-  }, [activeTab, revPeriodType, revOffset, cancelDays]);
+  }, [activeTab, revPeriodType, revOffset, cancelDays, payPeriodType, payOffset]);
 
   const fetchTabData = useCallback(async () => {
     if (!tenant) return;
@@ -133,6 +165,7 @@ export default function ReportsPage() {
         case "Peak Hours": setPeakHours(data as PeakHoursData); break;
         case "Staff Revenue": setStaffRevData(data as StaffRevenueData); break;
         case "Cancellations": setCancels(data as CancellationData); break;
+        case "Payment Methods": setPayData(data as PaymentMethodsData); break;
         default: setOverview(data as OverviewData); break;
       }
     } finally { setLoading(false); }
@@ -581,6 +614,138 @@ export default function ReportsPage() {
               </div>
             </>
           )}
+
+          {/* ═══ PAYMENT METHODS TAB ═══ */}
+          {activeTab === "Payment Methods" && (() => {
+            const money = (n: number) => `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            const meta = (m: string) => PAY_METHOD_META[m] || PAY_METHOD_META.other;
+            const rows = (payData?.methods || []).filter(m => CORE_PAY_METHODS.includes(m.method) || m.count > 0);
+            const grand = payData?.totals.total || 0;
+            const pct = (n: number) => (grand > 0 ? Math.round((n / grand) * 100) : 0);
+            const txns = (payData?.transactions || []).filter(t => payFilter === "all" || t.method === payFilter);
+            return (
+              <>
+                <div className={styles.revControls}>
+                  <div className={styles.revPeriodToggle}>
+                    <button className={`${styles.revToggleBtn} ${payPeriodType === 'monthly' ? styles.revToggleActive : ''}`}
+                      onClick={() => { setPayPeriodType('monthly'); setPayOffset(0); }}>Monthly</button>
+                    <button className={`${styles.revToggleBtn} ${payPeriodType === 'biweekly' ? styles.revToggleActive : ''}`}
+                      onClick={() => { setPayPeriodType('biweekly'); setPayOffset(0); }}>Biweekly</button>
+                  </div>
+                  <div className={styles.revPeriodNav}>
+                    <button className={styles.revNavBtn} onClick={() => setPayOffset(o => o - 1)}>← Previous</button>
+                    <span className={styles.revPeriodLabel}>{payData?.period?.label || '...'}</span>
+                    <button className={styles.revNavBtn} onClick={() => setPayOffset(o => Math.min(o + 1, 0))} disabled={payOffset >= 0}>Next →</button>
+                  </div>
+                </div>
+
+                {payData && (
+                  <>
+                    <div className={styles.kpiGrid}>
+                      {rows.filter(m => CORE_PAY_METHODS.includes(m.method)).map(m => (
+                        <button
+                          key={m.method}
+                          type="button"
+                          className={`card ${styles.kpiCard} ${styles.payTile} ${payFilter === m.method ? styles.payTileActive : ''}`}
+                          style={{ borderTopColor: meta(m.method).color }}
+                          onClick={() => setPayFilter(f => (f === m.method ? "all" : m.method))}
+                          title="Show only these payments below"
+                        >
+                          <span className={styles.kpiLabel}>{meta(m.method).icon} {meta(m.method).label}</span>
+                          <span className={styles.kpiValue}>{money(m.total)}</span>
+                          <span className={styles.kpiChange} style={{ color: "var(--text-secondary)" }}>
+                            {m.count} {m.count === 1 ? "payment" : "payments"} · {pct(m.total)}%
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className={`card ${styles.revTableCard}`}>
+                      <h2>Income by payment method</h2>
+                      {payData.totals.count === 0 ? (
+                        <p className={styles.emptyNote}>No checked-out appointments in this period.</p>
+                      ) : (
+                        <div style={{ overflowX: "auto" }}>
+                          <table className={styles.revTable}>
+                            <thead>
+                              <tr><th>Method</th><th>Payments</th><th>Services</th><th>Tips</th><th>Total</th><th>Share</th></tr>
+                            </thead>
+                            <tbody>
+                              {rows.map(m => (
+                                <tr key={m.method}>
+                                  <td><span style={{ color: meta(m.method).color, fontWeight: 700 }}>{meta(m.method).icon}</span> {meta(m.method).label}</td>
+                                  <td>{m.count}</td>
+                                  <td className={styles.revMoney}>{money(m.services)}</td>
+                                  <td className={styles.revMoney}>{money(m.tips)}</td>
+                                  <td className={styles.revMoney}><strong>{money(m.total)}</strong></td>
+                                  <td>
+                                    <div className={styles.reasonBarTrack}>
+                                      <div className={styles.reasonBarFill} style={{ width: `${pct(m.total)}%`, background: meta(m.method).color }} />
+                                      <span>{pct(m.total)}%</span>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                              <tr className={styles.revTotalsRow}>
+                                <td><strong>Total</strong></td>
+                                <td><strong>{payData.totals.count}</strong></td>
+                                <td className={styles.revMoney}><strong>{money(payData.totals.services)}</strong></td>
+                                <td className={styles.revMoney}><strong>{money(payData.totals.tips)}</strong></td>
+                                <td className={styles.revMoney}><strong>{money(payData.totals.total)}</strong></td>
+                                <td></td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                      {rows.some(m => m.method === "mixed" && m.count > 0) && (
+                        <p className={styles.emptyNote}>&ldquo;Mixed&rdquo; payments are shown on their own, because checkout doesn&rsquo;t record how they were split.</p>
+                      )}
+                      {rows.some(m => m.method === "gift_card" && m.count > 0) && (
+                        <p className={styles.emptyNote}>Gift card payments use money collected when the card was sold.</p>
+                      )}
+                    </div>
+
+                    <div className={`card ${styles.revTableCard}`}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "var(--space-2)" }}>
+                        <h2>Payments</h2>
+                        <select className="input" style={{ width: "auto" }} value={payFilter} onChange={(e) => setPayFilter(e.target.value)}>
+                          <option value="all">All methods</option>
+                          {rows.map(m => <option key={m.method} value={m.method}>{meta(m.method).label}</option>)}
+                        </select>
+                      </div>
+                      {txns.length === 0 ? (
+                        <p className={styles.emptyNote}>No payments to show.</p>
+                      ) : (
+                        <div style={{ overflowX: "auto" }}>
+                          <table className={styles.revTable}>
+                            <thead>
+                              <tr><th>Date</th><th>Client</th><th>Service</th><th>Staff</th><th>Method</th><th>Total</th></tr>
+                            </thead>
+                            <tbody>
+                              {txns.map(t => (
+                                <tr key={t.id}>
+                                  <td>{localeDateStr(new Date(t.date), { month: "short", day: "numeric" })}</td>
+                                  <td>{t.clientName}</td>
+                                  <td>{t.serviceName}</td>
+                                  <td>{t.staffName}</td>
+                                  <td><span style={{ color: meta(t.method).color, fontWeight: 700 }}>{meta(t.method).icon}</span> {meta(t.method).label}</td>
+                                  <td className={styles.revMoney}>
+                                    {money(t.services + t.tips)}
+                                    {t.tips > 0 && <span className={styles.emptyNote} style={{ display: "block", fontSize: "var(--text-xs)" }}>incl. {money(t.tips)} tip</span>}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </>
+            );
+          })()}
 
           {/* ═══ STAFF REVENUE TAB ═══ */}
           {activeTab === "Staff Revenue" && (

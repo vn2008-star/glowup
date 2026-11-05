@@ -57,6 +57,7 @@ const READ_ACTIONS = new Set([
   'reports.daily-tally',
   'reports.forecast',
   'reports.overview',
+  'reports.payment-methods',
   'reports.peak-hours',
   'reports.retention',
   'reports.staff-performance',

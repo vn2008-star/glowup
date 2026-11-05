@@ -133,7 +133,7 @@ const CLIENT_IMPORT_WRITABLE = ['first_name', 'last_name', 'phone', 'email', 'bi
 // anything that deletes a record or messages clients at the salon's cost.
 const MANAGEMENT_ACTIONS = new Set([
   'reports.overview', 'reports.staff-performance', 'reports.staff-revenue', 'reports.retention',
-  'reports.cancellations', 'reports.forecast', 'reports.peak-hours', 'reports.daily-tally',
+  'reports.cancellations', 'reports.forecast', 'reports.peak-hours', 'reports.daily-tally', 'reports.payment-methods',
   'loyalty.update_tiers',
   'campaigns.add', 'campaigns.update', 'campaigns.delete',
   'services.add', 'services.bulkAdd', 'services.update', 'services.delete', 'services.reorder',
@@ -2527,6 +2527,73 @@ export async function POST(request: Request) {
             staffRevenue, totals, periodType,
             period: { start: periodStart.toISOString(), end: periodEnd.toISOString(), label: periodLabel }
           }
+        })
+      }
+
+      // Income split by how the client paid (cash, card, Venmo, Zelle, …) for
+      // a pay period, so the owner can reconcile each one against the drawer,
+      // the card processor and the Venmo/Zelle accounts. Same period maths as
+      // reports.staff-revenue so the two tabs agree on what "this month" means.
+      case 'reports.payment-methods': {
+        const periodType = payload?.period === 'monthly' ? 'monthly' : 'biweekly'
+        const offset = Math.min(Number(payload?.offset) || 0, 0)
+        const period = payPeriodInTz(periodType, offset, await fetchTenantTz(svc, tenantId))
+
+        const { data: rows } = await svc
+          .from('appointments')
+          .select('id, start_time, total_price, tip_amount, payment_method, client:clients(first_name, last_name), service:services(name), staff_member:staff!staff_id(name)')
+          .eq('tenant_id', tenantId)
+          .eq('status', 'completed')
+          .gte('start_time', new Date(period.start).toISOString())
+          .lte('start_time', new Date(period.end).toISOString())
+          .order('start_time', { ascending: false })
+          .limit(2000)
+
+        const ORDER = ['cash', 'card', 'venmo', 'zelle', 'gift_card', 'mixed', 'other'] as const
+        const known = new Set<string>(ORDER)
+        const byMethod: Record<string, { method: string; count: number; services: number; tips: number; total: number }> = {}
+        for (const m of ORDER) byMethod[m] = { method: m, count: 0, services: 0, tips: 0, total: 0 }
+        const cents = (n: number) => Math.round(n * 100) / 100
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const list = (rows || []) as any[]
+        for (const r of list) {
+          // Unrecorded or unexpected values are kept in "other" so the grand
+          // total still matches completed revenue elsewhere in Reports.
+          const m = known.has(r.payment_method) ? r.payment_method : 'other'
+          const services = Number(r.total_price || 0)
+          const tips = Number(r.tip_amount || 0)
+          const b = byMethod[m]
+          b.count++
+          b.services += services
+          b.tips += tips
+          b.total += services + tips
+        }
+        const methods = ORDER.map(m => byMethod[m]).map(b => ({
+          ...b, services: cents(b.services), tips: cents(b.tips), total: cents(b.total),
+        }))
+        const totals = {
+          count: list.length,
+          services: cents(methods.reduce((s, b) => s + b.services, 0)),
+          tips: cents(methods.reduce((s, b) => s + b.tips, 0)),
+          total: cents(methods.reduce((s, b) => s + b.total, 0)),
+        }
+
+        return NextResponse.json({
+          data: {
+            methods, totals, periodType,
+            period: { start: period.start, end: period.end, label: period.label },
+            transactions: list.map(r => ({
+              id: r.id,
+              date: r.start_time,
+              method: known.has(r.payment_method) ? r.payment_method : 'other',
+              clientName: r.client ? `${r.client.first_name} ${r.client.last_name || ''}`.trim() : 'Walk-in',
+              serviceName: r.service?.name || '—',
+              staffName: r.staff_member?.name || 'Unassigned',
+              services: Number(r.total_price || 0),
+              tips: Number(r.tip_amount || 0),
+            })),
+          },
         })
       }
 

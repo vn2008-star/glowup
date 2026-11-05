@@ -294,3 +294,15 @@
   color: var(--text-tertiary);
   margin-top: var(--space-3);
 }
+
+/* ── Payment Methods tab ── */
+.payTile {
+  text-align: left;
+  border-top: 3px solid transparent;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  transition: box-shadow 0.15s, transform 0.15s;
+}
+.payTile:hover { transform: translateY(-1px); }
+.payTileActive { box-shadow: 0 0 0 2px var(--color-primary); }
