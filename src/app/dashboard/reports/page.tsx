@@ -69,20 +69,33 @@ interface PaymentMethodsData {
   }[];
 }
 
+// label is a reportsPage translation key, except Venmo/Zelle (brand names).
 const PAY_METHOD_META: Record<string, { label: string; icon: string; color: string }> = {
-  cash: { label: "Cash", icon: "💵", color: "#2E9E5B" },
-  card: { label: "Credit / Debit Card", icon: "💳", color: "#3B6FD8" },
+  cash: { label: "pmCash", icon: "💵", color: "#2E9E5B" },
+  card: { label: "pmCard", icon: "💳", color: "#3B6FD8" },
   venmo: { label: "Venmo", icon: "Ⓥ", color: "#008CFF" },
   zelle: { label: "Zelle", icon: "Ⓩ", color: "#6D1ED4" },
-  gift_card: { label: "Gift Card", icon: "🎁", color: "#D4A017" },
-  mixed: { label: "Mixed", icon: "🔄", color: "#8A8A8A" },
-  other: { label: "Not recorded", icon: "❔", color: "#B0B0B0" },
+  gift_card: { label: "pmGiftCard", icon: "🎁", color: "#D4A017" },
+  mixed: { label: "pmMixed", icon: "🔄", color: "#8A8A8A" },
+  other: { label: "notRecorded", icon: "❔", color: "#B0B0B0" },
 };
+const BRAND_PAY_LABELS = new Set(["Venmo", "Zelle"]);
 // The four the owner reconciles are always shown; the rest only when
 // something was actually paid that way in the period.
 const CORE_PAY_METHODS = ["cash", "card", "venmo", "zelle"];
 
 const TABS = ["Overview", "Staff Performance", "Staff Revenue", "Payment Type", "Client Retention", "Revenue Forecast", "Peak Hours", "Cancellations"] as const;
+// Tab ids stay English (they key the fetch switch); these are their label keys.
+const TAB_LABEL_KEYS: Record<(typeof TABS)[number], string> = {
+  "Overview": "tabOverview",
+  "Staff Performance": "tabStaffPerformance",
+  "Staff Revenue": "tabStaffRevenue",
+  "Payment Type": "paymentType",
+  "Client Retention": "tabClientRetention",
+  "Revenue Forecast": "tabRevenueForecast",
+  "Peak Hours": "tabPeakHours",
+  "Cancellations": "tabCancellations",
+};
 
 type RetentionData = {
   summary: { total: number; active: number; atRisk: number; lost: number; new: number; retentionRate: number };
@@ -179,11 +192,11 @@ export default function ReportsPage() {
     <div className={styles.page}>
       <div className={styles.pageHeader}>
         <div>
-          <h1>Reports & Analytics</h1>
-          <p>Comprehensive business intelligence dashboard</p>
+          <h1>{t("pageTitle")}</h1>
+          <p>{t("pageSubtitle")}</p>
         </div>
         <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
-          {[{ label: "Export last 90 days", days: 90 }, { label: "Export last 12 months", days: 365 }].map(({ label, days }) => (
+          {[{ label: t("export90"), days: 90 }, { label: t("export12m"), days: 365 }].map(({ label, days }) => (
             <button
               key={days}
               type="button"
@@ -197,12 +210,12 @@ export default function ReportsPage() {
                   endDate: dayRangeInTz(todayInTz(tz), tz).end,
                 });
                 setExporting(false);
-                if (error || !data) { toast.error(error || "Export failed"); return; }
+                if (error || !data) { toast.error(error || t("exportFailed")); return; }
                 downloadText(data.filename, data.csv);
-                toast.success(`Exported ${data.count} appointments`);
+                toast.success(t("exportedCount", { count: data.count }));
               }}
             >
-              {exporting ? "Exporting…" : label}
+              {exporting ? t("exporting") : label}
             </button>
           ))}
         </div>
@@ -212,13 +225,13 @@ export default function ReportsPage() {
       <div className={styles.tabs}>
         {TABS.map(tab => (
           <button key={tab} className={`${styles.tab} ${activeTab === tab ? styles.tabActive : ''}`} onClick={() => setActiveTab(tab)}>
-            {tab === "Payment Type" ? t("paymentType") : tab}
+            {t(TAB_LABEL_KEYS[tab])}
           </button>
         ))}
       </div>
 
       {loading ? (
-        <div className="pending-fade" style={{ padding: "3rem", textAlign: "center", color: "var(--text-secondary)" }}>Loading analytics...</div>
+        <div className="pending-fade" style={{ padding: "3rem", textAlign: "center", color: "var(--text-secondary)" }}>{t("loadingAnalytics")}</div>
       ) : (
         <>
           {/* ═══ OVERVIEW TAB ═══ */}
@@ -226,37 +239,37 @@ export default function ReportsPage() {
             <>
               <div className={styles.kpiGrid}>
                 <div className={`card ${styles.kpiCard}`}>
-                  <span className={styles.kpiLabel}>Monthly Revenue</span>
+                  <span className={styles.kpiLabel}>{t("monthlyRevenue")}</span>
                   <span className={styles.kpiValue}>{fmt(overview.thisMonth.revenue)}</span>
                   <span className={`${styles.kpiChange} ${overview.thisMonth.revenue >= overview.lastMonth.revenue ? styles.positive : styles.negative}`}>
-                    {overview.lastMonth.revenue > 0 ? `${overview.thisMonth.revenue >= overview.lastMonth.revenue ? '+' : ''}${Math.round(((overview.thisMonth.revenue - overview.lastMonth.revenue) / overview.lastMonth.revenue) * 100)}%` : '—'} vs last month
+                    {t("vsLastMonth", { value: overview.lastMonth.revenue > 0 ? `${overview.thisMonth.revenue >= overview.lastMonth.revenue ? '+' : ''}${Math.round(((overview.thisMonth.revenue - overview.lastMonth.revenue) / overview.lastMonth.revenue) * 100)}%` : '—' })}
                   </span>
                 </div>
                 <div className={`card ${styles.kpiCard}`}>
-                  <span className={styles.kpiLabel}>Appointments</span>
+                  <span className={styles.kpiLabel}>{t("appointments")}</span>
                   <span className={styles.kpiValue}>{overview.thisMonth.appointments}</span>
                   <span className={`${styles.kpiChange} ${overview.thisMonth.appointments >= overview.lastMonth.appointments ? styles.positive : styles.negative}`}>
-                    {overview.thisMonth.appointments - overview.lastMonth.appointments >= 0 ? '+' : ''}{overview.thisMonth.appointments - overview.lastMonth.appointments} vs last month
+                    {t("vsLastMonth", { value: `${overview.thisMonth.appointments - overview.lastMonth.appointments >= 0 ? '+' : ''}${overview.thisMonth.appointments - overview.lastMonth.appointments}` })}
                   </span>
                 </div>
                 <div className={`card ${styles.kpiCard}`}>
-                  <span className={styles.kpiLabel}>New Clients</span>
+                  <span className={styles.kpiLabel}>{t("newClients")}</span>
                   <span className={styles.kpiValue}>{overview.thisMonth.newClients}</span>
                   <span className={`${styles.kpiChange} ${overview.thisMonth.newClients >= overview.lastMonth.newClients ? styles.positive : styles.negative}`}>
-                    {overview.thisMonth.newClients - overview.lastMonth.newClients >= 0 ? '+' : ''}{overview.thisMonth.newClients - overview.lastMonth.newClients} vs last month
+                    {t("vsLastMonth", { value: `${overview.thisMonth.newClients - overview.lastMonth.newClients >= 0 ? '+' : ''}${overview.thisMonth.newClients - overview.lastMonth.newClients}` })}
                   </span>
                 </div>
                 <div className={`card ${styles.kpiCard}`}>
-                  <span className={styles.kpiLabel}>No-Show Rate</span>
+                  <span className={styles.kpiLabel}>{t("noShowRate")}</span>
                   <span className={styles.kpiValue}>{overview.noShowRate || 0}%</span>
-                  <span className={styles.kpiChange}>industry avg: 15%</span>
+                  <span className={styles.kpiChange}>{t("industryAvg")}</span>
                 </div>
               </div>
 
               <div className={`card ${styles.topServicesCard}`}>
-                <h2>Top Services</h2>
+                <h2>{t("topServices")}</h2>
                 {overview.topServices.length === 0 ? (
-                  <p style={{ color: "var(--text-secondary)", padding: "1rem 0" }}>No completed appointments yet.</p>
+                  <p style={{ color: "var(--text-secondary)", padding: "1rem 0" }}>{t("noCompletedYet")}</p>
                 ) : (
                   <div className={styles.servicesList}>
                     {overview.topServices.map((s, i) => (
@@ -268,7 +281,7 @@ export default function ReportsPage() {
                             <div className={styles.serviceBarFill} style={{ width: `${(s.bookings / (overview.topServices[0]?.bookings || 1)) * 100}%` }} />
                           </div>
                         </div>
-                        <span className={styles.serviceBookings}>{s.bookings} bookings</span>
+                        <span className={styles.serviceBookings}>{t("bookingsCount", { count: s.bookings })}</span>
                         <span className={styles.serviceRevenue}>{fmt(s.revenue)}</span>
                       </div>
                     ))}
@@ -283,8 +296,8 @@ export default function ReportsPage() {
             <>
               {staffPerf.length === 0 ? (
                 <div className="card" style={{ padding: "3rem", textAlign: "center", color: "var(--text-secondary)" }}>
-                  <h3 style={{ marginBottom: "var(--space-2)" }}>No Staff Data Yet</h3>
-                  <p>Complete appointments to see staff performance metrics.</p>
+                  <h3 style={{ marginBottom: "var(--space-2)" }}>{t("noStaffData")}</h3>
+                  <p>{t("noStaffDataHint")}</p>
                 </div>
               ) : (
                 <div className={styles.staffGrid}>
@@ -294,30 +307,30 @@ export default function ReportsPage() {
                         <div className={styles.perfAvatar}>{s.name.charAt(0)}</div>
                         <div>
                           <div className={styles.perfName}>{i === 0 && '🏆 '}{s.name}</div>
-                          <div className={styles.perfRole}>{s.specialties?.[0] || 'Team Member'}</div>
+                          <div className={styles.perfRole}>{s.specialties?.[0] || t("teamMember")}</div>
                         </div>
                       </div>
                       <div className={styles.perfStats}>
                         <div className={styles.perfStat}>
                           <div className={styles.perfStatValue}>{fmt(s.revenue)}</div>
-                          <div className={styles.perfStatLabel}>Revenue</div>
+                          <div className={styles.perfStatLabel}>{t("revenue")}</div>
                         </div>
                         <div className={styles.perfStat}>
                           <div className={styles.perfStatValue}>{s.completed}</div>
-                          <div className={styles.perfStatLabel}>Completed</div>
+                          <div className={styles.perfStatLabel}>{t("completed")}</div>
                         </div>
                         <div className={styles.perfStat}>
                           <div className={styles.perfStatValue}>{fmt(s.avgTicket)}</div>
-                          <div className={styles.perfStatLabel}>Avg Ticket</div>
+                          <div className={styles.perfStatLabel}>{t("avgTicket")}</div>
                         </div>
                         <div className={styles.perfStat}>
                           <div className={styles.perfStatValue}>{s.uniqueClients}</div>
-                          <div className={styles.perfStatLabel}>Clients</div>
+                          <div className={styles.perfStatLabel}>{t("clients")}</div>
                         </div>
                       </div>
                       <div className={styles.perfBar}>
                         <div className={styles.perfBarLabel}>
-                          <span>Completion Rate</span>
+                          <span>{t("completionRate")}</span>
                           <span>{s.completionRate}%</span>
                         </div>
                         <div className={styles.perfBarTrack}>
@@ -326,7 +339,7 @@ export default function ReportsPage() {
                       </div>
                       {s.commissionRate > 0 && (
                         <div style={{ marginTop: 'var(--space-3)', fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
-                          💰 Commission ({s.commissionRate}%): <strong>{fmt(s.commissionEarned)}</strong>
+                          💰 {t("commissionRate", { rate: s.commissionRate })}: <strong>{fmt(s.commissionEarned)}</strong>
                         </div>
                       )}
                     </div>
@@ -342,32 +355,32 @@ export default function ReportsPage() {
               <div className={styles.retentionSummary}>
                 <div className={styles.retCard}>
                   <div className={styles.retValue} style={{ color: 'var(--color-primary)' }}>{retention.summary.retentionRate}%</div>
-                  <div className={styles.retLabel}>Retention Rate</div>
+                  <div className={styles.retLabel}>{t("retentionRate")}</div>
                 </div>
                 <div className={styles.retCard}>
                   <div className={styles.retValue} style={{ color: 'var(--color-success)' }}>{retention.summary.active}</div>
-                  <div className={styles.retLabel}>Active</div>
+                  <div className={styles.retLabel}>{t("active")}</div>
                 </div>
                 <div className={styles.retCard}>
                   <div className={styles.retValue} style={{ color: '#d97706' }}>{retention.summary.atRisk}</div>
-                  <div className={styles.retLabel}>At Risk</div>
+                  <div className={styles.retLabel}>{t("atRisk")}</div>
                 </div>
                 <div className={styles.retCard}>
                   <div className={styles.retValue} style={{ color: 'var(--color-danger)' }}>{retention.summary.lost}</div>
-                  <div className={styles.retLabel}>Lost (90+ days)</div>
+                  <div className={styles.retLabel}>{t("lost90")}</div>
                 </div>
                 <div className={styles.retCard}>
                   <div className={styles.retValue} style={{ color: '#3b82f6' }}>{retention.summary.new}</div>
-                  <div className={styles.retLabel}>New / No Visit</div>
+                  <div className={styles.retLabel}>{t("newNoVisit")}</div>
                 </div>
               </div>
 
               <div className={`card ${styles.retListCard}`}>
-                <h2>Client Health</h2>
+                <h2>{t("clientHealth")}</h2>
                 <div className={styles.retFilters}>
                   {["all", "active", "at_risk", "lost", "new"].map(f => (
                     <button key={f} className={`${styles.retFilterBtn} ${retFilter === f ? styles.retFilterActive : ''}`} onClick={() => setRetFilter(f)}>
-                      {f === 'all' ? 'All' : f === 'at_risk' ? 'At Risk' : f.charAt(0).toUpperCase() + f.slice(1)}
+                      {t(f === 'all' ? 'filterAll' : f === 'at_risk' ? 'atRisk' : f === 'active' ? 'active' : f === 'lost' ? 'filterLost' : 'filterNew')}
                     </button>
                   ))}
                 </div>
@@ -381,9 +394,9 @@ export default function ReportsPage() {
                       {c.retentionRisk === 'active' ? '🟢' : c.retentionRisk === 'at_risk' ? '🟡' : c.retentionRisk === 'lost' ? '🔴' : '🔵'}
                     </span>
                     <span className={styles.retName}>{c.first_name} {c.last_name || ''}</span>
-                    <span className={styles.retVisits}>{c.visit_count} visits</span>
+                    <span className={styles.retVisits}>{t("visitsCount", { count: c.visit_count })}</span>
                     <span className={styles.retDays} style={{ color: c.daysSinceLastVisit > 90 ? 'var(--color-danger)' : c.daysSinceLastVisit > 45 ? '#d97706' : 'var(--text-secondary)' }}>
-                      {c.daysSinceLastVisit > 900 ? 'No visits' : `${c.daysSinceLastVisit}d ago`}
+                      {c.daysSinceLastVisit > 900 ? t("noVisits") : t("daysAgo", { count: c.daysSinceLastVisit })}
                     </span>
                   </div>
                 ))}
@@ -396,30 +409,30 @@ export default function ReportsPage() {
             <>
               <div className={styles.kpiGrid}>
                 <div className={`card ${styles.kpiCard}`}>
-                  <span className={styles.kpiLabel}>Projected (4 Weeks)</span>
+                  <span className={styles.kpiLabel}>{t("projected4w")}</span>
                   <span className={styles.kpiValue}>{fmt(forecast.projectedMonthRevenue)}</span>
-                  <span className={styles.kpiChange}>from booked appointments</span>
+                  <span className={styles.kpiChange}>{t("fromBooked")}</span>
                 </div>
                 <div className={`card ${styles.kpiCard}`}>
-                  <span className={styles.kpiLabel}>Best Case</span>
+                  <span className={styles.kpiLabel}>{t("bestCase")}</span>
                   <span className={styles.kpiValue} style={{ color: 'var(--color-success)' }}>{fmt(forecast.bestCase)}</span>
-                  <span className={styles.kpiChange}>+30% walk-ins & upsells</span>
+                  <span className={styles.kpiChange}>{t("bestCaseHint")}</span>
                 </div>
                 <div className={`card ${styles.kpiCard}`}>
-                  <span className={styles.kpiLabel}>Conservative</span>
+                  <span className={styles.kpiLabel}>{t("conservative")}</span>
                   <span className={styles.kpiValue} style={{ color: '#d97706' }}>{fmt(forecast.conservative)}</span>
-                  <span className={styles.kpiChange}>-15% cancellations</span>
+                  <span className={styles.kpiChange}>{t("conservativeHint")}</span>
                 </div>
                 <div className={`card ${styles.kpiCard}`}>
-                  <span className={styles.kpiLabel}>Avg Weekly</span>
+                  <span className={styles.kpiLabel}>{t("avgWeekly")}</span>
                   <span className={styles.kpiValue}>{fmt(Math.round(forecast.projectedMonthRevenue / 4))}</span>
-                  <span className={styles.kpiChange}>per week projected</span>
+                  <span className={styles.kpiChange}>{t("perWeekProjected")}</span>
                 </div>
               </div>
 
               <div className={styles.forecastGrid}>
                 <div className={`card ${styles.forecastCard}`}>
-                  <h2>📅 Weekly Forecast</h2>
+                  <h2>📅 {t("weeklyForecast")}</h2>
                   <div className={styles.barChart}>
                     {forecast.weeks.map(w => {
                       const maxVal = Math.max(...forecast.weeks.map(x => x.projected), 1);
@@ -438,7 +451,7 @@ export default function ReportsPage() {
                 </div>
 
                 <div className={`card ${styles.forecastCard}`}>
-                  <h2>📈 6-Month Trend</h2>
+                  <h2>📈 {t("sixMonthTrend")}</h2>
                   <div className={styles.trendChart}>
                     {forecast.monthlyTrend.map(m => {
                       const maxRev = Math.max(...forecast.monthlyTrend.map(x => x.revenue), 1);
@@ -459,8 +472,8 @@ export default function ReportsPage() {
           {/* ═══ PEAK HOURS HEATMAP TAB ═══ */}
           {activeTab === "Peak Hours" && peakHours && (
             <div className={`card ${styles.heatmapCard}`}>
-              <h2>🔥 Peak Hours Heatmap</h2>
-              <p>Appointment density over the past 3 months. Darker = busier.</p>
+              <h2>🔥 {t("peakHoursHeatmap")}</h2>
+              <p>{t("peakHoursHint")}</p>
 
               <div className={styles.heatmapGrid} style={{ gridTemplateColumns: `80px repeat(${peakHours.hours.length}, 1fr)` }}>
                 {/* Header row */}
@@ -487,7 +500,7 @@ export default function ReportsPage() {
                           key={`${day}-${hour}`}
                           className={styles.heatmapCell}
                           style={{ background: bg, color: textColor }}
-                          title={`${day} ${hour > 12 ? hour - 12 : hour}${hour >= 12 ? 'pm' : 'am'}: ${count} appointments`}
+                          title={`${day} ${hour > 12 ? hour - 12 : hour}${hour >= 12 ? 'pm' : 'am'}: ${t("apptCount", { count })}`}
                         >
                           {count > 0 ? count : ''}
                         </div>
@@ -498,13 +511,13 @@ export default function ReportsPage() {
               </div>
 
               <div className={styles.heatmapLegend}>
-                <span>Low</span>
+                <span>{t("low")}</span>
                 <div className={styles.heatmapLegendBar}>
                   {[0.15, 0.3, 0.45, 0.6, 0.75, 0.9].map(op => (
                     <div key={op} className={styles.heatmapLegendSwatch} style={{ background: `rgba(201, 160, 220, ${op})` }} />
                   ))}
                 </div>
-                <span>High</span>
+                <span>{t("high")}</span>
               </div>
             </div>
           )}
@@ -520,7 +533,7 @@ export default function ReportsPage() {
                       className={`${styles.revToggleBtn} ${cancelDays === d ? styles.revToggleActive : ""}`}
                       onClick={() => setCancelDays(d)}
                     >
-                      {d === 365 ? "12 months" : `${d} days`}
+                      {d === 365 ? t("months12") : t("daysN", { count: d })}
                     </button>
                   ))}
                 </div>
@@ -528,42 +541,42 @@ export default function ReportsPage() {
 
               <div className={styles.kpiGrid}>
                 <div className={`card ${styles.kpiCard}`}>
-                  <span className={styles.statLabel}>Cancelled</span>
+                  <span className={styles.statLabel}>{t("cancelled")}</span>
                   <span className={styles.statValue}>{cancels.total}</span>
-                  <span className={styles.statSub}>of {cancels.booked} booked</span>
+                  <span className={styles.statSub}>{t("ofBooked", { count: cancels.booked })}</span>
                 </div>
                 <div className={`card ${styles.kpiCard}`}>
-                  <span className={styles.statLabel}>Cancellation Rate</span>
+                  <span className={styles.statLabel}>{t("cancellationRate")}</span>
                   <span className={styles.statValue}>{cancels.cancellationRate}%</span>
-                  <span className={styles.statSub}>last {cancels.days} days</span>
+                  <span className={styles.statSub}>{t("lastNDays", { count: cancels.days })}</span>
                 </div>
                 <div className={`card ${styles.kpiCard}`}>
-                  <span className={styles.statLabel}>Revenue Not Earned</span>
+                  <span className={styles.statLabel}>{t("revenueNotEarned")}</span>
                   <span className={styles.statValue}>{fmt(cancels.lostRevenue)}</span>
-                  <span className={styles.statSub}>at list price</span>
+                  <span className={styles.statSub}>{t("atListPrice")}</span>
                 </div>
                 <div className={`card ${styles.kpiCard}`}>
-                  <span className={styles.statLabel}>Who Cancelled</span>
+                  <span className={styles.statLabel}>{t("whoCancelled")}</span>
                   <span className={styles.statValue}>
                     {cancels.bySource.client}/{cancels.bySource.salon}
                   </span>
-                  <span className={styles.statSub}>client / salon</span>
+                  <span className={styles.statSub}>{t("clientSalon")}</span>
                 </div>
               </div>
 
               <div className={`card ${styles.revTableCard}`}>
-                <h2>Why appointments were cancelled</h2>
+                <h2>{t("whyCancelled")}</h2>
                 {cancels.reasons.length === 0 ? (
-                  <p className={styles.emptyNote}>No cancellations in this period.</p>
+                  <p className={styles.emptyNote}>{t("noCancellations")}</p>
                 ) : (
                   <table className={styles.revTable}>
                     <thead>
-                      <tr><th>Reason</th><th>Count</th><th>Share</th><th>Value</th></tr>
+                      <tr><th>{t("colReason")}</th><th>{t("colCount")}</th><th>{t("colShare")}</th><th>{t("colValue")}</th></tr>
                     </thead>
                     <tbody>
                       {cancels.reasons.map((r) => (
                         <tr key={r.reason}>
-                          <td>{r.reason === "Not recorded" ? <em>Not recorded</em> : r.reason}</td>
+                          <td>{r.reason === "Not recorded" ? <em>{t("notRecorded")}</em> : r.reason}</td>
                           <td>{r.count}</td>
                           <td>
                             <div className={styles.reasonBarTrack}>
@@ -581,21 +594,18 @@ export default function ReportsPage() {
                   </table>
                 )}
                 {cancels.reasons.some((r) => r.reason === "Not recorded") && (
-                  <p className={styles.emptyNote}>
-                    Reasons have only been captured since 11 Aug 2026 — anything cancelled before that shows as
-                    &ldquo;Not recorded&rdquo;.
-                  </p>
+                  <p className={styles.emptyNote}>{t("reasonsSince")}</p>
                 )}
               </div>
 
               <div className={`card ${styles.revTableCard}`}>
-                <h2>Recent cancellations</h2>
+                <h2>{t("recentCancellations")}</h2>
                 {cancels.recent.length === 0 ? (
-                  <p className={styles.emptyNote}>Nothing to show.</p>
+                  <p className={styles.emptyNote}>{t("nothingToShow")}</p>
                 ) : (
                   <table className={styles.revTable}>
                     <thead>
-                      <tr><th>Date</th><th>Client</th><th>Service</th><th>Staff</th><th>Reason</th><th>By</th></tr>
+                      <tr><th>{t("colDate")}</th><th>{t("colClient")}</th><th>{t("colService")}</th><th>{t("colStaff")}</th><th>{t("colReason")}</th><th>{t("colBy")}</th></tr>
                     </thead>
                     <tbody>
                       {cancels.recent.map((r) => (
@@ -619,23 +629,24 @@ export default function ReportsPage() {
           {activeTab === "Payment Type" && (() => {
             const money = (n: number) => `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
             const meta = (m: string) => PAY_METHOD_META[m] || PAY_METHOD_META.other;
+            const payLabel = (m: string) => { const l = meta(m).label; return BRAND_PAY_LABELS.has(l) ? l : t(l); };
             const rows = (payData?.methods || []).filter(m => CORE_PAY_METHODS.includes(m.method) || m.count > 0);
             const grand = payData?.totals.total || 0;
             const pct = (n: number) => (grand > 0 ? Math.round((n / grand) * 100) : 0);
-            const txns = (payData?.transactions || []).filter(t => payFilter === "all" || t.method === payFilter);
+            const txns = (payData?.transactions || []).filter(tx => payFilter === "all" || tx.method === payFilter);
             return (
               <>
                 <div className={styles.revControls}>
                   <div className={styles.revPeriodToggle}>
                     <button className={`${styles.revToggleBtn} ${payPeriodType === 'monthly' ? styles.revToggleActive : ''}`}
-                      onClick={() => { setPayPeriodType('monthly'); setPayOffset(0); }}>Monthly</button>
+                      onClick={() => { setPayPeriodType('monthly'); setPayOffset(0); }}>{t("monthly")}</button>
                     <button className={`${styles.revToggleBtn} ${payPeriodType === 'biweekly' ? styles.revToggleActive : ''}`}
-                      onClick={() => { setPayPeriodType('biweekly'); setPayOffset(0); }}>Biweekly</button>
+                      onClick={() => { setPayPeriodType('biweekly'); setPayOffset(0); }}>{t("biweekly")}</button>
                   </div>
                   <div className={styles.revPeriodNav}>
-                    <button className={styles.revNavBtn} onClick={() => setPayOffset(o => o - 1)}>← Previous</button>
+                    <button className={styles.revNavBtn} onClick={() => setPayOffset(o => o - 1)}>{t("previous")}</button>
                     <span className={styles.revPeriodLabel}>{payData?.period?.label || '...'}</span>
-                    <button className={styles.revNavBtn} onClick={() => setPayOffset(o => Math.min(o + 1, 0))} disabled={payOffset >= 0}>Next →</button>
+                    <button className={styles.revNavBtn} onClick={() => setPayOffset(o => Math.min(o + 1, 0))} disabled={payOffset >= 0}>{t("next")}</button>
                   </div>
                 </div>
 
@@ -649,12 +660,12 @@ export default function ReportsPage() {
                           className={`card ${styles.kpiCard} ${styles.payTile} ${payFilter === m.method ? styles.payTileActive : ''}`}
                           style={{ borderTopColor: meta(m.method).color }}
                           onClick={() => setPayFilter(f => (f === m.method ? "all" : m.method))}
-                          title="Show only these payments below"
+                          title={t("showOnlyThese")}
                         >
-                          <span className={styles.kpiLabel}>{meta(m.method).icon} {meta(m.method).label}</span>
+                          <span className={styles.kpiLabel}>{meta(m.method).icon} {payLabel(m.method)}</span>
                           <span className={styles.kpiValue}>{money(m.total)}</span>
                           <span className={styles.kpiChange} style={{ color: "var(--text-secondary)" }}>
-                            {m.count} {m.count === 1 ? "payment" : "payments"} · {pct(m.total)}%
+                            {t("paymentsCount", { count: m.count })} · {pct(m.total)}%
                           </span>
                         </button>
                       ))}
@@ -663,17 +674,17 @@ export default function ReportsPage() {
                     <div className={`card ${styles.revTableCard}`}>
                       <h2>{t("incomeByPaymentType")}</h2>
                       {payData.totals.count === 0 ? (
-                        <p className={styles.emptyNote}>No checked-out appointments in this period.</p>
+                        <p className={styles.emptyNote}>{t("noCheckedOut")}</p>
                       ) : (
                         <div style={{ overflowX: "auto" }}>
                           <table className={styles.revTable}>
                             <thead>
-                              <tr><th>{t("type")}</th><th>Payments</th><th>Services</th><th>Tips</th><th>Total</th><th>Share</th></tr>
+                              <tr><th>{t("type")}</th><th>{t("colPayments")}</th><th>{t("colServices")}</th><th>{t("colTips")}</th><th>{t("colTotal")}</th><th>{t("colShare")}</th></tr>
                             </thead>
                             <tbody>
                               {rows.map(m => (
                                 <tr key={m.method}>
-                                  <td><span style={{ color: meta(m.method).color, fontWeight: 700 }}>{meta(m.method).icon}</span> {meta(m.method).label}</td>
+                                  <td><span style={{ color: meta(m.method).color, fontWeight: 700 }}>{meta(m.method).icon}</span> {payLabel(m.method)}</td>
                                   <td>{m.count}</td>
                                   <td className={styles.revMoney}>{money(m.services)}</td>
                                   <td className={styles.revMoney}>{money(m.tips)}</td>
@@ -687,7 +698,7 @@ export default function ReportsPage() {
                                 </tr>
                               ))}
                               <tr className={styles.revTotalsRow}>
-                                <td><strong>Total</strong></td>
+                                <td><strong>{t("total")}</strong></td>
                                 <td><strong>{payData.totals.count}</strong></td>
                                 <td className={styles.revMoney}><strong>{money(payData.totals.services)}</strong></td>
                                 <td className={styles.revMoney}><strong>{money(payData.totals.tips)}</strong></td>
@@ -699,40 +710,40 @@ export default function ReportsPage() {
                         </div>
                       )}
                       {rows.some(m => m.method === "mixed" && m.count > 0) && (
-                        <p className={styles.emptyNote}>&ldquo;Mixed&rdquo; payments are shown on their own, because checkout doesn&rsquo;t record how they were split.</p>
+                        <p className={styles.emptyNote}>{t("mixedNote")}</p>
                       )}
                       {rows.some(m => m.method === "gift_card" && m.count > 0) && (
-                        <p className={styles.emptyNote}>Gift card payments use money collected when the card was sold.</p>
+                        <p className={styles.emptyNote}>{t("giftCardNote")}</p>
                       )}
                     </div>
 
                     <div className={`card ${styles.revTableCard}`}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "var(--space-2)" }}>
-                        <h2>Payments</h2>
+                        <h2>{t("payments")}</h2>
                         <select className="input" style={{ width: "auto" }} value={payFilter} onChange={(e) => setPayFilter(e.target.value)}>
-                          <option value="all">All methods</option>
-                          {rows.map(m => <option key={m.method} value={m.method}>{meta(m.method).label}</option>)}
+                          <option value="all">{t("allTypes")}</option>
+                          {rows.map(m => <option key={m.method} value={m.method}>{payLabel(m.method)}</option>)}
                         </select>
                       </div>
                       {txns.length === 0 ? (
-                        <p className={styles.emptyNote}>No payments to show.</p>
+                        <p className={styles.emptyNote}>{t("noPayments")}</p>
                       ) : (
                         <div style={{ overflowX: "auto" }}>
                           <table className={styles.revTable}>
                             <thead>
-                              <tr><th>Date</th><th>Client</th><th>Service</th><th>Staff</th><th>{t("type")}</th><th>Total</th></tr>
+                              <tr><th>{t("colDate")}</th><th>{t("colClient")}</th><th>{t("colService")}</th><th>{t("colStaff")}</th><th>{t("type")}</th><th>{t("colTotal")}</th></tr>
                             </thead>
                             <tbody>
-                              {txns.map(t => (
-                                <tr key={t.id}>
-                                  <td>{localeDateStr(new Date(t.date), { month: "short", day: "numeric" })}</td>
-                                  <td>{t.clientName}</td>
-                                  <td>{t.serviceName}</td>
-                                  <td>{t.staffName}</td>
-                                  <td><span style={{ color: meta(t.method).color, fontWeight: 700 }}>{meta(t.method).icon}</span> {meta(t.method).label}</td>
+                              {txns.map(tx => (
+                                <tr key={tx.id}>
+                                  <td>{localeDateStr(new Date(tx.date), { month: "short", day: "numeric" })}</td>
+                                  <td>{tx.clientName}</td>
+                                  <td>{tx.serviceName}</td>
+                                  <td>{tx.staffName}</td>
+                                  <td><span style={{ color: meta(tx.method).color, fontWeight: 700 }}>{meta(tx.method).icon}</span> {payLabel(tx.method)}</td>
                                   <td className={styles.revMoney}>
-                                    {money(t.services + t.tips)}
-                                    {t.tips > 0 && <span className={styles.emptyNote} style={{ display: "block", fontSize: "var(--text-xs)" }}>incl. {money(t.tips)} tip</span>}
+                                    {money(tx.services + tx.tips)}
+                                    {tx.tips > 0 && <span className={styles.emptyNote} style={{ display: "block", fontSize: "var(--text-xs)" }}>{t("inclTip", { amount: money(tx.tips) })}</span>}
                                   </td>
                                 </tr>
                               ))}
@@ -754,14 +765,14 @@ export default function ReportsPage() {
               <div className={styles.revControls}>
                 <div className={styles.revPeriodToggle}>
                   <button className={`${styles.revToggleBtn} ${revPeriodType === 'biweekly' ? styles.revToggleActive : ''}`}
-                    onClick={() => { setRevPeriodType('biweekly'); setRevOffset(0); }}>Biweekly</button>
+                    onClick={() => { setRevPeriodType('biweekly'); setRevOffset(0); }}>{t("biweekly")}</button>
                   <button className={`${styles.revToggleBtn} ${revPeriodType === 'monthly' ? styles.revToggleActive : ''}`}
-                    onClick={() => { setRevPeriodType('monthly'); setRevOffset(0); }}>Monthly</button>
+                    onClick={() => { setRevPeriodType('monthly'); setRevOffset(0); }}>{t("monthly")}</button>
                 </div>
                 <div className={styles.revPeriodNav}>
-                  <button className={styles.revNavBtn} onClick={() => setRevOffset(o => o - 1)}>← Previous</button>
+                  <button className={styles.revNavBtn} onClick={() => setRevOffset(o => o - 1)}>{t("previous")}</button>
                   <span className={styles.revPeriodLabel}>{staffRevData?.period?.label || '...'}</span>
-                  <button className={styles.revNavBtn} onClick={() => setRevOffset(o => Math.min(o + 1, 0))} disabled={revOffset >= 0}>Next →</button>
+                  <button className={styles.revNavBtn} onClick={() => setRevOffset(o => Math.min(o + 1, 0))} disabled={revOffset >= 0}>{t("next")}</button>
                 </div>
                 <button className={`btn btn-primary ${styles.revEmailAllBtn}`}
                   disabled={sendingEmail === 'all' || !staffRevData?.staffRevenue?.length}
@@ -774,11 +785,11 @@ export default function ReportsPage() {
                         body: JSON.stringify({ period: revPeriodType, offset: revOffset }),
                       });
                       const result = await res.json();
-                      toast.success(`Reports sent! ${result.data?.sent || 0} emails delivered.${result.data?.dry_run ? ' (Dry run — set RESEND_API_KEY for live sending)' : ''}`);
-                    } catch { toast.error('Failed to send reports.'); }
+                      toast.success(`${t("reportsSent", { count: result.data?.sent || 0 })}${result.data?.dry_run ? ' (Dry run — set RESEND_API_KEY for live sending)' : ''}`);
+                    } catch { toast.error(t("sendReportsFailed")); }
                     setSendingEmail(null);
                   }}>
-                  {sendingEmail === 'all' ? '⏳ Sending...' : '📧 Email All Staff'}
+                  {sendingEmail === 'all' ? `⏳ ${t("sending")}` : `📧 ${t("emailAllStaff")}`}
                 </button>
                 {/* Auto-send toggle — this flag is what the biweekly cron
                     checks; without it the scheduled statements never fire */}
@@ -795,7 +806,7 @@ export default function ReportsPage() {
                       refetchTenant();
                     }}
                   />
-                  Auto-email on the 1st &amp; 16th
+                  {t("autoEmail")}
                 </label>
               </div>
 
@@ -803,19 +814,19 @@ export default function ReportsPage() {
               {staffRevData && (
                 <div className={styles.kpiGrid}>
                   <div className={`card ${styles.kpiCard}`}>
-                    <span className={styles.kpiLabel}>Total Revenue</span>
+                    <span className={styles.kpiLabel}>{t("totalRevenue")}</span>
                     <span className={styles.kpiValue}>{fmt(staffRevData.totals.revenue)}</span>
                     <span className={styles.kpiChange}>{staffRevData.period.label}</span>
                   </div>
                   <div className={`card ${styles.kpiCard}`}>
-                    <span className={styles.kpiLabel}>Total Commission</span>
+                    <span className={styles.kpiLabel}>{t("totalCommission")}</span>
                     <span className={styles.kpiValue} style={{ color: 'var(--color-success)' }}>{fmt(staffRevData.totals.commission)}</span>
-                    <span className={styles.kpiChange}>all staff combined</span>
+                    <span className={styles.kpiChange}>{t("allStaffCombined")}</span>
                   </div>
                   <div className={`card ${styles.kpiCard}`}>
-                    <span className={styles.kpiLabel}>Total Tips</span>
+                    <span className={styles.kpiLabel}>{t("totalTips")}</span>
                     <span className={styles.kpiValue} style={{ color: '#e8b4cb' }}>{fmt(staffRevData.totals.tips)}</span>
-                    <span className={styles.kpiChange}>{staffRevData.totals.appointments} appointments</span>
+                    <span className={styles.kpiChange}>{t("apptCount", { count: staffRevData.totals.appointments })}</span>
                   </div>
                 </div>
               )}
@@ -826,15 +837,15 @@ export default function ReportsPage() {
                   <table className={styles.revTable}>
                     <thead>
                       <tr>
-                        <th>Staff</th>
-                        <th>Appts</th>
-                        <th>Revenue</th>
-                        <th>Rate</th>
-                        <th>Commission</th>
-                        <th>Tips</th>
-                        <th>Avg Ticket</th>
-                        <th>Clients</th>
-                        <th>Total Earned</th>
+                        <th>{t("colStaff")}</th>
+                        <th>{t("colAppts")}</th>
+                        <th>{t("revenue")}</th>
+                        <th>{t("colRate")}</th>
+                        <th>{t("colCommission")}</th>
+                        <th>{t("colTips")}</th>
+                        <th>{t("avgTicket")}</th>
+                        <th>{t("clients")}</th>
+                        <th>{t("colTotalEarned")}</th>
                         <th></th>
                       </tr>
                     </thead>
@@ -860,7 +871,7 @@ export default function ReportsPage() {
                           <td className={styles.revMoney} style={{ fontWeight: 700, color: 'var(--color-primary)' }}>{fmt(s.commissionEarned + s.tips)}</td>
                           <td style={{ whiteSpace: 'nowrap' }}>
                             <button className={`btn btn-ghost btn-sm ${styles.revEmailBtn}`}
-                              title="Preview statement"
+                              title={t("previewStatement")}
                               onClick={async (e) => {
                                 e.stopPropagation();
                                 try {
@@ -871,13 +882,13 @@ export default function ReportsPage() {
                                   });
                                   const result = await res.json();
                                   if (result.data?.url) window.open(result.data.url, '_blank');
-                                } catch { toast.error('Failed to generate preview.'); }
+                                } catch { toast.error(t("failedPreview")); }
                               }}>
                               👁️
                             </button>
                             <button className={`btn btn-ghost btn-sm ${styles.revEmailBtn}`}
                               disabled={!s.email || sendingEmail === s.id}
-                              title={s.email ? `Send to ${s.email}` : 'No email on file'}
+                              title={s.email ? t("sendTo", { email: s.email }) : t("noEmailOnFile")}
                               onClick={async (e) => {
                                 e.stopPropagation();
                                 setSendingEmail(s.id);
@@ -888,8 +899,8 @@ export default function ReportsPage() {
                                     body: JSON.stringify({ period: revPeriodType, offset: revOffset, staffIds: [s.id] }),
                                   });
                                   const result = await res.json();
-                                  toast.success(`Report sent to ${s.name}!${result.data?.dry_run ? ' (Dry run)' : ''}`);
-                                } catch { toast.error('Failed to send.'); }
+                                  toast.success(`${t("reportSentTo", { name: s.name })}${result.data?.dry_run ? ' (Dry run)' : ''}`);
+                                } catch { toast.error(t("failedSend")); }
                                 setSendingEmail(null);
                               }}>
                               {sendingEmail === s.id ? '⏳' : '📧'}
@@ -900,7 +911,7 @@ export default function ReportsPage() {
                     </tbody>
                     <tfoot>
                       <tr className={styles.revTotalsRow}>
-                        <td><strong>TOTALS</strong></td>
+                        <td><strong>{t("totals")}</strong></td>
                         <td><strong>{staffRevData.totals.appointments}</strong></td>
                         <td className={styles.revMoney}><strong>{fmt(staffRevData.totals.revenue)}</strong></td>
                         <td></td>
@@ -916,8 +927,8 @@ export default function ReportsPage() {
                 </div>
               ) : staffRevData ? (
                 <div className="card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                  <h3 style={{ marginBottom: 'var(--space-2)' }}>No Revenue Data</h3>
-                  <p>No completed appointments found for this period.</p>
+                  <h3 style={{ marginBottom: 'var(--space-2)' }}>{t("noRevenueData")}</h3>
+                  <p>{t("noRevenueHint")}</p>
                 </div>
               ) : null}
             </>
