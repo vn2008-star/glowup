@@ -3077,8 +3077,8 @@ export async function POST(request: Request) {
           const handle = (pay.venmo_handle || '').trim().replace(/^@/, '')
           if (!handle) {
             return NextResponse.json(
-              { error: 'Add your Venmo username in Settings → Payment Methods first' },
-              { status: 400 }
+              { error: 'Add your Venmo username in Settings → Payment Type first' },
+  { status: 400 }
             )
           }
           // Venmo's web payment link — opens the app prefilled on a phone.
@@ -3093,8 +3093,8 @@ export async function POST(request: Request) {
           const recipient = (pay.zelle_recipient || '').trim()
           if (!recipient) {
             return NextResponse.json(
-              { error: 'Add your Zelle phone or email in Settings → Payment Methods first' },
-              { status: 400 }
+              { error: 'Add your Zelle phone or email in Settings → Payment Type first' },
+  { status: 400 }
             )
           }
           // Zelle has no payment link — the client sends from their bank app.

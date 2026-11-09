@@ -2306,7 +2306,7 @@ export default function CheckoutPage() {
               ) : (
                 <div className={styles.qrPlaceholder}>
                   <p>No QR code uploaded</p>
-                  <small>Go to Settings → Payment Methods to upload</small>
+                  <small>Go to Settings → Payment Type to upload</small>
                 </div>
               )}
               <button className={styles.qrDoneBtn} style={{ background: brandColor }} onClick={() => setShowQrModal(null)}>

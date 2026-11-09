@@ -82,7 +82,7 @@ const PAY_METHOD_META: Record<string, { label: string; icon: string; color: stri
 // something was actually paid that way in the period.
 const CORE_PAY_METHODS = ["cash", "card", "venmo", "zelle"];
 
-const TABS = ["Overview", "Staff Performance", "Staff Revenue", "Payment Methods", "Client Retention", "Revenue Forecast", "Peak Hours", "Cancellations"] as const;
+const TABS = ["Overview", "Staff Performance", "Staff Revenue", "Payment Type", "Client Retention", "Revenue Forecast", "Peak Hours", "Cancellations"] as const;
 
 type RetentionData = {
   summary: { total: number; active: number; atRisk: number; lost: number; new: number; retentionRate: number };
@@ -145,7 +145,7 @@ export default function ReportsPage() {
       case "Peak Hours": return { action: "reports.peak-hours" };
       case "Staff Revenue": return { action: "reports.staff-revenue", payload: { period: revPeriodType, offset: revOffset } };
       case "Cancellations": return { action: "reports.cancellations", payload: { days: cancelDays } };
-      case "Payment Methods": return { action: "reports.payment-methods", payload: { period: payPeriodType, offset: payOffset } };
+      case "Payment Type": return { action: "reports.payment-methods", payload: { period: payPeriodType, offset: payOffset } };
       default: return { action: "reports.overview" };
     }
   }, [activeTab, revPeriodType, revOffset, cancelDays, payPeriodType, payOffset]);
@@ -165,7 +165,7 @@ export default function ReportsPage() {
         case "Peak Hours": setPeakHours(data as PeakHoursData); break;
         case "Staff Revenue": setStaffRevData(data as StaffRevenueData); break;
         case "Cancellations": setCancels(data as CancellationData); break;
-        case "Payment Methods": setPayData(data as PaymentMethodsData); break;
+        case "Payment Type": setPayData(data as PaymentMethodsData); break;
         default: setOverview(data as OverviewData); break;
       }
     } finally { setLoading(false); }
@@ -616,7 +616,7 @@ export default function ReportsPage() {
           )}
 
           {/* ═══ PAYMENT METHODS TAB ═══ */}
-          {activeTab === "Payment Methods" && (() => {
+          {activeTab === "Payment Type" && (() => {
             const money = (n: number) => `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
             const meta = (m: string) => PAY_METHOD_META[m] || PAY_METHOD_META.other;
             const rows = (payData?.methods || []).filter(m => CORE_PAY_METHODS.includes(m.method) || m.count > 0);
@@ -661,14 +661,14 @@ export default function ReportsPage() {
                     </div>
 
                     <div className={`card ${styles.revTableCard}`}>
-                      <h2>Income by payment method</h2>
+                      <h2>Income by payment type</h2>
                       {payData.totals.count === 0 ? (
                         <p className={styles.emptyNote}>No checked-out appointments in this period.</p>
                       ) : (
                         <div style={{ overflowX: "auto" }}>
                           <table className={styles.revTable}>
                             <thead>
-                              <tr><th>Method</th><th>Payments</th><th>Services</th><th>Tips</th><th>Total</th><th>Share</th></tr>
+                              <tr><th>Type</th><th>Payments</th><th>Services</th><th>Tips</th><th>Total</th><th>Share</th></tr>
                             </thead>
                             <tbody>
                               {rows.map(m => (
@@ -720,7 +720,7 @@ export default function ReportsPage() {
                         <div style={{ overflowX: "auto" }}>
                           <table className={styles.revTable}>
                             <thead>
-                              <tr><th>Date</th><th>Client</th><th>Service</th><th>Staff</th><th>Method</th><th>Total</th></tr>
+                              <tr><th>Date</th><th>Client</th><th>Service</th><th>Staff</th><th>Type</th><th>Total</th></tr>
                             </thead>
                             <tbody>
                               {txns.map(t => (
