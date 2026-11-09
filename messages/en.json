@@ -422,10 +422,14 @@
     "newClients": "New Clients",
     "avgTicket": "Avg. Ticket",
     "noData": "No data for selected period",
-    "export": "Export"
+    "export": "Export",
+    "paymentType": "Payment Type",
+    "incomeByPaymentType": "Income by payment type",
+    "type": "Type"
   },
   "settingsPage": {
     "title": "Settings",
+    "paymentType": "Payment Type",
     "business": "Business",
     "notifications": "Notifications",
     "billing": "Billing",

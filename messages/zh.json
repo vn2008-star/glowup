@@ -422,10 +422,14 @@
     "newClients": "新客户",
     "avgTicket": "均价",
     "noData": "所选时段无数据",
-    "export": "导出"
+    "export": "导出",
+    "paymentType": "付款类型",
+    "incomeByPaymentType": "按付款类型统计收入",
+    "type": "类型"
   },
   "settingsPage": {
     "title": "设置",
+    "paymentType": "付款类型",
     "business": "商家",
     "notifications": "通知",
     "billing": "账单",

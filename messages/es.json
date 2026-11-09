@@ -422,10 +422,14 @@
     "newClients": "Nuevos clientes",
     "avgTicket": "Ticket medio",
     "noData": "Sin datos para el periodo seleccionado",
-    "export": "Exportar"
+    "export": "Exportar",
+    "paymentType": "Tipo de pago",
+    "incomeByPaymentType": "Ingresos por tipo de pago",
+    "type": "Tipo"
   },
   "settingsPage": {
     "title": "Configuración",
+    "paymentType": "Tipo de pago",
     "business": "Negocio",
     "notifications": "Notificaciones",
     "billing": "Facturación",

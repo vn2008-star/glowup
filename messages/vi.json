@@ -422,10 +422,14 @@
     "newClients": "Khách mới",
     "avgTicket": "Giá TB",
     "noData": "Không có dữ liệu cho khoảng thời gian đã chọn",
-    "export": "Xuất"
+    "export": "Xuất",
+    "paymentType": "Hình thức thanh toán",
+    "incomeByPaymentType": "Thu nhập theo hình thức thanh toán",
+    "type": "Hình thức"
   },
   "settingsPage": {
     "title": "Cài đặt",
+    "paymentType": "Hình thức thanh toán",
     "business": "Doanh nghiệp",
     "notifications": "Thông báo",
     "billing": "Thanh toán",

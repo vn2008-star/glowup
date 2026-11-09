@@ -212,7 +212,7 @@ export default function ReportsPage() {
       <div className={styles.tabs}>
         {TABS.map(tab => (
           <button key={tab} className={`${styles.tab} ${activeTab === tab ? styles.tabActive : ''}`} onClick={() => setActiveTab(tab)}>
-            {tab}
+            {tab === "Payment Type" ? t("paymentType") : tab}
           </button>
         ))}
       </div>
@@ -661,14 +661,14 @@ export default function ReportsPage() {
                     </div>
 
                     <div className={`card ${styles.revTableCard}`}>
-                      <h2>Income by payment type</h2>
+                      <h2>{t("incomeByPaymentType")}</h2>
                       {payData.totals.count === 0 ? (
                         <p className={styles.emptyNote}>No checked-out appointments in this period.</p>
                       ) : (
                         <div style={{ overflowX: "auto" }}>
                           <table className={styles.revTable}>
                             <thead>
-                              <tr><th>Type</th><th>Payments</th><th>Services</th><th>Tips</th><th>Total</th><th>Share</th></tr>
+                              <tr><th>{t("type")}</th><th>Payments</th><th>Services</th><th>Tips</th><th>Total</th><th>Share</th></tr>
                             </thead>
                             <tbody>
                               {rows.map(m => (
@@ -720,7 +720,7 @@ export default function ReportsPage() {
                         <div style={{ overflowX: "auto" }}>
                           <table className={styles.revTable}>
                             <thead>
-                              <tr><th>Date</th><th>Client</th><th>Service</th><th>Staff</th><th>Type</th><th>Total</th></tr>
+                              <tr><th>Date</th><th>Client</th><th>Service</th><th>Staff</th><th>{t("type")}</th><th>Total</th></tr>
                             </thead>
                             <tbody>
                               {txns.map(t => (

@@ -1043,7 +1043,7 @@ export default function SettingsPage() {
 
       {/* Payment Methods */}
       <div className={`card ${styles.section}`}>
-        <h2><Icon name="dollar" /> Payment Type</h2>
+        <h2><Icon name="dollar" /> {t("paymentType")}</h2>
         <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginBottom: "var(--space-4)" }}>
           Upload your Venmo and Zelle QR codes. Staff can show these to clients during checkout.
           Add your username and Zelle contact below to also text or email clients a payment request from the checkout screen.
